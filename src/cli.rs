@@ -22,6 +22,7 @@ pub enum Commands {
         pretty_print: bool,
         object_hash: String,
     },
+    WriteTree,
 
 }
 
@@ -37,6 +38,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::CatFile { pretty_print, object_hash } => {
             crate::commands::cat_file(pretty_print, object_hash)?;
+        }
+        Commands::WriteTree => {
+            crate::commands::write_tree()?;
         }
     }
 

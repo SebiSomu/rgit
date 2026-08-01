@@ -23,10 +23,6 @@ pub enum Commands {
         object_hash: String,
     },
 
-    Commit {
-        #[arg(short = 'm')]
-        message: String,
-    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -41,9 +37,6 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::CatFile { pretty_print, object_hash } => {
             crate::commands::cat_file(pretty_print, object_hash)?;
-        }
-        Commands::Commit { message: _message } => {
-            println!("TODO: Implement 'rgit commit'");
         }
     }
 

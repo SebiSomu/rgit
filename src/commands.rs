@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
+use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
 use std::fs;
-use std::io::{Write};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 pub fn init() -> Result<()> {
@@ -39,5 +40,26 @@ pub fn hash_object(write: bool, file: PathBuf) -> Result<()> {
     }
 
     println!("{}", hash_hex);
+    Ok(())
+}
+
+pub fn cat_file(pretty_print: bool, object_hash: String) -> Result<()> {
+    let dir = &object_hash[0..2];
+    let file_name = &object_hash[2..];
+    let path = format!(".git/objects/{}/{}", dir, file_name);
+
+    let compressed_data = fs::read(&path).context("Failed to read object file (does this hash exist?)")?;
+    let mut decoder = ZlibDecoder::new(&compressed_data[..]);
+    let mut decompressed_data = Vec::new();
+    decoder.read_to_end(&mut decompressed_data)?;
+
+    let null_pos = decompressed_data.iter().position(|&b| b == 0).context("Invalid Git object format")?;
+
+    if pretty_print {
+        let content = &decompressed_data[null_pos + 1..];
+        let text = String::from_utf8_lossy(content);
+        println!("{}", text);
+    }
+
     Ok(())
 }

@@ -39,8 +39,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::HashObject { write, file} => {
             crate::commands::hash_object(write, file)?;
         }
-        Commands::CatFile { pretty_print: _pretty_print, object_hash: _object_hash } => {
-            println!("TODO: Implement 'rgit cat-file'");
+        Commands::CatFile { pretty_print, object_hash } => {
+            crate::commands::cat_file(pretty_print, object_hash)?;
         }
         Commands::Commit { message: _message } => {
             println!("TODO: Implement 'rgit commit'");

@@ -1,5 +1,7 @@
-mod objects;
+pub mod objects;
+
+use objects::{CommitData, GitObject, TreeEntry};
 
 fn main() {
-    println!("Hello, world!");
+    println!("RGit object models loaded successfully!");
 }

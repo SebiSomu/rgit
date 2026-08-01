@@ -34,10 +34,10 @@ pub fn handle_commands() -> Result<()> {
 
     match cli.command {
         Commands::Init => {
-            println!("TODO: Implement 'rgit init'");
+            crate::commands::init()?;
         }
-        Commands::HashObject { write: _write, file: _file } => {
-            println!("TODO: Implement 'rgit hash-object'");
+        Commands::HashObject { write, file} => {
+            crate::commands::hash_object(write, file)?;
         }
         Commands::CatFile { pretty_print: _pretty_print, object_hash: _object_hash } => {
             println!("TODO: Implement 'rgit cat-file'");

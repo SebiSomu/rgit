@@ -1,7 +1,8 @@
+pub mod cli;
 pub mod objects;
 
-use objects::{CommitData, GitObject, TreeEntry};
+use anyhow::Result;
 
-fn main() {
-    println!("RGit object models loaded successfully!");
+fn main() -> Result<()> {
+    cli::handle_commands()
 }

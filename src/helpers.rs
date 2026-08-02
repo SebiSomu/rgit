@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use anyhow::{Context, Result};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -129,4 +130,47 @@ pub fn normalize_path(path: &Path) -> String {
         })
         .collect::<Vec<_>>()
         .join("/")
+}
+
+pub fn hash_content(obj_type: &str, content: &[u8]) -> [u8; 20] {
+    let header = format!("{} {}\0", obj_type, content.len());
+    let mut store = header.into_bytes();
+    store.extend_from_slice(content);
+    let mut hasher = Sha1::new();
+    hasher.update(&store);
+    hasher.finalize().into()
+}
+
+pub fn flatten_tree(tree_hash: &str, prefix: &str, out: &mut BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
+    let (object_type, content) = read_object(tree_hash)?;
+    if object_type != "tree" {
+        anyhow::bail!("{} is not a tree object", tree_hash);
+    }
+
+    let mut pos = 0;
+    while pos < content.len() {
+        let space_pos = content[pos..].iter().position(|&b| b == b' ').context("Missing mode separator")? + pos;
+        let mode_str = String::from_utf8_lossy(&content[pos..space_pos]).to_string();
+
+        let null_pos = content[space_pos..].iter().position(|&b| b == 0).context("Missing name terminator")? + space_pos;
+        let name = String::from_utf8_lossy(&content[space_pos + 1..null_pos]).to_string();
+
+        let hash_start = null_pos + 1;
+        let hash_end = hash_start + 20;
+        let mut hash = [0u8; 20];
+        hash.copy_from_slice(&content[hash_start..hash_end]);
+
+        let full_path = if prefix.is_empty() { name } else { format!("{}/{}", prefix, name) };
+
+        if mode_str == "40000" {
+            flatten_tree(&hex::encode(hash), &full_path, out)?;
+        } else {
+            let mode = u32::from_str_radix(&mode_str, 8).unwrap_or(0o100644);
+            out.insert(full_path, (hash, mode));
+        }
+
+        pos = hash_end;
+    }
+
+    Ok(())
 }

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::*;
 use crate::index::*;
+use std::collections::BTreeMap;
 
 pub fn init() -> Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -259,21 +260,136 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
     for file_path in files_to_add {
         let content = fs::read(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
-        
+
         let hash_hex = write_object("blob", &content)?;
         let mut hash = [0u8; 20];
         hash.copy_from_slice(&hex::decode(&hash_hex)?);
-        
+
         let metadata = fs::metadata(&file_path)?;
         let rel_path = normalize_path(&file_path);
         let new_entry = build_entry(&rel_path, hash, &metadata);
-        
+
         entries.retain(|e| e.path != rel_path);
         entries.push(new_entry);
     }
 
     write_index(&mut entries)?;
     println!("Staged files to index.");
+
+    Ok(())
+}
+
+pub fn status() -> Result<()> {
+    let ref_path = current_branch_ref()?;
+    let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path).to_string();
+    let ref_file = format!(".git/{}", ref_path);
+
+    println!("On branch {}", branch_name);
+
+    let mut no_commits_yet = false;
+    let mut head_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+
+    if Path::new(&ref_file).exists() {
+        let commit_hash = fs::read_to_string(&ref_file)?.trim().to_string();
+        let tree_hash = tree_hash_of_commit(&commit_hash)?;
+        flatten_tree(&tree_hash, "", &mut head_tree)?;
+    } else {
+        no_commits_yet = true;
+        println!("\nNo commits yet");
+    }
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, ([u8; 20], u32)> = index_entries
+        .iter()
+        .map(|e| (e.path.clone(), (e.hash, e.mode)))
+        .collect();
+
+    let mut staged_new = Vec::new();
+    let mut staged_modified = Vec::new();
+    let mut staged_deleted = Vec::new();
+
+    for (path, (hash, _mode)) in &index_map {
+        match head_tree.get(path) {
+            None => staged_new.push(path.clone()),
+            Some((head_hash, _)) if head_hash != hash => staged_modified.push(path.clone()),
+            _ => {}
+        }
+    }
+    for path in head_tree.keys() {
+        if !index_map.contains_key(path) {
+            staged_deleted.push(path.clone());
+        }
+    }
+
+    let mut working_files = Vec::new();
+    collect_files(Path::new("."), &mut working_files)?;
+
+    let mut working_map: BTreeMap<String, [u8; 20]> = BTreeMap::new();
+    for file_path in &working_files {
+        let rel_path = normalize_path(file_path);
+        let content = fs::read(file_path).with_context(|| format!("Failed to read {}", file_path.display()))?;
+        working_map.insert(rel_path, hash_content("blob", &content));
+    }
+
+    let mut unstaged_modified = Vec::new();
+    let mut unstaged_deleted = Vec::new();
+    let mut untracked = Vec::new();
+
+    for (path, hash) in &working_map {
+        match index_map.get(path) {
+            None => untracked.push(path.clone()),
+            Some((idx_hash, _)) if idx_hash != hash => unstaged_modified.push(path.clone()),
+            _ => {}
+        }
+    }
+    for path in index_map.keys() {
+        if !working_map.contains_key(path) {
+            unstaged_deleted.push(path.clone());
+        }
+    }
+
+    let has_staged = !staged_new.is_empty() || !staged_modified.is_empty() || !staged_deleted.is_empty();
+    let has_unstaged = !unstaged_modified.is_empty() || !unstaged_deleted.is_empty();
+    let has_untracked = !untracked.is_empty();
+    let mut need_leading_blank = no_commits_yet;
+
+    if has_staged {
+        if need_leading_blank { println!(); }
+        println!("Changes to be committed:");
+        for p in &staged_new { println!("\tnew file:   {}", p); }
+        for p in &staged_modified { println!("\tmodified:   {}", p); }
+        for p in &staged_deleted { println!("\tdeleted:    {}", p); }
+        println!();
+        need_leading_blank = false;
+    }
+
+    if has_unstaged {
+        if need_leading_blank { println!(); }
+        println!("Changes not staged for commit:");
+        for p in &unstaged_modified { println!("\tmodified:   {}", p); }
+        for p in &unstaged_deleted { println!("\tdeleted:    {}", p); }
+        println!();
+        need_leading_blank = false;
+    }
+
+    if has_untracked {
+        if need_leading_blank { println!(); }
+        println!("Untracked files:");
+        for p in &untracked { println!("\t{}", p); }
+        println!();
+        need_leading_blank = false;
+    }
+
+    if !has_staged {
+        if need_leading_blank { println!(); }
+        if no_commits_yet && !has_unstaged && !has_untracked {
+            println!("nothing to commit (create/copy files and use 'add' to track)");
+        } else if has_unstaged || has_untracked {
+            println!("no changes added to commit (use 'add' to track or stage changes)");
+        } else {
+            println!("nothing to commit, working tree clean");
+        }
+    }
 
     Ok(())
 }

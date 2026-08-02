@@ -46,6 +46,7 @@ pub enum Commands {
         #[arg(short = 'o', long = "oneline")]
         oneline: bool,
     },
+    Status
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -78,6 +79,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Log { oneline } => {
             crate::commands::log(oneline)?;
+        }
+        Commands::Status => {
+            crate::commands::status()?;
         }
     }
 

@@ -23,6 +23,9 @@ pub enum Commands {
         object_hash: String,
     },
     WriteTree,
+    Add {
+        paths: Vec<PathBuf>,
+    },
     LsTree {
         #[arg(long)]
         name_only: bool,
@@ -60,6 +63,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::WriteTree => {
             crate::commands::write_tree()?;
+        }
+        Commands::Add { paths } => {
+            crate::commands::add(paths)?;
         }
         Commands::LsTree { name_only, tree_hash } => {
             crate::commands::ls_tree(name_only, tree_hash)?;

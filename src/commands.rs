@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::*;
+use crate::index::*;
 
 pub fn init() -> Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -244,6 +245,35 @@ pub fn log(oneline: bool) -> Result<()> {
         first = false;
         current_hash = parent;
     }
+
+    Ok(())
+}
+
+pub fn add(paths: Vec<PathBuf>) -> Result<()> {
+    let mut entries = read_index().unwrap_or_default();
+    let mut files_to_add: Vec<PathBuf> = Vec::new();
+    for path in paths {
+        collect_files(&path, &mut files_to_add)?;
+    }
+
+    for file_path in files_to_add {
+        let content = fs::read(&file_path)
+            .with_context(|| format!("Failed to read {}", file_path.display()))?;
+        
+        let hash_hex = write_object("blob", &content)?;
+        let mut hash = [0u8; 20];
+        hash.copy_from_slice(&hex::decode(&hash_hex)?);
+        
+        let metadata = fs::metadata(&file_path)?;
+        let rel_path = normalize_path(&file_path);
+        let new_entry = build_entry(&rel_path, hash, &metadata);
+        
+        entries.retain(|e| e.path != rel_path);
+        entries.push(new_entry);
+    }
+
+    write_index(&mut entries)?;
+    println!("Staged files to index.");
 
     Ok(())
 }

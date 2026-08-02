@@ -5,7 +5,7 @@ use flate2::Compression;
 use sha1::{Digest, Sha1};
 use std::fs;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn write_object(object_type: &str, content: &[u8]) -> Result<String> {
     let header = format!("{} {}\0", object_type, content.len());
@@ -92,4 +92,41 @@ pub fn tree_hash_of_commit(commit_hash: &str) -> Result<String> {
         .strip_prefix("tree ")
         .map(|s| s.to_string())
         .context("Malformed commit: first line isn't a tree line")
+}
+
+pub fn collect_files(path: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("path '{}' did not match any files", path.display()))?;
+
+    if metadata.is_file() {
+        out.push(path.to_path_buf());
+        return Ok(());
+    }
+
+    if metadata.is_dir() {
+        let mut dir_entries: Vec<_> = fs::read_dir(path)?.filter_map(Result::ok).collect();
+        dir_entries.sort_by_key(|e| e.file_name());
+
+        for entry in dir_entries {
+            let name_str = entry.file_name().to_string_lossy().to_string();
+
+            if name_str == ".git" || name_str == "target" || name_str == ".idea" || name_str.starts_with('.') {
+                continue;
+            }
+
+            collect_files(&entry.path(), out)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn normalize_path(path: &Path) -> String {
+    path.components()
+        .filter_map(|c| match c {
+            std::path::Component::Normal(s) => Some(s.to_string_lossy().to_string()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("/")
 }

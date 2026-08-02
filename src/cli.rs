@@ -39,7 +39,6 @@ pub enum Commands {
         #[arg(short = 'm', long = "message")]
         message: String,
     },
-
 }
 
 pub fn handle_commands() -> Result<()> {

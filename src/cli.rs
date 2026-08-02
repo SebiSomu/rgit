@@ -39,6 +39,10 @@ pub enum Commands {
         #[arg(short = 'm', long = "message")]
         message: String,
     },
+    Log {
+        #[arg(short = 'o', long = "oneline")]
+        oneline: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -65,6 +69,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Commit { message } => {
             crate::commands::commit(message)?;
+        }
+        Commands::Log { oneline } => {
+            crate::commands::log(oneline)?;
         }
     }
 

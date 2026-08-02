@@ -181,3 +181,69 @@ pub fn commit(message: String) -> Result<()> {
 
     Ok(())
 }
+
+pub fn log(oneline: bool) -> Result<()> {
+    let ref_path = current_branch_ref()?;
+    let ref_file = format!(".git/{}", ref_path);
+    let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path);
+
+    if !Path::new(&ref_file).exists() {
+        anyhow::bail!(
+            "fatal: your current branch '{}' does not have any commits yet",
+            branch_name
+        );
+    }
+
+    let mut current_hash = Some(fs::read_to_string(&ref_file)?.trim().to_string());
+    let mut first = true;
+
+    while let Some(hash) = current_hash {
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            anyhow::bail!("{} is not a commit object", hash);
+        }
+
+        let text = String::from_utf8_lossy(&content);
+        let mut parent: Option<String> = None;
+        let mut author_line: Option<String> = None;
+        let mut message_lines: Vec<String> = Vec::new();
+        let mut in_message = false;
+
+        for line in text.lines() {
+            if in_message {
+                message_lines.push(line.to_string());
+            } else if line.is_empty() {
+                in_message = true;
+            } else if let Some(p) = line.strip_prefix("parent ") {
+                parent = Some(p.to_string());
+            } else if let Some(a) = line.strip_prefix("author ") {
+                author_line = Some(a.to_string());
+            }
+        }
+
+        if oneline {
+            let first_line = message_lines.first().map(|s| s.as_str()).unwrap_or("");
+            println!("{} {}", &hash[..7], first_line);
+        } else {
+            if !first {
+                println!();
+            }
+
+            println!("commit {}", hash);
+
+            if let Some(author) = &author_line {
+                println!("Author: {}", author);
+            }
+
+            println!();
+            for line in &message_lines {
+                println!("    {}", line);
+            }
+        }
+
+        first = false;
+        current_hash = parent;
+    }
+
+    Ok(())
+}

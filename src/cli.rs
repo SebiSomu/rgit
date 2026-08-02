@@ -23,6 +23,22 @@ pub enum Commands {
         object_hash: String,
     },
     WriteTree,
+    LsTree {
+        #[arg(long)]
+        name_only: bool,
+        tree_hash: String,
+    },
+    CommitTree {
+        tree_hash: String,
+        #[arg(short = 'p')]
+        parent_hash: Option<String>,
+        #[arg(short = 'm')]
+        message: String,
+    },
+    Commit {
+        #[arg(short = 'm', long = "message")]
+        message: String,
+    },
 
 }
 
@@ -41,6 +57,15 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::WriteTree => {
             crate::commands::write_tree()?;
+        }
+        Commands::LsTree { name_only, tree_hash } => {
+            crate::commands::ls_tree(name_only, tree_hash)?;
+        }
+        Commands::CommitTree { tree_hash, parent_hash, message } => {
+            crate::commands::commit_tree(tree_hash, parent_hash, message)?;
+        }
+        Commands::Commit { message } => {
+            crate::commands::commit(message)?;
         }
     }
 

@@ -423,3 +423,52 @@ pub fn branch(name: Option<String>) -> Result<()> {
 
     Ok(())
 }
+
+pub fn switch(branch: String, force: bool) -> Result<()> {
+    let target_ref = format!("refs/heads/{}", branch);
+    let target_commit = match refs::read_ref(&target_ref)? {
+        Some(hash) => hash,
+        None => {
+            anyhow::bail!("fatal: invalid reference: {}", branch);
+        }
+    };
+
+    let current_head = refs::resolve_head()?;
+    if let refs::HeadState::Branch(current_branch) = &current_head {
+        if current_branch == &branch {
+            println!("Already on '{}'", branch);
+            return Ok(());
+        }
+    }
+
+    let target_tree_hash = tree_hash_of_commit(&target_commit)?;
+    let mut target_tree = BTreeMap::new();
+    flatten_tree(&target_tree_hash, "", &mut target_tree)?;
+
+    let mut head_tree = BTreeMap::new();
+    if let refs::HeadState::Branch(current_branch) = &current_head {
+        let current_ref = format!("refs/heads/{}", current_branch);
+        if let Some(current_commit) = refs::read_ref(&current_ref)? {
+            let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+            flatten_tree(&current_tree_hash, "", &mut head_tree)?;
+        }
+    }
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, [u8; 20]> = index_entries
+        .iter()
+        .map(|e| (e.path.clone(), e.hash))
+        .collect();
+
+    if !force {
+        check_switch_safety(&target_tree, &head_tree, &index_map)?;
+    }
+
+    sync_working_tree(&target_tree, &head_tree, &index_map)?;
+    update_index_from_tree(&target_tree)?;
+
+    refs::set_head(&branch)?;
+    println!("Switched to branch '{}'", branch);
+
+    Ok(())
+}

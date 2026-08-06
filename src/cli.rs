@@ -49,6 +49,11 @@ pub enum Commands {
     Status,
     Branch {
         name: Option<String>,
+    },
+    Switch {
+        branch: String,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
     }
 }
 
@@ -88,6 +93,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Branch { name } => {
             crate::commands::branch(name)?;
+        }
+        Commands::Switch { branch, force } => {
+            crate::commands::switch(branch, force)?;
         }
     }
 

@@ -7,6 +7,7 @@ use sha1::{Digest, Sha1};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use crate::index::{write_index, build_entry};
 
 pub fn write_object(object_type: &str, content: &[u8]) -> Result<String> {
     let header = format!("{} {}\0", object_type, content.len());
@@ -164,5 +165,154 @@ pub fn flatten_tree(tree_hash: &str, prefix: &str, out: &mut BTreeMap<String, ([
         pos = hash_end;
     }
 
+    Ok(())
+}
+
+pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>, index_map: &BTreeMap<String, [u8; 20]>) -> Result<()> {
+    let mut working_files = Vec::new();
+    collect_files(Path::new("."), &mut working_files)?;
+    let mut working_map = BTreeMap::new();
+    for file_path in &working_files {
+        let rel_path = normalize_path(file_path);
+        let content = fs::read(file_path)?;
+        working_map.insert(rel_path, hash_content("blob", &content));
+    }
+
+    let mut local_changes = std::collections::BTreeSet::new();
+
+    for (path, work_hash) in &working_map {
+        match index_map.get(path) {
+            None => {
+                if let Some((target_hash, _)) = target_tree.get(path) {
+                    if target_hash != work_hash {
+                        anyhow::bail!("error: The following untracked working tree files would be overwritten by switch:\n\t{}\nPlease move or remove them before you switch branches.", path);
+                    }
+                }
+            }
+            Some(idx_hash) => {
+                if idx_hash != work_hash {
+                    local_changes.insert(path.clone());
+                }
+            }
+        }
+    }
+    for path in index_map.keys() {
+        if !working_map.contains_key(path) {
+            local_changes.insert(path.clone());
+        }
+    }
+
+    for (path, idx_hash) in index_map {
+        match head_tree.get(path) {
+            None => {
+                local_changes.insert(path.clone());
+            }
+            Some((head_hash, _)) => {
+                if head_hash != idx_hash {
+                    local_changes.insert(path.clone());
+                }
+            }
+        }
+    }
+    for path in head_tree.keys() {
+        if !index_map.contains_key(path) {
+            local_changes.insert(path.clone());
+        }
+    }
+
+    let mut overwritten_files = Vec::new();
+    for path in &local_changes {
+        let current_hash_in_work_or_index = working_map.get(path)
+            .or_else(|| index_map.get(path));
+
+        let target_hash = target_tree.get(path).map(|(h, _)| h);
+
+        if let Some(curr_hash) = current_hash_in_work_or_index {
+            if let Some(t_hash) = target_hash {
+                if curr_hash != t_hash {
+                    overwritten_files.push(path.clone());
+                }
+            } else {
+                overwritten_files.push(path.clone());
+            }
+        } else {
+            if target_hash.is_some() {
+                overwritten_files.push(path.clone());
+            }
+        }
+    }
+
+    if !overwritten_files.is_empty() {
+        let mut msg = String::from("error: Your local changes to the following files would be overwritten by switch:\n");
+        for file in overwritten_files {
+            msg.push_str(&format!("\t{}\n", file));
+        }
+        msg.push_str("Please commit your changes or stash them before you switch branches.\nAborting");
+        anyhow::bail!(msg);
+    }
+
+    Ok(())
+}
+
+pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>, index_map: &BTreeMap<String, [u8; 20]>) -> Result<()> {
+    let mut files_to_delete = std::collections::BTreeSet::new();
+    for path in index_map.keys() {
+        if !target_tree.contains_key(path) {
+            files_to_delete.insert(path.clone());
+        }
+    }
+    for path in head_tree.keys() {
+        if !target_tree.contains_key(path) {
+            files_to_delete.insert(path.clone());
+        }
+    }
+
+    for path in files_to_delete {
+        let path_obj = Path::new(&path);
+        if path_obj.exists() {
+            fs::remove_file(path_obj)?;
+            let mut parent = path_obj.parent();
+            while let Some(p) = parent {
+                if p == Path::new("") || p == Path::new(".") {
+                    break;
+                }
+                if p.exists() {
+                    if fs::read_dir(p)?.next().is_none() {
+                        fs::remove_dir(p)?;
+                    } else {
+                        break;
+                    }
+                }
+                parent = p.parent();
+            }
+        }
+    }
+
+    for (path, (hash, _mode)) in target_tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(&path).parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, &content)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let file_mode = if (_mode & 0o111) != 0 { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
+    let mut new_entries = Vec::new();
+    for (path, (hash, _)) in target_tree {
+        let metadata = fs::metadata(path)?;
+        let entry = build_entry(path, *hash, &metadata);
+        new_entries.push(entry);
+    }
+    write_index(&mut new_entries)?;
     Ok(())
 }

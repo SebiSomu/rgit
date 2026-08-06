@@ -46,7 +46,10 @@ pub enum Commands {
         #[arg(short = 'o', long = "oneline")]
         oneline: bool,
     },
-    Status
+    Status,
+    Branch {
+        name: Option<String>,
+    }
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -82,6 +85,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Status => {
             crate::commands::status()?;
+        }
+        Commands::Branch { name } => {
+            crate::commands::branch(name)?;
         }
     }
 

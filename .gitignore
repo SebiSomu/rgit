@@ -1,4 +1,5 @@
 /target/
+/test-sandbox/
 /*.rs.bk
 *.rs.bk
 .idea/

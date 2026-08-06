@@ -66,15 +66,7 @@ pub fn read_object(hash: &str) -> Result<(String, Vec<u8>)> {
     Ok((object_type, content))
 }
 
-pub fn current_branch_ref() -> Result<String> {
-    let head_content = fs::read_to_string(".git/HEAD").context("Failed to read .git/HEAD")?;
 
-    head_content
-        .trim()
-        .strip_prefix("ref: ")
-        .map(|s| s.to_string())
-        .context("HEAD is not a branch ref (detached HEAD isn't supported yet)")
-}
 
 pub fn tree_hash_of_commit(commit_hash: &str) -> Result<String> {
     let (object_type, content) = read_object(commit_hash)?;

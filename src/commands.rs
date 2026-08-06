@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::*;
+use crate::refs;
 use crate::index::*;
 use std::collections::BTreeMap;
 
@@ -150,14 +151,8 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 
 pub fn commit(message: String) -> Result<()> {
     let tree_hash = write_tree_recursive(Path::new("."))?;
-    let ref_path = current_branch_ref()?;
-    let ref_file = format!(".git/{}", ref_path);
-
-    let parent_hash = if Path::new(&ref_file).exists() {
-        Some(fs::read_to_string(&ref_file)?.trim().to_string())
-    } else {
-        None
-    };
+    let ref_path = refs::current_branch_ref()?;
+    let parent_hash = refs::read_ref(&ref_path)?;
 
     if let Some(parent) = &parent_hash {
         if tree_hash_of_commit(parent)? == tree_hash {
@@ -166,11 +161,7 @@ pub fn commit(message: String) -> Result<()> {
     }
 
     let commit_hash = build_commit(tree_hash, parent_hash.clone(), &message)?;
-
-    if let Some(parent_dir) = Path::new(&ref_file).parent() {
-        fs::create_dir_all(parent_dir)?;
-    }
-    fs::write(&ref_file, format!("{}\n", commit_hash))?;
+    refs::write_ref(&ref_path, &commit_hash)?;
 
     let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path);
     let short_hash = &commit_hash[..7];
@@ -185,18 +176,18 @@ pub fn commit(message: String) -> Result<()> {
 }
 
 pub fn log(oneline: bool) -> Result<()> {
-    let ref_path = current_branch_ref()?;
-    let ref_file = format!(".git/{}", ref_path);
+    let ref_path = refs::current_branch_ref()?;
     let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path);
 
-    if !Path::new(&ref_file).exists() {
+    let mut current_hash = refs::read_ref(&ref_path)?;
+
+    if current_hash.is_none() {
         anyhow::bail!(
             "fatal: your current branch '{}' does not have any commits yet",
             branch_name
         );
     }
 
-    let mut current_hash = Some(fs::read_to_string(&ref_file)?.trim().to_string());
     let mut first = true;
 
     while let Some(hash) = current_hash {
@@ -280,17 +271,15 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
 }
 
 pub fn status() -> Result<()> {
-    let ref_path = current_branch_ref()?;
+    let ref_path = refs::current_branch_ref()?;
     let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path).to_string();
-    let ref_file = format!(".git/{}", ref_path);
 
     println!("On branch {}", branch_name);
 
     let mut no_commits_yet = false;
     let mut head_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
 
-    if Path::new(&ref_file).exists() {
-        let commit_hash = fs::read_to_string(&ref_file)?.trim().to_string();
+    if let Some(commit_hash) = refs::read_ref(&ref_path)? {
         let tree_hash = tree_hash_of_commit(&commit_hash)?;
         flatten_tree(&tree_hash, "", &mut head_tree)?;
     } else {
@@ -388,6 +377,47 @@ pub fn status() -> Result<()> {
             println!("no changes added to commit (use 'add' to track or stage changes)");
         } else {
             println!("nothing to commit, working tree clean");
+        }
+    }
+
+    Ok(())
+}
+
+pub fn branch(name: Option<String>) -> Result<()> {
+    match name {
+        None => {
+            let head_state = refs::resolve_head()?;
+            let current_branch = match &head_state {
+                refs::HeadState::Branch(b) => Some(b.as_str()),
+                refs::HeadState::Detached(_) => None,
+            };
+
+            let branches = refs::list_branches()?;
+
+            if branches.is_empty() {
+                if let Some(name) = current_branch {
+                    println!("* {}", name);
+                }
+            } else {
+                for branch in &branches {
+                    if Some(branch.as_str()) == current_branch {
+                        println!("* {}", branch);
+                    } else {
+                        println!("  {}", branch);
+                    }
+                }
+            }
+        }
+        Some(branch_name) => {
+            let ref_path = refs::current_branch_ref()?;
+            let commit_hash = refs::read_ref(&ref_path)?.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "fatal: not a valid object name: '{}' has no commits yet",
+                    ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path)
+                )
+            })?;
+            refs::create_branch(&branch_name, &commit_hash)?;
+            println!("Created branch '{}' at {}", branch_name, &commit_hash[..7]);
         }
     }
 

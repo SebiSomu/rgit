@@ -7,7 +7,7 @@ use sha1::{Digest, Sha1};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use crate::index::{write_index, build_entry};
+use crate::index::{read_index, write_index, build_entry};
 
 pub fn write_object(object_type: &str, content: &[u8]) -> Result<String> {
     let header = format!("{} {}\0", object_type, content.len());
@@ -222,6 +222,20 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
 
     let mut overwritten_files = Vec::new();
     for path in &local_changes {
+        // A local change only conflicts if the switch would actually touch this file.
+        // If HEAD and target have the same blob, sync_working_tree will skip it,
+        // so the local edit carries over safely — no conflict.
+        let file_changes_in_switch = match (head_tree.get(path), target_tree.get(path)) {
+            (Some((h, _)), Some((t, _))) => h != t, // file exists in both but differs
+            (None, Some(_)) => true,                 // new file introduced by target
+            (Some(_), None) => true,                 // file deleted by target
+            (None, None) => false,                   // file doesn't exist in either
+        };
+
+        if !file_changes_in_switch {
+            continue; // switch won't touch this file — local edit is safe to carry
+        }
+
         let current_hash_in_work_or_index = working_map.get(path)
             .or_else(|| index_map.get(path));
 
@@ -289,30 +303,48 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
     }
 
     for (path, (hash, _mode)) in target_tree {
-        let (_, content) = read_object(&hex::encode(hash))?;
-        if let Some(parent) = Path::new(&path).parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, &content)?;
+        let should_write = match head_tree.get(path) {
+            None => true,                          
+            Some((head_hash, _)) => head_hash != hash, 
+        };
 
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let file_mode = if (_mode & 0o111) != 0 { 0o755 } else { 0o644 };
-            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        if should_write {
+            let (_, content) = read_object(&hex::encode(hash))?;
+            if let Some(parent) = Path::new(&path).parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(path, &content)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let file_mode = if (_mode & 0o111) != 0 { 0o755 } else { 0o644 };
+                fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+            }
         }
     }
 
     Ok(())
 }
 
-pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
-    let mut new_entries = Vec::new();
+pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
+    let mut entries = read_index().unwrap_or_default();
+    entries.retain(|e| target_tree.contains_key(&e.path));
+
     for (path, (hash, _)) in target_tree {
-        let metadata = fs::metadata(path)?;
-        let entry = build_entry(path, *hash, &metadata);
-        new_entries.push(entry);
+        let should_update = match head_tree.get(path) {
+            None => true,
+            Some((head_hash, _)) => head_hash != hash,
+        };
+
+        if should_update {
+            let metadata = fs::metadata(path)?;
+            let new_entry = build_entry(path, *hash, &metadata);
+            entries.retain(|e| &e.path != path);
+            entries.push(new_entry);
+        }
     }
-    write_index(&mut new_entries)?;
+
+    write_index(&mut entries)?;
     Ok(())
 }

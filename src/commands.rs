@@ -465,7 +465,7 @@ pub fn switch(branch: String, force: bool) -> Result<()> {
     }
 
     sync_working_tree(&target_tree, &head_tree, &index_map)?;
-    update_index_from_tree(&target_tree)?;
+    update_index_from_tree(&target_tree, &head_tree)?;
 
     refs::set_head(&branch)?;
     println!("Switched to branch '{}'", branch);

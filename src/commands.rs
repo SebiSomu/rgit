@@ -482,7 +482,15 @@ pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Op
     Ok(())
 }
 
-pub fn switch(branch: String, force: bool) -> Result<()> {
+pub fn switch(branch: String, create: bool, force: bool) -> Result<()> {
+    if create {
+        let ref_path = refs::current_branch_ref()?;
+        let commit_hash = refs::read_ref(&ref_path)?.ok_or_else(|| {
+            anyhow::anyhow!("fatal: cannot create branch — no commits yet on current branch")
+        })?;
+        refs::create_branch(&branch, &commit_hash)?;
+    }
+
     let target_ref = format!("refs/heads/{}", branch);
     let target_commit = match refs::read_ref(&target_ref)? {
         Some(hash) => hash,
@@ -526,7 +534,12 @@ pub fn switch(branch: String, force: bool) -> Result<()> {
     update_index_from_tree(&target_tree, &head_tree)?;
 
     refs::set_head(&branch)?;
-    println!("Switched to branch '{}'", branch);
+
+    if create {
+        println!("Switched to a new branch '{}'", branch);
+    } else {
+        println!("Switched to branch '{}'", branch);
+    }
 
     Ok(())
 }

@@ -58,7 +58,9 @@ pub enum Commands {
     },
     Switch {
         branch: String,
-        #[arg(short = 'f', long = "force")]
+        #[arg(short = 'c', long = "create", conflicts_with = "force")]
+        create: bool,
+        #[arg(short = 'f', long = "force", conflicts_with = "create")]
         force: bool,
     }
 }
@@ -100,8 +102,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Branch { name, delete, force_delete, rename } => {
             crate::commands::branch(name, delete, force_delete, rename)?;
         }
-        Commands::Switch { branch, force } => {
-            crate::commands::switch(branch, force)?;
+        Commands::Switch { branch, create, force } => {
+            crate::commands::switch(branch, create, force)?;
         }
     }
 

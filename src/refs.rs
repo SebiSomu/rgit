@@ -100,9 +100,30 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
         anyhow::bail!("fatal: a branch named '{}' already exists", name);
     }
 
+    let mut ancestor = Path::new(&path).parent();
+    while let Some(p) = ancestor {
+        if p == Path::new(".git/refs/heads") {
+            break;
+        }
+        if p.is_file() {
+            let conflict = p
+                .strip_prefix(".git/refs/heads/")
+                .unwrap_or(p)
+                .display()
+                .to_string();
+            anyhow::bail!(
+                "fatal: cannot lock ref 'refs/heads/{}': '{}' exists; \
+                 cannot create '{}' inside it",
+                name, conflict, name
+            );
+        }
+        ancestor = p.parent();
+    }
+
     write_ref(&ref_name, commit_hash)?;
     Ok(())
 }
+
 
 pub fn set_head(branch_name: &str) -> Result<()> {
     fs::write(".git/HEAD", format!("ref: refs/heads/{}\n", branch_name))

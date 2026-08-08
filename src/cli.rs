@@ -66,6 +66,19 @@ pub enum Commands {
         detach: bool,
         #[arg(short = 'f', long = "force", conflicts_with = "create")]
         force: bool,
+    },
+    Checkout {
+        /// Branch or commit to check out
+        target: Option<String>,
+        /// Create and switch to a new branch
+        #[arg(short = 'b')]
+        create_branch: Option<String>,
+        /// Enter detached HEAD at the tip of <branch> or at a raw commit hash
+        #[arg(long = "detach")]
+        detach: bool,
+        /// Force checkout
+        #[arg(short = 'f', long = "force")]
+        force: bool,
     }
 }
 
@@ -108,6 +121,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Switch { branch, create, detach, force } => {
             crate::commands::switch(branch, create, detach, force)?;
+        }
+        Commands::Checkout { target, create_branch, detach, force } => {
+            crate::commands::checkout(target, create_branch, detach, force)?;
         }
     }
 

@@ -586,3 +586,46 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> Result
 
     Ok(())
 }
+
+pub fn checkout(target: Option<String>, create_branch: Option<String>, detach: bool, force: bool) -> Result<()> {
+    if create_branch.is_none() && target.is_none() {
+        anyhow::bail!("fatal: you must specify a branch or commit to checkout");
+    }
+
+    if let Some(new_branch) = create_branch {
+        // Resolve start point commit hash:
+        let commit_hash = if let Some(start_point) = target {
+            let branch_ref = format!("refs/heads/{}", start_point);
+            if let Some(hash) = refs::read_ref(&branch_ref)? {
+                hash
+            } else {
+                match read_object(&start_point) {
+                    Ok((obj_type, _)) if obj_type == "commit" => start_point,
+                    Ok((obj_type, _)) => {
+                        anyhow::bail!("fatal: '{}' is not a commit (it is a {})", start_point, obj_type);
+                    }
+                    Err(_) => {
+                        anyhow::bail!("fatal: '{}' is not a valid object hash or branch name", start_point);
+                    }
+                }
+            }
+        } else {
+            refs::resolve_head_commit()?.ok_or_else(|| {
+                anyhow::anyhow!("fatal: cannot create branch — no commits yet")
+            })?
+        };
+
+        refs::create_branch(&new_branch, &commit_hash)?;
+        switch(new_branch, false, false, force)?;
+    } else if let Some(t) = target {
+        let is_branch = {
+            let branch_ref = format!("refs/heads/{}", t);
+            refs::read_ref(&branch_ref)?.is_some()
+        };
+        let should_detach = detach || !is_branch;
+        switch(t, false, should_detach, force)?;
+    }
+
+    Ok(())
+}
+

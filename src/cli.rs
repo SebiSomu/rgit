@@ -57,9 +57,13 @@ pub enum Commands {
         rename: Option<String>,
     },
     Switch {
+        /// Branch name, or a commit hash when using --detach
         branch: String,
         #[arg(short = 'c', long = "create", conflicts_with = "force")]
         create: bool,
+        /// Enter detached HEAD at the tip of <branch> or at a raw commit hash
+        #[arg(long = "detach", conflicts_with = "create")]
+        detach: bool,
         #[arg(short = 'f', long = "force", conflicts_with = "create")]
         force: bool,
     }
@@ -102,8 +106,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Branch { name, delete, force_delete, rename } => {
             crate::commands::branch(name, delete, force_delete, rename)?;
         }
-        Commands::Switch { branch, create, force } => {
-            crate::commands::switch(branch, create, force)?;
+        Commands::Switch { branch, create, detach, force } => {
+            crate::commands::switch(branch, create, detach, force)?;
         }
     }
 

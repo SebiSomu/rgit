@@ -151,8 +151,8 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 
 pub fn commit(message: String) -> Result<()> {
     let tree_hash = write_tree_recursive(Path::new("."))?;
-    let ref_path = refs::current_branch_ref()?;
-    let parent_hash = refs::read_ref(&ref_path)?;
+    let head_state = refs::resolve_head()?;
+    let parent_hash = refs::resolve_head_commit()?;
 
     if let Some(parent) = &parent_hash {
         if tree_hash_of_commit(parent)? == tree_hash {
@@ -161,30 +161,47 @@ pub fn commit(message: String) -> Result<()> {
     }
 
     let commit_hash = build_commit(tree_hash, parent_hash.clone(), &message)?;
-    refs::write_ref(&ref_path, &commit_hash)?;
-
-    let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path);
     let short_hash = &commit_hash[..7];
 
-    if parent_hash.is_none() {
-        println!("[{} (root-commit) {}] {}", branch_name, short_hash, message);
-    } else {
-        println!("[{} {}] {}", branch_name, short_hash, message);
+    match &head_state {
+        refs::HeadState::Branch(branch_name) => {
+            let ref_path = format!("refs/heads/{}", branch_name);
+            refs::write_ref(&ref_path, &commit_hash)?;
+            if parent_hash.is_none() {
+                println!("[{} (root-commit) {}] {}", branch_name, short_hash, message);
+            } else {
+                println!("[{} {}] {}", branch_name, short_hash, message);
+            }
+        }
+        refs::HeadState::Detached(_) => {
+            refs::set_head_detached(&commit_hash)?;
+            if parent_hash.is_none() {
+                println!("[(detached HEAD) (root-commit) {}] {}", short_hash, message);
+            } else {
+                println!("[(detached HEAD) {}] {}", short_hash, message);
+            }
+            eprintln!("warning: You are in a detached HEAD state.");
+        }
     }
 
     Ok(())
 }
 
 pub fn log(oneline: bool) -> Result<()> {
-    let ref_path = refs::current_branch_ref()?;
-    let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path);
+    let head_state = refs::resolve_head()?;
 
-    let mut current_hash = refs::read_ref(&ref_path)?;
+    let (label, mut current_hash) = match &head_state {
+        refs::HeadState::Branch(b) => {
+            let ref_path = format!("refs/heads/{}", b);
+            (b.clone(), refs::read_ref(&ref_path)?)
+        }
+        refs::HeadState::Detached(h) => ("HEAD".to_string(), Some(h.clone())),
+    };
 
     if current_hash.is_none() {
         anyhow::bail!(
             "fatal: your current branch '{}' does not have any commits yet",
-            branch_name
+            label
         );
     }
 
@@ -271,20 +288,28 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
 }
 
 pub fn status() -> Result<()> {
-    let ref_path = refs::current_branch_ref()?;
-    let branch_name = ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path).to_string();
-
-    println!("On branch {}", branch_name);
+    let head_state = refs::resolve_head()?;
 
     let mut no_commits_yet = false;
     let mut head_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
 
-    if let Some(commit_hash) = refs::read_ref(&ref_path)? {
-        let tree_hash = tree_hash_of_commit(&commit_hash)?;
-        flatten_tree(&tree_hash, "", &mut head_tree)?;
-    } else {
-        no_commits_yet = true;
-        println!("\nNo commits yet");
+    match &head_state {
+        refs::HeadState::Branch(branch_name) => {
+            println!("On branch {}", branch_name);
+            let ref_path = format!("refs/heads/{}", branch_name);
+            if let Some(commit_hash) = refs::read_ref(&ref_path)? {
+                let tree_hash = tree_hash_of_commit(&commit_hash)?;
+                flatten_tree(&tree_hash, "", &mut head_tree)?;
+            } else {
+                no_commits_yet = true;
+                println!("\nNo commits yet");
+            }
+        }
+        refs::HeadState::Detached(hash) => {
+            println!("HEAD detached at {}", &hash[..7]);
+            let tree_hash = tree_hash_of_commit(hash)?;
+            flatten_tree(&tree_hash, "", &mut head_tree)?;
+        }
     }
 
     let index_entries = read_index().unwrap_or_default();
@@ -482,28 +507,48 @@ pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Op
     Ok(())
 }
 
-pub fn switch(branch: String, create: bool, force: bool) -> Result<()> {
+pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> Result<()> {
     if create {
-        let ref_path = refs::current_branch_ref()?;
-        let commit_hash = refs::read_ref(&ref_path)?.ok_or_else(|| {
-            anyhow::anyhow!("fatal: cannot create branch — no commits yet on current branch")
+        let commit_hash = refs::resolve_head_commit()?.ok_or_else(|| {
+            anyhow::anyhow!("fatal: cannot create branch — no commits yet")
         })?;
         refs::create_branch(&branch, &commit_hash)?;
     }
 
-    let target_ref = format!("refs/heads/{}", branch);
-    let target_commit = match refs::read_ref(&target_ref)? {
-        Some(hash) => hash,
-        None => {
-            anyhow::bail!("fatal: invalid reference: {}", branch);
+    // Resolve the target commit hash
+    let target_commit = if detach {
+        // Accept a branch name OR a raw commit hash
+        let branch_ref = format!("refs/heads/{}", branch);
+        if let Some(hash) = refs::read_ref(&branch_ref)? {
+            hash
+        } else {
+            // Treat the argument as a raw object hash — validate it's a commit
+            match read_object(&branch) {
+                Ok((obj_type, _)) if obj_type == "commit" => branch.clone(),
+                Ok((obj_type, _)) => {
+                    anyhow::bail!("fatal: '{}' is not a commit (it is a {})", branch, obj_type);
+                }
+                Err(_) => {
+                    anyhow::bail!("fatal: '{}' is not a valid object hash or branch name", branch);
+                }
+            }
+        }
+    } else {
+        let target_ref = format!("refs/heads/{}", branch);
+        match refs::read_ref(&target_ref)? {
+            Some(hash) => hash,
+            None => anyhow::bail!("fatal: invalid reference: {}", branch),
         }
     };
 
-    let current_head = refs::resolve_head()?;
-    if let refs::HeadState::Branch(current_branch) = &current_head {
-        if current_branch == &branch {
-            println!("Already on '{}'", branch);
-            return Ok(());
+    // Early exit when already on the same branch (only relevant for non-detach)
+    if !detach {
+        let current_head = refs::resolve_head()?;
+        if let refs::HeadState::Branch(ref current_branch) = current_head {
+            if current_branch == &branch {
+                println!("Already on '{}'", branch);
+                return Ok(());
+            }
         }
     }
 
@@ -511,13 +556,11 @@ pub fn switch(branch: String, create: bool, force: bool) -> Result<()> {
     let mut target_tree = BTreeMap::new();
     flatten_tree(&target_tree_hash, "", &mut target_tree)?;
 
+    // Build head_tree from the current HEAD commit (works for both attached/detached)
     let mut head_tree = BTreeMap::new();
-    if let refs::HeadState::Branch(current_branch) = &current_head {
-        let current_ref = format!("refs/heads/{}", current_branch);
-        if let Some(current_commit) = refs::read_ref(&current_ref)? {
-            let current_tree_hash = tree_hash_of_commit(&current_commit)?;
-            flatten_tree(&current_tree_hash, "", &mut head_tree)?;
-        }
+    if let Some(current_commit) = refs::resolve_head_commit()? {
+        let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+        flatten_tree(&current_tree_hash, "", &mut head_tree)?;
     }
 
     let index_entries = read_index().unwrap_or_default();
@@ -533,11 +576,16 @@ pub fn switch(branch: String, create: bool, force: bool) -> Result<()> {
     sync_working_tree(&target_tree, &head_tree, &index_map)?;
     update_index_from_tree(&target_tree, &head_tree)?;
 
-    refs::set_head(&branch)?;
-
-    if create {
+    if detach {
+        refs::set_head_detached(&target_commit)?;
+        println!("HEAD is now at {} (detached)", &target_commit[..7]);
+        eprintln!("warning: You are in a detached HEAD state.");
+        eprintln!("  You can look around, make experimental commits, or switch -c <branch> to keep them.");
+    } else if create {
+        refs::set_head(&branch)?;
         println!("Switched to a new branch '{}'", branch);
     } else {
+        refs::set_head(&branch)?;
         println!("Switched to branch '{}'", branch);
     }
 

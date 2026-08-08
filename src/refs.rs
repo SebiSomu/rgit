@@ -109,3 +109,61 @@ pub fn set_head(branch_name: &str) -> Result<()> {
         .context("Failed to update HEAD")?;
     Ok(())
 }
+
+pub fn delete_branch(name: &str) -> Result<()> {
+    let ref_path = format!("refs/heads/{}", name);
+    let fs_path = format!(".git/{}", ref_path);
+
+    if !Path::new(&fs_path).exists() {
+        anyhow::bail!("error: branch '{}' not found.", name);
+    }
+
+    fs::remove_file(&fs_path)
+        .with_context(|| format!("Failed to delete branch '{}'", name))?;
+
+    let mut parent = Path::new(&fs_path).parent();
+    while let Some(p) = parent {
+        if p == Path::new(".git/refs/heads") || p == Path::new(".git/refs") {
+            break;
+        }
+        let is_empty = fs::read_dir(p)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false);
+        if is_empty {
+            let _ = fs::remove_dir(p);
+        } else {
+            break;
+        }
+        parent = p.parent();
+    }
+
+    Ok(())
+}
+
+pub fn rename_branch(old: &str, new: &str) -> Result<()> {
+    let old_ref = format!("refs/heads/{}", old);
+    let new_ref = format!("refs/heads/{}", new);
+    let old_path = format!(".git/{}", old_ref);
+    let new_path = format!(".git/{}", new_ref);
+
+    if !Path::new(&old_path).exists() {
+        anyhow::bail!("error: branch '{}' not found.", old);
+    }
+    if Path::new(&new_path).exists() {
+        anyhow::bail!("fatal: a branch named '{}' already exists.", new);
+    }
+
+    if let Some(parent) = Path::new(&new_path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    fs::rename(&old_path, &new_path).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
+
+    let head_content = fs::read_to_string(".git/HEAD").unwrap_or_default();
+    let current_ref = format!("ref: {}", old_ref);
+    if head_content.trim() == current_ref {
+        set_head(new)?;
+    }
+
+    Ok(())
+}

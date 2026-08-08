@@ -49,6 +49,12 @@ pub enum Commands {
     Status,
     Branch {
         name: Option<String>,
+        #[arg(short = 'd', long = "delete", conflicts_with = "force_delete")]
+        delete: bool,
+        #[arg(short = 'D', conflicts_with = "delete")]
+        force_delete: bool,
+        #[arg(short = 'm', long = "move", value_name = "NEW")]
+        rename: Option<String>,
     },
     Switch {
         branch: String,
@@ -91,8 +97,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Status => {
             crate::commands::status()?;
         }
-        Commands::Branch { name } => {
-            crate::commands::branch(name)?;
+        Commands::Branch { name, delete, force_delete, rename } => {
+            crate::commands::branch(name, delete, force_delete, rename)?;
         }
         Commands::Switch { branch, force } => {
             crate::commands::switch(branch, force)?;

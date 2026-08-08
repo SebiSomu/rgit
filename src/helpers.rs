@@ -348,3 +348,43 @@ pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, h
     write_index(&mut entries)?;
     Ok(())
 }
+
+pub fn is_reachable(start: &str, target: &str) -> Result<bool> {
+    use std::collections::{HashSet, VecDeque};
+
+    if start == target {
+        return Ok(true);
+    }
+
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<String> = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        if hash == target {
+            return Ok(true);
+        }
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent_hash) = line.strip_prefix("parent ") {
+                queue.push_back(parent_hash.to_string());
+            }
+        }
+    }
+
+    Ok(false)
+}

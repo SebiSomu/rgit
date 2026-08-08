@@ -383,7 +383,65 @@ pub fn status() -> Result<()> {
     Ok(())
 }
 
-pub fn branch(name: Option<String>) -> Result<()> {
+pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Option<String>) -> Result<()> {
+    if let Some(new_name) = rename {
+        let old_name = match name {
+            Some(ref n) => n.as_str().to_string(),
+            None => {
+                let ref_path = refs::current_branch_ref()?;
+                ref_path
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(&ref_path)
+                    .to_string()
+            }
+        };
+        refs::rename_branch(&old_name, &new_name)?;
+        println!("Renamed branch '{}' to '{}'.", old_name, new_name);
+        return Ok(());
+    }
+
+    if delete || force_delete {
+        let branch_name = name.ok_or_else(|| {
+            anyhow::anyhow!("fatal: branch name required for delete")
+        })?;
+        let head = refs::resolve_head()?;
+        if let refs::HeadState::Branch(ref current) = head {
+            if current == &branch_name {
+                anyhow::bail!(
+                    "error: Cannot delete branch '{}' checked out locally.",
+                    branch_name
+                );
+            }
+        }
+
+        if delete && !force_delete {
+            let branch_ref = format!("refs/heads/{}", branch_name);
+            if let Some(branch_tip) = refs::read_ref(&branch_ref)? {
+                let head_commit = match &head {
+                    refs::HeadState::Branch(b) => {
+                        let r = format!("refs/heads/{}", b);
+                        refs::read_ref(&r)?
+                    }
+                    refs::HeadState::Detached(h) => Some(h.clone()),
+                };
+
+                let merged = if let Some(head_hash) = head_commit {
+                    is_reachable(&head_hash, &branch_tip)?
+                } else {
+                    false
+                };
+
+                if !merged {
+                    anyhow::bail!("error: The branch '{}' is not fully merged.\n If you are sure you want to delete it, run 'branch -D {}'.", branch_name, branch_name);
+                }
+            }
+        }
+
+        refs::delete_branch(&branch_name)?;
+        println!("Deleted branch {}.", branch_name);
+        return Ok(());
+    }
+
     match name {
         None => {
             let head_state = refs::resolve_head()?;

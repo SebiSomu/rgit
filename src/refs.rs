@@ -8,6 +8,9 @@ pub enum HeadState {
     Detached(String),
 }
 
+/// Resolves the current state of HEAD from `.git/HEAD` into either a branch name
+/// or a raw commit hash.
+// Used by `commit`, `log`, `status`, `switch`, and `checkout`.
 pub fn resolve_head() -> Result<HeadState> {
     let head_content = fs::read_to_string(".git/HEAD")
         .context("Failed to read .git/HEAD — is this an rgit repository?")?;
@@ -24,6 +27,9 @@ pub fn resolve_head() -> Result<HeadState> {
     }
 }
 
+/// Reads `.git/HEAD` and returns the target branch path (e.g. `refs/heads/main`).
+/// Returns an error if HEAD is in a detached state.
+// Used by commands requiring a current local branch (like `switch`, `checkout`, `commit`, `log`, and `status`).
 pub fn current_branch_ref() -> Result<String> {
     let head_content = fs::read_to_string(".git/HEAD")
         .context("Failed to read .git/HEAD — is this an rgit repository?")?;
@@ -35,6 +41,9 @@ pub fn current_branch_ref() -> Result<String> {
         .context("HEAD is not a branch ref (currently in detached HEAD state)")
 }
 
+/// Resolves HEAD to its underlying commit hash, whether in attached or detached mode.
+/// Returns `None` if the current branch has no commits yet.
+// Used by `commit`, `switch`, `checkout`, `restore` and branch validation.
 pub fn resolve_head_commit() -> Result<Option<String>> {
     match resolve_head()? {
         HeadState::Detached(hash) => Ok(Some(hash)),
@@ -45,12 +54,17 @@ pub fn resolve_head_commit() -> Result<Option<String>> {
     }
 }
 
+/// Sets HEAD directly to a raw commit hash, entering detached HEAD state.
+// Used by `commit`, `switch`, and `checkout` commands.
 pub fn set_head_detached(hash: &str) -> Result<()> {
     fs::write(".git/HEAD", format!("{}\n", hash))
         .context("Failed to write detached HEAD")?;
     Ok(())
 }
 
+/// Reads the commit hash associated with a specific reference file.
+/// Returns `None` if the reference does not exist.
+// Used widely by branch management, switching, checkout, commits, and logs.
 pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
     let path = format!(".git/{}", ref_name);
 
@@ -63,6 +77,9 @@ pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
     Ok(Some(content.trim().to_string()))
 }
 
+/// Writes a commit hash to the specified reference file under `.git/`.
+/// Creates parent directories if needed.
+// Used by `commit`, `branch`, `switch`, and `checkout`.
 pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
     let path = format!(".git/{}", ref_name);
 
@@ -76,6 +93,8 @@ pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns a sorted list of all branch names located in `.git/refs/heads/`.
+// Used by the `branch` command (list mode).
 pub fn list_branches() -> Result<Vec<String>> {
     let heads_dir = ".git/refs/heads";
 
@@ -89,6 +108,8 @@ pub fn list_branches() -> Result<Vec<String>> {
     Ok(branches)
 }
 
+/// Recursively walks `.git/refs/heads/` to collect all branch names (supporting nested hierarchies).
+// Used by `list_branches()`.
 fn collect_branches(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -108,6 +129,9 @@ fn collect_branches(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<(
     Ok(())
 }
 
+/// Creates a new branch reference pointing to the specified commit hash.
+/// Validates the name and checks for existing files/folder component conflicts.
+// Used by `branch`, `switch -c`, and `checkout -b` commands.
 pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
     if !is_valid_branch_name(name) {
         anyhow::bail!("fatal: '{}' is not a valid branch name", name);
@@ -145,12 +169,16 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
 }
 
 
+/// Updates `.git/HEAD` to point to a specific local branch ref.
+// Used by `switch`, `checkout`, and `branch -m` (active branch rename).
 pub fn set_head(branch_name: &str) -> Result<()> {
     fs::write(".git/HEAD", format!("ref: refs/heads/{}\n", branch_name))
         .context("Failed to update HEAD")?;
     Ok(())
 }
 
+/// Deletes the reference file for a branch and cleans up empty parent folders.
+// Used by `branch -d` and `branch -D` commands.
 pub fn delete_branch(name: &str) -> Result<()> {
     let ref_path = format!("refs/heads/{}", name);
     let fs_path = format!(".git/{}", ref_path);
@@ -181,6 +209,9 @@ pub fn delete_branch(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Renames an existing branch ref, validating the new name and updating HEAD if the
+/// currently checked out branch was renamed.
+// Used by the `branch -m` command.
 pub fn rename_branch(old: &str, new: &str) -> Result<()> {
     if !is_valid_branch_name(new) {
         anyhow::bail!("fatal: '{}' is not a valid branch name", new);
@@ -213,6 +244,9 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
     Ok(())
 }
 
+/// Validates whether a branch name follows standard git reference formatting rules
+/// (no spaces, special characters, leading/ending dots, consecutive slashes, etc.).
+// Used by `create_branch` and `rename_branch`.
 pub fn is_valid_branch_name(name: &str) -> bool {
     if name.is_empty() || name.ends_with(".lock") || name.ends_with('.') || name == "@" || name.starts_with('.') {
         return false;

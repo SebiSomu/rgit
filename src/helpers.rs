@@ -8,7 +8,11 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use crate::index::{read_index, write_index, build_entry};
+use crate::refs;
 
+/// Hashes content, writes the zlib-compressed object to `.git/objects/`,
+/// and returns the hexadecimal SHA-1 string.
+// Used by commands that write objects (like `hash-object`, `write-tree`, `commit`, and staging index updates).
 pub fn write_object(object_type: &str, content: &[u8]) -> Result<String> {
     let header = format!("{} {}\0", object_type, content.len());
 
@@ -37,6 +41,9 @@ pub fn write_object(object_type: &str, content: &[u8]) -> Result<String> {
     Ok(hash_hex)
 }
 
+/// Reads a zlib-compressed object from `.git/objects/` and returns its
+/// object type and decompressed content.
+// Used by commands that read objects (like `cat-file`, `log`, `status`, `switch`, `checkout`, `restore`, and merge checks).
 pub fn read_object(hash: &str) -> Result<(String, Vec<u8>)> {
     if hash.len() < 3 {
         anyhow::bail!("Invalid object hash: {}", hash);
@@ -69,6 +76,8 @@ pub fn read_object(hash: &str) -> Result<(String, Vec<u8>)> {
 
 
 
+/// Parses a commit object to retrieve the tree hash associated with it.
+// Used by `status`, `switch`, `checkout`, and `restore` to load trees.
 pub fn tree_hash_of_commit(commit_hash: &str) -> Result<String> {
     let (object_type, content) = read_object(commit_hash)?;
 
@@ -88,6 +97,9 @@ pub fn tree_hash_of_commit(commit_hash: &str) -> Result<String> {
         .context("Malformed commit: first line isn't a tree line")
 }
 
+/// Recursively collects all files under the given path, ignoring build/IDE files
+/// and the `.git/` folder.
+// Used by index staging (`add`) and working tree safety checks.
 pub fn collect_files(path: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("path '{}' did not match any files", path.display()))?;
@@ -115,6 +127,8 @@ pub fn collect_files(path: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+/// Normalizes a file path into a relative, forward-slash separated path string.
+// Used for mapping paths consistently across platform boundaries in the index and object trees.
 pub fn normalize_path(path: &Path) -> String {
     path.components()
         .filter_map(|c| match c {
@@ -125,6 +139,8 @@ pub fn normalize_path(path: &Path) -> String {
         .join("/")
 }
 
+/// Calculates the 20-byte SHA-1 hash for the given content type and bytes.
+// Used by index staging and status checks to match files without writing them.
 pub fn hash_content(obj_type: &str, content: &[u8]) -> [u8; 20] {
     let header = format!("{} {}\0", obj_type, content.len());
     let mut store = header.into_bytes();
@@ -134,6 +150,9 @@ pub fn hash_content(obj_type: &str, content: &[u8]) -> [u8; 20] {
     hasher.finalize().into()
 }
 
+/// Recursively flattens tree objects starting from `tree_hash` into a map
+/// of relative paths to their corresponding hashes and modes.
+// Used by `status`, `switch`, `checkout`, and `restore` commands.
 pub fn flatten_tree(tree_hash: &str, prefix: &str, out: &mut BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
     let (object_type, content) = read_object(tree_hash)?;
     if object_type != "tree" {
@@ -168,6 +187,8 @@ pub fn flatten_tree(tree_hash: &str, prefix: &str, out: &mut BTreeMap<String, ([
     Ok(())
 }
 
+/// Checks whether switching branches would overwrite untracked or modified files in the working directory.
+// Used by `switch` and `checkout` commands to prevent data loss.
 pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>, index_map: &BTreeMap<String, [u8; 20]>) -> Result<()> {
     let mut working_files = Vec::new();
     collect_files(Path::new("."), &mut working_files)?;
@@ -222,19 +243,15 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
 
     let mut overwritten_files = Vec::new();
     for path in &local_changes {
-        // A local change only conflicts if the switch would actually touch this file.
-        // If HEAD and target have the same blob, sync_working_tree will skip it,
-        // so the local edit carries over safely — no conflict.
         let file_changes_in_switch = match (head_tree.get(path), target_tree.get(path)) {
-            (Some((h, _)), Some((t, _))) => h != t, // file exists in both but differs
-            (None, Some(_)) => true,                 // new file introduced by target
-            (Some(_), None) => true,                 // file deleted by target
-            (None, None) => false,                   // file doesn't exist in either
+            (Some((h, _)), Some((t, _))) => h != t,
+            (None, Some(_)) => true,
+            (Some(_), None) => true,
+            (None, None) => false,
         };
 
         if !file_changes_in_switch {
-            continue; // switch won't touch this file — local edit is safe to carry
-        }
+            continue;
 
         let current_hash_in_work_or_index = working_map.get(path)
             .or_else(|| index_map.get(path));
@@ -268,6 +285,9 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
     Ok(())
 }
 
+/// Synchronizes the files in the working directory to match the target commit tree.
+/// Writes modified/new files and cleans up files removed in the target.
+// Used by `switch` and `checkout` commands.
 pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>, index_map: &BTreeMap<String, [u8; 20]>) -> Result<()> {
     let mut files_to_delete = std::collections::BTreeSet::new();
     for path in index_map.keys() {
@@ -327,6 +347,8 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
     Ok(())
 }
 
+/// Updates the index entries to reflect target branch files after a switch.
+// Used by `switch` and `checkout` commands.
 pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>) -> Result<()> {
     let mut entries = read_index().unwrap_or_default();
     entries.retain(|e| target_tree.contains_key(&e.path));
@@ -349,6 +371,9 @@ pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, h
     Ok(())
 }
 
+/// Traverses parent commit hashes via BFS to check if the target commit is reachable
+/// from the start commit.
+// Used by `branch -d` safety checks to verify merge status.
 pub fn is_reachable(start: &str, target: &str) -> Result<bool> {
     use std::collections::{HashSet, VecDeque};
 
@@ -389,6 +414,9 @@ pub fn is_reachable(start: &str, target: &str) -> Result<bool> {
     Ok(false)
 }
 
+/// Resolves a source branch/commit name/hash into its tree structure, returning
+/// a map of paths to their object hashes and modes.
+// Used by the restore feature.
 pub fn resolve_tree_from_source(source: &str) -> Result<BTreeMap<String, ([u8; 20], u32)>> {
     let commit_hash = if source.eq_ignore_ascii_case("head") {
         refs::resolve_head_commit()?.ok_or_else(|| {

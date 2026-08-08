@@ -18,6 +18,7 @@ This document defines the constraints, protocols, and architectural patterns tha
 > [!WARNING]
 > **Strict Test Isolation**
 > All execution and testing of the compiled `rgit` binary must be isolated to the `test-sandbox/` directory.
+>
 > - **Always** use `cargo run --bin rtest -- [args]` to run test commands.
 > - **Never** run `cargo run -- init` or other repository-lifecycle commands directly in the repository root (`c:\rgit-main`), as this will overwrite the main project's actual `.git` configuration and head.
 
@@ -28,8 +29,9 @@ This document defines the constraints, protocols, and architectural patterns tha
 `rgit` is a lightweight Git implementation in Rust. Its internal architecture maps closely to standard Git specifications:
 
 ### Core Modules:
+
 1. **[cli.rs](file:///c:/rgit-main/src/cli.rs)**: Parses and routes all command-line arguments using `clap`. All subcommands (e.g., `Branch`, `Switch`, `Checkout`) are declared here.
-2. **[commands.rs](file:///c:/rgit-main/src/commands.rs)**: Core business logic for commands (`init`, `add`, `commit`, `log`, `status`, `branch`, `switch`, `checkout`).
+2. **[commands.rs](file:///c:/rgit-main/src/commands.rs)**: Core business logic for rgit commands.
 3. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
 4. **[helpers.rs](file:///c:/rgit-main/src/helpers.rs)**: Lower-level helpers for reading and writing compressed Git objects, walking the commit graph (`is_reachable`), and matching file status.
 5. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).

@@ -2,14 +2,27 @@
 
 A lightweight, locally functional implementation of Git written in Rust.
 
-`rgit` was built to explore the internal architecture of version control systems. Version 1.0.0 successfully implements the core Git object model (blobs, trees, commits), the staging index, and the local repository lifecycle.
+`rgit` was built to explore the internal architecture of version control systems. The core Git object model (blobs, trees, commits), the staging index, the local repository lifecycle, and a full branching system are all implemented.
 
-## Features (v1.0.0)
+## Features
+
+### Core Repository (v1.0.0)
 
 - **`init`**: Initializes a new repository with the standard `.git` directory structure.
 - **`add`**: Hashes file contents into blobs and stages them in the index.
 - **`status`**: Compares the working directory, index, and HEAD to report untracked, modified, and staged files.
-- **`commit`**: Generates tree objects from the index and records a new commit in the repository history.
+- **`commit -m <message>`**: Generates tree objects from the index and records a new commit in the repository history.
+- **`log`** / **`log --oneline`**: Walks the commit history from HEAD and prints commit metadata.
+
+### Branching (v1.1.0)
+
+#### `branch` — Branch management
+
+#### `switch` — Modern branch switching
+
+#### `checkout` — Classic Git-style branch operations
+
+(all with their own classic git variations)
 
 ## Installation
 
@@ -35,17 +48,15 @@ Prefix your `rgit` commands with `cargo run --bin rtest --`:
 # Initialize a repository inside the sandbox
 cargo run --bin rtest -- init
 
-# Create a file inside the sandbox and check status
-# (Manually create one first, or let rtest run)
-cargo run --bin rtest -- status
-
-# Stage and commit in the sandbox
+# Stage and commit
 cargo run --bin rtest -- add hello.txt
 cargo run --bin rtest -- commit -m "Initial commit"
 
-# List or create branches in the sandbox
-cargo run --bin rtest -- branch
+# Work with branches
 cargo run --bin rtest -- branch feature-branch
+cargo run --bin rtest -- switch feature-branch
+cargo run --bin rtest -- switch -c new-feature
+cargo run --bin rtest -- checkout -b hotfix main
 ```
 
 ### Cleaning the Sandbox
@@ -64,10 +75,10 @@ cargo run --bin rtest -- --clean init
 
 ## Roadmap (Future Features)
 
-- Branching (`branch`, `checkout`)
 - Viewing changes (`diff`)
 - Restoring files (`restore`)
 - `.gitignore` parsing
+- Remote operations (`fetch`, `pull`, `push`)
 
 ## License
 

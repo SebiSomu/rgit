@@ -57,26 +57,20 @@ pub enum Commands {
         rename: Option<String>,
     },
     Switch {
-        /// Branch name, or a commit hash when using --detach
         branch: String,
         #[arg(short = 'c', long = "create", conflicts_with = "force")]
         create: bool,
-        /// Enter detached HEAD at the tip of <branch> or at a raw commit hash
         #[arg(long = "detach", conflicts_with = "create")]
         detach: bool,
         #[arg(short = 'f', long = "force", conflicts_with = "create")]
         force: bool,
     },
     Checkout {
-        /// Branch or commit to check out
         target: Option<String>,
-        /// Create and switch to a new branch
         #[arg(short = 'b')]
         create_branch: Option<String>,
-        /// Enter detached HEAD at the tip of <branch> or at a raw commit hash
         #[arg(long = "detach")]
         detach: bool,
-        /// Force checkout
         #[arg(short = 'f', long = "force")]
         force: bool,
     }

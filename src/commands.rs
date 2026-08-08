@@ -593,7 +593,6 @@ pub fn checkout(target: Option<String>, create_branch: Option<String>, detach: b
     }
 
     if let Some(new_branch) = create_branch {
-        // Resolve start point commit hash:
         let commit_hash = if let Some(start_point) = target {
             let branch_ref = format!("refs/heads/{}", start_point);
             if let Some(hash) = refs::read_ref(&branch_ref)? {

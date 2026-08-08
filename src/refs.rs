@@ -109,6 +109,10 @@ fn collect_branches(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<(
 }
 
 pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
+    if !is_valid_branch_name(name) {
+        anyhow::bail!("fatal: '{}' is not a valid branch name", name);
+    }
+
     let ref_name = format!("refs/heads/{}", name);
     let path = format!(".git/{}", ref_name);
 
@@ -178,6 +182,10 @@ pub fn delete_branch(name: &str) -> Result<()> {
 }
 
 pub fn rename_branch(old: &str, new: &str) -> Result<()> {
+    if !is_valid_branch_name(new) {
+        anyhow::bail!("fatal: '{}' is not a valid branch name", new);
+    }
+
     let old_ref = format!("refs/heads/{}", old);
     let new_ref = format!("refs/heads/{}", new);
     let old_path = format!(".git/{}", old_ref);
@@ -204,3 +212,49 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
 
     Ok(())
 }
+
+pub fn is_valid_branch_name(name: &str) -> bool {
+    if name.is_empty() || name.ends_with(".lock") || name.ends_with('.') || name == "@" || name.starts_with('.') {
+        return false;
+    }
+
+    let mut prev_char = '\0';
+    for c in name.chars() {
+        if c.is_ascii_control() || (c as u32) < 32 || c == '\u{7f}' {
+            return false;
+        }
+        if c == ' ' || c == '~' || c == '^' || c == ':' || c == '?' || c == '*' 
+            || c == '[' || c == '\\' {
+            return false;
+        }
+        if c == '.' && prev_char == '.' {
+            return false;
+        }
+        if c == '/' && prev_char == '/' {
+            return false;
+        }
+        if c == '{' && prev_char == '@' {
+            return false;
+        }
+        prev_char = c;
+    }
+
+    if name.starts_with('/') || name.ends_with('/') {
+        return false;
+    }
+
+    for component in name.split('/') {
+        if component.is_empty() {
+            return false;
+        }
+        if component.starts_with('.') {
+            return false;
+        }
+        if component.ends_with(".lock") {
+            return false;
+        }
+    }
+
+    true
+}
+

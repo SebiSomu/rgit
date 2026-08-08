@@ -627,4 +627,3 @@ pub fn checkout(target: Option<String>, create_branch: Option<String>, detach: b
 
     Ok(())
 }
-

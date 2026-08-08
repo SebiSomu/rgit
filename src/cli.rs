@@ -73,6 +73,15 @@ pub enum Commands {
         detach: bool,
         #[arg(short = 'f', long = "force")]
         force: bool,
+    },
+    Restore {
+        files: Vec<PathBuf>,
+        #[arg(short = 'S', long = "staged")]
+        staged: bool,
+        #[arg(short = 'W', long = "worktree")]
+        worktree: bool,
+        #[arg(long = "source")]
+        source: Option<String>,
     }
 }
 
@@ -118,6 +127,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Checkout { target, create_branch, detach, force } => {
             crate::commands::checkout(target, create_branch, detach, force)?;
+        }
+        Commands::Restore { files, staged, worktree, source } => {
+            crate::commands::restore(files, staged, worktree, source)?;
         }
     }
 

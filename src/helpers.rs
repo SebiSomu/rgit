@@ -388,3 +388,31 @@ pub fn is_reachable(start: &str, target: &str) -> Result<bool> {
 
     Ok(false)
 }
+
+pub fn resolve_tree_from_source(source: &str) -> Result<BTreeMap<String, ([u8; 20], u32)>> {
+    let commit_hash = if source.eq_ignore_ascii_case("head") {
+        refs::resolve_head_commit()?.ok_or_else(|| {
+            anyhow::anyhow!("error: could not restore: HEAD has no commits yet")
+        })?
+    } else {
+        let branch_ref = format!("refs/heads/{}", source);
+        if let Some(hash) = refs::read_ref(&branch_ref)? {
+            hash
+        } else {
+            match read_object(source) {
+                Ok((ref obj_type, _)) if obj_type == "commit" => source.to_string(),
+                Ok((obj_type, _)) => {
+                    anyhow::bail!("error: '{}' is not a commit (it is a {})", source, obj_type);
+                }
+                Err(_) => {
+                    anyhow::bail!("error: invalid reference: '{}'", source);
+                }
+            }
+        }
+    };
+
+    let tree_hash = tree_hash_of_commit(&commit_hash)?;
+    let mut tree_map = BTreeMap::new();
+    flatten_tree(&tree_hash, "", &mut tree_map)?;
+    Ok(tree_map)
+}

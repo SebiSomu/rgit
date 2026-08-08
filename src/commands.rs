@@ -515,14 +515,11 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> Result
         refs::create_branch(&branch, &commit_hash)?;
     }
 
-    // Resolve the target commit hash
     let target_commit = if detach {
-        // Accept a branch name OR a raw commit hash
         let branch_ref = format!("refs/heads/{}", branch);
         if let Some(hash) = refs::read_ref(&branch_ref)? {
             hash
         } else {
-            // Treat the argument as a raw object hash — validate it's a commit
             match read_object(&branch) {
                 Ok((obj_type, _)) if obj_type == "commit" => branch.clone(),
                 Ok((obj_type, _)) => {
@@ -541,7 +538,6 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> Result
         }
     };
 
-    // Early exit when already on the same branch (only relevant for non-detach)
     if !detach {
         let current_head = refs::resolve_head()?;
         if let refs::HeadState::Branch(ref current_branch) = current_head {
@@ -556,7 +552,6 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> Result
     let mut target_tree = BTreeMap::new();
     flatten_tree(&target_tree_hash, "", &mut target_tree)?;
 
-    // Build head_tree from the current HEAD commit (works for both attached/detached)
     let mut head_tree = BTreeMap::new();
     if let Some(current_commit) = refs::resolve_head_commit()? {
         let current_tree_hash = tree_hash_of_commit(&current_commit)?;

@@ -35,8 +35,6 @@ pub fn current_branch_ref() -> Result<String> {
         .context("HEAD is not a branch ref (currently in detached HEAD state)")
 }
 
-/// Resolve HEAD to a commit hash regardless of whether HEAD is attached to a
-/// branch or in detached HEAD state. Returns `None` when there are no commits yet.
 pub fn resolve_head_commit() -> Result<Option<String>> {
     match resolve_head()? {
         HeadState::Detached(hash) => Ok(Some(hash)),
@@ -47,7 +45,6 @@ pub fn resolve_head_commit() -> Result<Option<String>> {
     }
 }
 
-/// Write a raw commit hash directly to HEAD, entering detached HEAD state.
 pub fn set_head_detached(hash: &str) -> Result<()> {
     fs::write(".git/HEAD", format!("{}\n", hash))
         .context("Failed to write detached HEAD")?;

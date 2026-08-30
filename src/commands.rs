@@ -54,48 +54,77 @@ pub fn cat_file(pretty_print: bool, object_hash: String) -> Result<()> {
 }
 
 pub fn write_tree() -> Result<()> {
-    let tree_hash = write_tree_recursive(Path::new("."))?;
+    let entries = read_index().unwrap_or_default();
+    let tree_hash = write_tree_from_index_prefix(&entries, "")?;
     println!("{}", tree_hash);
     Ok(())
 }
 
-fn write_tree_recursive(dir_path: &Path) -> Result<String> {
-    let mut paths: Vec<_> = fs::read_dir(dir_path)?.filter_map(Result::ok).collect();
-    paths.sort_by_key(|entry| entry.file_name());
+fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> Result<String> {
+    let prefix_with_slash = if prefix.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", prefix)
+    };
 
-    let mut tree_content = Vec::new();
+    let mut direct_files: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+    let mut subdirs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
 
-    for entry in paths {
-        let name = match entry.file_name().into_string() {
-            Ok(name) => name,
-            Err(_) => continue,
-        };
-
-        if name == ".git" || name == "target" || name == ".idea" || name.starts_with('.') {
+    for entry in entries {
+        if !prefix_with_slash.is_empty() && !entry.path.starts_with(&prefix_with_slash) {
             continue;
         }
 
-        let metadata = entry.metadata()?;
+        let rel = if prefix_with_slash.is_empty() {
+            entry.path.as_str()
+        } else {
+            &entry.path[prefix_with_slash.len()..]
+        };
 
-        if metadata.is_dir() {
-            let tree_hash = write_tree_recursive(&entry.path())?;
-            let tree_hash_bytes = hex::decode(tree_hash)?;
-
-            tree_content.extend_from_slice(b"40000 ");
-            tree_content.extend_from_slice(name.as_bytes());
-            tree_content.push(0);
-            tree_content.extend_from_slice(&tree_hash_bytes);
-        } else if metadata.is_file() {
-            let content = fs::read(entry.path())?;
-            let blob_hash = write_object("blob", &content)?;
-            let blob_hash_bytes = hex::decode(blob_hash)?;
-
-            tree_content.extend_from_slice(b"100644 ");
-            tree_content.extend_from_slice(name.as_bytes());
-            tree_content.push(0);
-            tree_content.extend_from_slice(&blob_hash_bytes);
+        if let Some(slash_idx) = rel.find('/') {
+            let subdir_name = &rel[..slash_idx];
+            subdirs.insert(subdir_name.to_string());
+        } else {
+            direct_files.insert(rel.to_string(), (entry.hash, entry.mode));
         }
     }
+
+    let mut tree_entries: Vec<(String, Vec<u8>)> = Vec::new();
+
+    for (name, (hash, mode)) in direct_files {
+        let mut entry_bytes = Vec::new();
+        let mode_str = format!("{:o} ", mode);
+        entry_bytes.extend_from_slice(mode_str.as_bytes());
+        entry_bytes.extend_from_slice(name.as_bytes());
+        entry_bytes.push(0);
+        entry_bytes.extend_from_slice(&hash);
+        tree_entries.push((name, entry_bytes));
+    }
+
+    for subdir in subdirs {
+        let sub_prefix = if prefix.is_empty() {
+            subdir.clone()
+        } else {
+            format!("{}/{}", prefix, subdir)
+        };
+        let sub_tree_hash_hex = write_tree_from_index_prefix(entries, &sub_prefix)?;
+        let sub_tree_hash = hex::decode(sub_tree_hash_hex)?;
+
+        let mut entry_bytes = Vec::new();
+        entry_bytes.extend_from_slice(b"40000 ");
+        entry_bytes.extend_from_slice(subdir.as_bytes());
+        entry_bytes.push(0);
+        entry_bytes.extend_from_slice(&sub_tree_hash);
+        tree_entries.push((subdir, entry_bytes));
+    }
+
+    tree_entries.sort_by(|(name_a, _), (name_b, _)| name_a.cmp(name_b));
+
+    let mut tree_content = Vec::new();
+    for (_, bytes) in tree_entries {
+        tree_content.extend_from_slice(&bytes);
+    }
+
     write_object("tree", &tree_content)
 }
 
@@ -150,7 +179,8 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 }
 
 pub fn commit(message: String) -> Result<()> {
-    let tree_hash = write_tree_recursive(Path::new("."))?;
+    let entries = read_index().unwrap_or_default();
+    let tree_hash = write_tree_from_index_prefix(&entries, "")?;
     let head_state = refs::resolve_head()?;
     let parent_hash = refs::resolve_head_commit()?;
 
@@ -343,6 +373,17 @@ pub fn status() -> Result<()> {
         let rel_path = normalize_path(file_path);
         let content = fs::read(file_path).with_context(|| format!("Failed to read {}", file_path.display()))?;
         working_map.insert(rel_path, hash_content("blob", &content));
+    }
+
+    for path in index_map.keys() {
+        if !working_map.contains_key(path) {
+            let path_obj = Path::new(path);
+            if path_obj.exists() && path_obj.is_file() {
+                if let Ok(content) = fs::read(path_obj) {
+                    working_map.insert(path.clone(), hash_content("blob", &content));
+                }
+            }
+        }
     }
 
     let mut unstaged_modified = Vec::new();

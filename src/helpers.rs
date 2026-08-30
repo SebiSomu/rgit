@@ -241,7 +241,7 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
         }
     }
 
-    let overwritten_files :Vec<String> = Vec::new();
+    let mut overwritten_files: Vec<String> = Vec::new();
     for path in &local_changes {
         let file_changes_in_switch = match (head_tree.get(path), target_tree.get(path)) {
             (Some((h, _)), Some((t, _))) => h != t,
@@ -253,6 +253,7 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
         if !file_changes_in_switch {
             continue;
         }
+        overwritten_files.push(path.clone());
     }
 
     if !overwritten_files.is_empty() {

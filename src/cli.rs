@@ -90,6 +90,9 @@ pub enum Commands {
         #[arg(last = true)]
         paths: Vec<PathBuf>,
     },
+    Merge {
+        branch: String,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -146,6 +149,9 @@ pub fn handle_commands() -> Result<()> {
                 _ => anyhow::bail!("usage: rgit diff [<commit> [<commit>]] [-- <path>...]"),
             };
             crate::commands::diff(staged, commit_a, commit_b, paths)?;
+        }
+        Commands::Merge { branch } => {
+            crate::commands::merge(branch)?;
         }
     }
 

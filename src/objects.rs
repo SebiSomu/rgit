@@ -35,3 +35,11 @@ pub enum DiffOp {
     Delete(String),
     Insert(String),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeConflict {
+    pub path: String,
+    pub base: Vec<u8>,
+    pub ours: Vec<u8>,
+    pub theirs: Vec<u8>,
+}

@@ -93,6 +93,15 @@ pub enum Commands {
     Merge {
         branch: String,
     },
+    Rm {
+        files: Vec<PathBuf>,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+        #[arg(long = "cached")]
+        cached: bool,
+        #[arg(short = 'r', long = "recursive")]
+        recursive: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -152,6 +161,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Merge { branch } => {
             crate::commands::merge(branch)?;
+        }
+        Commands::Rm { files, force, cached, recursive } => {
+            crate::commands::rm(files, force, cached, recursive)?;
         }
     }
 

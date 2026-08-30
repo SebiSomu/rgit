@@ -1157,3 +1157,138 @@ pub fn merge(branch: String) -> Result<()> {
 
     Ok(())
 }
+
+pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> Result<()> {
+    if files.is_empty() {
+        anyhow::bail!("fatal: No pathspec was given. Which files should I remove?");
+    }
+
+    let mut index_entries = read_index().unwrap_or_default();
+    let head_tree = if let Some(commit_hash) = refs::resolve_head_commit()? {
+        let tree_hash = tree_hash_of_commit(&commit_hash)?;
+        let mut map = BTreeMap::new();
+        flatten_tree(&tree_hash, "", &mut map)?;
+        Some(map)
+    } else {
+        None
+    };
+
+    let mut paths_to_remove: Vec<String> = Vec::new();
+
+    for path_buf in &files {
+        let rel_path = normalize_path(path_buf);
+
+        let matching_entries: Vec<String> = index_entries
+            .iter()
+            .filter_map(|e| {
+                if e.path == rel_path {
+                    Some(e.path.clone())
+                } else if recursive && e.path.starts_with(&format!("{}/", rel_path)) {
+                    Some(e.path.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if matching_entries.is_empty() {
+            let has_subentries = index_entries
+                .iter()
+                .any(|e| e.path.starts_with(&format!("{}/", rel_path)));
+
+            if has_subentries && !recursive {
+                anyhow::bail!("fatal: not removing '{}' recursively without -r", rel_path);
+            } else {
+                anyhow::bail!("fatal: pathspec '{}' did not match any files", rel_path);
+            }
+        }
+
+        for path in matching_entries {
+            if !paths_to_remove.contains(&path) {
+                paths_to_remove.push(path);
+            }
+        }
+    }
+
+    if !force {
+        let mut modified_files = Vec::new();
+
+        for path in &paths_to_remove {
+            let entry = index_entries.iter().find(|e| &e.path == path);
+            let idx_hash = entry.map(|e| e.hash);
+
+            let head_hash = head_tree.as_ref().and_then(|t| t.get(path)).map(|(h, _)| *h);
+
+            let disk_modified = if !cached && Path::new(path).exists() {
+                if let Ok(content) = fs::read(path) {
+                    let header = format!("blob {}\0", content.len());
+                    let mut store = header.into_bytes();
+                    store.extend_from_slice(&content);
+                    let disk_hash: [u8; 20] = Sha1::digest(&store).into();
+
+                    if let Some(ih) = idx_hash {
+                        disk_hash != ih
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            let index_staged = match (idx_hash, head_hash) {
+                (Some(ih), Some(hh)) => ih != hh,
+                (Some(_), None) => true,
+                _ => false,
+            };
+
+            if disk_modified || index_staged {
+                modified_files.push(path.clone());
+            }
+        }
+
+        if !modified_files.is_empty() {
+            let mut msg = String::from("error: the following file has local modifications:\n");
+            for file in modified_files {
+                msg.push_str(&format!("    {}\n", file));
+            }
+            msg.push_str("(use --cached to keep the file, or -f to force removal)");
+            anyhow::bail!(msg);
+        }
+    }
+
+    for path in &paths_to_remove {
+        index_entries.retain(|e| &e.path != path);
+
+        if !cached {
+            let path_obj = Path::new(path);
+            if path_obj.exists() {
+                fs::remove_file(path_obj)
+                    .with_context(|| format!("failed to remove file '{}'", path))?;
+
+                let mut parent = path_obj.parent();
+                while let Some(p) = parent {
+                    if p == Path::new("") || p == Path::new(".") {
+                        break;
+                    }
+                    if p.exists() {
+                        if fs::read_dir(p)?.next().is_none() {
+                            fs::remove_dir(p)?;
+                        } else {
+                            break;
+                        }
+                    }
+                    parent = p.parent();
+                }
+            }
+        }
+
+        println!("rm '{}'", path);
+    }
+
+    write_index(&mut index_entries)?;
+
+    Ok(())
+}

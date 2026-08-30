@@ -35,6 +35,7 @@ This document defines the constraints, protocols, and architectural patterns tha
 3. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
 4. **[helpers.rs](file:///c:/rgit-main/src/helpers.rs)**: Lower-level helpers for reading and writing compressed Git objects, walking the commit graph (`is_reachable`), and matching file status.
 5. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).
+6. **[objects.rs](file:///cgit-main/src/objects.rs)**: Declares special structures and types of data used either for helper functions or for commands. When declaring a new special type for data that we need later, declare it in objects.rs.
 
 ---
 

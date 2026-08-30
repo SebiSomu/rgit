@@ -82,7 +82,14 @@ pub enum Commands {
         worktree: bool,
         #[arg(long = "source")]
         source: Option<String>,
-    }
+    },
+    Diff {
+        #[arg(long = "staged", alias = "cached")]
+        staged: bool,
+        commits: Vec<String>,
+        #[arg(last = true)]
+        paths: Vec<PathBuf>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -130,6 +137,15 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Restore { files, staged, worktree, source } => {
             crate::commands::restore(files, staged, worktree, source)?;
+        }
+        Commands::Diff { staged, commits, paths } => {
+            let (commit_a, commit_b) = match commits.len() {
+                0 => (None, None),
+                1 => (Some(commits[0].clone()), None),
+                2 => (Some(commits[0].clone()), Some(commits[1].clone())),
+                _ => anyhow::bail!("usage: rgit diff [<commit> [<commit>]] [-- <path>...]"),
+            };
+            crate::commands::diff(staged, commit_a, commit_b, paths)?;
         }
     }
 

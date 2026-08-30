@@ -19,3 +19,19 @@ pub struct CommitData {
     pub author: String,
     pub message: String,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitIgnoreRule {
+    pub pattern: String,
+    pub base_dir: String,
+    pub negated: bool,
+    pub dir_only: bool,
+    pub has_slash: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffOp {
+    Keep(String),
+    Delete(String),
+    Insert(String),
+}

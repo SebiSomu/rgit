@@ -9,6 +9,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use crate::index::{read_index, write_index, build_entry};
 use crate::refs;
+use crate::objects::*;
 
 /// Hashes content, writes the zlib-compressed object to `.git/objects/`,
 /// and returns the hexadecimal SHA-1 string.
@@ -95,15 +96,6 @@ pub fn tree_hash_of_commit(commit_hash: &str) -> Result<String> {
         .strip_prefix("tree ")
         .map(|s| s.to_string())
         .context("Malformed commit: first line isn't a tree line")
-}
-
-#[derive(Clone, Debug)]
-pub struct GitIgnoreRule {
-    pub pattern: String,
-    pub base_dir: String,
-    pub negated: bool,
-    pub dir_only: bool,
-    pub has_slash: bool,
 }
 
 /// Matches a string against a glob pattern supporting `*`, `?`, and `**`.
@@ -632,13 +624,6 @@ pub fn resolve_tree_from_source(source: &str) -> Result<BTreeMap<String, ([u8; 2
     let mut tree_map = BTreeMap::new();
     flatten_tree(&tree_hash, "", &mut tree_map)?;
     Ok(tree_map)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DiffOp {
-    Keep(String),
-    Delete(String),
-    Insert(String),
 }
 
 /// Generates an edit script comparing two lists of text lines using the Myers diff algorithm.

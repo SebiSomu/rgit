@@ -1211,6 +1211,7 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> Re
     }
 
     if !force {
+        let mut staged_files = Vec::new();
         let mut modified_files = Vec::new();
 
         for path in &paths_to_remove {
@@ -1219,18 +1220,16 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> Re
 
             let head_hash = head_tree.as_ref().and_then(|t| t.get(path)).map(|(h, _)| *h);
 
-            let disk_modified = if !cached && Path::new(path).exists() {
-                if let Ok(content) = fs::read(path) {
-                    let header = format!("blob {}\0", content.len());
-                    let mut store = header.into_bytes();
-                    store.extend_from_slice(&content);
-                    let disk_hash: [u8; 20] = Sha1::digest(&store).into();
+            let index_staged = match (idx_hash, head_hash) {
+                (Some(ih), Some(hh)) => ih != hh,
+                (Some(_), None) => true,
+                _ => false,
+            };
 
-                    if let Some(ih) = idx_hash {
-                        disk_hash != ih
-                    } else {
-                        false
-                    }
+            let disk_modified = if !cached && !index_staged && Path::new(path).exists() {
+                if let Ok(content) = fs::read(path) {
+                    let disk_hash = hash_content("blob", &content);
+                    idx_hash.map(|ih| disk_hash != ih).unwrap_or(false)
                 } else {
                     false
                 }
@@ -1238,21 +1237,29 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> Re
                 false
             };
 
-            let index_staged = match (idx_hash, head_hash) {
-                (Some(ih), Some(hh)) => ih != hh,
-                (Some(_), None) => true,
-                _ => false,
-            };
-
-            if disk_modified || index_staged {
+            // Mirror git's own precedence: a file that differs from HEAD is reported
+            // as having staged changes, even if it also has further working-tree edits.
+            if index_staged {
+                staged_files.push(path.clone());
+            } else if disk_modified {
                 modified_files.push(path.clone());
             }
         }
 
-        if !modified_files.is_empty() {
-            let mut msg = String::from("error: the following file has local modifications:\n");
-            for file in modified_files {
-                msg.push_str(&format!("    {}\n", file));
+        if !staged_files.is_empty() || !modified_files.is_empty() {
+            let mut msg = String::new();
+
+            if !staged_files.is_empty() {
+                msg.push_str("error: the following file has changes staged in the index:\n");
+                for file in &staged_files {
+                    msg.push_str(&format!("    {}\n", file));
+                }
+            }
+            if !modified_files.is_empty() {
+                msg.push_str("error: the following file has local modifications:\n");
+                for file in &modified_files {
+                    msg.push_str(&format!("    {}\n", file));
+                }
             }
             msg.push_str("(use --cached to keep the file, or -f to force removal)");
             anyhow::bail!(msg);

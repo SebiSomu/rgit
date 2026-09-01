@@ -743,7 +743,8 @@ pub fn generate_conflict_markers(ours_content: &[u8], theirs_content: &[u8], bra
     out.into_bytes()
 }
 
-/// Generates an edit script comparing two lists of text lines using the Myers diff algorithm.
+/// Generates an edit script comparing two lists of text lines using the Myers diff algorithm
+// for shortest path in a 2d grid.
 // Used by the `diff` command to generate line-by-line differences between file versions.
 pub fn myers_diff(old_lines: &[&str], new_lines: &[&str]) -> Vec<DiffOp> {
     let n = old_lines.len();
@@ -832,13 +833,7 @@ fn backtrack_myers(trace: &[Vec<isize>], old_lines: &[&str], new_lines: &[&str],
 
 /// Formats a list of line diff operations into unified diff format (with headers and line hunks).
 // Used by `diff` command.
-pub fn format_diff_output(
-    path: &str,
-    old_lines: &[&str],
-    new_lines: &[&str],
-    old_label: &str,
-    new_label: &str,
-) -> String {
+pub fn format_diff_output(path: &str, old_lines: &[&str], new_lines: &[&str], old_label: &str, new_label: &str,) -> String {
     let ops = myers_diff(old_lines, new_lines);
 
     let mut has_changes = false;

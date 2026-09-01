@@ -1432,10 +1432,7 @@ fn commit_subject_line(commit_hash: &str) -> Result<String> {
 /// Prints the `Unstaged changes after reset:` summary that `git reset` shows after a
 /// mixed reset, listing what changed between the previous index and the new one using
 /// the familiar `A`/`M`/`D` status letters.
-fn print_unstaged_after_reset(
-    old_index_map: &BTreeMap<String, [u8; 20]>,
-    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
-) {
+fn print_unstaged_after_reset(old_index_map: &BTreeMap<String, [u8; 20]>, target_tree: &BTreeMap<String, ([u8; 20], u32)>) {
     let mut changes: Vec<(String, char)> = Vec::new();
 
     for (path, old_hash) in old_index_map {

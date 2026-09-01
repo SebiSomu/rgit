@@ -1432,7 +1432,10 @@ fn commit_subject_line(commit_hash: &str) -> Result<String> {
 /// Prints the `Unstaged changes after reset:` summary that `git reset` shows after a
 /// mixed reset, listing what changed between the previous index and the new one using
 /// the familiar `A`/`M`/`D` status letters.
-fn print_unstaged_after_reset(old_index_map: &BTreeMap<String, [u8; 20]>, target_tree: &BTreeMap<String, ([u8; 20], u32)>) {
+fn print_unstaged_after_reset(
+    old_index_map: &BTreeMap<String, [u8; 20]>,
+    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
+) {
     let mut changes: Vec<(String, char)> = Vec::new();
 
     for (path, old_hash) in old_index_map {
@@ -1460,7 +1463,92 @@ fn print_unstaged_after_reset(old_index_map: &BTreeMap<String, [u8; 20]>, target
     }
 }
 
-pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool) -> Result<()> {
+fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> Result<()> {
+    let source_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(src) = source {
+        resolve_tree_from_source(src)?
+    } else {
+        match refs::resolve_head_commit()? {
+            Some(commit_hash) => {
+                let tree_hash = tree_hash_of_commit(&commit_hash)?;
+                let mut map = BTreeMap::new();
+                flatten_tree(&tree_hash, "", &mut map)?;
+                map
+            }
+            // No commits yet: HEAD is effectively an empty tree, so pathspecs simply unstage.
+            None => BTreeMap::new(),
+        }
+    };
+
+    let mut index_entries = read_index().unwrap_or_default();
+
+    for path_buf in paths {
+        let rel_path = normalize_path(path_buf);
+
+        let mut matches: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for entry in &index_entries {
+            if entry.path == rel_path || entry.path.starts_with(&format!("{}/", rel_path)) {
+                matches.insert(entry.path.clone());
+            }
+        }
+        for src_path in source_tree.keys() {
+            if src_path == &rel_path || src_path.starts_with(&format!("{}/", rel_path)) {
+                matches.insert(src_path.clone());
+            }
+        }
+
+        if matches.is_empty() {
+            anyhow::bail!(
+                "fatal: pathspec '{}' did not match any file(s) known to rgit",
+                rel_path
+            );
+        }
+
+        for m in matches {
+            match source_tree.get(&m) {
+                Some(&(hash, mode)) => {
+                    if let Some(entry) = index_entries.iter_mut().find(|e| e.path == m) {
+                        entry.hash = hash;
+                        entry.mode = mode;
+                    } else {
+                        let (_, content) = read_object(&hex::encode(hash))?;
+                        index_entries.push(IndexEntry {
+                            ctime_secs: 0,
+                            ctime_nsecs: 0,
+                            mtime_secs: 0,
+                            mtime_nsecs: 0,
+                            dev: 0,
+                            ino: 0,
+                            mode,
+                            uid: 0,
+                            gid: 0,
+                            size: content.len() as u32,
+                            hash,
+                            path: m.clone(),
+                        });
+                    }
+                }
+                None => {
+                    index_entries.retain(|e| e.path != m);
+                }
+            }
+        }
+    }
+
+    write_index(&mut index_entries)?;
+    Ok(())
+}
+
+pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths: Vec<PathBuf>) -> Result<()> {
+    if !paths.is_empty() {
+        if soft {
+            anyhow::bail!("fatal: Cannot do soft reset with paths.");
+        }
+        if hard {
+            anyhow::bail!("fatal: Cannot do hard reset with paths.");
+        }
+        return reset_paths(commit.as_deref(), &paths);
+    }
+
     let mode = if hard {
         ResetMode::Hard
     } else if soft {

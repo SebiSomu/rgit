@@ -110,6 +110,8 @@ pub enum Commands {
         mixed: bool,
         #[arg(long = "hard", conflicts_with_all = ["soft", "mixed"])]
         hard: bool,
+        #[arg(last = true)]
+        paths: Vec<PathBuf>,
     },
 }
 
@@ -174,8 +176,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Rm { files, force, cached, recursive } => {
             crate::commands::rm(files, force, cached, recursive)?;
         }
-        Commands::Reset { commit, soft, mixed, hard } => {
-            crate::commands::reset(commit, soft, mixed, hard)?;
+        Commands::Reset { commit, soft, mixed, hard, paths } => {
+            crate::commands::reset(commit, soft, mixed, hard, paths)?;
         }
     }
 

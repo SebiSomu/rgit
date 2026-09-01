@@ -1299,3 +1299,242 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> Re
 
     Ok(())
 }
+
+enum ResetMode {
+    Soft,
+    Mixed,
+    Hard,
+}
+
+/// Force-overwrites the working directory to exactly match `target_tree`, discarding
+/// any uncommitted changes. Deletes files that were tracked (per `tracked_paths`) but
+/// are absent from the target.
+///
+/// Unlike `sync_working_tree` (used by `switch`/`checkout`), every file present in the
+/// target is rewritten unconditionally rather than only when it differs from the old
+/// HEAD tree — `reset --hard` must discard local modifications even when their content
+/// happens to match the previous HEAD.
+// Used by `reset --hard`.
+fn hard_reset_working_tree(
+    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
+    tracked_paths: &std::collections::BTreeSet<String>,
+) -> Result<()> {
+    for path in tracked_paths {
+        if target_tree.contains_key(path) {
+            continue;
+        }
+
+        let path_obj = Path::new(path);
+        if path_obj.exists() {
+            fs::remove_file(path_obj)
+                .with_context(|| format!("failed to remove file '{}'", path))?;
+
+            let mut parent = path_obj.parent();
+            while let Some(p) = parent {
+                if p == Path::new("") || p == Path::new(".") {
+                    break;
+                }
+                if p.exists() {
+                    if fs::read_dir(p)?.next().is_none() {
+                        fs::remove_dir(p)?;
+                    } else {
+                        break;
+                    }
+                }
+                parent = p.parent();
+            }
+        }
+    }
+
+    for (path, (hash, mode)) in target_tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let file_mode = if (*mode & 0o111) != 0 { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Builds a fresh set of index entries describing exactly `target_tree`, independent of
+/// whatever the index previously contained. When `read_disk_metadata` is true (after a
+/// hard reset has just written every file to disk), real stat info is captured via
+/// `build_entry`; otherwise (a mixed reset, which never touches the working tree) a
+/// placeholder stat entry is used, mirroring the convention already used by `restore`.
+// Used by `reset --mixed` and `reset --hard`.
+fn build_index_entries_for_tree(
+    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
+    read_disk_metadata: bool,
+) -> Result<Vec<IndexEntry>> {
+    let mut entries = Vec::with_capacity(target_tree.len());
+
+    for (path, (hash, mode)) in target_tree {
+        if read_disk_metadata {
+            if let Ok(metadata) = fs::metadata(path) {
+                let mut entry = build_entry(path, *hash, &metadata);
+                entry.mode = *mode;
+                entries.push(entry);
+                continue;
+            }
+        }
+
+        let (_, content) = read_object(&hex::encode(hash))?;
+        entries.push(IndexEntry {
+            ctime_secs: 0,
+            ctime_nsecs: 0,
+            mtime_secs: 0,
+            mtime_nsecs: 0,
+            dev: 0,
+            ino: 0,
+            mode: *mode,
+            uid: 0,
+            gid: 0,
+            size: content.len() as u32,
+            hash: *hash,
+            path: path.clone(),
+        });
+    }
+
+    Ok(entries)
+}
+
+/// Returns the first line of a commit's message body (its "subject line").
+// Used by `reset --hard` to print the familiar `HEAD is now at <hash> <subject>` line.
+fn commit_subject_line(commit_hash: &str) -> Result<String> {
+    let (object_type, content) = read_object(commit_hash)?;
+    if object_type != "commit" {
+        anyhow::bail!("{} is not a commit object", commit_hash);
+    }
+
+    let text = String::from_utf8_lossy(&content);
+    let mut in_message = false;
+    for line in text.lines() {
+        if in_message {
+            return Ok(line.to_string());
+        } else if line.is_empty() {
+            in_message = true;
+        }
+    }
+
+    Ok(String::new())
+}
+
+/// Prints the `Unstaged changes after reset:` summary that `git reset` shows after a
+/// mixed reset, listing what changed between the previous index and the new one using
+/// the familiar `A`/`M`/`D` status letters.
+fn print_unstaged_after_reset(
+    old_index_map: &BTreeMap<String, [u8; 20]>,
+    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
+) {
+    let mut changes: Vec<(String, char)> = Vec::new();
+
+    for (path, old_hash) in old_index_map {
+        match target_tree.get(path) {
+            None => changes.push((path.clone(), 'D')),
+            Some((new_hash, _)) if new_hash != old_hash => changes.push((path.clone(), 'M')),
+            _ => {}
+        }
+    }
+    for path in target_tree.keys() {
+        if !old_index_map.contains_key(path) {
+            changes.push((path.clone(), 'A'));
+        }
+    }
+
+    if changes.is_empty() {
+        return;
+    }
+
+    changes.sort_by(|a, b| a.0.cmp(&b.0));
+
+    println!("Unstaged changes after reset:");
+    for (path, status) in changes {
+        println!("{}\t{}", status, path);
+    }
+}
+
+pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool) -> Result<()> {
+    let mode = if hard {
+        ResetMode::Hard
+    } else if soft {
+        ResetMode::Soft
+    } else {
+        ResetMode::Mixed
+    };
+
+    let source = commit.as_deref().unwrap_or("HEAD");
+    let target_commit = resolve_commit_from_source(source)?;
+
+    let head_state = refs::resolve_head()?;
+    let old_head_commit = refs::resolve_head_commit()?;
+
+    match &head_state {
+        refs::HeadState::Branch(branch_name) => {
+            let ref_path = format!("refs/heads/{}", branch_name);
+            refs::write_ref(&ref_path, &target_commit)?;
+        }
+        refs::HeadState::Detached(_) => {
+            refs::set_head_detached(&target_commit)?;
+        }
+    }
+
+    if Path::new(".git/MERGE_HEAD").exists() {
+        let _ = fs::remove_file(".git/MERGE_HEAD");
+    }
+    if Path::new(".git/MERGE_MSG").exists() {
+        let _ = fs::remove_file(".git/MERGE_MSG");
+    }
+
+    if let ResetMode::Soft = mode {
+        return Ok(());
+    }
+
+    let target_tree_hash = tree_hash_of_commit(&target_commit)?;
+    let mut target_tree = BTreeMap::new();
+    flatten_tree(&target_tree_hash, "", &mut target_tree)?;
+
+    let mut old_head_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+    if let Some(ref old_commit) = old_head_commit {
+        let old_tree_hash = tree_hash_of_commit(old_commit)?;
+        flatten_tree(&old_tree_hash, "", &mut old_head_tree)?;
+    }
+
+    let old_index_entries = read_index().unwrap_or_default();
+    let old_index_map: BTreeMap<String, [u8; 20]> = old_index_entries
+        .iter()
+        .map(|e| (e.path.clone(), e.hash))
+        .collect();
+
+    if let ResetMode::Hard = mode {
+        let mut tracked_paths: std::collections::BTreeSet<String> = old_index_map.keys().cloned().collect();
+        tracked_paths.extend(old_head_tree.keys().cloned());
+        hard_reset_working_tree(&target_tree, &tracked_paths)?;
+    }
+
+    let read_disk_metadata = matches!(mode, ResetMode::Hard);
+    let mut new_entries = build_index_entries_for_tree(&target_tree, read_disk_metadata)?;
+    write_index(&mut new_entries)?;
+
+    match mode {
+        ResetMode::Hard => {
+            let subject = commit_subject_line(&target_commit)?;
+            println!("HEAD is now at {} {}", &target_commit[..7], subject);
+        }
+        ResetMode::Mixed => {
+            print_unstaged_after_reset(&old_index_map, &target_tree);
+        }
+        ResetMode::Soft => unreachable!("soft reset returns earlier"),
+    }
+
+    Ok(())
+}

@@ -788,13 +788,7 @@ pub fn myers_diff(old_lines: &[&str], new_lines: &[&str]) -> Vec<DiffOp> {
     Vec::new()
 }
 
-fn backtrack_myers(
-    trace: &[Vec<isize>],
-    old_lines: &[&str],
-    new_lines: &[&str],
-    n: usize,
-    m: usize,
-) -> Vec<DiffOp> {
+fn backtrack_myers(trace: &[Vec<isize>], old_lines: &[&str], new_lines: &[&str], n: usize, m: usize) -> Vec<DiffOp> {
     let mut x = n as isize;
     let mut y = m as isize;
     let max = n + m;

@@ -102,6 +102,15 @@ pub enum Commands {
         #[arg(short = 'r', long = "recursive")]
         recursive: bool,
     },
+    Reset {
+        commit: Option<String>,
+        #[arg(long = "soft", conflicts_with_all = ["mixed", "hard"])]
+        soft: bool,
+        #[arg(long = "mixed", conflicts_with_all = ["soft", "hard"])]
+        mixed: bool,
+        #[arg(long = "hard", conflicts_with_all = ["soft", "mixed"])]
+        hard: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -164,6 +173,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Rm { files, force, cached, recursive } => {
             crate::commands::rm(files, force, cached, recursive)?;
+        }
+        Commands::Reset { commit, soft, mixed, hard } => {
+            crate::commands::reset(commit, soft, mixed, hard)?;
         }
     }
 

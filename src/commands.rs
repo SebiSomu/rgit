@@ -315,6 +315,15 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
         collect_files(&path, &mut files_to_add)?;
     }
 
+    if files_to_add.is_empty() {
+        println!("nothing specified, nothing added.");
+        return Ok(());
+    }
+
+    let mut added = 0;
+    let mut modified = 0;
+    let mut unchanged = 0;
+
     for file_path in files_to_add {
         let content = fs::read(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
@@ -323,16 +332,44 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
         let mut hash = [0u8; 20];
         hash.copy_from_slice(&hex::decode(&hash_hex)?);
 
-        let metadata = fs::metadata(&file_path)?;
         let rel_path = normalize_path(&file_path);
-        let new_entry = build_entry(&rel_path, hash, &metadata);
 
+        match entries.iter().find(|e| e.path == rel_path) {
+            Some(existing) if existing.hash == hash => {
+                unchanged += 1;
+                continue;
+            }
+            Some(_) => modified += 1,
+            None => added += 1,
+        }
+
+        let metadata = fs::metadata(&file_path)?;
+        let new_entry = build_entry(&rel_path, hash, &metadata);
         entries.retain(|e| e.path != rel_path);
         entries.push(new_entry);
     }
 
+    if added == 0 && modified == 0 {
+        println!(
+            "nothing to add: {} file(s) already up to date, no modifications found",
+            unchanged
+        );
+        return Ok(());
+    }
+
     write_index(&mut entries)?;
-    println!("Staged files to index.");
+
+    let mut summary = Vec::new();
+    if added > 0 {
+        summary.push(format!("{} new", added));
+    }
+    if modified > 0 {
+        summary.push(format!("{} modified", modified));
+    }
+    if unchanged > 0 {
+        summary.push(format!("{} unchanged", unchanged));
+    }
+    println!("Staged files to index ({}).", summary.join(", "));
 
     Ok(())
 }

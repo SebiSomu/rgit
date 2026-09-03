@@ -2128,3 +2128,509 @@ fn cherry_pick_abort() -> Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// stash
+// ============================================================================
+//
+// Storage model: each stash entry is represented by two loose commit objects,
+// mirroring (a simplified version of) how real git implements `git stash`:
+//
+//   i_commit: tree = snapshot of the index at stash time, parent = HEAD
+//   w_commit: tree = snapshot of the working directory (for tracked files)
+//             at stash time, parents = [HEAD, i_commit]
+//
+// The hash of `w_commit` is what gets recorded as the stash entry; walking
+// its parents recovers both the index snapshot (2nd parent) and the HEAD it
+// was taken against (1st parent), which is enough to reapply staged vs.
+// unstaged changes separately, and to `stash show` a diff.
+//
+// Unlike real git, entries aren't tracked via `refs/stash` + a reflog; they're
+// kept in a simple ordered list file at `.git/STASH_LIST` (oldest first on
+// disk, so appending a new stash is a single write). This keeps the storage
+// format simple while preserving the same `stash@{N}` addressing scheme
+// (`stash@{0}` is always the most recently pushed entry).
+//
+// Also unlike real git, `pop`/`apply` require a working tree and index that
+// are currently clean (i.e. exactly matching HEAD) — rgit does not attempt a
+// three-way merge of the stash back into a dirty tree.
+
+const STASH_LIST_PATH: &str = ".git/STASH_LIST";
+
+/// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
+fn read_stash_list() -> Result<Vec<StashEntry>> {
+    if !Path::new(STASH_LIST_PATH).exists() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs::read_to_string(STASH_LIST_PATH).context("Failed to read .git/STASH_LIST")?;
+    let mut entries: Vec<StashEntry> = content
+        .lines()
+        .filter(|l| !l.is_empty())
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, ' ');
+            let hash = parts.next()?.to_string();
+            let message = parts.next().unwrap_or("").to_string();
+            Some(StashEntry { hash, message })
+        })
+        .collect();
+
+    // File is stored oldest-first (append order); reverse so index 0 is newest.
+    entries.reverse();
+    Ok(entries)
+}
+
+/// Overwrites the stash list. `entries` must be newest-first (index 0 ==
+/// `stash@{0}`), matching what `read_stash_list` returns.
+fn write_stash_list(entries: &[StashEntry]) -> Result<()> {
+    if entries.is_empty() {
+        if Path::new(STASH_LIST_PATH).exists() {
+            fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
+        }
+        return Ok(());
+    }
+
+    let mut lines: Vec<String> = entries.iter().map(|e| format!("{} {}", e.hash, e.message)).collect();
+    lines.reverse();
+    let mut content = lines.join("\n");
+    content.push('\n');
+    fs::write(STASH_LIST_PATH, content).context("Failed to write .git/STASH_LIST")?;
+    Ok(())
+}
+
+/// Appends a newly-created stash entry as the new `stash@{0}`.
+fn append_stash_entry(hash: &str, message: &str) -> Result<()> {
+    use std::io::Write as _;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(STASH_LIST_PATH)
+        .context("Failed to open .git/STASH_LIST")?;
+    writeln!(file, "{} {}", hash, message)?;
+    Ok(())
+}
+
+/// Parses a `stash@{N}` reference, a bare `N`, or `None` (meaning `stash@{0}`)
+/// into an index into the stash list.
+fn parse_stash_index(s: Option<&str>) -> Result<usize> {
+    match s {
+        None => Ok(0),
+        Some(raw) => {
+            let trimmed = raw.trim();
+            let inner = trimmed
+                .strip_prefix("stash@{")
+                .and_then(|r| r.strip_suffix('}'))
+                .unwrap_or(trimmed);
+            inner
+                .parse::<usize>()
+                .map_err(|_| anyhow::anyhow!("fatal: '{}' is not a valid stash reference", raw))
+        }
+    }
+}
+
+/// Human-readable label for the current HEAD, used in stash messages
+/// ("WIP on <label>: ...").
+fn current_branch_label() -> Result<String> {
+    match refs::resolve_head()? {
+        refs::HeadState::Branch(b) => Ok(b),
+        refs::HeadState::Detached(h) => {
+            let short = &h[..h.len().min(7)];
+            Ok(format!("(detached HEAD at {})", short))
+        }
+    }
+}
+
+/// Builds and writes a tree object directly from a flattened path -> (hash,
+/// mode) map, reusing `write_tree_from_index_prefix` via a throwaway
+/// `IndexEntry` list. Stat fields are irrelevant here since only the mode and
+/// blob hash are encoded into tree entries.
+fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> Result<String> {
+    let entries: Vec<IndexEntry> = map
+        .iter()
+        .map(|(path, (hash, mode))| IndexEntry {
+            ctime_secs: 0,
+            ctime_nsecs: 0,
+            mtime_secs: 0,
+            mtime_nsecs: 0,
+            dev: 0,
+            ino: 0,
+            mode: *mode,
+            uid: 0,
+            gid: 0,
+            size: 0,
+            hash: *hash,
+            path: path.clone(),
+        })
+        .collect();
+
+    write_tree_from_index_prefix(&entries, "")
+}
+
+/// Refuses to proceed unless the working directory and index are currently
+/// clean (i.e. exactly match HEAD). `stash apply`/`pop` use this in place of
+/// a real three-way merge back into a dirty tree.
+fn ensure_clean_for_stash(action: &str) -> Result<()> {
+    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
+        Some(commit_hash) => {
+            let tree_hash = tree_hash_of_commit(&commit_hash)?;
+            let mut map = BTreeMap::new();
+            flatten_tree(&tree_hash, "", &mut map)?;
+            map
+        }
+        None => BTreeMap::new(),
+    };
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, ([u8; 20], u32)> = index_entries
+        .iter()
+        .map(|e| (e.path.clone(), (e.hash, e.mode)))
+        .collect();
+
+    if index_map != head_tree {
+        anyhow::bail!(
+            "error: cannot {}: you have staged changes.\nPlease commit or reset them first.",
+            action
+        );
+    }
+
+    let mut working_files = Vec::new();
+    collect_files(Path::new("."), &mut working_files)?;
+
+    let mut seen = BTreeSet::new();
+    for file_path in &working_files {
+        let rel_path = normalize_path(file_path);
+        let content = fs::read(file_path).with_context(|| format!("Failed to read {}", rel_path))?;
+        let hash = hash_content("blob", &content);
+        seen.insert(rel_path.clone());
+
+        match head_tree.get(&rel_path) {
+            Some((h, _)) if *h == hash => {}
+            _ => anyhow::bail!(
+                "error: Your local changes to the following files would be overwritten by {}:\n\t{}\nPlease commit your changes or stash them before running this command again.\nAborting",
+                action,
+                rel_path
+            ),
+        }
+    }
+
+    for path in head_tree.keys() {
+        if !seen.contains(path) {
+            anyhow::bail!(
+                "error: local file '{}' is missing; cannot safely {}.\nAborting",
+                path,
+                action
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// `rgit stash` / `rgit stash push [-m <message>]`
+///
+/// Snapshots the current index and (tracked) working directory into a pair
+/// of commit objects, records the stash entry, then resets the working
+/// directory and index back to exactly match HEAD.
+pub fn stash_push(message: Option<String>) -> Result<()> {
+    let head_commit = refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: You do not have the initial commit yet"))?;
+
+    let head_tree_hash = tree_hash_of_commit(&head_commit)?;
+    let mut head_tree = BTreeMap::new();
+    flatten_tree(&head_tree_hash, "", &mut head_tree)?;
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_tree_hash = write_tree_from_index_prefix(&index_entries, "")?;
+
+    let mut working_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+    for entry in &index_entries {
+        let path_obj = Path::new(&entry.path);
+        if !path_obj.exists() {
+            // Deleted in the working tree (but still present in the index):
+            // omit from the working-tree snapshot.
+            continue;
+        }
+
+        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", entry.path))?;
+        let hash = hash_content("blob", &content);
+        if hash != entry.hash {
+            write_object("blob", &content)?;
+        }
+
+        #[cfg(unix)]
+        let mode: u32 = {
+            use std::os::unix::fs::PermissionsExt;
+            let perm = fs::metadata(path_obj)?.permissions().mode();
+            if perm & 0o111 != 0 { 0o100755 } else { 0o100644 }
+        };
+        #[cfg(not(unix))]
+        let mode: u32 = entry.mode;
+
+        working_tree.insert(entry.path.clone(), (hash, mode));
+    }
+
+    let working_tree_hash = build_tree_from_map(&working_tree)?;
+
+    if index_tree_hash == head_tree_hash && working_tree_hash == head_tree_hash {
+        println!("No local changes to save");
+        return Ok(());
+    }
+
+    let branch_label = current_branch_label()?;
+    let short_head = &head_commit[..7];
+    let subject = commit_subject_line(&head_commit)?;
+
+    let index_message = format!("index on {}: {} {}", branch_label, short_head, subject);
+    let i_commit_hash = build_commit(index_tree_hash, Some(head_commit.clone()), &index_message)?;
+
+    let stash_message = match &message {
+        Some(m) => format!("On {}: {}", branch_label, m),
+        None => format!("WIP on {}: {} {}", branch_label, short_head, subject),
+    };
+    let w_commit_hash = build_merge_commit(working_tree_hash, &head_commit, &i_commit_hash, &stash_message)?;
+
+    append_stash_entry(&w_commit_hash, &stash_message)?;
+
+    let mut tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
+    tracked_paths.extend(head_tree.keys().cloned());
+    tracked_paths.extend(working_tree.keys().cloned());
+
+    hard_reset_working_tree(&head_tree, &tracked_paths)?;
+    let mut new_entries = build_index_entries_for_tree(&head_tree, true)?;
+    write_index(&mut new_entries)?;
+
+    println!("Saved working directory and index state {}", stash_message);
+
+    Ok(())
+}
+
+/// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens
+/// both into path -> (hash, mode) maps: `(working_tree, index_tree)`.
+fn load_stash_trees(idx: usize, list: &[StashEntry]) -> Result<(BTreeMap<String, ([u8; 20], u32)>, BTreeMap<String, ([u8; 20], u32)>)> {
+    let w_hash = &list[idx].hash;
+
+    let (obj_type, content) = read_object(w_hash)?;
+    if obj_type != "commit" {
+        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+    }
+    let text = String::from_utf8_lossy(&content).to_string();
+    let parents = commit_parents(&text);
+    if parents.len() < 2 {
+        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+    }
+    let head_at_stash = &parents[0];
+    let i_hash = &parents[1];
+
+    let w_tree_hash = tree_hash_of_commit(w_hash)?;
+    let mut w_tree = BTreeMap::new();
+    flatten_tree(&w_tree_hash, "", &mut w_tree)?;
+
+    let i_tree_hash = tree_hash_of_commit(i_hash)?;
+    let mut i_tree = BTreeMap::new();
+    flatten_tree(&i_tree_hash, "", &mut i_tree)?;
+
+    let _ = head_at_stash; // only needed by `stash show`, kept here for symmetry
+    Ok((w_tree, i_tree))
+}
+
+/// Shared implementation of `stash apply` and `stash pop`.
+fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> Result<()> {
+    let idx = parse_stash_index(stash_ref.as_deref())?;
+    let list = read_stash_list()?;
+    if list.is_empty() {
+        anyhow::bail!("No stash entries found.");
+    }
+    if idx >= list.len() {
+        anyhow::bail!("fatal: stash@{{{}}} is not a valid reference", idx);
+    }
+
+    let action = if drop_after { "apply stash (pop)" } else { "apply stash" };
+    ensure_clean_for_stash(action)?;
+
+    let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
+
+    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
+        Some(commit_hash) => {
+            let tree_hash = tree_hash_of_commit(&commit_hash)?;
+            let mut map = BTreeMap::new();
+            flatten_tree(&tree_hash, "", &mut map)?;
+            map
+        }
+        None => BTreeMap::new(),
+    };
+
+    // Remove tracked files that existed at HEAD but were deleted in the
+    // stash's working-tree snapshot.
+    for path in head_tree.keys() {
+        if !w_tree.contains_key(path) {
+            let p = Path::new(path);
+            if p.exists() {
+                let _ = fs::remove_file(p);
+            }
+        }
+    }
+
+    // Write the stash's working-tree snapshot to disk.
+    for (path, (hash, mode)) in &w_tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let file_mode = if (*mode & 0o111) != 0 { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        }
+    }
+
+    // Rebuild the index to match the stash's index snapshot (preserving the
+    // staged vs. unstaged distinction that existed when the stash was made).
+    let mut new_entries = build_index_entries_for_tree(&i_tree, true)?;
+    write_index(&mut new_entries)?;
+
+    let message = list[idx].message.clone();
+
+    if drop_after {
+        let mut remaining: Vec<StashEntry> = list;
+        remaining.remove(idx);
+        write_stash_list(&remaining)?;
+        println!("Dropped stash@{{{}}} ({})", idx, message);
+    } else {
+        println!("Applied stash@{{{}}} ({})", idx, message);
+    }
+
+    Ok(())
+}
+
+/// `rgit stash pop [<stash>]`
+pub fn stash_pop(stash_ref: Option<String>) -> Result<()> {
+    stash_apply_or_pop(stash_ref, true)
+}
+
+/// `rgit stash apply [<stash>]`
+pub fn stash_apply(stash_ref: Option<String>) -> Result<()> {
+    stash_apply_or_pop(stash_ref, false)
+}
+
+/// `rgit stash list`
+pub fn stash_list() -> Result<()> {
+    let list = read_stash_list()?;
+    for (i, entry) in list.iter().enumerate() {
+        println!("stash@{{{}}}: {}", i, entry.message);
+    }
+    Ok(())
+}
+
+/// `rgit stash drop [<stash>]`
+pub fn stash_drop(stash_ref: Option<String>) -> Result<()> {
+    let idx = parse_stash_index(stash_ref.as_deref())?;
+    let mut list = read_stash_list()?;
+    if list.is_empty() {
+        anyhow::bail!("No stash entries found.");
+    }
+    if idx >= list.len() {
+        anyhow::bail!("fatal: stash@{{{}}} is not a valid reference", idx);
+    }
+
+    let removed = list.remove(idx);
+    write_stash_list(&list)?;
+    println!("Dropped stash@{{{}}} ({})", idx, removed.message);
+    Ok(())
+}
+
+/// `rgit stash show [<stash>]`
+///
+/// Prints the diff between the HEAD the stash was taken against and its
+/// working-tree snapshot.
+pub fn stash_show(stash_ref: Option<String>) -> Result<()> {
+    let idx = parse_stash_index(stash_ref.as_deref())?;
+    let list = read_stash_list()?;
+    if list.is_empty() {
+        anyhow::bail!("No stash entries found.");
+    }
+    if idx >= list.len() {
+        anyhow::bail!("fatal: stash@{{{}}} is not a valid reference", idx);
+    }
+
+    let w_hash = &list[idx].hash;
+    let (obj_type, content) = read_object(w_hash)?;
+    if obj_type != "commit" {
+        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+    }
+    let text = String::from_utf8_lossy(&content).to_string();
+    let parents = commit_parents(&text);
+    let head_at_stash = parents
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("fatal: corrupted stash entry stash@{{{}}}", idx))?;
+
+    let base_tree = resolve_tree_from_source(&head_at_stash)?;
+    let w_tree = resolve_tree_from_source(w_hash)?;
+
+    let mut all_paths = BTreeSet::new();
+    for p in base_tree.keys() {
+        all_paths.insert(p.clone());
+    }
+    for p in w_tree.keys() {
+        all_paths.insert(p.clone());
+    }
+
+    for path in all_paths {
+        let old_bytes = if let Some((hash, _)) = base_tree.get(&path) {
+            read_object(&hex::encode(hash))?.1
+        } else {
+            Vec::new()
+        };
+        let new_bytes = if let Some((hash, _)) = w_tree.get(&path) {
+            read_object(&hex::encode(hash))?.1
+        } else {
+            Vec::new()
+        };
+
+        if old_bytes == new_bytes {
+            continue;
+        }
+
+        let old_str = String::from_utf8_lossy(&old_bytes);
+        let new_str = String::from_utf8_lossy(&new_bytes);
+        let old_lines: Vec<&str> = if old_bytes.is_empty() { Vec::new() } else { old_str.lines().collect() };
+        let new_lines: Vec<&str> = if new_bytes.is_empty() { Vec::new() } else { new_str.lines().collect() };
+
+        let old_label = format!("a/{}", path);
+        let new_label = format!("b/{}", path);
+        let formatted = format_diff_output(&path, &old_lines, &new_lines, &old_label, &new_label);
+        print!("{}", formatted);
+    }
+
+    Ok(())
+}
+
+/// `rgit stash clear`
+pub fn stash_clear() -> Result<()> {
+    if Path::new(STASH_LIST_PATH).exists() {
+        fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
+    }
+    Ok(())
+}
+
+/// Top-level dispatcher for `rgit stash [<action>]`. A bare `rgit stash`
+/// (no subcommand) behaves like `rgit stash push`.
+pub fn stash(action: Option<crate::cli::StashAction>) -> Result<()> {
+    use crate::cli::StashAction;
+
+    match action {
+        None => stash_push(None),
+        Some(StashAction::Push { message }) => stash_push(message),
+        Some(StashAction::Pop { stash }) => stash_pop(stash),
+        Some(StashAction::Apply { stash }) => stash_apply(stash),
+        Some(StashAction::List) => stash_list(),
+        Some(StashAction::Drop { stash }) => stash_drop(stash),
+        Some(StashAction::Show { stash }) => stash_show(stash),
+        Some(StashAction::Clear) => stash_clear(),
+    }
+}

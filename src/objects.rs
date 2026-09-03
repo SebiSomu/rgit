@@ -1,3 +1,5 @@
+use clap::Subcommand;
+
 #[derive(Debug)]
 pub enum GitObject {
     Blob(Vec<u8>),
@@ -42,4 +44,31 @@ pub struct MergeConflict {
     pub base: Vec<u8>,
     pub ours: Vec<u8>,
     pub theirs: Vec<u8>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum StashAction {
+    Push {
+        #[arg(short = 'm', long = "message")]
+        message: Option<String>,
+    },
+    Pop {
+        stash: Option<String>,
+    },
+    Apply {
+        stash: Option<String>,
+    },
+    List,
+    Drop {
+        stash: Option<String>,
+    },
+    Show {
+        stash: Option<String>,
+    },
+    Clear,
+}
+
+pub struct StashEntry {
+    pub(crate) hash: String,
+    pub(crate) message: String,
 }

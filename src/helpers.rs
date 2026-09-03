@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{Context, Result};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -922,4 +922,90 @@ pub fn format_diff_output(path: &str, old_lines: &[&str], new_lines: &[&str], ol
     }
 
     output
+}
+
+/// Runs a git-style three-way tree merge given base/ours/theirs, returning the
+/// resulting merged tree plus any paths that conflict and need manual resolution.
+/// Identical to the diff loop `merge` uses inline, factored out here so both
+/// `cherry_pick` and `cherry_pick_abort` (which has to recompute what an in-progress pick touched) can share it.
+// Used by `cherry_pick` and `cherry_pick_abort`.
+pub fn three_way_tree_merge(base_tree: &BTreeMap<String, ([u8; 20], u32)>, our_tree: &BTreeMap<String, ([u8; 20], u32)>, their_tree: &BTreeMap<String, ([u8; 20], u32)>) -> Result<(BTreeMap<String, ([u8; 20], u32)>, Vec<MergeConflict>)> {
+    let mut all_paths = BTreeSet::new();
+    for p in base_tree.keys() { all_paths.insert(p.clone()); }
+    for p in our_tree.keys() { all_paths.insert(p.clone()); }
+    for p in their_tree.keys() { all_paths.insert(p.clone()); }
+
+    let mut merged_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+    let mut conflicts: Vec<MergeConflict> = Vec::new();
+
+    for path in all_paths {
+        let base_entry = base_tree.get(&path);
+        let our_entry = our_tree.get(&path);
+        let their_entry = their_tree.get(&path);
+
+        if our_entry == their_entry {
+            if let Some(entry) = our_entry {
+                merged_tree.insert(path, *entry);
+            }
+        } else if their_entry == base_entry {
+            if let Some(entry) = our_entry {
+                merged_tree.insert(path, *entry);
+            }
+        } else if our_entry == base_entry {
+            if let Some(entry) = their_entry {
+                merged_tree.insert(path, *entry);
+            }
+        } else {
+            let our_bytes = if let Some(our) = our_entry {
+                read_object(&hex::encode(our.0))?.1
+            } else {
+                Vec::new()
+            };
+            let their_bytes = if let Some(their) = their_entry {
+                read_object(&hex::encode(their.0))?.1
+            } else {
+                Vec::new()
+            };
+            let base_bytes = if let Some(base) = base_entry {
+                read_object(&hex::encode(base.0))?.1
+            } else {
+                Vec::new()
+            };
+
+            conflicts.push(MergeConflict {
+                path,
+                base: base_bytes,
+                ours: our_bytes,
+                theirs: their_bytes,
+            });
+        }
+    }
+
+    Ok((merged_tree, conflicts))
+}
+
+/// Extracts the full commit message body (everything after the blank line that
+/// separates it from the header) from a commit object's raw content.
+// Used by `cherry_pick`.
+pub fn extract_commit_message(commit_text: &str) -> String {
+    let mut in_message = false;
+    let mut lines: Vec<&str> = Vec::new();
+    for line in commit_text.lines() {
+        if in_message {
+            lines.push(line);
+        } else if line.is_empty() {
+            in_message = true;
+        }
+    }
+    lines.join("\n")
+}
+
+/// Resolves a commit's parent hashes from its raw object content, in order.
+// Used by `cherry_pick`.
+pub fn commit_parents(commit_text: &str) -> Vec<String> {
+    commit_text
+        .lines()
+        .filter_map(|line| line.strip_prefix("parent "))
+        .map(|s| s.to_string())
+        .collect()
 }

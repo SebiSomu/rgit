@@ -113,6 +113,18 @@ pub enum Commands {
         #[arg(last = true)]
         paths: Vec<PathBuf>,
     },
+    Clean {
+        #[arg(short = 'n', long = "dry-run")]
+        dry_run: bool,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+        #[arg(short = 'd')]
+        dirs: bool,
+        #[arg(short = 'x', conflicts_with = "only_ignored")]
+        ignored: bool,
+        #[arg(short = 'X', conflicts_with = "ignored")]
+        only_ignored: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -178,6 +190,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Reset { commit, soft, mixed, hard, paths } => {
             crate::commands::reset(commit, soft, mixed, hard, paths)?;
+        }
+        Commands::Clean { dry_run, force, dirs, ignored, only_ignored } => {
+            crate::commands::clean(dry_run, force, dirs, ignored, only_ignored)?;
         }
     }
 

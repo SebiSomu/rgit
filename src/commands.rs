@@ -10,6 +10,7 @@ use crate::refs;
 use crate::index::*;
 use crate::objects::*;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 pub fn init() -> Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -328,14 +329,12 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
         let content = fs::read(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
 
-        let hash_hex = write_object("blob", &content)?;
-        let mut hash = [0u8; 20];
-        hash.copy_from_slice(&hex::decode(&hash_hex)?);
-
+        let hash = hash_content("blob", &content);
         let rel_path = normalize_path(&file_path);
 
         match entries.iter().find(|e| e.path == rel_path) {
             Some(existing) if existing.hash == hash => {
+                // Content already matches what's staged -- nothing to do.
                 unchanged += 1;
                 continue;
             }
@@ -343,8 +342,12 @@ pub fn add(paths: Vec<PathBuf>) -> Result<()> {
             None => added += 1,
         }
 
+        // Only now actually write the object, since we know it's new content.
+        write_object("blob", &content)?;
+
         let metadata = fs::metadata(&file_path)?;
         let new_entry = build_entry(&rel_path, hash, &metadata);
+
         entries.retain(|e| e.path != rel_path);
         entries.push(new_entry);
     }
@@ -1656,6 +1659,185 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
             print_unstaged_after_reset(&old_index_map, &target_tree);
         }
         ResetMode::Soft => unreachable!("soft reset returns earlier"),
+    }
+
+    Ok(())
+}
+
+/// Controls which untracked entries `clean` considers, mirroring git's
+/// `-x` / `-X` / default distinction around `.gitignore`.
+enum CleanMode {
+    /// Default: consider only untracked files that are NOT ignored.
+    Normal,
+    /// `-x`: consider untracked files whether ignored or not.
+    IncludeIgnored,
+    /// `-X`: consider ONLY files that are ignored.
+    IgnoredOnly,
+}
+
+impl CleanMode {
+    fn wants(&self, ignored: bool) -> bool {
+        match self {
+            CleanMode::Normal => !ignored,
+            CleanMode::IncludeIgnored => true,
+            CleanMode::IgnoredOnly => ignored,
+        }
+    }
+}
+
+/// Removes files and directories from the working tree that are not tracked by the
+/// index, similar to `git clean`. Requires either `dry_run` or `force`, matching
+/// git's `clean.requireForce` default safety behavior.
+// Used by the `clean` command.
+pub fn clean(dry_run: bool, force: bool, dirs: bool, ignored: bool, only_ignored: bool) -> Result<()> {
+    if ignored && only_ignored {
+        anyhow::bail!("fatal: -x and -X cannot be used together");
+    }
+
+    if !dry_run && !force {
+        anyhow::bail!(
+            "fatal: clean.requireForce defaults to true and neither -n nor -f given; refusing to clean"
+        );
+    }
+
+    let mode = if only_ignored {
+        CleanMode::IgnoredOnly
+    } else if ignored {
+        CleanMode::IncludeIgnored
+    } else {
+        CleanMode::Normal
+    };
+
+    let index_entries = read_index().unwrap_or_default();
+    let tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
+
+    // Every ancestor directory of every tracked path, so we can tell whether an
+    // untracked directory has tracked content underneath it (and must therefore
+    // be descended into rather than removed wholesale).
+    let mut tracked_dirs: BTreeSet<String> = BTreeSet::new();
+    for path in &tracked_paths {
+        let mut components: Vec<&str> = path.split('/').collect();
+        components.pop();
+        let mut prefix = String::new();
+        for comp in components {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(comp);
+            tracked_dirs.insert(prefix.clone());
+        }
+    }
+
+    let mut files_out: Vec<String> = Vec::new();
+    let mut dirs_out: Vec<String> = Vec::new();
+    let mut rules: Vec<GitIgnoreRule> = Vec::new();
+
+    collect_clean_candidates(
+        Path::new("."),
+        &mut rules,
+        &tracked_paths,
+        &tracked_dirs,
+        &mode,
+        dirs,
+        &mut files_out,
+        &mut dirs_out,
+    )?;
+
+    files_out.sort();
+    dirs_out.sort();
+
+    if files_out.is_empty() && dirs_out.is_empty() {
+        println!("nothing to clean, working tree already clean");
+        return Ok(());
+    }
+
+    let verb = if dry_run { "Would remove" } else { "Removing" };
+
+    for dir in &dirs_out {
+        if !dry_run {
+            fs::remove_dir_all(dir).with_context(|| format!("Failed to remove directory {}", dir))?;
+        }
+        println!("{} {}/", verb, dir);
+    }
+    for file in &files_out {
+        if !dry_run {
+            fs::remove_file(file).with_context(|| format!("Failed to remove {}", file))?;
+        }
+        println!("{} {}", verb, file);
+    }
+
+    Ok(())
+}
+
+fn collect_clean_candidates(path: &Path, rules: &mut Vec<GitIgnoreRule>, tracked_paths: &BTreeSet<String>, tracked_dirs: &BTreeSet<String>, mode: &CleanMode, remove_dirs: bool, files_out: &mut Vec<String>, dirs_out: &mut Vec<String>) -> Result<()> {
+    let metadata = fs::symlink_metadata(path).with_context(|| format!("Failed to stat {}", path.display()))?;
+    let rel_path = normalize_path(path);
+
+    if metadata.is_file() || metadata.file_type().is_symlink() {
+        if tracked_paths.contains(&rel_path) {
+            return Ok(());
+        }
+        let ignored = !rel_path.is_empty() && is_path_ignored(rules, &rel_path, false);
+        if mode.wants(ignored) {
+            files_out.push(rel_path);
+        }
+        return Ok(());
+    }
+
+    if metadata.is_dir() {
+        let name_str = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        if name_str == ".git" {
+            return Ok(());
+        }
+
+        let ignored = !rel_path.is_empty() && is_path_ignored(rules, &rel_path, true);
+        let has_tracked_content = tracked_dirs.contains(&rel_path);
+
+        if remove_dirs && !has_tracked_content && !rel_path.is_empty() {
+            if mode.wants(ignored) {
+                dirs_out.push(rel_path);
+                return Ok(());
+            }
+            if ignored {
+                return Ok(());
+            }
+        }
+
+        if ignored && !mode.wants(true) {
+            return Ok(());
+        }
+
+        let mut current_rules = rules.clone();
+        let gitignore_file = path.join(".gitignore");
+        if gitignore_file.exists() && gitignore_file.is_file() {
+            if let Ok(content) = fs::read_to_string(&gitignore_file) {
+                for line in content.lines() {
+                    if let Some(rule) = parse_gitignore_line(line, &rel_path) {
+                        current_rules.push(rule);
+                    }
+                }
+            }
+        }
+
+        let mut dir_entries: Vec<_> = fs::read_dir(path)?.filter_map(Result::ok).collect();
+        dir_entries.sort_by_key(|e| e.file_name());
+
+        for entry in dir_entries {
+            let entry_name = entry.file_name().to_string_lossy().to_string();
+            if entry_name == ".git" {
+                continue;
+            }
+            collect_clean_candidates(
+                &entry.path(),
+                &mut current_rules,
+                tracked_paths,
+                tracked_dirs,
+                mode,
+                remove_dirs,
+                files_out,
+                dirs_out,
+            )?;
+        }
     }
 
     Ok(())

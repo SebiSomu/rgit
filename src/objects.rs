@@ -72,3 +72,10 @@ pub struct StashEntry {
     pub(crate) hash: String,
     pub(crate) message: String,
 }
+
+pub enum BisectOutcome {
+    WaitingForBad,
+    WaitingForGood,
+    Continue(String, usize),
+    Found(String),
+}

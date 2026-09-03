@@ -11,6 +11,7 @@ use crate::index::*;
 use crate::objects::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::{HashSet, VecDeque};
 
 pub fn init() -> Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -2129,32 +2130,6 @@ fn cherry_pick_abort() -> Result<()> {
     Ok(())
 }
 
-// ============================================================================
-// stash
-// ============================================================================
-//
-// Storage model: each stash entry is represented by two loose commit objects,
-// mirroring (a simplified version of) how real git implements `git stash`:
-//
-//   i_commit: tree = snapshot of the index at stash time, parent = HEAD
-//   w_commit: tree = snapshot of the working directory (for tracked files)
-//             at stash time, parents = [HEAD, i_commit]
-//
-// The hash of `w_commit` is what gets recorded as the stash entry; walking
-// its parents recovers both the index snapshot (2nd parent) and the HEAD it
-// was taken against (1st parent), which is enough to reapply staged vs.
-// unstaged changes separately, and to `stash show` a diff.
-//
-// Unlike real git, entries aren't tracked via `refs/stash` + a reflog; they're
-// kept in a simple ordered list file at `.git/STASH_LIST` (oldest first on
-// disk, so appending a new stash is a single write). This keeps the storage
-// format simple while preserving the same `stash@{N}` addressing scheme
-// (`stash@{0}` is always the most recently pushed entry).
-//
-// Also unlike real git, `pop`/`apply` require a working tree and index that
-// are currently clean (i.e. exactly matching HEAD) — rgit does not attempt a
-// three-way merge of the stash back into a dirty tree.
-
 const STASH_LIST_PATH: &str = ".git/STASH_LIST";
 
 /// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
@@ -2269,7 +2244,7 @@ fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> Result<String
 /// Refuses to proceed unless the working directory and index are currently
 /// clean (i.e. exactly match HEAD). `stash apply`/`pop` use this in place of
 /// a real three-way merge back into a dirty tree.
-fn ensure_clean_for_stash(action: &str) -> Result<()> {
+fn ensure_working_tree_clean(action: &str) -> Result<()> {
     let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
         Some(commit_hash) => {
             let tree_hash = tree_hash_of_commit(&commit_hash)?;
@@ -2293,32 +2268,23 @@ fn ensure_clean_for_stash(action: &str) -> Result<()> {
         );
     }
 
-    let mut working_files = Vec::new();
-    collect_files(Path::new("."), &mut working_files)?;
-
-    let mut seen = BTreeSet::new();
-    for file_path in &working_files {
-        let rel_path = normalize_path(file_path);
-        let content = fs::read(file_path).with_context(|| format!("Failed to read {}", rel_path))?;
-        let hash = hash_content("blob", &content);
-        seen.insert(rel_path.clone());
-
-        match head_tree.get(&rel_path) {
-            Some((h, _)) if *h == hash => {}
-            _ => anyhow::bail!(
-                "error: Your local changes to the following files would be overwritten by {}:\n\t{}\nPlease commit your changes or stash them before running this command again.\nAborting",
-                action,
-                rel_path
-            ),
-        }
-    }
-
-    for path in head_tree.keys() {
-        if !seen.contains(path) {
+    for (path, (head_hash, _mode)) in &head_tree {
+        let path_obj = Path::new(path);
+        if !path_obj.exists() {
             anyhow::bail!(
                 "error: local file '{}' is missing; cannot safely {}.\nAborting",
                 path,
                 action
+            );
+        }
+
+        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", path))?;
+        let hash = hash_content("blob", &content);
+        if hash != *head_hash {
+            anyhow::bail!(
+                "error: Your local changes to the following files would be overwritten by {}:\n\t{}\nPlease commit your changes or stash them before running this command again.\nAborting",
+                action,
+                path
             );
         }
     }
@@ -2445,7 +2411,7 @@ fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> Result<()>
     }
 
     let action = if drop_after { "apply stash (pop)" } else { "apply stash" };
-    ensure_clean_for_stash(action)?;
+    ensure_working_tree_clean(action)?;
 
     let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
 
@@ -2632,5 +2598,498 @@ pub fn stash(action: Option<crate::cli::StashAction>) -> Result<()> {
         Some(StashAction::Drop { stash }) => stash_drop(stash),
         Some(StashAction::Show { stash }) => stash_show(stash),
         Some(StashAction::Clear) => stash_clear(),
+    }
+}
+
+const BISECT_START_PATH: &str = ".git/BISECT_START";
+const BISECT_LOG_PATH: &str = ".git/BISECT_LOG";
+const BISECT_BAD_PATH: &str = ".git/BISECT_BAD";
+const BISECT_GOOD_PATH: &str = ".git/BISECT_GOOD";
+const BISECT_SKIP_PATH: &str = ".git/BISECT_SKIP";
+
+fn read_lines_set(path: &str) -> Result<Vec<String>> {
+    if !Path::new(path).exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
+    Ok(content
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
+}
+
+fn append_line(path: &str, line: &str) -> Result<()> {
+    use std::io::Write as _;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("Failed to open {}", path))?;
+    writeln!(file, "{}", line)?;
+    Ok(())
+}
+
+/// Collects the full ancestor set of `start` (inclusive), following parent
+/// links via BFS.
+fn collect_ancestors(start: &str) -> Result<HashSet<String>> {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent) = line.strip_prefix("parent ") {
+                queue.push_back(parent.to_string());
+            }
+        }
+    }
+
+    Ok(visited)
+}
+
+/// BFS from `start` over the *entire* ancestor graph (so it can walk through
+/// non-candidate commits to reach further candidates), collecting only the
+/// commits that are members of `candidates`, in BFS discovery order.
+fn order_candidates_from(start: &str, candidates: &HashSet<String>) -> Result<Vec<String>> {
+    let mut order = Vec::new();
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        if candidates.contains(&hash) {
+            order.push(hash.clone());
+        }
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent) = line.strip_prefix("parent ") {
+                queue.push_back(parent.to_string());
+            }
+        }
+    }
+
+    Ok(order)
+}
+
+/// Detaches HEAD at `hash` and syncs the working directory + index to match
+/// it, refusing (like `switch`) if that would clobber local changes. Shared
+/// by every point where bisect moves HEAD: stepping to a new midpoint,
+/// `bisect reset <commit>`, and restoring a detached-HEAD starting point.
+fn checkout_bisect_commit(hash: &str) -> Result<()> {
+    let target_tree_hash = tree_hash_of_commit(hash)?;
+    let mut target_tree = BTreeMap::new();
+    flatten_tree(&target_tree_hash, "", &mut target_tree)?;
+
+    let mut head_tree = BTreeMap::new();
+    if let Some(current_commit) = refs::resolve_head_commit()? {
+        let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+        flatten_tree(&current_tree_hash, "", &mut head_tree)?;
+    }
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
+
+    check_switch_safety(&target_tree, &head_tree, &index_map)?;
+    sync_working_tree(&target_tree, &head_tree, &index_map)?;
+    update_index_from_tree(&target_tree, &head_tree)?;
+
+    refs::set_head_detached(hash)?;
+    Ok(())
+}
+
+fn print_commit_oneline(hash: &str) -> Result<()> {
+    let subject = commit_subject_line(hash)?;
+    println!("[{}] {}", &hash[..hash.len().min(7)], subject);
+    Ok(())
+}
+
+fn report_first_bad(hash: &str) -> Result<()> {
+    let (object_type, content) = read_object(hash)?;
+    let text = String::from_utf8_lossy(&content);
+
+    println!("{} is the first bad commit", hash);
+    println!("commit {}", hash);
+    if object_type == "commit" {
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(author) = line.strip_prefix("author ") {
+                println!("Author: {}", author);
+            }
+        }
+    }
+    println!();
+    println!("    {}", commit_subject_line(hash)?);
+    Ok(())
+}
+
+fn report_outcome(outcome: &BisectOutcome) -> Result<()> {
+    match outcome {
+        BisectOutcome::WaitingForBad => {
+            println!("status: waiting for bad commit, good commit(s) known");
+        }
+        BisectOutcome::WaitingForGood => {
+            println!("status: waiting for good commit(s), bad commit known");
+        }
+        BisectOutcome::Continue(hash, remaining) => {
+            let steps = if *remaining == 0 { 0 } else { (*remaining as f64).log2().ceil() as u32 };
+            println!(
+                "Bisecting: {} revision{} left to test after this (roughly {} step{})",
+                remaining,
+                if *remaining == 1 { "" } else { "s" },
+                steps,
+                if steps == 1 { "" } else { "s" }
+            );
+            print_commit_oneline(hash)?;
+        }
+        BisectOutcome::Found(hash) => {
+            report_first_bad(hash)?;
+        }
+    }
+    Ok(())
+}
+
+/// Recomputes the candidate set from the current BISECT_BAD/GOOD/SKIP state
+/// and either checks out the next midpoint (`Continue`) or concludes the
+/// search (`Found`). Pure aside from the checkout side effect on `Continue`.
+fn bisect_recompute() -> Result<BisectOutcome> {
+    let bad = match fs::read_to_string(BISECT_BAD_PATH)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        Some(b) => b,
+        None => return Ok(BisectOutcome::WaitingForBad),
+    };
+
+    let goods = read_lines_set(BISECT_GOOD_PATH)?;
+    if goods.is_empty() {
+        return Ok(BisectOutcome::WaitingForGood);
+    }
+
+    for good in &goods {
+        if !is_reachable(&bad, good)? {
+            anyhow::bail!(
+                "error: some good revs are not ancestors of the bad rev.\n\
+                 rgit bisect cannot work properly in this state."
+            );
+        }
+    }
+
+    let ancestors_bad = collect_ancestors(&bad)?;
+    let mut ancestors_good: HashSet<String> = HashSet::new();
+    for g in &goods {
+        ancestors_good.extend(collect_ancestors(g)?);
+    }
+
+    let candidates: HashSet<String> = ancestors_bad.difference(&ancestors_good).cloned().collect();
+
+    let skip_set: HashSet<String> = read_lines_set(BISECT_SKIP_PATH)?.into_iter().collect();
+    let testable: HashSet<String> = candidates.difference(&skip_set).cloned().collect();
+
+    if testable.is_empty() {
+        if candidates.len() <= 1 {
+            let hash = candidates.into_iter().next().unwrap_or_else(|| bad.clone());
+            return Ok(BisectOutcome::Found(hash));
+        }
+        anyhow::bail!(
+            "error: every commit left to test has been skipped; cannot narrow down further.\n\
+             Try marking a different commit good/bad, or reducing the number of skips."
+        );
+    }
+
+    let order = order_candidates_from(&bad, &testable)?;
+
+    if order.len() == 1 {
+        return Ok(BisectOutcome::Found(order[0].clone()));
+    }
+
+    let mid = order[order.len() / 2].clone();
+    checkout_bisect_commit(&mid)?;
+
+    let remaining = order.len() - 1;
+    Ok(BisectOutcome::Continue(mid, remaining))
+}
+
+fn mark_bad(rev: Option<String>) -> Result<BisectOutcome> {
+    if !Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let target = match rev {
+        Some(r) => resolve_commit_from_source(&r)?,
+        None => refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
+    };
+
+    fs::write(BISECT_BAD_PATH, format!("{}\n", target)).context("Failed to write .git/BISECT_BAD")?;
+    append_line(BISECT_LOG_PATH, &format!("git bisect bad {}", target))?;
+
+    bisect_recompute()
+}
+
+fn mark_good(rev: Option<String>) -> Result<BisectOutcome> {
+    if !Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let target = match rev {
+        Some(r) => resolve_commit_from_source(&r)?,
+        None => refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
+    };
+
+    let mut goods = read_lines_set(BISECT_GOOD_PATH)?;
+    if !goods.iter().any(|g| g == &target) {
+        goods.push(target.clone());
+        let mut content = goods.join("\n");
+        content.push('\n');
+        fs::write(BISECT_GOOD_PATH, content).context("Failed to write .git/BISECT_GOOD")?;
+    }
+    append_line(BISECT_LOG_PATH, &format!("git bisect good {}", target))?;
+
+    bisect_recompute()
+}
+
+fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
+    if !Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let targets: Vec<String> = if revs.is_empty() {
+        vec![refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?]
+    } else {
+        revs.iter().map(|r| resolve_commit_from_source(r)).collect::<Result<Vec<_>>>()?
+    };
+
+    let mut skips = read_lines_set(BISECT_SKIP_PATH)?;
+    for target in &targets {
+        if !skips.iter().any(|s| s == target) {
+            skips.push(target.clone());
+        }
+        append_line(BISECT_LOG_PATH, &format!("git bisect skip {}", target))?;
+    }
+    let mut content = skips.join("\n");
+    content.push('\n');
+    fs::write(BISECT_SKIP_PATH, content).context("Failed to write .git/BISECT_SKIP")?;
+
+    bisect_recompute()
+}
+
+/// `rgit bisect start [<bad> [<good>...]]`
+pub fn bisect_start(bad: Option<String>, good: Vec<String>) -> Result<()> {
+    if Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!(
+            "fatal: a bisect session is already in progress\n\
+             hint: use 'rgit bisect reset' to start over"
+        );
+    }
+
+    refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit to bisect"))?;
+    ensure_working_tree_clean("start a bisect")?;
+
+    let head_content = fs::read_to_string(".git/HEAD").context("Failed to read .git/HEAD")?;
+    fs::write(BISECT_START_PATH, &head_content).context("Failed to write .git/BISECT_START")?;
+
+    let _ = fs::remove_file(BISECT_BAD_PATH);
+    let _ = fs::remove_file(BISECT_GOOD_PATH);
+    let _ = fs::remove_file(BISECT_SKIP_PATH);
+    let _ = fs::remove_file(BISECT_LOG_PATH);
+    append_line(BISECT_LOG_PATH, "git bisect start")?;
+
+    let mut last_outcome = None;
+    if let Some(bad_rev) = bad {
+        last_outcome = Some(mark_bad(Some(bad_rev))?);
+    }
+    for good_rev in good {
+        last_outcome = Some(mark_good(Some(good_rev))?);
+    }
+
+    if let Some(outcome) = last_outcome {
+        report_outcome(&outcome)?;
+    }
+
+    Ok(())
+}
+
+/// `rgit bisect bad [<rev>]`
+pub fn bisect_bad(rev: Option<String>) -> Result<()> {
+    let outcome = mark_bad(rev)?;
+    report_outcome(&outcome)
+}
+
+/// `rgit bisect good [<rev>]`
+pub fn bisect_good(rev: Option<String>) -> Result<()> {
+    let outcome = mark_good(rev)?;
+    report_outcome(&outcome)
+}
+
+/// `rgit bisect skip [<rev>...]`
+pub fn bisect_skip(revs: Vec<String>) -> Result<()> {
+    let outcome = mark_skip(revs)?;
+    report_outcome(&outcome)
+}
+
+/// `rgit bisect reset [<commit>]`
+pub fn bisect_reset(commit: Option<String>) -> Result<()> {
+    if !Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: We are not bisecting.");
+    }
+
+    if let Some(target) = commit {
+        let hash = resolve_commit_from_source(&target)?;
+        checkout_bisect_commit(&hash)?;
+        println!("HEAD is now at {} (detached)", &hash[..hash.len().min(7)]);
+    } else {
+        let saved = fs::read_to_string(BISECT_START_PATH).context("Failed to read .git/BISECT_START")?;
+        let trimmed = saved.trim();
+
+        if let Some(branch_ref) = trimmed.strip_prefix("ref: ") {
+            let branch_name = branch_ref.strip_prefix("refs/heads/").unwrap_or(branch_ref).to_string();
+            let target_hash = refs::read_ref(branch_ref)?.ok_or_else(|| {
+                anyhow::anyhow!("fatal: '{}' no longer exists; cannot restore original branch", branch_name)
+            })?;
+
+            let target_tree_hash = tree_hash_of_commit(&target_hash)?;
+            let mut target_tree = BTreeMap::new();
+            flatten_tree(&target_tree_hash, "", &mut target_tree)?;
+
+            let mut head_tree = BTreeMap::new();
+            if let Some(current_commit) = refs::resolve_head_commit()? {
+                let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+                flatten_tree(&current_tree_hash, "", &mut head_tree)?;
+            }
+
+            let index_entries = read_index().unwrap_or_default();
+            let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
+
+            check_switch_safety(&target_tree, &head_tree, &index_map)?;
+            sync_working_tree(&target_tree, &head_tree, &index_map)?;
+            update_index_from_tree(&target_tree, &head_tree)?;
+
+            refs::set_head(&branch_name)?;
+            println!("Switched to branch '{}'", branch_name);
+        } else {
+            checkout_bisect_commit(trimmed)?;
+            println!("HEAD is now at {} (detached)", &trimmed[..trimmed.len().min(7)]);
+        }
+    }
+
+    let _ = fs::remove_file(BISECT_START_PATH);
+    let _ = fs::remove_file(BISECT_LOG_PATH);
+    let _ = fs::remove_file(BISECT_BAD_PATH);
+    let _ = fs::remove_file(BISECT_GOOD_PATH);
+    let _ = fs::remove_file(BISECT_SKIP_PATH);
+
+    println!("Bisect session ended.");
+
+    Ok(())
+}
+
+/// `rgit bisect log`
+pub fn bisect_log() -> Result<()> {
+    if !Path::new(BISECT_LOG_PATH).exists() {
+        anyhow::bail!("fatal: We are not bisecting.");
+    }
+    let content = fs::read_to_string(BISECT_LOG_PATH).context("Failed to read .git/BISECT_LOG")?;
+    print!("{}", content);
+    Ok(())
+}
+
+/// `rgit bisect run <cmd> [<args>...]`
+///
+/// Repeatedly runs the given command against each midpoint: exit code 0
+/// marks it good, 125 marks it skipped (matching git's convention for
+/// "untestable"), any other exit code in 1..=127 marks it bad. Stops once a
+/// single first-bad commit is found.
+pub fn bisect_run(command: Vec<String>) -> Result<()> {
+    if command.is_empty() {
+        anyhow::bail!("fatal: 'rgit bisect run' requires a command to run");
+    }
+    if !Path::new(BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+    if !Path::new(BISECT_BAD_PATH).exists() || read_lines_set(BISECT_GOOD_PATH)?.is_empty() {
+        anyhow::bail!("fatal: bisect run requires both a bad and at least one good commit to be marked first");
+    }
+
+    loop {
+        println!("running {}", command.join(" "));
+        let status = std::process::Command::new(&command[0])
+            .args(&command[1..])
+            .status()
+            .with_context(|| format!("failed to run '{}'", command[0]))?;
+
+        let code = status.code().unwrap_or(-1);
+
+        let outcome = if code == 0 {
+            mark_good(None)?
+        } else if code == 125 {
+            mark_skip(Vec::new())?
+        } else if (1..=127).contains(&code) {
+            mark_bad(None)?
+        } else {
+            anyhow::bail!("fatal: bisect run failed: exit code {} from '{}'", code, command[0]);
+        };
+
+        report_outcome(&outcome)?;
+
+        match outcome {
+            BisectOutcome::Found(_) => {
+                println!("bisect run success");
+                break;
+            }
+            BisectOutcome::WaitingForBad | BisectOutcome::WaitingForGood => {
+                anyhow::bail!("fatal: bisect run cannot proceed further; missing bad/good commit");
+            }
+            BisectOutcome::Continue(_, _) => continue,
+        }
+    }
+
+    Ok(())
+}
+
+/// Top-level dispatcher for `rgit bisect <action>`.
+pub fn bisect(action: crate::cli::BisectAction) -> Result<()> {
+    use crate::cli::BisectAction;
+
+    match action {
+        BisectAction::Start { bad, good } => bisect_start(bad, good),
+        BisectAction::Bad { rev } => bisect_bad(rev),
+        BisectAction::Good { rev } => bisect_good(rev),
+        BisectAction::Skip { revs } => bisect_skip(revs),
+        BisectAction::Reset { commit } => bisect_reset(commit),
+        BisectAction::Log => bisect_log(),
+        BisectAction::Run { command } => bisect_run(command),
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use anyhow::{Context, Result};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -7,7 +7,7 @@ use sha1::{Digest, Sha1};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use crate::index::{read_index, write_index, build_entry};
+use crate::index::{read_index, write_index, build_entry, IndexEntry};
 use crate::refs;
 use crate::objects::*;
 
@@ -1008,4 +1008,566 @@ pub fn commit_parents(commit_text: &str) -> Vec<String> {
         .filter_map(|line| line.strip_prefix("parent "))
         .map(|s| s.to_string())
         .collect()
+}
+
+const STASH_LIST_PATH: &str = ".git/STASH_LIST";
+
+/// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
+pub fn read_stash_list() -> Result<Vec<StashEntry>> {
+    if !Path::new(STASH_LIST_PATH).exists() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs::read_to_string(STASH_LIST_PATH).context("Failed to read .git/STASH_LIST")?;
+    let mut entries: Vec<StashEntry> = content
+        .lines()
+        .filter(|l| !l.is_empty())
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, ' ');
+            let hash = parts.next()?.to_string();
+            let message = parts.next().unwrap_or("").to_string();
+            Some(StashEntry { hash, message })
+        })
+        .collect();
+
+    entries.reverse();
+    Ok(entries)
+}
+
+/// Overwrites the stash list. `entries` must be newest-first (index 0 ==
+/// `stash@{0}`), matching what `read_stash_list` returns.
+pub fn write_stash_list(entries: &[StashEntry]) -> Result<()> {
+    if entries.is_empty() {
+        if Path::new(STASH_LIST_PATH).exists() {
+            fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
+        }
+        return Ok(());
+    }
+
+    let mut lines: Vec<String> = entries.iter().map(|e| format!("{} {}", e.hash, e.message)).collect();
+    lines.reverse();
+    let mut content = lines.join("\n");
+    content.push('\n');
+    fs::write(STASH_LIST_PATH, content).context("Failed to write .git/STASH_LIST")?;
+    Ok(())
+}
+
+/// Appends a newly-created stash entry as the new `stash@{0}`.
+pub fn append_stash_entry(hash: &str, message: &str) -> Result<()> {
+    use std::io::Write as _;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(STASH_LIST_PATH)
+        .context("Failed to open .git/STASH_LIST")?;
+    writeln!(file, "{} {}", hash, message)?;
+    Ok(())
+}
+
+/// Parses a `stash@{N}` reference, a bare `N`, or `None` (meaning `stash@{0}`)
+/// into an index into the stash list.
+pub fn parse_stash_index(s: Option<&str>) -> Result<usize> {
+    match s {
+        None => Ok(0),
+        Some(raw) => {
+            let trimmed = raw.trim();
+            let inner = trimmed
+                .strip_prefix("stash@{")
+                .and_then(|r| r.strip_suffix('}'))
+                .unwrap_or(trimmed);
+            inner
+                .parse::<usize>()
+                .map_err(|_| anyhow::anyhow!("fatal: '{}' is not a valid stash reference", raw))
+        }
+    }
+}
+
+/// Human-readable label for the current HEAD, used in stash messages
+/// ("WIP on <label>: ...").
+pub fn current_branch_label() -> Result<String> {
+    match refs::resolve_head()? {
+        refs::HeadState::Branch(b) => Ok(b),
+        refs::HeadState::Detached(h) => {
+            let short = &h[..h.len().min(7)];
+            Ok(format!("(detached HEAD at {})", short))
+        }
+    }
+}
+
+/// Builds and writes a tree object directly from a flattened path -> (hash,
+/// mode) map, reusing `write_tree_from_index_prefix` via a throwaway
+/// `IndexEntry` list. Stat fields are irrelevant here since only the mode and
+/// blob hash are encoded into tree entries.
+pub fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> Result<String> {
+    let entries: Vec<IndexEntry> = map
+        .iter()
+        .map(|(path, (hash, mode))| IndexEntry {
+            ctime_secs: 0,
+            ctime_nsecs: 0,
+            mtime_secs: 0,
+            mtime_nsecs: 0,
+            dev: 0,
+            ino: 0,
+            mode: *mode,
+            uid: 0,
+            gid: 0,
+            size: 0,
+            hash: *hash,
+            path: path.clone(),
+        })
+        .collect();
+
+    crate::commands::write_tree_from_index_prefix(&entries, "")
+}
+
+/// Refuses to proceed unless the working directory and index are currently
+/// clean (i.e. exactly match HEAD). `stash apply`/`pop` use this in place of
+/// a real three-way merge back into a dirty tree.
+pub fn ensure_working_tree_clean(action: &str) -> Result<()> {
+    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
+        Some(commit_hash) => {
+            let tree_hash = tree_hash_of_commit(&commit_hash)?;
+            let mut map = BTreeMap::new();
+            flatten_tree(&tree_hash, "", &mut map)?;
+            map
+        }
+        None => BTreeMap::new(),
+    };
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, ([u8; 20], u32)> = index_entries
+        .iter()
+        .map(|e| (e.path.clone(), (e.hash, e.mode)))
+        .collect();
+
+    if index_map != head_tree {
+        anyhow::bail!(
+            "error: cannot {}: you have staged changes.\nPlease commit or reset them first.",
+            action
+        );
+    }
+
+    for (path, (head_hash, _mode)) in &head_tree {
+        let path_obj = Path::new(path);
+        if !path_obj.exists() {
+            anyhow::bail!(
+                "error: local file '{}' is missing; cannot safely {}.\nAborting",
+                path,
+                action
+            );
+        }
+
+        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", path))?;
+        let hash = hash_content("blob", &content);
+        if hash != *head_hash {
+            anyhow::bail!(
+                "error: Your local changes to the following files would be overwritten by {}:\n\t{}\nPlease commit your changes or stash them before running this command again.\nAborting",
+                action,
+                path
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens
+/// both into path -> (hash, mode) maps: `(working_tree, index_tree)`.
+pub fn load_stash_trees(idx: usize, list: &[StashEntry]) -> Result<(BTreeMap<String, ([u8; 20], u32)>, BTreeMap<String, ([u8; 20], u32)>)> {
+    let w_hash = &list[idx].hash;
+
+    let (obj_type, content) = read_object(w_hash)?;
+    if obj_type != "commit" {
+        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+    }
+    let text = String::from_utf8_lossy(&content).to_string();
+    let parents = commit_parents(&text);
+    if parents.len() < 2 {
+        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+    }
+    let head_at_stash = &parents[0];
+    let i_hash = &parents[1];
+
+    let w_tree_hash = tree_hash_of_commit(w_hash)?;
+    let mut w_tree = BTreeMap::new();
+    flatten_tree(&w_tree_hash, "", &mut w_tree)?;
+
+    let i_tree_hash = tree_hash_of_commit(i_hash)?;
+    let mut i_tree = BTreeMap::new();
+    flatten_tree(&i_tree_hash, "", &mut i_tree)?;
+
+    let _ = head_at_stash; // only needed by `stash show`, kept here for symmetry
+    Ok((w_tree, i_tree))
+}
+
+/// Shared implementation of `stash apply` and `stash pop`.
+pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> Result<()> {
+    let idx = parse_stash_index(stash_ref.as_deref())?;
+    let list = read_stash_list()?;
+    if list.is_empty() {
+        anyhow::bail!("No stash entries found.");
+    }
+    if idx >= list.len() {
+        anyhow::bail!("fatal: stash@{{{}}} is not a valid reference", idx);
+    }
+
+    let action = if drop_after { "apply stash (pop)" } else { "apply stash" };
+    ensure_working_tree_clean(action)?;
+
+    let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
+
+    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
+        Some(commit_hash) => {
+            let tree_hash = tree_hash_of_commit(&commit_hash)?;
+            let mut map = BTreeMap::new();
+            flatten_tree(&tree_hash, "", &mut map)?;
+            map
+        }
+        None => BTreeMap::new(),
+    };
+
+    // Remove tracked files that existed at HEAD but were deleted in the
+    // stash's working-tree snapshot.
+    for path in head_tree.keys() {
+        if !w_tree.contains_key(path) {
+            let p = Path::new(path);
+            if p.exists() {
+                let _ = fs::remove_file(p);
+            }
+        }
+    }
+
+    // Write the stash's working-tree snapshot to disk.
+    for (path, (hash, mode)) in &w_tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let file_mode = if (*mode & 0o111) != 0 { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        }
+    }
+
+    // Rebuild the index to match the stash's index snapshot (preserving the
+    // staged vs. unstaged distinction that existed when the stash was made).
+    let mut new_entries = crate::commands::build_index_entries_for_tree(&i_tree, true)?;
+    write_index(&mut new_entries)?;
+
+    let message = list[idx].message.clone();
+
+    if drop_after {
+        let mut remaining: Vec<StashEntry> = list;
+        remaining.remove(idx);
+        write_stash_list(&remaining)?;
+        println!("Dropped stash@{{{}}} ({})", idx, message);
+    } else {
+        println!("Applied stash@{{{}}} ({})", idx, message);
+    }
+
+    Ok(())
+}
+
+pub fn read_lines_set(path: &str) -> Result<Vec<String>> {
+    if !Path::new(path).exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
+    Ok(content
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
+}
+
+pub fn append_line(path: &str, line: &str) -> Result<()> {
+    use std::io::Write as _;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("Failed to open {}", path))?;
+    writeln!(file, "{}", line)?;
+    Ok(())
+}
+
+/// Collects the full ancestor set of `start` (inclusive), following parent
+/// links via BFS.
+pub fn collect_ancestors(start: &str) -> Result<HashSet<String>> {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent) = line.strip_prefix("parent ") {
+                queue.push_back(parent.to_string());
+            }
+        }
+    }
+
+    Ok(visited)
+}
+
+/// BFS from `start` over the *entire* ancestor graph (so it can walk through
+/// non-candidate commits to reach further candidates), collecting only the
+/// commits that are members of `candidates`, in BFS discovery order.
+pub fn order_candidates_from(start: &str, candidates: &HashSet<String>) -> Result<Vec<String>> {
+    let mut order = Vec::new();
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        if candidates.contains(&hash) {
+            order.push(hash.clone());
+        }
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent) = line.strip_prefix("parent ") {
+                queue.push_back(parent.to_string());
+            }
+        }
+    }
+
+    Ok(order)
+}
+
+/// Detaches HEAD at `hash` and syncs the working directory + index to match
+/// it, refusing (like `switch`) if that would clobber local changes. Shared
+/// by every point where bisect moves HEAD: stepping to a new midpoint,
+/// `bisect reset <commit>`, and restoring a detached-HEAD starting point.
+pub fn checkout_bisect_commit(hash: &str) -> Result<()> {
+    let target_tree_hash = tree_hash_of_commit(hash)?;
+    let mut target_tree = BTreeMap::new();
+    flatten_tree(&target_tree_hash, "", &mut target_tree)?;
+
+    let mut head_tree = BTreeMap::new();
+    if let Some(current_commit) = refs::resolve_head_commit()? {
+        let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+        flatten_tree(&current_tree_hash, "", &mut head_tree)?;
+    }
+
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
+
+    check_switch_safety(&target_tree, &head_tree, &index_map)?;
+    sync_working_tree(&target_tree, &head_tree, &index_map)?;
+    update_index_from_tree(&target_tree, &head_tree)?;
+
+    refs::set_head_detached(hash)?;
+    Ok(())
+}
+
+pub fn print_commit_oneline(hash: &str) -> Result<()> {
+    let subject = crate::commands::commit_subject_line(hash)?;
+    println!("[{}] {}", &hash[..hash.len().min(7)], subject);
+    Ok(())
+}
+
+pub fn report_first_bad(hash: &str) -> Result<()> {
+    let (object_type, content) = read_object(hash)?;
+    let text = String::from_utf8_lossy(&content);
+
+    println!("{} is the first bad commit", hash);
+    println!("commit {}", hash);
+    if object_type == "commit" {
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(author) = line.strip_prefix("author ") {
+                println!("Author: {}", author);
+            }
+        }
+    }
+    println!();
+    println!("    {}", crate::commands::commit_subject_line(hash)?);
+    Ok(())
+}
+
+pub fn report_outcome(outcome: &BisectOutcome) -> Result<()> {
+    match outcome {
+        BisectOutcome::WaitingForBad => {
+            println!("status: waiting for bad commit, good commit(s) known");
+        }
+        BisectOutcome::WaitingForGood => {
+            println!("status: waiting for good commit(s), bad commit known");
+        }
+        BisectOutcome::Continue(hash, remaining) => {
+            let steps = if *remaining == 0 { 0 } else { (*remaining as f64).log2().ceil() as u32 };
+            println!(
+                "Bisecting: {} revision{} left to test after this (roughly {} step{})",
+                remaining,
+                if *remaining == 1 { "" } else { "s" },
+                steps,
+                if steps == 1 { "" } else { "s" }
+            );
+            print_commit_oneline(hash)?;
+        }
+        BisectOutcome::Found(hash) => {
+            report_first_bad(hash)?;
+        }
+    }
+    Ok(())
+}
+
+/// Recomputes the candidate set from the current BISECT_BAD/GOOD/SKIP state
+/// and either checks out the next midpoint (`Continue`) or concludes the
+/// search (`Found`). Pure aside from the checkout side effect on `Continue`.
+pub fn bisect_recompute() -> Result<BisectOutcome> {
+    let bad = match fs::read_to_string(crate::commands::BISECT_BAD_PATH)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        Some(b) => b,
+        None => return Ok(BisectOutcome::WaitingForBad),
+    };
+
+    let goods = read_lines_set(crate::commands::BISECT_GOOD_PATH)?;
+    if goods.is_empty() {
+        return Ok(BisectOutcome::WaitingForGood);
+    }
+
+    for good in &goods {
+        if !is_reachable(&bad, good)? {
+            anyhow::bail!(
+                "error: some good revs are not ancestors of the bad rev.\n\
+                 rgit bisect cannot work properly in this state."
+            );
+        }
+    }
+
+    let ancestors_bad = collect_ancestors(&bad)?;
+    let mut ancestors_good: HashSet<String> = HashSet::new();
+    for g in &goods {
+        ancestors_good.extend(collect_ancestors(g)?);
+    }
+
+    let candidates: HashSet<String> = ancestors_bad.difference(&ancestors_good).cloned().collect();
+
+    let skip_set: HashSet<String> = read_lines_set(crate::commands::BISECT_SKIP_PATH)?.into_iter().collect();
+    let testable: HashSet<String> = candidates.difference(&skip_set).cloned().collect();
+
+    if testable.is_empty() {
+        if candidates.len() <= 1 {
+            let hash = candidates.into_iter().next().unwrap_or_else(|| bad.clone());
+            return Ok(BisectOutcome::Found(hash));
+        }
+        anyhow::bail!(
+            "error: every commit left to test has been skipped; cannot narrow down further.\n\
+             Try marking a different commit good/bad, or reducing the number of skips."
+        );
+    }
+
+    let order = order_candidates_from(&bad, &testable)?;
+
+    if order.len() == 1 {
+        return Ok(BisectOutcome::Found(order[0].clone()));
+    }
+
+    let mid = order[order.len() / 2].clone();
+    checkout_bisect_commit(&mid)?;
+
+    let remaining = order.len() - 1;
+    Ok(BisectOutcome::Continue(mid, remaining))
+}
+
+pub fn mark_bad(rev: Option<String>) -> Result<BisectOutcome> {
+    if !Path::new(crate::commands::BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let target = match rev {
+        Some(r) => resolve_commit_from_source(&r)?,
+        None => refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
+    };
+
+    fs::write(crate::commands::BISECT_BAD_PATH, format!("{}\n", target)).context("Failed to write .git/BISECT_BAD")?;
+    append_line(crate::commands::BISECT_LOG_PATH, &format!("git bisect bad {}", target))?;
+
+    bisect_recompute()
+}
+
+pub fn mark_good(rev: Option<String>) -> Result<BisectOutcome> {
+    if !Path::new(crate::commands::BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let target = match rev {
+        Some(r) => resolve_commit_from_source(&r)?,
+        None => refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
+    };
+
+    let mut goods = read_lines_set(crate::commands::BISECT_GOOD_PATH)?;
+    if !goods.iter().any(|g| g == &target) {
+        goods.push(target.clone());
+        let mut content = goods.join("\n");
+        content.push('\n');
+        fs::write(crate::commands::BISECT_GOOD_PATH, content).context("Failed to write .git/BISECT_GOOD")?;
+    }
+    append_line(crate::commands::BISECT_LOG_PATH, &format!("git bisect good {}", target))?;
+
+    bisect_recompute()
+}
+
+pub fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
+    if !Path::new(crate::commands::BISECT_START_PATH).exists() {
+        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
+    }
+
+    let targets: Vec<String> = if revs.is_empty() {
+        vec![refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?]
+    } else {
+        revs.iter().map(|r| resolve_commit_from_source(r)).collect::<Result<Vec<_>>>()?
+    };
+
+    let mut skips = read_lines_set(crate::commands::BISECT_SKIP_PATH)?;
+    for target in &targets {
+        if !skips.iter().any(|s| s == target) {
+            skips.push(target.clone());
+        }
+        append_line(crate::commands::BISECT_LOG_PATH, &format!("git bisect skip {}", target))?;
+    }
+    let mut content = skips.join("\n");
+    content.push('\n');
+    fs::write(crate::commands::BISECT_SKIP_PATH, content).context("Failed to write .git/BISECT_SKIP")?;
+
+    bisect_recompute()
 }

@@ -134,6 +134,15 @@ pub enum Commands {
         #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
         abort: bool,
     },
+    Revert {
+        commit: Option<String>,
+        #[arg(short = 'n', long = "no-commit", conflicts_with_all = ["cont", "abort"])]
+        no_commit: bool,
+        #[arg(long = "continue", conflicts_with_all = ["abort", "no_commit"])]
+        cont: bool,
+        #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
+        abort: bool,
+    },
     Stash {
         #[command(subcommand)]
         action: Option<StashAction>,
@@ -260,6 +269,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::CherryPick { commit, no_commit, cont, abort } => {
             crate::commands::cherry_pick(commit, no_commit, cont, abort)?;
+        }
+        Commands::Revert { commit, no_commit, cont, abort } => {
+            crate::commands::revert(commit, no_commit, cont, abort)?;
         }
         Commands::Stash { action } => {
             crate::commands::stash(action)?;

@@ -63,7 +63,7 @@ pub fn write_tree() -> Result<()> {
     Ok(())
 }
 
-fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> Result<String> {
+pub(crate) fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> Result<String> {
     let prefix_with_slash = if prefix.is_empty() {
         String::new()
     } else {
@@ -1413,7 +1413,7 @@ fn hard_reset_working_tree(
 /// `build_entry`; otherwise (a mixed reset, which never touches the working tree) a
 /// placeholder stat entry is used, mirroring the convention already used by `restore`.
 // Used by `reset --mixed` and `reset --hard`.
-fn build_index_entries_for_tree(
+pub(crate) fn build_index_entries_for_tree(
     target_tree: &BTreeMap<String, ([u8; 20], u32)>,
     read_disk_metadata: bool,
 ) -> Result<Vec<IndexEntry>> {
@@ -1451,7 +1451,7 @@ fn build_index_entries_for_tree(
 
 /// Returns the first line of a commit's message body (its "subject line").
 // Used by `reset --hard` to print the familiar `HEAD is now at <hash> <subject>` line.
-fn commit_subject_line(commit_hash: &str) -> Result<String> {
+pub(crate) fn commit_subject_line(commit_hash: &str) -> Result<String> {
     let (object_type, content) = read_object(commit_hash)?;
     if object_type != "commit" {
         anyhow::bail!("{} is not a commit object", commit_hash);
@@ -2130,168 +2130,6 @@ fn cherry_pick_abort() -> Result<()> {
     Ok(())
 }
 
-const STASH_LIST_PATH: &str = ".git/STASH_LIST";
-
-/// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
-fn read_stash_list() -> Result<Vec<StashEntry>> {
-    if !Path::new(STASH_LIST_PATH).exists() {
-        return Ok(Vec::new());
-    }
-
-    let content = fs::read_to_string(STASH_LIST_PATH).context("Failed to read .git/STASH_LIST")?;
-    let mut entries: Vec<StashEntry> = content
-        .lines()
-        .filter(|l| !l.is_empty())
-        .filter_map(|line| {
-            let mut parts = line.splitn(2, ' ');
-            let hash = parts.next()?.to_string();
-            let message = parts.next().unwrap_or("").to_string();
-            Some(StashEntry { hash, message })
-        })
-        .collect();
-
-    // File is stored oldest-first (append order); reverse so index 0 is newest.
-    entries.reverse();
-    Ok(entries)
-}
-
-/// Overwrites the stash list. `entries` must be newest-first (index 0 ==
-/// `stash@{0}`), matching what `read_stash_list` returns.
-fn write_stash_list(entries: &[StashEntry]) -> Result<()> {
-    if entries.is_empty() {
-        if Path::new(STASH_LIST_PATH).exists() {
-            fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
-        }
-        return Ok(());
-    }
-
-    let mut lines: Vec<String> = entries.iter().map(|e| format!("{} {}", e.hash, e.message)).collect();
-    lines.reverse();
-    let mut content = lines.join("\n");
-    content.push('\n');
-    fs::write(STASH_LIST_PATH, content).context("Failed to write .git/STASH_LIST")?;
-    Ok(())
-}
-
-/// Appends a newly-created stash entry as the new `stash@{0}`.
-fn append_stash_entry(hash: &str, message: &str) -> Result<()> {
-    use std::io::Write as _;
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(STASH_LIST_PATH)
-        .context("Failed to open .git/STASH_LIST")?;
-    writeln!(file, "{} {}", hash, message)?;
-    Ok(())
-}
-
-/// Parses a `stash@{N}` reference, a bare `N`, or `None` (meaning `stash@{0}`)
-/// into an index into the stash list.
-fn parse_stash_index(s: Option<&str>) -> Result<usize> {
-    match s {
-        None => Ok(0),
-        Some(raw) => {
-            let trimmed = raw.trim();
-            let inner = trimmed
-                .strip_prefix("stash@{")
-                .and_then(|r| r.strip_suffix('}'))
-                .unwrap_or(trimmed);
-            inner
-                .parse::<usize>()
-                .map_err(|_| anyhow::anyhow!("fatal: '{}' is not a valid stash reference", raw))
-        }
-    }
-}
-
-/// Human-readable label for the current HEAD, used in stash messages
-/// ("WIP on <label>: ...").
-fn current_branch_label() -> Result<String> {
-    match refs::resolve_head()? {
-        refs::HeadState::Branch(b) => Ok(b),
-        refs::HeadState::Detached(h) => {
-            let short = &h[..h.len().min(7)];
-            Ok(format!("(detached HEAD at {})", short))
-        }
-    }
-}
-
-/// Builds and writes a tree object directly from a flattened path -> (hash,
-/// mode) map, reusing `write_tree_from_index_prefix` via a throwaway
-/// `IndexEntry` list. Stat fields are irrelevant here since only the mode and
-/// blob hash are encoded into tree entries.
-fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> Result<String> {
-    let entries: Vec<IndexEntry> = map
-        .iter()
-        .map(|(path, (hash, mode))| IndexEntry {
-            ctime_secs: 0,
-            ctime_nsecs: 0,
-            mtime_secs: 0,
-            mtime_nsecs: 0,
-            dev: 0,
-            ino: 0,
-            mode: *mode,
-            uid: 0,
-            gid: 0,
-            size: 0,
-            hash: *hash,
-            path: path.clone(),
-        })
-        .collect();
-
-    write_tree_from_index_prefix(&entries, "")
-}
-
-/// Refuses to proceed unless the working directory and index are currently
-/// clean (i.e. exactly match HEAD). `stash apply`/`pop` use this in place of
-/// a real three-way merge back into a dirty tree.
-fn ensure_working_tree_clean(action: &str) -> Result<()> {
-    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
-        Some(commit_hash) => {
-            let tree_hash = tree_hash_of_commit(&commit_hash)?;
-            let mut map = BTreeMap::new();
-            flatten_tree(&tree_hash, "", &mut map)?;
-            map
-        }
-        None => BTreeMap::new(),
-    };
-
-    let index_entries = read_index().unwrap_or_default();
-    let index_map: BTreeMap<String, ([u8; 20], u32)> = index_entries
-        .iter()
-        .map(|e| (e.path.clone(), (e.hash, e.mode)))
-        .collect();
-
-    if index_map != head_tree {
-        anyhow::bail!(
-            "error: cannot {}: you have staged changes.\nPlease commit or reset them first.",
-            action
-        );
-    }
-
-    for (path, (head_hash, _mode)) in &head_tree {
-        let path_obj = Path::new(path);
-        if !path_obj.exists() {
-            anyhow::bail!(
-                "error: local file '{}' is missing; cannot safely {}.\nAborting",
-                path,
-                action
-            );
-        }
-
-        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", path))?;
-        let hash = hash_content("blob", &content);
-        if hash != *head_hash {
-            anyhow::bail!(
-                "error: Your local changes to the following files would be overwritten by {}:\n\t{}\nPlease commit your changes or stash them before running this command again.\nAborting",
-                action,
-                path
-            );
-        }
-    }
-
-    Ok(())
-}
-
 /// `rgit stash` / `rgit stash push [-m <message>]`
 ///
 /// Snapshots the current index and (tracked) working directory into a pair
@@ -2312,8 +2150,6 @@ pub fn stash_push(message: Option<String>) -> Result<()> {
     for entry in &index_entries {
         let path_obj = Path::new(&entry.path);
         if !path_obj.exists() {
-            // Deleted in the working tree (but still present in the index):
-            // omit from the working-tree snapshot.
             continue;
         }
 
@@ -2345,7 +2181,6 @@ pub fn stash_push(message: Option<String>) -> Result<()> {
     let branch_label = current_branch_label()?;
     let short_head = &head_commit[..7];
     let subject = commit_subject_line(&head_commit)?;
-
     let index_message = format!("index on {}: {} {}", branch_label, short_head, subject);
     let i_commit_hash = build_commit(index_tree_hash, Some(head_commit.clone()), &index_message)?;
 
@@ -2366,109 +2201,6 @@ pub fn stash_push(message: Option<String>) -> Result<()> {
     write_index(&mut new_entries)?;
 
     println!("Saved working directory and index state {}", stash_message);
-
-    Ok(())
-}
-
-/// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens
-/// both into path -> (hash, mode) maps: `(working_tree, index_tree)`.
-fn load_stash_trees(idx: usize, list: &[StashEntry]) -> Result<(BTreeMap<String, ([u8; 20], u32)>, BTreeMap<String, ([u8; 20], u32)>)> {
-    let w_hash = &list[idx].hash;
-
-    let (obj_type, content) = read_object(w_hash)?;
-    if obj_type != "commit" {
-        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
-    }
-    let text = String::from_utf8_lossy(&content).to_string();
-    let parents = commit_parents(&text);
-    if parents.len() < 2 {
-        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
-    }
-    let head_at_stash = &parents[0];
-    let i_hash = &parents[1];
-
-    let w_tree_hash = tree_hash_of_commit(w_hash)?;
-    let mut w_tree = BTreeMap::new();
-    flatten_tree(&w_tree_hash, "", &mut w_tree)?;
-
-    let i_tree_hash = tree_hash_of_commit(i_hash)?;
-    let mut i_tree = BTreeMap::new();
-    flatten_tree(&i_tree_hash, "", &mut i_tree)?;
-
-    let _ = head_at_stash; // only needed by `stash show`, kept here for symmetry
-    Ok((w_tree, i_tree))
-}
-
-/// Shared implementation of `stash apply` and `stash pop`.
-fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> Result<()> {
-    let idx = parse_stash_index(stash_ref.as_deref())?;
-    let list = read_stash_list()?;
-    if list.is_empty() {
-        anyhow::bail!("No stash entries found.");
-    }
-    if idx >= list.len() {
-        anyhow::bail!("fatal: stash@{{{}}} is not a valid reference", idx);
-    }
-
-    let action = if drop_after { "apply stash (pop)" } else { "apply stash" };
-    ensure_working_tree_clean(action)?;
-
-    let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
-
-    let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
-        Some(commit_hash) => {
-            let tree_hash = tree_hash_of_commit(&commit_hash)?;
-            let mut map = BTreeMap::new();
-            flatten_tree(&tree_hash, "", &mut map)?;
-            map
-        }
-        None => BTreeMap::new(),
-    };
-
-    // Remove tracked files that existed at HEAD but were deleted in the
-    // stash's working-tree snapshot.
-    for path in head_tree.keys() {
-        if !w_tree.contains_key(path) {
-            let p = Path::new(path);
-            if p.exists() {
-                let _ = fs::remove_file(p);
-            }
-        }
-    }
-
-    // Write the stash's working-tree snapshot to disk.
-    for (path, (hash, mode)) in &w_tree {
-        let (_, content) = read_object(&hex::encode(hash))?;
-        if let Some(parent) = Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let file_mode = if (*mode & 0o111) != 0 { 0o755 } else { 0o644 };
-            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
-        }
-    }
-
-    // Rebuild the index to match the stash's index snapshot (preserving the
-    // staged vs. unstaged distinction that existed when the stash was made).
-    let mut new_entries = build_index_entries_for_tree(&i_tree, true)?;
-    write_index(&mut new_entries)?;
-
-    let message = list[idx].message.clone();
-
-    if drop_after {
-        let mut remaining: Vec<StashEntry> = list;
-        remaining.remove(idx);
-        write_stash_list(&remaining)?;
-        println!("Dropped stash@{{{}}} ({})", idx, message);
-    } else {
-        println!("Applied stash@{{{}}} ({})", idx, message);
-    }
 
     Ok(())
 }
@@ -2577,6 +2309,7 @@ pub fn stash_show(stash_ref: Option<String>) -> Result<()> {
 }
 
 /// `rgit stash clear`
+pub const STASH_LIST_PATH: &str = ".git/STASH_LIST";
 pub fn stash_clear() -> Result<()> {
     if Path::new(STASH_LIST_PATH).exists() {
         fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
@@ -2601,309 +2334,21 @@ pub fn stash(action: Option<crate::cli::StashAction>) -> Result<()> {
     }
 }
 
-const BISECT_START_PATH: &str = ".git/BISECT_START";
-const BISECT_LOG_PATH: &str = ".git/BISECT_LOG";
-const BISECT_BAD_PATH: &str = ".git/BISECT_BAD";
-const BISECT_GOOD_PATH: &str = ".git/BISECT_GOOD";
-const BISECT_SKIP_PATH: &str = ".git/BISECT_SKIP";
 
-fn read_lines_set(path: &str) -> Result<Vec<String>> {
-    if !Path::new(path).exists() {
-        return Ok(Vec::new());
-    }
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
-    Ok(content
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect())
-}
+// ============================================================================
+// bisect
+// ============================================================================
+//
+// Simplified `git bisect`: narrows down the first commit reachable from a
+// known-bad commit but not reachable from any known-good commit, by
+// repeatedly checking out a midpoint and letting the caller mark it `good`,
+// `bad`, or `skip`.
 
-fn append_line(path: &str, line: &str) -> Result<()> {
-    use std::io::Write as _;
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .with_context(|| format!("Failed to open {}", path))?;
-    writeln!(file, "{}", line)?;
-    Ok(())
-}
-
-/// Collects the full ancestor set of `start` (inclusive), following parent
-/// links via BFS.
-fn collect_ancestors(start: &str) -> Result<HashSet<String>> {
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-    queue.push_back(start.to_string());
-
-    while let Some(hash) = queue.pop_front() {
-        if visited.contains(&hash) {
-            continue;
-        }
-        visited.insert(hash.clone());
-
-        let (object_type, content) = read_object(&hash)?;
-        if object_type != "commit" {
-            continue;
-        }
-        let text = String::from_utf8_lossy(&content);
-        for line in text.lines() {
-            if line.is_empty() {
-                break;
-            }
-            if let Some(parent) = line.strip_prefix("parent ") {
-                queue.push_back(parent.to_string());
-            }
-        }
-    }
-
-    Ok(visited)
-}
-
-/// BFS from `start` over the *entire* ancestor graph (so it can walk through
-/// non-candidate commits to reach further candidates), collecting only the
-/// commits that are members of `candidates`, in BFS discovery order.
-fn order_candidates_from(start: &str, candidates: &HashSet<String>) -> Result<Vec<String>> {
-    let mut order = Vec::new();
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-    queue.push_back(start.to_string());
-
-    while let Some(hash) = queue.pop_front() {
-        if visited.contains(&hash) {
-            continue;
-        }
-        visited.insert(hash.clone());
-
-        if candidates.contains(&hash) {
-            order.push(hash.clone());
-        }
-
-        let (object_type, content) = read_object(&hash)?;
-        if object_type != "commit" {
-            continue;
-        }
-        let text = String::from_utf8_lossy(&content);
-        for line in text.lines() {
-            if line.is_empty() {
-                break;
-            }
-            if let Some(parent) = line.strip_prefix("parent ") {
-                queue.push_back(parent.to_string());
-            }
-        }
-    }
-
-    Ok(order)
-}
-
-/// Detaches HEAD at `hash` and syncs the working directory + index to match
-/// it, refusing (like `switch`) if that would clobber local changes. Shared
-/// by every point where bisect moves HEAD: stepping to a new midpoint,
-/// `bisect reset <commit>`, and restoring a detached-HEAD starting point.
-fn checkout_bisect_commit(hash: &str) -> Result<()> {
-    let target_tree_hash = tree_hash_of_commit(hash)?;
-    let mut target_tree = BTreeMap::new();
-    flatten_tree(&target_tree_hash, "", &mut target_tree)?;
-
-    let mut head_tree = BTreeMap::new();
-    if let Some(current_commit) = refs::resolve_head_commit()? {
-        let current_tree_hash = tree_hash_of_commit(&current_commit)?;
-        flatten_tree(&current_tree_hash, "", &mut head_tree)?;
-    }
-
-    let index_entries = read_index().unwrap_or_default();
-    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
-
-    check_switch_safety(&target_tree, &head_tree, &index_map)?;
-    sync_working_tree(&target_tree, &head_tree, &index_map)?;
-    update_index_from_tree(&target_tree, &head_tree)?;
-
-    refs::set_head_detached(hash)?;
-    Ok(())
-}
-
-fn print_commit_oneline(hash: &str) -> Result<()> {
-    let subject = commit_subject_line(hash)?;
-    println!("[{}] {}", &hash[..hash.len().min(7)], subject);
-    Ok(())
-}
-
-fn report_first_bad(hash: &str) -> Result<()> {
-    let (object_type, content) = read_object(hash)?;
-    let text = String::from_utf8_lossy(&content);
-
-    println!("{} is the first bad commit", hash);
-    println!("commit {}", hash);
-    if object_type == "commit" {
-        for line in text.lines() {
-            if line.is_empty() {
-                break;
-            }
-            if let Some(author) = line.strip_prefix("author ") {
-                println!("Author: {}", author);
-            }
-        }
-    }
-    println!();
-    println!("    {}", commit_subject_line(hash)?);
-    Ok(())
-}
-
-fn report_outcome(outcome: &BisectOutcome) -> Result<()> {
-    match outcome {
-        BisectOutcome::WaitingForBad => {
-            println!("status: waiting for bad commit, good commit(s) known");
-        }
-        BisectOutcome::WaitingForGood => {
-            println!("status: waiting for good commit(s), bad commit known");
-        }
-        BisectOutcome::Continue(hash, remaining) => {
-            let steps = if *remaining == 0 { 0 } else { (*remaining as f64).log2().ceil() as u32 };
-            println!(
-                "Bisecting: {} revision{} left to test after this (roughly {} step{})",
-                remaining,
-                if *remaining == 1 { "" } else { "s" },
-                steps,
-                if steps == 1 { "" } else { "s" }
-            );
-            print_commit_oneline(hash)?;
-        }
-        BisectOutcome::Found(hash) => {
-            report_first_bad(hash)?;
-        }
-    }
-    Ok(())
-}
-
-/// Recomputes the candidate set from the current BISECT_BAD/GOOD/SKIP state
-/// and either checks out the next midpoint (`Continue`) or concludes the
-/// search (`Found`). Pure aside from the checkout side effect on `Continue`.
-fn bisect_recompute() -> Result<BisectOutcome> {
-    let bad = match fs::read_to_string(BISECT_BAD_PATH)
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        Some(b) => b,
-        None => return Ok(BisectOutcome::WaitingForBad),
-    };
-
-    let goods = read_lines_set(BISECT_GOOD_PATH)?;
-    if goods.is_empty() {
-        return Ok(BisectOutcome::WaitingForGood);
-    }
-
-    for good in &goods {
-        if !is_reachable(&bad, good)? {
-            anyhow::bail!(
-                "error: some good revs are not ancestors of the bad rev.\n\
-                 rgit bisect cannot work properly in this state."
-            );
-        }
-    }
-
-    let ancestors_bad = collect_ancestors(&bad)?;
-    let mut ancestors_good: HashSet<String> = HashSet::new();
-    for g in &goods {
-        ancestors_good.extend(collect_ancestors(g)?);
-    }
-
-    let candidates: HashSet<String> = ancestors_bad.difference(&ancestors_good).cloned().collect();
-
-    let skip_set: HashSet<String> = read_lines_set(BISECT_SKIP_PATH)?.into_iter().collect();
-    let testable: HashSet<String> = candidates.difference(&skip_set).cloned().collect();
-
-    if testable.is_empty() {
-        if candidates.len() <= 1 {
-            let hash = candidates.into_iter().next().unwrap_or_else(|| bad.clone());
-            return Ok(BisectOutcome::Found(hash));
-        }
-        anyhow::bail!(
-            "error: every commit left to test has been skipped; cannot narrow down further.\n\
-             Try marking a different commit good/bad, or reducing the number of skips."
-        );
-    }
-
-    let order = order_candidates_from(&bad, &testable)?;
-
-    if order.len() == 1 {
-        return Ok(BisectOutcome::Found(order[0].clone()));
-    }
-
-    let mid = order[order.len() / 2].clone();
-    checkout_bisect_commit(&mid)?;
-
-    let remaining = order.len() - 1;
-    Ok(BisectOutcome::Continue(mid, remaining))
-}
-
-fn mark_bad(rev: Option<String>) -> Result<BisectOutcome> {
-    if !Path::new(BISECT_START_PATH).exists() {
-        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
-    }
-
-    let target = match rev {
-        Some(r) => resolve_commit_from_source(&r)?,
-        None => refs::resolve_head_commit()?
-            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
-    };
-
-    fs::write(BISECT_BAD_PATH, format!("{}\n", target)).context("Failed to write .git/BISECT_BAD")?;
-    append_line(BISECT_LOG_PATH, &format!("git bisect bad {}", target))?;
-
-    bisect_recompute()
-}
-
-fn mark_good(rev: Option<String>) -> Result<BisectOutcome> {
-    if !Path::new(BISECT_START_PATH).exists() {
-        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
-    }
-
-    let target = match rev {
-        Some(r) => resolve_commit_from_source(&r)?,
-        None => refs::resolve_head_commit()?
-            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
-    };
-
-    let mut goods = read_lines_set(BISECT_GOOD_PATH)?;
-    if !goods.iter().any(|g| g == &target) {
-        goods.push(target.clone());
-        let mut content = goods.join("\n");
-        content.push('\n');
-        fs::write(BISECT_GOOD_PATH, content).context("Failed to write .git/BISECT_GOOD")?;
-    }
-    append_line(BISECT_LOG_PATH, &format!("git bisect good {}", target))?;
-
-    bisect_recompute()
-}
-
-fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
-    if !Path::new(BISECT_START_PATH).exists() {
-        anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
-    }
-
-    let targets: Vec<String> = if revs.is_empty() {
-        vec![refs::resolve_head_commit()?
-            .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?]
-    } else {
-        revs.iter().map(|r| resolve_commit_from_source(r)).collect::<Result<Vec<_>>>()?
-    };
-
-    let mut skips = read_lines_set(BISECT_SKIP_PATH)?;
-    for target in &targets {
-        if !skips.iter().any(|s| s == target) {
-            skips.push(target.clone());
-        }
-        append_line(BISECT_LOG_PATH, &format!("git bisect skip {}", target))?;
-    }
-    let mut content = skips.join("\n");
-    content.push('\n');
-    fs::write(BISECT_SKIP_PATH, content).context("Failed to write .git/BISECT_SKIP")?;
-
-    bisect_recompute()
-}
+pub(crate) const BISECT_START_PATH: &str = ".git/BISECT_START";
+pub(crate) const BISECT_LOG_PATH: &str = ".git/BISECT_LOG";
+pub(crate) const BISECT_BAD_PATH: &str = ".git/BISECT_BAD";
+pub(crate) const BISECT_GOOD_PATH: &str = ".git/BISECT_GOOD";
+pub(crate) const BISECT_SKIP_PATH: &str = ".git/BISECT_SKIP";
 
 /// `rgit bisect start [<bad> [<good>...]]`
 pub fn bisect_start(bad: Option<String>, good: Vec<String>) -> Result<()> {
@@ -3092,4 +2537,274 @@ pub fn bisect(action: crate::cli::BisectAction) -> Result<()> {
         BisectAction::Log => bisect_log(),
         BisectAction::Run { command } => bisect_run(command),
     }
+}
+
+
+// ============================================================================
+// revert
+// ============================================================================
+//
+// A revert is a cherry-pick run backward: instead of replaying a commit's
+// changes forward onto HEAD, it applies the *inverse* of those changes.
+// Concretely, the same three-way merge cherry-pick uses is reused here with
+// the roles swapped:
+//
+//   cherry-pick <C>: base = parent(C), ours = HEAD, theirs = C
+//   revert      <C>: base = C,         ours = HEAD, theirs = parent(C)
+//
+// i.e. "merge in the parent's tree, treating the commit itself as the
+// common ancestor" — which is exactly the diff that undoes C.
+//
+// Conflict state mirrors cherry-pick's `.git/CHERRY_PICK_HEAD` /
+// `.git/CHERRY_PICK_MSG` via `.git/REVERT_HEAD` / `.git/REVERT_MSG`, and
+// `--continue`/`--abort` work the same way.
+
+/// `rgit revert <commit>` / `--continue` / `--abort`
+pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) -> Result<()> {
+    if abort {
+        return revert_abort();
+    }
+    if cont {
+        return revert_continue();
+    }
+
+    let commit_ref = commit.ok_or_else(|| {
+        anyhow::anyhow!("fatal: revert requires a <commit>, or --continue / --abort")
+    })?;
+
+    if Path::new(".git/REVERT_HEAD").exists() {
+        anyhow::bail!(
+            "fatal: a revert is already in progress\n\
+             hint: use 'rgit revert --continue' or 'rgit revert --abort'"
+        );
+    }
+
+    let head_state = refs::resolve_head()?;
+    let our_commit = refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
+
+    let revert_commit = resolve_commit_from_source(&commit_ref)?;
+    let (object_type, content) = read_object(&revert_commit)?;
+    if object_type != "commit" {
+        anyhow::bail!("fatal: '{}' does not point to a commit object", commit_ref);
+    }
+    let text = String::from_utf8_lossy(&content).to_string();
+
+    let parents = commit_parents(&text);
+    if parents.len() > 1 {
+        anyhow::bail!(
+            "error: commit {} is a merge but no -m option was given.\nfatal: revert failed",
+            &revert_commit[..7]
+        );
+    }
+
+    let original_subject = commit_subject_line(&revert_commit)?;
+    let subject = format!("Revert \"{}\"", original_subject);
+    let final_message = format!("{}\n\nThis reverts commit {}.", subject, revert_commit);
+
+    let base_tree = resolve_tree_from_source(&revert_commit)?;
+    let their_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(parent) = parents.first() {
+        resolve_tree_from_source(parent)?
+    } else {
+        BTreeMap::new()
+    };
+    let our_tree = resolve_tree_from_source(&our_commit)?;
+
+    let (merged_tree, conflicts) = three_way_tree_merge(&base_tree, &our_tree, &their_tree)?;
+
+    if !conflicts.is_empty() {
+        for conflict in &conflicts {
+            let conflict_content = generate_conflict_markers(
+                &conflict.ours,
+                &conflict.theirs,
+                &format!("parent of {}...", &revert_commit[..7]),
+            );
+            if let Some(parent) = Path::new(&conflict.path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
+            fs::write(&conflict.path, &conflict_content)?;
+            println!("CONFLICT (content): Merge conflict in {}", conflict.path);
+        }
+
+        for (path, (hash, _mode)) in &merged_tree {
+            let (_, content) = read_object(&hex::encode(hash))?;
+            if let Some(parent) = Path::new(path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
+            fs::write(path, &content)?;
+        }
+
+        fs::write(".git/REVERT_HEAD", format!("{}\n", revert_commit))?;
+        fs::write(".git/REVERT_MSG", format!("{}\n", final_message))?;
+
+        println!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
+        println!("hint: after resolving the conflicts, mark the corrected paths");
+        println!("hint: with 'rgit add <paths>' and run 'rgit revert --continue'");
+        println!("hint: (or 'rgit revert --abort' to give up)");
+        return Ok(());
+    }
+
+    for path in our_tree.keys() {
+        if !merged_tree.contains_key(path) {
+            let path_obj = Path::new(path);
+            if path_obj.exists() {
+                let _ = fs::remove_file(path_obj);
+            }
+        }
+    }
+
+    let mut new_index_entries = Vec::new();
+    for (path, (hash, _mode)) in &merged_tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::write(path, &content)?;
+
+        let metadata = fs::metadata(path)?;
+        let entry = build_entry(path, *hash, &metadata);
+        new_index_entries.push(entry);
+    }
+
+    write_index(&mut new_index_entries)?;
+
+    let tree_hash = write_tree_from_index_prefix(&new_index_entries, "")?;
+
+    if tree_hash_of_commit(&our_commit)? == tree_hash {
+        println!("The revert is now empty, possibly due to conflict resolution.");
+        println!("nothing to commit");
+        return Ok(());
+    }
+
+    if no_commit {
+        println!("Reverted {}... {}", &revert_commit[..7], original_subject);
+        println!("(staged, not committed -- run 'rgit commit -m \"...\"')");
+        return Ok(());
+    }
+
+    let commit_hash = build_commit(tree_hash, Some(our_commit.clone()), &final_message)?;
+    let short_hash = &commit_hash[..7];
+
+    match &head_state {
+        refs::HeadState::Branch(branch_name) => {
+            let ref_path = format!("refs/heads/{}", branch_name);
+            refs::write_ref(&ref_path, &commit_hash)?;
+            println!("[{} {}] {}", branch_name, short_hash, subject);
+        }
+        refs::HeadState::Detached(_) => {
+            refs::set_head_detached(&commit_hash)?;
+            println!("[(detached HEAD) {}] {}", short_hash, subject);
+        }
+    }
+
+    Ok(())
+}
+
+/// `rgit revert --continue`
+fn revert_continue() -> Result<()> {
+    if !Path::new(".git/REVERT_HEAD").exists() {
+        anyhow::bail!("fatal: no revert in progress");
+    }
+
+    let revert_commit = fs::read_to_string(".git/REVERT_HEAD")?.trim().to_string();
+    let final_message = fs::read_to_string(".git/REVERT_MSG")
+        .context("fatal: missing .git/REVERT_MSG for the in-progress revert")?
+        .trim_end_matches('\n')
+        .to_string();
+
+    let entries = read_index().unwrap_or_default();
+    for entry in &entries {
+        if let Ok(content) = fs::read(&entry.path) {
+            if content.windows(7).any(|w| w == b"<<<<<<<") {
+                anyhow::bail!(
+                    "error: '{}' still has unresolved conflict markers; fix it and 'rgit add' it first",
+                    entry.path
+                );
+            }
+        }
+    }
+
+    let our_commit = refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
+
+    let tree_hash = write_tree_from_index_prefix(&entries, "")?;
+    let commit_hash = build_commit(tree_hash, Some(our_commit), &final_message)?;
+    let short_hash = &commit_hash[..7];
+
+    let head_state = refs::resolve_head()?;
+    match &head_state {
+        refs::HeadState::Branch(branch_name) => {
+            let ref_path = format!("refs/heads/{}", branch_name);
+            refs::write_ref(&ref_path, &commit_hash)?;
+        }
+        refs::HeadState::Detached(_) => {
+            refs::set_head_detached(&commit_hash)?;
+        }
+    }
+
+    let _ = fs::remove_file(".git/REVERT_HEAD");
+    let _ = fs::remove_file(".git/REVERT_MSG");
+
+    println!(
+        "[{} {}] revert of {} continued",
+        match &head_state {
+            refs::HeadState::Branch(b) => b.clone(),
+            refs::HeadState::Detached(_) => "(detached HEAD)".to_string(),
+        },
+        short_hash,
+        &revert_commit[..7]
+    );
+
+    Ok(())
+}
+
+/// `rgit revert --abort`
+fn revert_abort() -> Result<()> {
+    if !Path::new(".git/REVERT_HEAD").exists() {
+        anyhow::bail!("fatal: no revert in progress");
+    }
+
+    let revert_commit = fs::read_to_string(".git/REVERT_HEAD")?.trim().to_string();
+    let our_commit = refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
+    let our_tree = resolve_tree_from_source(&our_commit)?;
+
+    let (object_type, content) = read_object(&revert_commit)?;
+    let (merged_tree, conflicts) = if object_type == "commit" {
+        let text = String::from_utf8_lossy(&content).to_string();
+        let parents = commit_parents(&text);
+        let base_tree = resolve_tree_from_source(&revert_commit)?;
+        let their_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(parent) = parents.first() {
+            resolve_tree_from_source(parent)?
+        } else {
+            BTreeMap::new()
+        };
+        three_way_tree_merge(&base_tree, &our_tree, &their_tree)?
+    } else {
+        (BTreeMap::new(), Vec::new())
+    };
+
+    let index_entries = read_index().unwrap_or_default();
+    let mut tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
+    tracked_paths.extend(our_tree.keys().cloned());
+    tracked_paths.extend(merged_tree.keys().cloned());
+    tracked_paths.extend(conflicts.iter().map(|c| c.path.clone()));
+
+    hard_reset_working_tree(&our_tree, &tracked_paths)?;
+
+    let mut new_index_entries = build_index_entries_for_tree(&our_tree, true)?;
+    write_index(&mut new_index_entries)?;
+
+    let _ = fs::remove_file(".git/REVERT_HEAD");
+    let _ = fs::remove_file(".git/REVERT_MSG");
+
+    println!("Revert of {} aborted; HEAD left unchanged.", &revert_commit[..7]);
+
+    Ok(())
 }

@@ -232,3 +232,4 @@ pub fn build_entry(rel_path: &str, hash: [u8; 20], metadata: &fs::Metadata) -> I
         path: rel_path.to_string(),
     }
 }
+

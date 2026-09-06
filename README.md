@@ -1,85 +1,97 @@
 # rgit
 
-A lightweight, locally functional implementation of Git written in Rust.
+A lightweight, fully functional implementation of Git written in Rust.
 
-`rgit` was built to explore the internal architecture of version control systems. The core Git object model (blobs, trees, commits), the staging index, the local repository lifecycle, and a full branching system are all implemented.
+`rgit` was built to explore the internal architecture and mechanics of version control systems. It includes a complete implementation of the core Git object model (blobs, trees, commits), index staging, reference tracking (`refs/heads`, `HEAD`), Myers diffing, 3-way merges, stash state stacks, binary-search debugging (`bisect`), and modular crate architecture.
 
-## Features
+---
 
-### Core Repository (v1.0.0)
+## Modular Architecture (v2.0)
 
-- **`init`**: Initializes a new repository with the standard `.git` directory structure.
-- **`add`**: Hashes file contents into blobs and stages them in the index.
-- **`status`**: Compares the working directory, index, and HEAD to report untracked, modified, and staged files.
-- **`commit -m <message>`**: Generates tree objects from the index and records a new commit in the repository history.
-- **`log`** / **`log --oneline`**: Walks the commit history from HEAD and prints commit metadata.
+`rgit` is structured into clean, decoupled domain modules:
 
-### Branching (v1.1.0)
+- **[`src/cli.rs`](file:///c:/rgit-main/src/cli.rs)**: Command-line parsing and routing powered by `clap`.
+- **[`src/commands/`](file:///c:/rgit-main/src/commands)**: Porcelain & plumbing business logic (split per command namespace: `branch`, `commit`, `diff`, `merge`, `reset`, `stash`, `bisect`, etc.).
+- **[`src/helpers/`](file:///c:/rgit-main/src/helpers)**: Core engine utilities (Git object serialization/zlib compression, commit graph BFS traversal, Myers diffing algorithm, `.gitignore` glob matching, working-tree safety checks).
+- **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Staging index (`.git/index`) binary file parsing and serialization.
+- **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch refs, detached HEAD states).
+- **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Core data models, structs, and CLI subcommand enums.
 
-#### `branch` — Branch management
+---
 
-#### `switch` — Modern branch switching
+## Features & Supported Commands
 
-#### `checkout` — Classic Git-style branch operations
+### Porcelain Commands (High Level)
 
-(all with their own classic git variations)
+#### Repository & Staging
+- **`init`**: Initializes `.git/` directory layout.
+- **`add <paths...>`**: Hashes file contents into blobs and updates `.git/index`.
+- **`rm <files...>`** (`--cached`, `-r`, `-f`): Removes files from index and working tree.
+- **`status`**: Reports untracked, modified, and staged changes.
+- **`restore`** (`--staged`, `--worktree`, `--source`): Restores working tree or index files from a tree or commit.
+- **`clean`** (`-f`, `-d`, `-x`, `-X`): Cleans untracked files and directories with `.gitignore` pattern support.
 
-## Installation
+#### History & Diffing
+- **`commit -m <msg>`**: Writes tree and commit objects from the staging index.
+- **`log`** (`--oneline`): Walks commit parent graph and displays history.
+- **`diff`** (`--staged`, `[<commit> [<commit>]]`): Computes line-by-line Myers diffs between working tree, index, or commits.
 
-Ensure you have [Rust and Cargo](https://rustup.rs/) installed. Clone the repository and build the project:
+#### Branching & Navigation
+- **`branch`** (`-d`, `-D`, `-m`): Creates, lists, renames, and safely deletes branches.
+- **`switch`** (`-c`, `--detach`, `-f`): Switches branches or checks out detached HEADs with safety checks.
+- **`checkout`** (`-b`, `--detach`, `-f`): Classic branch and commit switching interface.
+
+#### Merging, Replaying & Reverting
+- **`merge <branch>`**: Performs 3-way tree merges with conflict marker generation (`<<<<<<<`, `=======`, `>>>>>>>`).
+- **`cherry-pick <commit>`** (`--no-commit`, `--continue`, `--abort`): Replays a single commit onto current HEAD with state recording.
+- **`revert <commit>`** (`--no-commit`, `--continue`, `--abort`): Inverts and applies the changes of a target commit.
+
+#### Reset & Stash Operations
+- **`reset`** (`--soft`, `--mixed`, `--hard`, `[-- <paths...>]`): Resets HEAD, index, and working tree.
+- **`stash`** (`push`, `pop`, `apply`, `list`, `drop`, `show`, `clear`): Stashes working directory and index state onto `.git/STASH_LIST`.
+
+#### Automated Debugging
+- **`bisect`** (`start`, `bad`, `good`, `skip`, `reset`, `log`, `run`): Binary search tool to locate the commit that introduced a bug.
+
+### Plumbing Commands (Low Level)
+- **`hash-object`** (`-w`): Computes SHA-1 hash for a file and optionally writes it to object store.
+- **`cat-file`** (`-p`): Decompresses and displays raw Git object contents.
+- **`write-tree`**: Builds tree objects from the index.
+- **`ls-tree`** (`--name-only`): Lists tree object contents.
+- **`commit-tree`**: Low-level creation of commit objects.
+
+---
+
+## Installation & Build
+
+Requires [Rust and Cargo](https://rustup.rs/).
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/SebiSomu/rgit.git
 cd rgit
 cargo build --release
 ```
 
-The compiled binary will be available in `target/release/rgit`.
+The binary will be generated at `target/release/rgit`.
 
-## Testing & Usage
+---
 
-To prevent conflicts with real Git repositories, this project includes a built-in test harness (`rtest`) that compiles and runs the application inside an isolated `test-sandbox/` directory (which is git-ignored).
+## Test Harness (`rtest`)
 
-### Running Commands in the Sandbox
-
-Prefix your `rgit` commands with `cargo run --bin rtest --`:
+To safely test `rgit` commands without touching the primary repository's `.git` folder, `rgit` includes an isolated test runner (`rtest`):
 
 ```bash
-# Initialize a repository inside the sandbox
+# Execute rgit commands within test-sandbox/
 cargo run --bin rtest -- init
+cargo run --bin rtest -- add .
+cargo run --bin rtest -- commit -m "Initial sandbox commit"
 
-# Stage and commit
-cargo run --bin rtest -- add hello.txt
-cargo run --bin rtest -- commit -m "Initial commit"
-
-# Work with branches
-cargo run --bin rtest -- branch feature-branch
-cargo run --bin rtest -- switch feature-branch
-cargo run --bin rtest -- switch -c new-feature
-cargo run --bin rtest -- checkout -b hotfix main
-```
-
-### Cleaning the Sandbox
-
-To wipe the test sandbox completely and start fresh, pass the `--clean` option:
-
-```bash
+# Clean sandbox environment
 cargo run --bin rtest -- --clean
 ```
 
-You can combine it to clean and reinitialize in one command:
-
-```bash
-cargo run --bin rtest -- --clean init
-```
-
-## Roadmap (Future Features)
-
-- Viewing changes (`diff`)
-- Restoring files (`restore`)
-- `.gitignore` parsing
-- Remote operations (`fetch`, `pull`, `push`)
+---
 
 ## License
 
-This project is open-source and available under the MIT License.
+MIT License.

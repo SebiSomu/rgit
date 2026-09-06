@@ -69,8 +69,8 @@ pub enum StashAction {
 }
 
 pub struct StashEntry {
-    pub(crate) hash: String,
-    pub(crate) message: String,
+    pub hash: String,
+    pub message: String,
 }
 
 pub enum BisectOutcome {
@@ -78,4 +78,35 @@ pub enum BisectOutcome {
     WaitingForGood,
     Continue(String, usize),
     Found(String),
+}
+
+#[derive(Subcommand, Debug)]
+pub enum BisectAction {
+    Start {
+        bad: Option<String>,
+        good: Vec<String>,
+    },
+    Bad {
+        rev: Option<String>,
+    },
+    Good {
+        rev: Option<String>,
+    },
+    Skip {
+        revs: Vec<String>,
+    },
+    Reset {
+        commit: Option<String>,
+    },
+    Log,
+    Run {
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
+}
+
+pub enum ResetMode {
+    Soft,
+    Mixed,
+    Hard,
 }

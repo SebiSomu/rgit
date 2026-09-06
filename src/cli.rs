@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use crate::objects::{BisectAction, StashAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -153,52 +154,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum BisectAction {
-    Start {
-        bad: Option<String>,
-        good: Vec<String>,
-    },
-    Bad {
-        rev: Option<String>,
-    },
-    Good {
-        rev: Option<String>,
-    },
-    Skip {
-        revs: Vec<String>,
-    },
-    Reset {
-        commit: Option<String>,
-    },
-    Log,
-    Run {
-        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
-        command: Vec<String>,
-    },
-}
 
-#[derive(Subcommand, Debug)]
-pub enum StashAction {
-    Push {
-        #[arg(short = 'm', long = "message")]
-        message: Option<String>,
-    },
-    Pop {
-        stash: Option<String>,
-    },
-    Apply {
-        stash: Option<String>,
-    },
-    List,
-    Drop {
-        stash: Option<String>,
-    },
-    Show {
-        stash: Option<String>,
-    },
-    Clear,
-}
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();

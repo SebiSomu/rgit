@@ -16,36 +16,36 @@ pub enum Commands {
     HashObject {
         #[arg(short = 'w')]
         write: bool,
-        file: PathBuf,
+        file: PathBuf
     },
     CatFile {
         #[arg(short = 'p')]
         pretty_print: bool,
-        object_hash: String,
+        object_hash: String
     },
     WriteTree,
     Add {
-        paths: Vec<PathBuf>,
+        paths: Vec<PathBuf>
     },
     LsTree {
         #[arg(long)]
         name_only: bool,
-        tree_hash: String,
+        tree_hash: String
     },
     CommitTree {
         tree_hash: String,
         #[arg(short = 'p')]
         parent_hash: Option<String>,
         #[arg(short = 'm')]
-        message: String,
+        message: String
     },
     Commit {
         #[arg(short = 'm', long = "message")]
-        message: String,
+        message: String
     },
     Log {
         #[arg(short = 'o', long = "oneline")]
-        oneline: bool,
+        oneline: bool
     },
     Status,
     Branch {
@@ -55,7 +55,7 @@ pub enum Commands {
         #[arg(short = 'D', conflicts_with = "delete")]
         force_delete: bool,
         #[arg(short = 'm', long = "move", value_name = "NEW")]
-        rename: Option<String>,
+        rename: Option<String>
     },
     Switch {
         branch: String,
@@ -64,7 +64,7 @@ pub enum Commands {
         #[arg(long = "detach", conflicts_with = "create")]
         detach: bool,
         #[arg(short = 'f', long = "force", conflicts_with = "create")]
-        force: bool,
+        force: bool
     },
     Checkout {
         target: Option<String>,
@@ -73,7 +73,7 @@ pub enum Commands {
         #[arg(long = "detach")]
         detach: bool,
         #[arg(short = 'f', long = "force")]
-        force: bool,
+        force: bool
     },
     Restore {
         files: Vec<PathBuf>,
@@ -82,17 +82,17 @@ pub enum Commands {
         #[arg(short = 'W', long = "worktree")]
         worktree: bool,
         #[arg(long = "source")]
-        source: Option<String>,
+        source: Option<String>
     },
     Diff {
         #[arg(long = "staged", alias = "cached")]
         staged: bool,
         commits: Vec<String>,
         #[arg(last = true)]
-        paths: Vec<PathBuf>,
+        paths: Vec<PathBuf>
     },
     Merge {
-        branch: String,
+        branch: String
     },
     Rm {
         files: Vec<PathBuf>,
@@ -101,7 +101,7 @@ pub enum Commands {
         #[arg(long = "cached")]
         cached: bool,
         #[arg(short = 'r', long = "recursive")]
-        recursive: bool,
+        recursive: bool
     },
     Reset {
         commit: Option<String>,
@@ -112,7 +112,7 @@ pub enum Commands {
         #[arg(long = "hard", conflicts_with_all = ["soft", "mixed"])]
         hard: bool,
         #[arg(last = true)]
-        paths: Vec<PathBuf>,
+        paths: Vec<PathBuf>
     },
     Clean {
         #[arg(short = 'n', long = "dry-run")]
@@ -124,7 +124,7 @@ pub enum Commands {
         #[arg(short = 'x', conflicts_with = "only_ignored")]
         ignored: bool,
         #[arg(short = 'X', conflicts_with = "ignored")]
-        only_ignored: bool,
+        only_ignored: bool
     },
     CherryPick {
         commit: Option<String>,
@@ -133,7 +133,7 @@ pub enum Commands {
         #[arg(long = "continue", conflicts_with_all = ["abort", "no_commit"])]
         cont: bool,
         #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
-        abort: bool,
+        abort: bool
     },
     Revert {
         commit: Option<String>,
@@ -142,18 +142,18 @@ pub enum Commands {
         #[arg(long = "continue", conflicts_with_all = ["abort", "no_commit"])]
         cont: bool,
         #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
-        abort: bool,
+        abort: bool
     },
     Stash {
         #[command(subcommand)]
-        action: Option<StashAction>,
+        action: Option<StashAction>
     },
     Bisect {
         #[command(subcommand)]
-        action: BisectAction,
+        action: BisectAction
     },
     Show {
-        commit: Option<String>,
+        commit: Option<String>
     },
     Tag {
         name: Option<String>,
@@ -161,7 +161,10 @@ pub enum Commands {
         #[arg(short = 'd', long = "delete")]
         delete: bool,
         #[arg(short = 'l', long = "list")]
-        list: bool,
+        list: bool
+    },
+    Describe {
+        commit: Option<String>
     },
 }
 
@@ -249,6 +252,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Tag { name, commit, delete, list } => {
             crate::commands::tag(name, commit, delete, list)?;
+        }
+        Commands::Describe { commit } => {
+            crate::commands::describe(commit)?;
         }
     }
 

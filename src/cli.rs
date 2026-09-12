@@ -172,6 +172,13 @@ pub enum Commands {
         #[arg(short = 'f', long = "force")]
         force: bool,
     },
+    Rebase {
+        upstream: Option<String>,
+        #[arg(long = "continue", conflicts_with = "abort")]
+        cont: bool,
+        #[arg(long = "abort", conflicts_with = "cont")]
+        abort: bool
+    }
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -264,6 +271,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Mv { source, destination, force} => {
             crate::commands::mv(source, destination, force)?;
+        }
+        Commands::Rebase { upstream, cont, abort } => {
+            crate::commands::rebase(upstream, cont, abort)?;
         }
     }
 

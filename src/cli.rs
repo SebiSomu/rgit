@@ -152,9 +152,10 @@ pub enum Commands {
         #[command(subcommand)]
         action: BisectAction,
     },
+    Show {
+        commit: Option<String>,
+    },
 }
-
-
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
@@ -234,6 +235,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Bisect { action } => {
             crate::commands::bisect(action)?;
+        }
+        Commands::Show { commit } => {
+            crate::commands::show(commit)?;
         }
     }
 

@@ -166,6 +166,12 @@ pub enum Commands {
     Describe {
         commit: Option<String>
     },
+    Mv {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -255,6 +261,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Describe { commit } => {
             crate::commands::describe(commit)?;
+        }
+        Commands::Mv { source, destination, force} => {
+            crate::commands::mv(source, destination, force)?;
         }
     }
 

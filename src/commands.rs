@@ -11,6 +11,7 @@ pub mod stash;
 pub mod bisect;
 pub mod revert;
 pub mod tag;
+pub mod mv;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -25,3 +26,4 @@ pub use stash::*;
 pub use bisect::*;
 pub use revert::*;
 pub use tag::*;
+pub use mv::*;

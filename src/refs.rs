@@ -292,3 +292,92 @@ pub fn is_valid_branch_name(name: &str) -> bool {
     true
 }
 
+/// Returns a sorted list of all tag names located in `.git/refs/tags/`.
+/// Reuses `collect_branches` (a generic ref-directory walker despite its
+/// name) rather than duplicating the recursive-directory logic.
+// Used by the `tag` command (list mode).
+pub fn list_tags() -> Result<Vec<String>> {
+    let tags_dir = ".git/refs/tags";
+
+    if !Path::new(tags_dir).exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut tags = Vec::new();
+    collect_branches(Path::new(tags_dir), "", &mut tags)?;
+    tags.sort();
+    Ok(tags)
+}
+
+/// Creates a new lightweight tag reference pointing to the specified commit
+/// hash. Same format as a branch ref, except a tag is meant to stay fixed
+/// once created — there is no `rename_tag`/`move` operation.
+// Used by the `tag` command (create mode).
+pub fn create_tag(name: &str, commit_hash: &str) -> Result<()> {
+    if !is_valid_branch_name(name) {
+        anyhow::bail!("fatal: '{}' is not a valid tag name", name);
+    }
+
+    let ref_name = format!("refs/tags/{}", name);
+    let path = format!(".git/{}", ref_name);
+
+    if Path::new(&path).exists() {
+        anyhow::bail!("fatal: tag '{}' already exists", name);
+    }
+
+    let mut ancestor = Path::new(&path).parent();
+    while let Some(p) = ancestor {
+        if p == Path::new(".git/refs/tags") {
+            break;
+        }
+        if p.is_file() {
+            let conflict = p
+                .strip_prefix(".git/refs/tags/")
+                .unwrap_or(p)
+                .display()
+                .to_string();
+            anyhow::bail!(
+                "fatal: cannot lock ref 'refs/tags/{}': '{}' exists; \
+                 cannot create '{}' inside it",
+                name, conflict, name
+            );
+        }
+        ancestor = p.parent();
+    }
+
+    write_ref(&ref_name, commit_hash)?;
+    Ok(())
+}
+
+/// Deletes the reference file for a tag and cleans up empty parent folders.
+// Used by `tag -d`.
+pub fn delete_tag(name: &str) -> Result<()> {
+    let ref_path = format!("refs/tags/{}", name);
+    let fs_path = format!(".git/{}", ref_path);
+
+    if !Path::new(&fs_path).exists() {
+        anyhow::bail!("error: tag '{}' not found.", name);
+    }
+
+    fs::remove_file(&fs_path)
+        .with_context(|| format!("Failed to delete tag '{}'", name))?;
+
+    let mut parent = Path::new(&fs_path).parent();
+    while let Some(p) = parent {
+        if p == Path::new(".git/refs/tags") || p == Path::new(".git/refs") {
+            break;
+        }
+        let is_empty = fs::read_dir(p)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false);
+        if is_empty {
+            let _ = fs::remove_dir(p);
+        } else {
+            break;
+        }
+        parent = p.parent();
+    }
+
+    Ok(())
+}
+

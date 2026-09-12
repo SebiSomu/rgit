@@ -10,6 +10,7 @@ pub mod cherry_pick;
 pub mod stash;
 pub mod bisect;
 pub mod revert;
+mod tag;
 
 pub use plumbing::*;
 pub use commit::*;

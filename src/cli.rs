@@ -155,6 +155,14 @@ pub enum Commands {
     Show {
         commit: Option<String>,
     },
+    Tag {
+        name: Option<String>,
+        commit: Option<String>,
+        #[arg(short = 'd', long = "delete")]
+        delete: bool,
+        #[arg(short = 'l', long = "list")]
+        list: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -238,6 +246,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Show { commit } => {
             crate::commands::show(commit)?;
+        }
+        Commands::Tag { name, commit, delete, list } => {
+            crate::commands::tag(name, commit, delete, list)?;
         }
     }
 

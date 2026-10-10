@@ -12,6 +12,7 @@ pub mod bisect;
 pub mod revert;
 pub mod tag;
 pub mod restore;
+pub mod config;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -27,3 +28,4 @@ pub use bisect::*;
 pub use revert::*;
 pub use tag::*;
 pub use restore::*;
+pub use config::*;

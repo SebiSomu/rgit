@@ -178,7 +178,17 @@ pub enum Commands {
         cont: bool,
         #[arg(long = "abort", conflicts_with = "cont")]
         abort: bool
-    }
+    },
+    Config {
+        key: Option<String>,
+        value: Option<String>,
+        #[arg(long = "global")]
+        global: bool,
+        #[arg(short = 'l', long = "list", conflicts_with_all = ["value", "unset"])]
+        list: bool,
+        #[arg(long = "unset", conflicts_with = "value")]
+        unset: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -274,6 +284,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Rebase { upstream, cont, abort } => {
             crate::commands::rebase(upstream, cont, abort)?;
+        }
+        Commands::Config { key, value, global, list, unset } => {
+            crate::commands::config(key, value, global, list, unset)?;
         }
     }
 

@@ -13,7 +13,7 @@ pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &st
     }
 
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let author = "rgit <rgit@example.com>";
+    let author = crate::helpers::config::author_identity()?
 
     content.push_str(&format!("author {} {} +0000\n", author, timestamp));
     content.push_str(&format!("committer {} {} +0000\n", author, timestamp));

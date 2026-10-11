@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use crate::objects::{BisectAction, StashAction};
+use crate::objects::{BisectAction, RemoteAction, StashAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -222,6 +222,12 @@ pub enum Commands {
         remote: Option<String>,
         branch: Option<String>,
     },
+    Remote {
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        #[command(subcommand)]
+        action: Option<RemoteAction>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -335,6 +341,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Pull { remote, branch } => {
             crate::commands::pull(remote, branch)?;
+        }
+        Commands::Remote { verbose, action } => {
+            crate::commands::remote(verbose, action)?;
         }
     }
 

@@ -54,7 +54,8 @@ src/
 │   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
 │   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
 │   ├── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
-│   └── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
+│   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
+│   └── remote.rs             # remote (list, verbose, add, remove/rm, rename, get-url, set-url, show)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -71,7 +72,8 @@ src/
 │   ├── push.rs               # Remote repo resolution, object enumeration, loose object copier, ref updates
 │   ├── github.rs             # GitHub Git Data API client, blob/tree/commit uploader, remote ref updates
 │   ├── fetch.rs              # Local filesystem fetch transport, remote branch walking, object downloading
-│   └── clone.rs              # Source classification, skeleton repo creation, target dir prep/cleanup, worktree checkout
+│   ├── clone.rs              # Source classification, skeleton repo creation, target dir prep/cleanup, worktree checkout
+│   └── remote.rs             # Remote config queries, name validation, ref directory manipulation, tracking branch collection
 
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

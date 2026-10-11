@@ -16,6 +16,7 @@ pub mod push;
 pub mod github;
 pub mod fetch;
 pub mod clone;
+pub mod remote;
 
 pub use objects::*;
 pub use diff::*;
@@ -33,3 +34,4 @@ pub use push::*;
 pub use github::*;
 pub use fetch::*;
 pub use clone::*;
+pub use remote::*;

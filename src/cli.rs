@@ -218,6 +218,10 @@ pub enum Commands {
         #[arg(short = 'o', long = "origin")]
         origin: Option<String>,
     },
+    Pull {
+        remote: Option<String>,
+        branch: Option<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -328,6 +332,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Clone { repository, directory, branch, origin } => {
             crate::commands::clone(repository, directory, branch, origin)?;
+        }
+        Commands::Pull { remote, branch } => {
+            crate::commands::pull(remote, branch)?;
         }
     }
 

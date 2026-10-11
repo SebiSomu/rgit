@@ -47,19 +47,22 @@ pub fn resolve_commit_from_source(source: &str) -> anyhow::Result<String> {
         refs::resolve_head_commit()?.ok_or_else(|| {
             anyhow::anyhow!("error: could not resolve HEAD: HEAD has no commits yet")
         })?
+    } else if let Some(hash) = refs::read_ref(&format!("refs/heads/{}", base_name))? {
+        hash
+    } else if base_name.starts_with("refs/") && refs::read_ref(base_name)?.is_some() {
+        refs::read_ref(base_name)?.unwrap()
+    } else if let Some(hash) = refs::read_ref(&format!("refs/remotes/{}", base_name))? {
+        hash
+    } else if let Some(hash) = refs::read_ref(&format!("refs/tags/{}", base_name))? {
+        hash
     } else {
-        let branch_ref = format!("refs/heads/{}", base_name);
-        if let Some(hash) = refs::read_ref(&branch_ref)? {
-            hash
-        } else {
-            match read_object(base_name) {
-                Ok((ref obj_type, _)) if obj_type == "commit" => base_name.to_string(),
-                Ok((obj_type, _)) => {
-                    anyhow::bail!("error: '{}' is not a commit (it is a {})", base_name, obj_type);
-                }
-                Err(_) => {
-                    anyhow::bail!("error: invalid reference: '{}'", base_name);
-                }
+        match read_object(base_name) {
+            Ok((ref obj_type, _)) if obj_type == "commit" => base_name.to_string(),
+            Ok((obj_type, _)) => {
+                anyhow::bail!("error: '{}' is not a commit (it is a {})", base_name, obj_type);
+            }
+            Err(_) => {
+                anyhow::bail!("error: invalid reference: '{}'", base_name);
             }
         }
     };

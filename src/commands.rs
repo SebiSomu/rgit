@@ -18,6 +18,7 @@ pub mod banana_split;
 pub mod push;
 pub mod fetch;
 pub mod clone;
+pub mod pull;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -39,3 +40,4 @@ pub use banana_split::*;
 pub use push::*;
 pub use fetch::*;
 pub use clone::*;
+pub use pull::*;

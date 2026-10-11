@@ -53,7 +53,8 @@ src/
 │   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
 │   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
 │   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
-│   └── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
+│   ├── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
+│   └── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing

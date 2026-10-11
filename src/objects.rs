@@ -245,6 +245,16 @@ pub enum PushStatus {
     Deleted,
 }
 
+/// The update status of a single remote-tracking ref after a fetch operation.
+// Used by: src/helpers/fetch.rs, src/commands/fetch.rs
+// Used by command/helper: `fetch_from_local`, `fetch_from_github`, and the `fetch` command
+#[derive(Debug, PartialEq, Eq)]
+pub enum FetchRefResult {
+    NewBranch { branch: String, sha: String },
+    Updated { branch: String, old_sha: String, new_sha: String },
+    UpToDate { branch: String },
+}
+
 /// Target repository metadata and authentication credentials for pushing to GitHub via the Git Data API.
 // Used by: src/helpers/github.rs, src/commands/push.rs
 // Used by command/helper: `push_to_github`, `resolve_github_target`, and the `push` command

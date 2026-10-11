@@ -48,11 +48,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("[rtest] Building rgit-main...");
+    println!("[rtest] Building rgit...");
     let build_status = Command::new("cargo")
         .arg("build")
         .arg("--bin")
-        .arg("rgit-main")
+        .arg("rgit")
         .current_dir(&project_root)
         .status()?;
 
@@ -66,9 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[rtest] Created sandbox: {}", sandbox.display());
     }
     #[cfg(target_os = "windows")]
-    let bin_name = "rgit-main.exe";
+    let bin_name = "rgit.exe";
     #[cfg(not(target_os = "windows"))]
-    let bin_name = "rgit-main";
+    let bin_name = "rgit";
 
     let binary_path = project_root.join("target").join("debug").join(bin_name);
 

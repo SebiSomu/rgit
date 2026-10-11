@@ -372,8 +372,332 @@ pub fn delete_github_ref(client: &reqwest::blocking::Client, target: &GitHubTarg
     Ok(())
 }
 
+/// Lists all branch references from a GitHub repository, returning pairs of (branch_name, commit_sha).
+// Used by `fetch`.
+pub fn list_github_refs(client: &reqwest::blocking::Client, target: &GitHubTarget) -> Result<Vec<(String, String)>> {
+    let url = format!("https://api.github.com/repos/{}/{}/git/refs/heads", target.owner, target.repo);
+    let res = client.get(&url).send().context("Failed to list refs from GitHub")?;
+
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        anyhow::bail!("fatal: Repository '{}/{}' not found or not accessible.", target.owner, target.repo);
+    }
+    if res.status() == reqwest::StatusCode::UNAUTHORIZED {
+        anyhow::bail!("fatal: Authentication failed for GitHub (bad credentials). Check your GITHUB_TOKEN.");
+    }
+    if !res.status().is_success() {
+        let err = res.text().unwrap_or_default();
+        anyhow::bail!("fatal: GitHub API error listing refs: {}", err);
+    }
+
+    let json: serde_json::Value = res.json().context("Failed to parse GitHub refs response")?;
+    let mut refs = Vec::new();
+    if let Some(arr) = json.as_array() {
+        for item in arr {
+            if let (Some(ref_name), Some(sha)) = (
+                item["ref"].as_str(),
+                item["object"]["sha"].as_str(),
+            ) {
+                let branch = ref_name
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(ref_name)
+                    .to_string();
+                refs.push((branch, sha.to_string()));
+            }
+        }
+    }
+    Ok(refs)
+}
+
+/// Gets the default branch name for a GitHub repository (usually "main" or "master").
+// Used by `fetch`.
+pub fn get_github_default_branch(client: &reqwest::blocking::Client, target: &GitHubTarget) -> Result<String> {
+    let url = format!("https://api.github.com/repos/{}/{}", target.owner, target.repo);
+    let res = client.get(&url).send().context("Failed to get repo info from GitHub")?;
+    if !res.status().is_success() {
+        return Ok("main".to_string());
+    }
+    let json: serde_json::Value = res.json().context("Failed to parse repo info")?;
+    Ok(json["default_branch"]
+        .as_str()
+        .unwrap_or("main")
+        .to_string())
+}
+
+/// Downloads a blob object from GitHub, reconstructs the raw git blob, and writes it to
+/// the local `.git/objects/` store.
+// Used by `fetch`.
+pub fn fetch_github_blob(client: &reqwest::blocking::Client, target: &GitHubTarget, sha: &str) -> Result<()> {
+    if crate::helpers::fetch::local_has_object(sha) {
+        return Ok(());
+    }
+
+    let url = format!("https://api.github.com/repos/{}/{}/git/blobs/{}", target.owner, target.repo, sha);
+    let res = client.get(&url).send().context("Failed to fetch blob from GitHub")?;
+    if !res.status().is_success() {
+        let err = res.text().unwrap_or_default();
+        anyhow::bail!("Failed to fetch blob {} from GitHub: {}", sha, err);
+    }
+
+    let json: serde_json::Value = res.json().context("Failed to parse blob response")?;
+    let encoding = json["encoding"].as_str().unwrap_or("base64");
+    let content_str = json["content"].as_str().context("Missing content in blob response")?;
+    let content_clean: String = content_str.chars().filter(|c| !c.is_whitespace()).collect();
+
+    let content = if encoding == "base64" {
+        base64::engine::general_purpose::STANDARD.decode(&content_clean)
+            .context("Failed to base64-decode blob content")?
+    } else {
+        content_clean.into_bytes()
+    };
+
+    crate::helpers::write_object("blob", &content)?;
+    Ok(())
+}
+
+/// Downloads a tree object from GitHub, reconstructs the raw binary git tree, and writes
+/// it to the local `.git/objects/` store. Recursively fetches all subtrees and blobs.
+// Used by `fetch`.
+pub fn fetch_github_tree(client: &reqwest::blocking::Client, target: &GitHubTarget, sha: &str, visited_trees: &mut std::collections::HashSet<String>) -> Result<()> {
+    if !visited_trees.insert(sha.to_string()) {
+        return Ok(());
+    }
+    if crate::helpers::fetch::local_has_object(sha) {
+        return Ok(());
+    }
+
+    let url = format!("https://api.github.com/repos/{}/{}/git/trees/{}", target.owner, target.repo, sha);
+    let res = client.get(&url).send().context("Failed to fetch tree from GitHub")?;
+    if !res.status().is_success() {
+        let err = res.text().unwrap_or_default();
+        anyhow::bail!("Failed to fetch tree {} from GitHub: {}", sha, err);
+    }
+
+    let json: serde_json::Value = res.json().context("Failed to parse tree response")?;
+    let items = json["tree"].as_array().context("Missing tree array in response")?;
+
+    for item in items {
+        let item_sha = item["sha"].as_str().context("Missing sha in tree item")?.to_string();
+        let item_type = item["type"].as_str().unwrap_or("blob");
+        if item_type == "tree" {
+            fetch_github_tree(client, target, &item_sha, visited_trees)?;
+        } else {
+            fetch_github_blob(client, target, &item_sha)?;
+        }
+    }
+
+    let mut entries: Vec<(String, String, String, Vec<u8>)> = Vec::new();
+    for item in items {
+        let item_path = item["path"].as_str().context("Missing path in tree item")?.to_string();
+        let item_sha = item["sha"].as_str().context("Missing sha in tree item")?.to_string();
+        let item_mode = item["mode"].as_str().unwrap_or("100644").to_string();
+        let item_type = item["type"].as_str().unwrap_or("blob");
+
+        let sort_key = if item_type == "tree" {
+            format!("{}/", item_path)
+        } else {
+            item_path.clone()
+        };
+
+        let sha_bytes = hex::decode(&item_sha)
+            .with_context(|| format!("Invalid SHA hex in tree: {}", item_sha))?;
+
+        entries.push((sort_key, item_mode, item_path, sha_bytes));
+    }
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut tree_content = Vec::new();
+    for (_, mode, name, sha_bytes) in entries {
+        tree_content.extend_from_slice(mode.as_bytes());
+        tree_content.push(b' ');
+        tree_content.extend_from_slice(name.as_bytes());
+        tree_content.push(0);
+        tree_content.extend_from_slice(&sha_bytes);
+    }
+
+    let written_sha = crate::helpers::write_object("tree", &tree_content)?;
+    if written_sha != sha {
+    }
+    Ok(())
+}
+
+/// Downloads a commit from GitHub, reconstructs the raw git commit object text, and writes
+/// it to the local `.git/objects/` store. Recursively fetches its tree and parent commits.
+// Used by `fetch`.
+pub fn fetch_github_commit(client: &reqwest::blocking::Client, target: &GitHubTarget, sha: &str, visited_commits: &mut std::collections::HashSet<String>, visited_trees: &mut std::collections::HashSet<String>) -> Result<()> {
+    if !visited_commits.insert(sha.to_string()) {
+        return Ok(());
+    }
+    if crate::helpers::fetch::local_has_object(sha) {
+        return Ok(());
+    }
+
+    let url = format!("https://api.github.com/repos/{}/{}/git/commits/{}", target.owner, target.repo, sha);
+    let res = client.get(&url).send().context("Failed to fetch commit from GitHub")?;
+    if !res.status().is_success() {
+        let err = res.text().unwrap_or_default();
+        anyhow::bail!("Failed to fetch commit {} from GitHub: {}", sha, err);
+    }
+
+    let json: serde_json::Value = res.json().context("Failed to parse commit response")?;
+    let tree_sha = json["tree"]["sha"].as_str().context("Missing tree sha in commit")?.to_string();
+    fetch_github_tree(client, target, &tree_sha, visited_trees)?;
+
+    if let Some(parents) = json["parents"].as_array() {
+        for parent in parents {
+            let parent_sha = parent["sha"].as_str().context("Missing parent sha")?;
+            fetch_github_commit(client, target, parent_sha, visited_commits, visited_trees)?;
+        }
+    }
+
+    let author_name = json["author"]["name"].as_str().unwrap_or("Unknown");
+    let author_email = json["author"]["email"].as_str().unwrap_or("");
+    let author_date = json["author"]["date"].as_str().unwrap_or("1970-01-01T00:00:00Z");
+    let committer_name = json["committer"]["name"].as_str().unwrap_or("Unknown");
+    let committer_email = json["committer"]["email"].as_str().unwrap_or("");
+    let committer_date = json["committer"]["date"].as_str().unwrap_or("1970-01-01T00:00:00Z");
+    let message = json["message"].as_str().unwrap_or("").trim_end_matches('\n');
+    let author_ts = iso8601_to_git_timestamp(author_date);
+    let committer_ts = iso8601_to_git_timestamp(committer_date);
+
+    let mut commit_text = format!("tree {}\n", tree_sha);
+    if let Some(parents) = json["parents"].as_array() {
+        for parent in parents {
+            if let Some(p_sha) = parent["sha"].as_str() {
+                commit_text.push_str(&format!("parent {}\n", p_sha));
+            }
+        }
+    }
+    commit_text.push_str(&format!("author {} <{}> {}\n", author_name, author_email, author_ts));
+    commit_text.push_str(&format!("committer {} <{}> {}\n", committer_name, committer_email, committer_ts));
+    commit_text.push('\n');
+    commit_text.push_str(message);
+    commit_text.push('\n');
+
+    crate::helpers::write_object("commit", commit_text.as_bytes())?;
+    Ok(())
+}
+
+/// Converts an ISO 8601 UTC timestamp string to a git-format timestamp string (unix seconds + offset).
+// Used by `fetch`.
+pub fn iso8601_to_git_timestamp(iso: &str) -> String {
+    // Parse "2024-04-11T12:22:03Z" into unix seconds (best-effort without chrono)
+    let clean = iso.trim_end_matches('Z').replace('T', " ");
+    let parts: Vec<&str> = clean.split(|c| c == '-' || c == ':' || c == ' ').collect();
+    if parts.len() < 6 {
+        return "0 +0000".to_string();
+    }
+    let year: u64 = parts[0].parse().unwrap_or(1970);
+    let month: u64 = parts[1].parse().unwrap_or(1);
+    let day: u64 = parts[2].parse().unwrap_or(1);
+    let hour: u64 = parts[3].parse().unwrap_or(0);
+    let minute: u64 = parts[4].parse().unwrap_or(0);
+    let second: u64 = parts[5].parse().unwrap_or(0);
+
+    // Days since Unix epoch (1970-01-01)
+    let days = days_since_epoch(year, month, day);
+    let secs = days * 86400 + hour * 3600 + minute * 60 + second;
+    format!("{} +0000", secs)
+}
+
+/// Computes days elapsed since 1970-01-01 for a given calendar date.
+// Used by `fetch`.
+fn days_since_epoch(year: u64, month: u64, day: u64) -> u64 {
+    let m = if month <= 2 { month + 9 } else { month - 3 };
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y / 400;
+    let yoe = y % 400;
+    let doy = (153 * m + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Orchestrates fetching all refs and objects from a GitHub repository via the Git Data API,
+/// updating remote-tracking refs and writing FETCH_HEAD.
+// Used by `fetch`.
+pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_display: &str, branch_filter: Option<&str>) -> Result<Vec<crate::objects::FetchRefResult>> {
+    let client = build_github_client(&target.token)?;
+    let default_branch = get_github_default_branch(&client, target)?;
+
+    let remote_refs = list_github_refs(&client, target)?;
+    let filtered_refs: Vec<_> = match branch_filter {
+        Some(b) => remote_refs.into_iter().filter(|(name, _)| name == b).collect(),
+        None => remote_refs,
+    };
+
+    if filtered_refs.is_empty() {
+        println!("From {}", remote_display);
+        println!(" * (no branches found or empty repository)");
+        return Ok(Vec::new());
+    }
+
+    println!("From {}", remote_display);
+
+    let mut results = Vec::new();
+    let mut visited_commits = std::collections::HashSet::new();
+    let mut visited_trees = std::collections::HashSet::new();
+    let mut fetch_head_entries = Vec::new();
+    let mut total_objects = 0usize;
+
+    for (branch, remote_sha) in &filtered_refs {
+        let local_sha = crate::helpers::fetch::read_local_remote_tracking_ref(remote_name, branch);
+
+        if local_sha.as_deref() == Some(remote_sha.as_str()) {
+            print!(" = [up to date]      {:20} -> {}/{}", branch, remote_name, branch);
+            println!();
+            results.push(crate::objects::FetchRefResult::UpToDate { branch: branch.clone() });
+            fetch_head_entries.push((remote_sha.clone(), branch.clone(), remote_display.to_string()));
+            continue;
+        }
+
+        let before = visited_commits.len();
+        fetch_github_commit(&client, target, remote_sha, &mut visited_commits, &mut visited_trees)?;
+        let fetched = visited_commits.len() - before;
+        total_objects += fetched;
+
+        crate::helpers::fetch::write_local_remote_tracking_ref(remote_name, branch, remote_sha)?;
+        fetch_head_entries.push((remote_sha.clone(), branch.clone(), remote_display.to_string()));
+
+        let result = match &local_sha {
+            None => {
+                println!(" * [new branch]      {:20} -> {}/{}", branch, remote_name, branch);
+                crate::objects::FetchRefResult::NewBranch {
+                    branch: branch.clone(),
+                    sha: remote_sha.clone(),
+                }
+            }
+            Some(old) => {
+                println!(
+                    "   {}..{}  {:16} -> {}/{}",
+                    crate::helpers::short_hash(old),
+                    crate::helpers::short_hash(remote_sha),
+                    branch, remote_name, branch
+                );
+                crate::objects::FetchRefResult::Updated {
+                    branch: branch.clone(),
+                    old_sha: old.clone(),
+                    new_sha: remote_sha.clone(),
+                }
+            }
+        };
+        results.push(result);
+    }
+
+    if total_objects > 0 {
+        println!("Receiving objects: 100% ({}/{}), done.", total_objects, total_objects);
+    }
+
+    if let Some((_, sha)) = filtered_refs.iter().find(|(b, _)| b == &default_branch) {
+        let _ = crate::refs::write_ref(&format!("refs/remotes/{}/HEAD", remote_name), sha);
+    }
+
+    crate::helpers::fetch::write_fetch_head(&fetch_head_entries)?;
+
+    Ok(results)
+}
+
 /// Orchestrates pushing local commits and tree/blob objects to GitHub via the Git Data API.
 // Used by `push`.
+
 pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: &str, src_name: &str, dest_branch: &str, local_commit_hash: Option<&str>, force: bool,) -> Result<()> {
     let client = build_github_client(&target.token)?;
 
@@ -634,5 +958,12 @@ mod tests {
         );
         assert_eq!(parse_github_remote("./local/dir"), None);
         assert_eq!(parse_github_remote("local_repo"), None);
+    }
+
+    #[test]
+    fn test_iso8601_to_git_timestamp() {
+        assert_eq!(iso8601_to_git_timestamp("1970-01-01T00:00:00Z"), "0 +0000");
+        // 2024-01-01 00:00:00 UTC = 1704067200
+        assert_eq!(iso8601_to_git_timestamp("2024-01-01T00:00:00Z"), "1704067200 +0000");
     }
 }

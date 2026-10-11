@@ -206,6 +206,10 @@ pub enum Commands {
         #[arg(short = 'u', long = "set-upstream")]
         set_upstream: bool,
     },
+    Fetch {
+        remote: Option<String>,
+        branch: Option<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -310,6 +314,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Push { remote, refspec, force, set_upstream } => {
             crate::commands::push(remote, refspec, force, set_upstream)?;
+        }
+        Commands::Fetch { remote, branch } => {
+            crate::commands::fetch(remote, branch)?;
         }
     }
 

@@ -13,6 +13,7 @@ pub mod revert;
 pub mod tag;
 pub mod restore;
 pub mod config;
+pub mod rebase;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -29,3 +30,4 @@ pub use revert::*;
 pub use tag::*;
 pub use restore::*;
 pub use config::*;
+pub use rebase::*;

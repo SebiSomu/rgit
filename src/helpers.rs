@@ -15,6 +15,7 @@ pub mod rebase;
 pub mod push;
 pub mod github;
 pub mod fetch;
+pub mod clone;
 
 pub use objects::*;
 pub use diff::*;
@@ -31,3 +32,4 @@ pub use rebase::*;
 pub use push::*;
 pub use github::*;
 pub use fetch::*;
+pub use clone::*;

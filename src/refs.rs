@@ -381,3 +381,18 @@ pub fn delete_tag(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns a sorted list of the branch names tracked for `remote_name` under
+/// `.git/refs/remotes/<remote_name>/`, skipping the `HEAD` entry that `fetch` records there.
+// Used by `clone`.
+pub fn list_remote_tracking_branches(remote_name: &str) -> Result<Vec<String>> {
+    let dir = format!(".git/refs/remotes/{}", remote_name);
+    if !Path::new(&dir).exists() {
+        return Ok(Vec::new());
+    }
+ 
+    let mut branches = Vec::new();
+    collect_branches(Path::new(&dir), "", &mut branches)?;
+    branches.retain(|b| b != "HEAD");
+    branches.sort();
+    Ok(branches)
+}

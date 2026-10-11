@@ -17,6 +17,7 @@ pub mod rebase;
 pub mod banana_split;
 pub mod push;
 pub mod fetch;
+pub mod clone;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -36,4 +37,5 @@ pub use config::*;
 pub use rebase::*;
 pub use banana_split::*;
 pub use push::*;
-pub use fetch::*;
+pub use fetch::*;
+pub use clone::*;

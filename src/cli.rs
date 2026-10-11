@@ -210,6 +210,14 @@ pub enum Commands {
         remote: Option<String>,
         branch: Option<String>,
     },
+    Clone {
+        repository: String,
+        directory: Option<String>,
+        #[arg(short = 'b', long = "branch")]
+        branch: Option<String>,
+        #[arg(short = 'o', long = "origin")]
+        origin: Option<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -317,6 +325,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Fetch { remote, branch } => {
             crate::commands::fetch(remote, branch)?;
+        }
+        Commands::Clone { repository, directory, branch, origin } => {
+            crate::commands::clone(repository, directory, branch, origin)?;
         }
     }
 

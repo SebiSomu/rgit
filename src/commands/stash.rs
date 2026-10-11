@@ -3,14 +3,12 @@ use std::fs;
 use std::path::Path;
 use anyhow::Context;
 
-use crate::commands::commit::build_commit;
-use crate::commands::plumbing::write_tree_from_index_prefix;
 use crate::helpers::{
-    append_stash_entry, build_index_entries_for_tree, build_merge_commit, build_tree_from_map,
+    append_stash_entry, build_commit, build_index_entries_for_tree, build_merge_commit, build_tree_from_map,
     commit_parents, commit_subject_line, current_branch_label, flatten_tree, format_diff_output,
     hard_reset_working_tree, hash_content, parse_stash_index, read_object, read_stash_list,
     resolve_tree_from_source, stash_apply_or_pop, tree_hash_of_commit, write_object, write_stash_list,
-    STASH_LIST_PATH,
+    write_tree_from_index_prefix, STASH_LIST_PATH,
 };
 use crate::index::{read_index, write_index};
 use crate::refs;

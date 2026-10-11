@@ -1,31 +1,12 @@
-
-// ============================================================================
-// revert
-// ============================================================================
-//
-// A revert is a cherry-pick run backward: instead of replaying a commit's
-// changes forward onto HEAD, it applies the *inverse* of those changes.
-// Concretely, the same three-way merge cherry-pick uses is reused here with
-// the roles swapped:
-//
-//   cherry-pick <C>: base = parent(C), ours = HEAD, theirs = C
-//   revert      <C>: base = C,         ours = HEAD, theirs = parent(C)
-//
-// i.e. "merge in the parent's tree, treating the commit itself as the
-// common ancestor" — which is exactly the diff that undoes C.
-//
-// Conflict state mirrors cherry-pick's `.git/CHERRY_PICK_HEAD` /
-// `.git/CHERRY_PICK_MSG` via `.git/REVERT_HEAD` / `.git/REVERT_MSG`, and
-// `--continue`/`--abort` work the same way.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{build_index_entries_for_tree, commit_subject_line, hard_reset_working_tree};
-use crate::commands::commit::build_commit;
-use crate::commands::plumbing::write_tree_from_index_prefix;
-use crate::helpers::{commit_parents, generate_conflict_markers, read_object, resolve_commit_from_source, resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit};
+use crate::helpers::{
+    build_commit, build_index_entries_for_tree, commit_parents, commit_subject_line,
+    generate_conflict_markers, hard_reset_working_tree, read_object, resolve_commit_from_source,
+    resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit, write_tree_from_index_prefix,
+};
 use crate::index::{build_entry, read_index, write_index};
 use crate::refs;
 

@@ -1,12 +1,11 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use anyhow::Context;
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
-use crate::helpers::{read_object, write_object};
-use crate::index::{read_index, IndexEntry};
+use crate::helpers::{read_object, write_object, write_tree_from_index_prefix};
+use crate::index::read_index;
 
 pub fn init() -> anyhow::Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -56,74 +55,6 @@ pub fn write_tree() -> anyhow::Result<()> {
     let tree_hash = write_tree_from_index_prefix(&entries, "")?;
     println!("{}", tree_hash);
     Ok(())
-}
-
-pub(crate) fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> anyhow::Result<String> {
-    let prefix_with_slash = if prefix.is_empty() {
-        String::new()
-    } else {
-        format!("{}/", prefix)
-    };
-
-    let mut direct_files: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
-    let mut subdirs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-
-    for entry in entries {
-        if !prefix_with_slash.is_empty() && !entry.path.starts_with(&prefix_with_slash) {
-            continue;
-        }
-
-        let rel = if prefix_with_slash.is_empty() {
-            entry.path.as_str()
-        } else {
-            &entry.path[prefix_with_slash.len()..]
-        };
-
-        if let Some(slash_idx) = rel.find('/') {
-            let subdir_name = &rel[..slash_idx];
-            subdirs.insert(subdir_name.to_string());
-        } else {
-            direct_files.insert(rel.to_string(), (entry.hash, entry.mode));
-        }
-    }
-
-    let mut tree_entries: Vec<(String, Vec<u8>)> = Vec::new();
-
-    for (name, (hash, mode)) in direct_files {
-        let mut entry_bytes = Vec::new();
-        let mode_str = format!("{:o} ", mode);
-        entry_bytes.extend_from_slice(mode_str.as_bytes());
-        entry_bytes.extend_from_slice(name.as_bytes());
-        entry_bytes.push(0);
-        entry_bytes.extend_from_slice(&hash);
-        tree_entries.push((name, entry_bytes));
-    }
-
-    for subdir in subdirs {
-        let sub_prefix = if prefix.is_empty() {
-            subdir.clone()
-        } else {
-            format!("{}/{}", prefix, subdir)
-        };
-        let sub_tree_hash_hex = write_tree_from_index_prefix(entries, &sub_prefix)?;
-        let sub_tree_hash = hex::decode(sub_tree_hash_hex)?;
-
-        let mut entry_bytes = Vec::new();
-        entry_bytes.extend_from_slice(b"40000 ");
-        entry_bytes.extend_from_slice(subdir.as_bytes());
-        entry_bytes.push(0);
-        entry_bytes.extend_from_slice(&sub_tree_hash);
-        tree_entries.push((subdir, entry_bytes));
-    }
-
-    tree_entries.sort_by(|(name_a, _), (name_b, _)| name_a.cmp(name_b));
-
-    let mut tree_content = Vec::new();
-    for (_, bytes) in tree_entries {
-        tree_content.extend_from_slice(&bytes);
-    }
-
-    write_object("tree", &tree_content)
 }
 
 pub fn ls_tree(name_only: bool, tree_hash: String) -> anyhow::Result<()> {

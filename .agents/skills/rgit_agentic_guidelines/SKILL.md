@@ -24,18 +24,62 @@ This document defines the constraints, protocols, and architectural patterns tha
 
 ---
 
-## 2. Project Architecture & Components
+## 2. Project Architecture & Complete Structure
 
-`rgit` is a lightweight Git implementation in Rust. Its internal architecture maps closely to standard Git specifications:
+`rgit` is a modular, lightweight Git implementation in Rust. Its architecture strictly separates command entry points, domain objects, and operational helpers:
 
-### Core Modules:
+```text
+src/
+├── main.rs                   # Entry point calling cli::handle_commands()
+├── cli.rs                    # Parses CLI arguments with clap and routes to commands
+├── commands.rs               # Root module declaring and re-exporting subcommands
+├── commands/                 # High-level CLI command entry points
+│   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
+│   ├── commit.rs             # commit, commit-tree
+│   ├── staging.rs            # add, status, rm, mv
+│   ├── branch.rs             # branch, switch, checkout
+│   ├── restore.rs            # restore (worktree and staged paths)
+│   ├── diff.rs               # diff
+│   ├── merge.rs              # merge
+│   ├── reset.rs              # reset
+│   ├── clean.rs              # clean
+│   ├── cherry_pick.rs        # cherry-pick (--continue, --abort)
+│   ├── revert.rs             # revert (--continue, --abort)
+│   ├── stash.rs              # stash (push, pop, apply, list, drop, show, clear)
+│   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
+│   ├── tag.rs                # tag, show, describe
+│   ├── config.rs             # config (get, set, unset, list)
+│   ├── rebase.rs             # rebase (-i, --continue, --abort)
+│   └── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
+├── helpers.rs                # Root module declaring and re-exporting helper utilities
+├── helpers/                  # Lower-level helpers & engines
+│   ├── objects.rs            # Object compression, hashing, and tree writing
+│   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
+│   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
+│   ├── diff.rs               # Myers diff algorithm & unified diff formatting
+│   ├── gitignore.rs          # Gitignore parsing and pattern matching
+│   ├── merge.rs              # Three-way tree merge & conflict marker formatting
+│   ├── state_files.rs        # In-progress operation state readers/writers (.git state files)
+│   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
+│   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
+│   ├── banana_split.rs       # Path grouping helpers for banana-split
+│   └── rebase.rs             # Interactive rebase engine, todo editor, replay runner
+├── objects.rs                # Special types, enums, structs, and type aliases
+├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
+├── index.rs                  # Binary staging index (.git/index) reader and writer
+└── bin/
+    └── rtest.rs              # Isolated test runner executing rgit within test-sandbox/
+```
 
-1. **[cli.rs](file:///c:/rgit-main/src/cli.rs)**: Parses and routes all command-line arguments using `clap`. All subcommands (e.g., `Branch`, `Switch`, `Checkout`) are declared here.
-2. **[commands.rs](file:///c:/rgit-main/src/commands.rs)**: Core business logic for rgit commands.
-3. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
-4. **[helpers.rs](file:///c:/rgit-main/src/helpers.rs)**: Lower-level helpers for reading and writing compressed Git objects, walking the commit graph (`is_reachable`), and matching file status.
-5. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).
-6. **[objects.rs](file:///cgit-main/src/objects.rs)**: Declares special structures and types of data used either for helper functions or for commands. When declaring a new special type for data that we need later, declare it in objects.rs.
+### Module Responsibilities:
+
+1. **[cli.rs](file:///c:/rgit-main/src/cli.rs)**: Parses and routes all command-line arguments using `clap`. All subcommands are declared here.
+2. **[commands/](file:///c:/rgit-main/src/commands)**: Contains *only* high-level command entry points. Functions here orchestrate workflows between `helpers`, `refs`, and `index`, and must return `anyhow::Result<()>`. They do not contain low-level helper logic.
+3. **[helpers/](file:///c:/rgit-main/src/helpers)**: Standalone operational functions that read/write compressed objects, execute file I/O, spawn editors, walk commit graphs, manage state files, and resolve merge conflicts.
+4. **[objects.rs](file:///c:/rgit-main/src/objects.rs)**: Single source of truth for all domain structures, enums, AST items, and shared type aliases used across commands and helpers.
+5. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
+6. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).
+7. **[bin/rtest.rs](file:///c:/rgit-main/src/bin/rtest.rs)**: Test harness that cleans and targets `test-sandbox/` for all manual or agentic testing.
 
 ---
 
@@ -46,4 +90,34 @@ This document defines the constraints, protocols, and architectural patterns tha
 - **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `helpers.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
-- **Helper Functions**: Use the helper functions in `helpers.rs` for reading and writing compressed Git objects, walking the commit graph, and matching file status. When thinking of adding a new feature soon and a new helper function is needed for it, always implement the helper function in helpers.rs before implementing the feature itself. All helper functions should have a comment written above them explaining what they do and for which feature they are needed to be used for. The comments should look like this: one or more lines starting with `///` containing the explanation itself, followed by a new line starting with `//` containing the `Used by...` details, and then the function signature and body on the next line.
+
+### Helper Functions vs. Methods:
+- **Methods on Types (`impl Type`) in `objects.rs`**: Use methods for pure data transformations that do not perform disk I/O, process spawning, or repository lookups (e.g., `Action::parse`, `Action::name`, `TodoItem::format_line`, `CleanMode::wants`).
+- **Standalone Helper Functions in `helpers/`**: Use standalone functions in `helpers/` when interacting with the file system, repository metadata, state files, child processes, or multi-step graph algorithms.
+
+### Comment Requirements for Helper Functions:
+All helper functions in `helpers/` must have a comment written above them explaining what they do and for which feature they are needed. The comments must follow this format:
+```rust
+/// One or more lines explaining what the helper function does.
+// Used by `<command_or_caller>`.
+pub fn function_name(...) -> anyhow::Result<...> { ... }
+```
+
+### Comment Requirements for Objects:
+Every struct, enum, and type alias in `objects.rs` must have descriptive documentation comments directly preceding its declaration containing:
+1. **Description of its use case**: A doc-comment (`///`) detailing what data the object models and why it exists.
+2. **Used by a file**: A line comment (`// Used by: <file(s)>`) listing the files where the type is used.
+3. **Used by command or helper**: A line comment (`// Used by command/helper: <command_or_helper>`) explaining whether it is consumed by a command, a helper, or both.
+
+Example:
+```rust
+/// An instruction action assigned to an individual commit entry in an interactive rebase todo file.
+// Used by: src/helpers/rebase.rs, src/commands/rebase.rs
+// Used by command/helper: `parse_edited_todo`, `render_todo_for_editing`, `commit_item`, and the `rebase` command
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Action {
+    Pick,
+    Reword,
+    ...
+}
+```

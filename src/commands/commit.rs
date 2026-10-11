@@ -1,26 +1,8 @@
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::commands::plumbing::write_tree_from_index_prefix;
-use crate::helpers::{build_merge_commit, read_object, tree_hash_of_commit, write_object};
+use crate::helpers::{build_commit, build_merge_commit, read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::index::read_index;
 use crate::refs;
-
-pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &str) -> anyhow::Result<String> {
-    let mut content = format!("tree {}\n", tree_hash);
-    if let Some(parent) = parent_hash {
-        content.push_str(&format!("parent {}\n", parent));
-    }
-
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let author = crate::helpers::config::author_identity()?
-
-    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("\n{}\n", message));
-
-    write_object("commit", content.as_bytes())
-}
 
 pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: String) -> anyhow::Result<()> {
     println!("{}", build_commit(tree_hash, parent_hash, &message)?);

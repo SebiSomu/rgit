@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{build_index_entries_for_tree, hard_reset_working_tree};
-use crate::commands::plumbing::write_tree_from_index_prefix;
-use crate::commands::commit::build_commit;
-use crate::helpers::{commit_parents, extract_commit_message, generate_conflict_markers, read_object, resolve_commit_from_source, resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit};
+use crate::helpers::{
+    build_commit, build_index_entries_for_tree, commit_parents, extract_commit_message,
+    generate_conflict_markers, hard_reset_working_tree, read_object, resolve_commit_from_source,
+    resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit, write_tree_from_index_prefix,
+};
 use crate::index::{build_entry, read_index, write_index};
 use crate::refs;
 

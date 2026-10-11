@@ -1,51 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
-use crate::commands::commit::build_commit;
-use crate::commands::plumbing::write_tree_from_index_prefix;
-use crate::commands::rebase::{collect_commits_to_replay, rebase_in_progress, replay_onto};
+use crate::helpers::banana_split::group_key;
 use crate::helpers::checkout::ensure_working_tree_clean;
-use crate::helpers::{commit_parents, extract_commit_message, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source};
-use crate::index::IndexEntry;
+use crate::helpers::commit::{build_commit, commit_parents, extract_commit_message, is_reachable, resolve_commit_from_source, resolve_tree_from_source, short_hash};
+use crate::helpers::objects::read_object;
+use crate::helpers::rebase::{collect_commits_to_replay, rebase_in_progress, replay_onto};
+use crate::helpers::state_files::build_tree_from_map;
+use crate::objects::Tree;
 use crate::refs;
-
-type Tree = BTreeMap<String, ([u8; 20], u32)>;
-
-fn short(hash: &str) -> &str {
-    &hash[..hash.len().min(7)]
-}
-
-/// The group a changed path belongs to.
-fn group_key(path: &str, by_dir: bool) -> String {
-    if by_dir {
-        match path.split_once('/') {
-            Some((top, _)) => top.to_string(),
-            None => ".".to_string(),
-        }
-    } else {
-        path.to_string()
-    }
-}
-
-/// Writes a tree object for a flattened path -> (hash, mode) map.
-fn build_tree_from_map(map: &Tree) -> anyhow::Result<String> {
-    let entries: Vec<IndexEntry> = map
-        .iter()
-        .map(|(path, (hash, mode))| IndexEntry {
-            ctime_secs: 0,
-            ctime_nsecs: 0,
-            mtime_secs: 0,
-            mtime_nsecs: 0,
-            dev: 0,
-            ino: 0,
-            mode: *mode,
-            uid: 0,
-            gid: 0,
-            size: 0,
-            hash: *hash,
-            path: path.clone(),
-        })
-        .collect();
-    write_tree_from_index_prefix(&entries, "")
-}
 
 /// `rgit banana-split [--by-dir] [-n] [<commit>]`
 pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyhow::Result<()> {
@@ -66,7 +27,7 @@ pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyh
     if target != our_commit && !is_reachable(&our_commit, &target)? {
         anyhow::bail!(
             "fatal: commit {} is not part of the current branch's history",
-            short(&target)
+            short_hash(&target)
         );
     }
 
@@ -79,7 +40,7 @@ pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyh
     if parents.len() > 1 {
         anyhow::bail!(
             "error: commit {} is a merge commit; splitting merges is not supported",
-            short(&target)
+            short_hash(&target)
         );
     }
 
@@ -106,10 +67,10 @@ pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyh
 
     if groups.len() < 2 {
         match groups.keys().next() {
-            None => println!("Nothing to split: {} changes no files.", short(&target)),
+            None => println!("Nothing to split: {} changes no files.", short_hash(&target)),
             Some(only) => println!(
                 "Nothing to split: all of {}'s changes are in one {} ({}).",
-                short(&target),
+                short_hash(&target),
                 if by_dir { "directory" } else { "file" },
                 only
             ),
@@ -120,7 +81,7 @@ pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyh
     let n = groups.len();
 
     if dry_run {
-        println!("Would split {} \"{}\" into {} commits:", short(&target), subject, n);
+        println!("Would split {} \"{}\" into {} commits:", short_hash(&target), subject, n);
         for (i, (group, paths)) in groups.iter().enumerate() {
             if paths.len() == 1 && paths[0] == *group {
                 println!("  {}/{}  {}", i + 1, n, group);
@@ -171,13 +132,13 @@ pub fn banana_split(commit: Option<String>, by_dir: bool, dry_run: bool) -> anyh
     }
 
     if current != target_tree {
-        anyhow::bail!("internal error: the split pieces do not add up to {}; nothing was changed", short(&target));
+        anyhow::bail!("internal error: the split pieces do not add up to {}; nothing was changed", short_hash(&target));
     }
     let new_tip = previous.expect("at least two groups, so at least one commit was created");
 
-    println!("Split {} \"{}\" into {} commits:", short(&target), subject, n);
+    println!("Split {} \"{}\" into {} commits:", short_hash(&target), subject, n);
     for (hash, group) in &created {
-        println!("  [{}] {}", short(hash), group);
+        println!("  [{}] {}", short_hash(hash), group);
     }
 
     if target == our_commit {

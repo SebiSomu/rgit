@@ -140,7 +140,7 @@ pub fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::R
         })
         .collect();
 
-    crate::commands::plumbing::write_tree_from_index_prefix(&entries, "")
+    crate::helpers::objects::write_tree_from_index_prefix(&entries, "")
 }
 
 /// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens

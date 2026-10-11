@@ -179,13 +179,6 @@ pub enum Commands {
         #[arg(short = 'f', long = "force")]
         force: bool,
     },
-    Rebase {
-        upstream: Option<String>,
-        #[arg(long = "continue", conflicts_with = "abort")]
-        cont: bool,
-        #[arg(long = "abort", conflicts_with = "cont")]
-        abort: bool
-    },
     Config {
         key: Option<String>,
         value: Option<String>,
@@ -300,9 +293,6 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Mv { source, destination, force} => {
             crate::commands::mv(source, destination, force)?;
-        }
-        Commands::Rebase { upstream, cont, abort } => {
-            crate::commands::rebase(upstream, cont, abort)?;
         }
         Commands::Config { key, value, global, list, unset } => {
             crate::commands::config(key, value, global, list, unset)?;

@@ -172,10 +172,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     Ok(())
 }
 
-fn print_unstaged_after_reset(
-    old_index_map: &BTreeMap<String, [u8; 20]>,
-    target_tree: &BTreeMap<String, ([u8; 20], u32)>,
-) {
+fn print_unstaged_after_reset(old_index_map: &BTreeMap<String, [u8; 20]>, target_tree: &BTreeMap<String, ([u8; 20], u32)>) {
     let mut changes: Vec<(String, char)> = Vec::new();
 
     for (path, old_hash) in old_index_map {

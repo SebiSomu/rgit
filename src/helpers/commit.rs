@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
-use crate::helpers::objects::{flatten_tree, read_object, tree_hash_of_commit};
+use std::time::{SystemTime, UNIX_EPOCH};
+use crate::helpers::config::author_identity;
+use crate::helpers::objects::{flatten_tree, read_object, tree_hash_of_commit, write_object};
 use crate::refs;
 
 /// Resolves a commit's parent hashes from its raw object content, in order.
@@ -153,3 +155,27 @@ pub fn commit_subject_line(commit_hash: &str) -> anyhow::Result<String> {
 
     Ok(String::new())
 }
+
+/// Returns the abbreviated 7-character prefix of an object hash.
+// Used by `commit`, `rebase`, and `banana_split`.
+pub fn short_hash(hash: &str) -> &str {
+    &hash[..hash.len().min(7)]
+}
+
+/// Constructs and writes a commit object from a tree hash, optional parent hash, and commit message.
+// Used by `commit`, `rebase`, `banana_split`, `cherry_pick`, and `revert`.
+pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &str) -> anyhow::Result<String> {
+    let mut content = format!("tree {}\n", tree_hash);
+    if let Some(parent) = parent_hash {
+        content.push_str(&format!("parent {}\n", parent));
+    }
+
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let author = author_identity()?;
+
+    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
+    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
+    content.push_str(&format!("\n{}\n", message));
+
+    write_object("commit", content.as_bytes())
+}

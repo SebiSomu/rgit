@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use crate::commands::plumbing::write_tree_from_index_prefix;
-use crate::helpers::{build_merge_commit, check_switch_safety, find_merge_base, generate_conflict_markers, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree};
+use crate::helpers::{build_merge_commit, check_switch_safety, find_merge_base, generate_conflict_markers, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree, write_tree_from_index_prefix};
 use crate::index::{build_entry, read_index, write_index};
 use crate::objects::MergeConflict;
 use crate::refs;

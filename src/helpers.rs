@@ -11,6 +11,7 @@ pub mod clean;
 pub mod banana_split;
 pub mod rebase;
 pub mod push;
+pub mod github;
 
 pub use objects::*;
 pub use diff::*;
@@ -25,3 +26,4 @@ pub use clean::*;
 pub use banana_split::*;
 pub use rebase::*;
 pub use push::*;
+pub use github::*;

@@ -244,3 +244,34 @@ pub enum PushStatus {
     NewBranch { new_hash: String },
     Deleted,
 }
+
+/// Target repository metadata and authentication credentials for pushing to GitHub via the Git Data API.
+// Used by: src/helpers/github.rs, src/commands/push.rs
+// Used by command/helper: `push_to_github`, `resolve_github_target`, and the `push` command
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitHubTarget {
+    pub owner: String,
+    pub repo: String,
+    pub token: String,
+}
+
+/// Parsed author or committer metadata extracted from a raw commit object for API serialization.
+// Used by: src/helpers/github.rs
+// Used by command/helper: `parse_commit_identity`, `create_github_commit`
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CommitIdentity {
+    pub name: String,
+    pub email: String,
+    pub date: String,
+}
+
+/// A single file or subtree entry in a GitHub tree creation request.
+// Used by: src/helpers/github.rs
+// Used by command/helper: `upload_tree_to_github`, `create_github_tree`
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GitHubTreeEntry {
+    pub path: String,
+    pub mode: String,
+    pub r#type: String,
+    pub sha: String,
+}

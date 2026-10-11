@@ -1,70 +1,106 @@
 # rgit
 
-A lightweight, fully functional implementation of Git written in Rust.
+A lightweight, fully functional Git implementation written in Rust.
 
-`rgit` was built to explore the internal architecture and mechanics of version control systems. It includes a complete implementation of the core Git object model (blobs, trees, commits), index staging, reference tracking (`refs/heads`, `HEAD`), Myers diffing, 3-way merges, stash state stacks, binary-search debugging (`bisect`), and modular crate architecture.
+`rgit` was built from scratch to explore the internal architecture and mechanics of version control systems. It features a complete implementation of the core Git object model (blobs, trees, commits), index staging (`.git/index`), reference tracking (`refs/heads/`, `refs/remotes/`, `refs/tags/`, `HEAD`), Myers diff algorithm, 3-way tree merges with conflict markers, interactive rebase, stashes, binary-search debugging (`bisect`), dual remote transports (local filesystem + GitHub REST API), and full push/fetch/clone/pull workflows.
 
 ---
 
-## Modular Architecture (v2.0)
+## Modular Architecture (v2.1)
 
-`rgit` is structured into clean, decoupled domain modules:
+`rgit` enforces strict separation of concerns across its codebase:
 
-- **[`src/cli.rs`](file:///c:/rgit-main/src/cli.rs)**: Command-line parsing and routing powered by `clap`.
-- **[`src/commands/`](file:///c:/rgit-main/src/commands)**: Porcelain & plumbing business logic (split per command namespace: `branch`, `commit`, `diff`, `merge`, `reset`, `stash`, `bisect`, etc.).
-- **[`src/helpers/`](file:///c:/rgit-main/src/helpers)**: Core engine utilities (Git object serialization/zlib compression, commit graph BFS traversal, Myers diffing algorithm, `.gitignore` glob matching, working-tree safety checks).
-- **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Staging index (`.git/index`) binary file parsing and serialization.
-- **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch refs, detached HEAD states).
-- **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Core data models, structs, and CLI subcommand enums.
+- **[`src/cli.rs`](file:///c:/rgit-main/src/cli.rs)**: CLI argument parsing, subcommands, and flags powered by `clap`.
+- **[`src/commands/`](file:///c:/rgit-main/src/commands)**: Porcelain & plumbing command dispatchers and orchestration workflows.
+- **[`src/helpers/`](file:///c:/rgit-main/src/helpers)**: Standalone operational engines:
+  - `objects.rs`: Zlib compression/decompression, SHA-1 hashing, and tree writing.
+  - `commit.rs`: Commit parsing, parent chains, and BFS reachability walks.
+  - `diff.rs`: Myers diff algorithm and unified diff formatting.
+  - `merge.rs`: Three-way tree merge algorithm and conflict marker generation.
+  - `rebase.rs`: Interactive rebase engine, todo editor, and commit replay.
+  - `push.rs` / `fetch.rs`: Object enumeration, missing object pack/copy, and ref updates.
+  - `github.rs`: GitHub Git Data API integration (blobs, trees, commits, refs).
+  - `clone.rs`: Skeleton creation, remote setup, and initial worktree checkout.
+  - `remote.rs`: Remote configuration queries, tracking branch management, and ref directory maintenance.
+  - `config.rs`: INI parser/writer for local (`.git/config`) and global (`~/.rgitconfig`).
+- **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
+- **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
+- **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Domain models, shared type aliases, and CLI subcommand enums.
+- **[`src/bin/rtest.rs`](file:///c:/rgit-main/src/bin/rtest.rs)**: Isolated sandbox test harness executing `rgit` in `test-sandbox/`.
 
 ---
 
 ## Features & Supported Commands
 
-### Porcelain Commands (High Level)
+### Repository & Staging
 
-#### Repository & Staging
-- **`init`**: Initializes `.git/` directory layout.
-- **`add <paths...>`**: Hashes file contents into blobs and updates `.git/index`.
-- **`rm <files...>`** (`--cached`, `-r`, `-f`): Removes files from index and working tree.
-- **`status`**: Reports untracked, modified, and staged changes.
+- **`init`**: Initializes a new repository with standard `.git/` directory layout.
+- **`add <paths...>`**: Hashes file contents into blobs and updates the binary index (`.git/index`).
+- **`rm <files...>`** (`--cached`, `-r`, `-f`): Removes files from index and/or working tree.
+- **`mv <source> <destination>`** (`-f`): Moves/renames files, staging the change in the index.
+- **`status`**: Reports untracked files, working-tree modifications, and staged changes.
 - **`restore`** (`--staged`, `--worktree`, `--source`): Restores working tree or index files from a tree or commit.
-- **`clean`** (`-f`, `-d`, `-x`, `-X`): Cleans untracked files and directories with `.gitignore` pattern support.
+- **`clean`** (`-f`, `-d`, `-x`, `-X`): Prunes untracked and ignored files with `.gitignore` pattern evaluation.
 
-#### History & Diffing
-- **`commit -m <msg>`**: Writes tree and commit objects from the staging index.
-- **`log`** (`--oneline`): Walks commit parent graph and displays history.
+### History, Inspection & Diffs
+
+- **`commit`** (`-m <message>`): Writes tree and commit objects from the current index.
+- **`log`** (`--oneline`): Walks commit parent graphs and displays chronological commit logs.
+- **`show [<commit>]`**: Displays commit metadata, message, and unified patch diff.
 - **`diff`** (`--staged`, `[<commit> [<commit>]]`): Computes line-by-line Myers diffs between working tree, index, or commits.
+- **`tag`** (`<name> [<commit>]`, `-d`, `-l`): Creates, lists, or deletes lightweight tags.
+- **`describe [<commit>]`**: Finds the most recent reachable tag and formats a descriptive revision identifier.
 
-#### Branching & Navigation
-- **`branch`** (`-d`, `-D`, `-m`): Creates, lists, renames, and safely deletes branches.
-- **`switch`** (`-c`, `--detach`, `-f`): Switches branches or checks out detached HEADs with safety checks.
-- **`checkout`** (`-b`, `--detach`, `-f`): Classic branch and commit switching interface.
+### Branching & Navigation
 
-#### Merging, Replaying & Reverting
-- **`merge <branch>`**: Performs 3-way tree merges with conflict marker generation (`<<<<<<<`, `=======`, `>>>>>>>`).
+- **`branch`** (`[<name>]`, `-d`, `-D`, `-m`): Lists, creates, renames, and safely deletes branches with ancestor checks.
+- **`switch`** (`<branch>`, `-c`, `--detach`, `-f`): Modern branch switching and detached HEAD transitions with worktree safety.
+- **`checkout`** (`<branch|commit>`, `-b`, `--detach`, `-f`): Classic branch, commit, and revision switching interface.
+
+### Merging, Replaying & Rebasing
+
+- **`merge <branch>`**: Performs fast-forward or 3-way tree merges with conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+- **`rebase`** (`<upstream>`, `-i`, `--continue`, `--abort`): Full interactive rebase with `pick`, `reword`, `edit`, `squash`, `fixup`, and `drop` instructions.
 - **`cherry-pick <commit>`** (`--no-commit`, `--continue`, `--abort`): Replays a single commit onto current HEAD with state recording.
-- **`revert <commit>`** (`--no-commit`, `--continue`, `--abort`): Inverts and applies the changes of a target commit.
+- **`revert <commit>`** (`--no-commit`, `--continue`, `--abort`): Inverts and applies target commit changes.
 
-#### Reset & Stash Operations
-- **`reset`** (`--soft`, `--mixed`, `--hard`, `[-- <paths...>]`): Resets HEAD, index, and working tree.
-- **`stash`** (`push`, `pop`, `apply`, `list`, `drop`, `show`, `clear`): Stashes working directory and index state onto `.git/STASH_LIST`.
+### Staste & Recovery
 
-#### Automated Debugging
-- **`bisect`** (`start`, `bad`, `good`, `skip`, `reset`, `log`, `run`): Binary search tool to locate the commit that introduced a bug.
+- **`reset`** (`--soft`, `--mixed`, `--hard`, `[-- <paths...>]`): Moves HEAD, restores the index, and synchronizes the working tree.
+- **`stash`** (`push`, `pop`, `apply`, `list`, `drop`, `show`, `clear`): Stashes and restores working directory and index state.
 
-### Plumbing Commands (Low Level)
-- **`hash-object`** (`-w`): Computes SHA-1 hash for a file and optionally writes it to object store.
-- **`cat-file`** (`-p`): Decompresses and displays raw Git object contents.
-- **`write-tree`**: Builds tree objects from the index.
-- **`ls-tree`** (`--name-only`): Lists tree object contents.
-- **`commit-tree`**: Low-level creation of commit objects.
+### Remote Repositories & Collaboration
+
+`rgit` supports two transports for all remote operations:
+
+1. **Local transport**: Any local directory path or bare repository on the filesystem.
+2. **GitHub REST API transport**: Remote GitHub repositories (`owner/repo` or HTTPS URL) using Personal Access Tokens.
+
+- **`remote`** (`[-v|--verbose]`, `add`, `remove`/`rm`, `rename`, `get-url`, `set-url`, `show`): Manages tracked remotes, URLs, fetch refspecs, and remote-tracking references.
+- **`fetch [<remote>] [<branch>]`**: Walks remote commit graphs, downloads missing objects, updates remote-tracking refs (`refs/remotes/<remote>/<branch>`), and writes `FETCH_HEAD`.
+- **`push [<remote>] [<branch>]`** (`-f|--force`, `-u|--set-upstream`): Computes missing objects, transfers blobs/trees/commits, enforces fast-forward checks, and updates remote references.
+- **`clone [-b <branch>] [-o <origin>] <repository> [<directory>]`**: Initializes target directory, fetches remote objects, configures remote & upstream tracking, and checks out the working tree.
+- **`pull [<remote>] [<branch>]`**: Seamless convenience command composing `fetch` with upstream tracking resolution and `merge`.
+
+### Configuration & Diagnostics
+
+- **`config`** (`[--global]`, `<key> [<value>]`, `--list`, `--unset`): Reads, writes, lists, and unsets local (`.git/config`) and global (`~/.rgitconfig`) configurations.
+- **`bisect`** (`start`, `bad`, `good`, `skip`, `reset`, `log`, `run`): Automated binary search to locate the regression-introducing commit.
+- **`banana-split <commit>`** (`--by-dir`, `-n|--dry-run`): Custom tool that splits a commit into atomic per-path or per-directory commits.
+
+### Plumbing Commands
+
+- **`hash-object`** (`-w <file>`): Computes object SHA-1 hash and optionally writes compressed object to store.
+- **`cat-file`** (`-p <hash>`): Decompresses and displays object type and contents.
+- **`write-tree`**: Serializes current staging index into tree objects.
+- **`ls-tree`** (`--name-only <tree>`): Inspects tree contents and modes.
+- **`commit-tree <tree> [-p <parent>] -m <msg>`**: Directly writes a commit object from tree and parent hashes.
 
 ---
 
 ## Installation & Build
 
-Requires [Rust and Cargo](https://rustup.rs/).
+Requires [Rust and Cargo](https://rustup.rs/) (edition 2021+).
 
 ```bash
 git clone https://github.com/SebiSomu/rgit.git
@@ -72,21 +108,26 @@ cd rgit
 cargo build --release
 ```
 
-The binary will be generated at `target/release/rgit`.
+The compiled binary will be placed at `target/release/rgit` (or `target/release/rgit.exe` on Windows).
 
 ---
 
-## Test Harness (`rtest`)
+## Isolated Test Harness (`rtest`)
 
-To safely test `rgit` commands without touching the primary repository's `.git` folder, `rgit` includes an isolated test runner (`rtest`):
+To safely execute commands without altering the main repository's `.git` folder, `rgit` includes an isolated test harness:
 
 ```bash
-# Execute rgit commands within test-sandbox/
+# Initialize and test in test-sandbox/
 cargo run --bin rtest -- init
 cargo run --bin rtest -- add .
-cargo run --bin rtest -- commit -m "Initial sandbox commit"
+cargo run --bin rtest -- commit -m "Sandbox commit"
 
-# Clean sandbox environment
+# Test multi-repo workflows (e.g., clone, fetch, pull)
+cargo run --bin rtest -- --dir upstream init
+cargo run --bin rtest -- clone upstream local
+cargo run --bin rtest -- --dir local pull
+
+# Clean up sandbox environment
 cargo run --bin rtest -- --clean
 ```
 

@@ -10,6 +10,7 @@ pub mod config;
 pub mod clean;
 pub mod banana_split;
 pub mod rebase;
+pub mod push;
 
 pub use objects::*;
 pub use diff::*;
@@ -23,3 +24,4 @@ pub use config::*;
 pub use clean::*;
 pub use banana_split::*;
 pub use rebase::*;
+pub use push::*;

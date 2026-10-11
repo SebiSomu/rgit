@@ -198,6 +198,14 @@ pub enum Commands {
         #[arg(long = "abort", conflicts_with = "cont")]
         abort: bool,
     },
+    Push {
+        remote: Option<String>,
+        refspec: Option<String>,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+        #[arg(short = 'u', long = "set-upstream")]
+        set_upstream: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -299,6 +307,9 @@ pub fn handle_commands() -> Result<()> {
         }
        Commands::Rebase { upstream, interactive, cont, abort } => {
             crate::commands::rebase(upstream, interactive, cont, abort)?;
+        }
+        Commands::Push { remote, refspec, force, set_upstream } => {
+            crate::commands::push(remote, refspec, force, set_upstream)?;
         }
     }
 

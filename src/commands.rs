@@ -15,6 +15,7 @@ pub mod restore;
 pub mod config;
 pub mod rebase;
 pub mod banana_split;
+pub mod push;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -33,3 +34,4 @@ pub use restore::*;
 pub use config::*;
 pub use rebase::*;
 pub use banana_split::*;
+pub use push::*;

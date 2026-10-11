@@ -4,9 +4,19 @@ use std::process::Command;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().skip(1).collect();
-    let clean = args.iter().any(|arg| arg == "--clean");
-    let rgit_args: Vec<String> = args.into_iter().filter(|arg| arg != "--clean").collect();
+    let mut clean = false;
+    let mut sub_dir = None;
+    let mut rgit_args = Vec::new();
+    let mut iter = env::args().skip(1);
+    while let Some(arg) = iter.next() {
+        if arg == "--clean" {
+            clean = true;
+        } else if arg == "--dir" {
+            sub_dir = iter.next();
+        } else {
+            rgit_args.push(arg);
+        }
+    }
 
     let project_root = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         PathBuf::from(manifest_dir)
@@ -18,12 +28,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         exe_path
     };
 
-    let sandbox = project_root.join("test-sandbox");
+    let sandbox_root = project_root.join("test-sandbox");
+    let sandbox = match sub_dir {
+        Some(s) => sandbox_root.join(s),
+        None => sandbox_root.clone(),
+    };
+
 
     if clean {
-        if sandbox.exists() {
+        if sandbox_root.exists() {
             println!("[rtest] Cleaning sandbox...");
-            fs::remove_dir_all(&sandbox)?;
+            fs::remove_dir_all(&sandbox_root)?;
             println!("[rtest] Sandbox cleaned.");
         } else {
             println!("[rtest] Sandbox does not exist, nothing to clean.");

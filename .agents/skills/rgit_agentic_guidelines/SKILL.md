@@ -50,7 +50,8 @@ src/
 │   ├── tag.rs                # tag, show, describe
 │   ├── config.rs             # config (get, set, unset, list)
 │   ├── rebase.rs             # rebase (-i, --continue, --abort)
-│   └── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
+│   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
+│   └── push.rs               # push (local transport: enumerates and copies objects, fast-forward checks, updates refs)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -63,7 +64,8 @@ src/
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
 │   ├── banana_split.rs       # Path grouping helpers for banana-split
-│   └── rebase.rs             # Interactive rebase engine, todo editor, replay runner
+│   ├── rebase.rs             # Interactive rebase engine, todo editor, replay runner
+│   └── push.rs               # Remote repo resolution, object enumeration, loose object copier, ref updates
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
 ├── index.rs                  # Binary staging index (.git/index) reader and writer

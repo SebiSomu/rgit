@@ -5,7 +5,6 @@ mod helpers;
 mod index;
 pub mod refs;
 
-
 use anyhow::Result;
 
 fn main() -> Result<()> {

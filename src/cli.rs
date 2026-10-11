@@ -135,6 +135,13 @@ pub enum Commands {
         #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
         abort: bool
     },
+    BananaSplit {
+        commit: Option<String>,
+        #[arg(long = "by-dir")]
+        by_dir: bool,
+        #[arg(short = 'n', long = "dry-run")]
+        dry_run: bool,
+    },
     Revert {
         commit: Option<String>,
         #[arg(short = 'n', long = "no-commit", conflicts_with_all = ["cont", "abort"])]
@@ -269,6 +276,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::CherryPick { commit, no_commit, cont, abort } => {
             crate::commands::cherry_pick(commit, no_commit, cont, abort)?;
+        }
+        Commands::BananaSplit { commit, by_dir, dry_run } => {
+            crate::commands::banana_split(commit, by_dir, dry_run)?;
         }
         Commands::Revert { commit, no_commit, cont, abort } => {
             crate::commands::revert(commit, no_commit, cont, abort)?;

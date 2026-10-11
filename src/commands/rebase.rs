@@ -89,10 +89,6 @@ fn subject_of(hash: &str) -> anyhow::Result<String> {
     Ok(message.lines().next().unwrap_or("").to_string())
 }
 
-// ---------------------------------------------------------------------------
-// todo list: storage, editing, parsing
-// ---------------------------------------------------------------------------
-
 /// Reads the stored todo (full hashes). A bare 40-hex line is read as `pick`.
 fn read_todo() -> anyhow::Result<Vec<TodoItem>> {
     let mut items = Vec::new();
@@ -279,10 +275,6 @@ fn edit_message(initial: &str) -> anyhow::Result<String> {
     Ok(message)
 }
 
-// ---------------------------------------------------------------------------
-// entry point
-// ---------------------------------------------------------------------------
-
 /// `rgit rebase [-i] <upstream>` / `--continue` / `--abort`
 pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bool) -> anyhow::Result<()> {
     if abort {
@@ -296,7 +288,7 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
         anyhow::anyhow!("fatal: rebase requires an <upstream>, or --continue / --abort")
     })?;
 
-    if Path::new(REBASE_TODO_PATH).exists() || Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+    if rebase_in_progress() {
         anyhow::bail!(
             "fatal: a rebase is already in progress\n\
              hint: use 'rgit rebase --continue' or 'rgit rebase --abort'"
@@ -318,17 +310,12 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
     let merge_base = find_merge_base(&our_commit, &upstream_commit)?
         .ok_or_else(|| anyhow::anyhow!("fatal: refusing to rebase unrelated histories"))?;
 
-    // Upstream already contained in our history: nothing to move onto. An
-    // interactive rebase still proceeds, since `rebase -i HEAD~3` (rewrite the
-    // last three commits in place) is exactly this situation.
     if merge_base == upstream_commit && !interactive {
         println!("Current branch is up to date.");
         return Ok(());
     }
 
     if merge_base == our_commit {
-        // Our branch has nothing upstream doesn't already have: fast-forward,
-        // same mechanics as `merge`'s fast-forward path.
         let target_tree = resolve_tree_from_source(&upstream_commit)?;
         let head_tree = resolve_tree_from_source(&our_commit)?;
         let index_entries = read_index().unwrap_or_default();
@@ -359,20 +346,7 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
         items.push(TodoItem { action: Action::Pick, hash, subject });
     }
 
-    let branch_marker = match &head_state {
-        refs::HeadState::Branch(branch_name) => format!("refs/heads/{}", branch_name),
-        refs::HeadState::Detached(_) => "HEAD".to_string(),
-    };
-    fs::write(REBASE_BRANCH_PATH, format!("{}\n", branch_marker))
-        .context("Failed to write .git/REBASE_BRANCH")?;
-    fs::write(REBASE_ORIG_HEAD_PATH, format!("{}\n", our_commit))
-        .context("Failed to write .git/REBASE_ORIG_HEAD")?;
-    fs::write(REBASE_ONTO_PATH, format!("{}\n", upstream_commit))
-        .context("Failed to write .git/REBASE_ONTO")?;
-
     if interactive {
-        // Nothing in the repository has been touched yet, so on any failure
-        // here just discard the state files and leave everything as it was.
         match edit_todo(&items, &merge_base, &our_commit, &upstream_commit) {
             Ok(edited) => items = edited,
             Err(e) => {
@@ -386,12 +360,51 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
             return Ok(());
         }
     }
+
+    begin_replay(&head_state, &our_commit, &upstream_commit, items)
+}
+
+/// True while a rebase (or anything built on the rebase engine) is paused.
+pub(crate) fn rebase_in_progress() -> bool {
+    Path::new(REBASE_TODO_PATH).exists() || Path::new(REBASE_ORIG_HEAD_PATH).exists()
+}
+
+/// Replays `commits` (oldest first, as plain picks) on top of `onto`, then
+/// moves the current branch to the result. This is the rebase engine's entry
+/// point for other commands (e.g. `banana-split`): conflicts pause it exactly
+/// like a rebase, and `rgit rebase --continue` / `--abort` take over.
+/// `orig_head` is the tip being replaced, kept so `--abort` can restore it.
+pub(crate) fn replay_onto(head_state: &refs::HeadState, orig_head: &str, onto: &str, commits: &[String]) -> anyhow::Result<()> {
+    if rebase_in_progress() {
+        anyhow::bail!(
+            "fatal: a rebase is already in progress\n\
+             hint: use 'rgit rebase --continue' or 'rgit rebase --abort'"
+        );
+    }
+    let mut items = Vec::new();
+    for hash in commits {
+        items.push(TodoItem { action: Action::Pick, hash: hash.clone(), subject: subject_of(hash)? });
+    }
+    begin_replay(head_state, orig_head, onto, items)
+}
+
+/// Writes the rebase state, checks out `onto`, and runs the replay loop.
+fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, items: Vec<TodoItem>) -> anyhow::Result<()> {
+    let branch_marker = match head_state {
+        refs::HeadState::Branch(branch_name) => format!("refs/heads/{}", branch_name),
+        refs::HeadState::Detached(_) => "HEAD".to_string(),
+    };
+    fs::write(REBASE_BRANCH_PATH, format!("{}\n", branch_marker))
+        .context("Failed to write .git/REBASE_BRANCH")?;
+    fs::write(REBASE_ORIG_HEAD_PATH, format!("{}\n", orig_head))
+        .context("Failed to write .git/REBASE_ORIG_HEAD")?;
+    fs::write(REBASE_ONTO_PATH, format!("{}\n", onto))
+        .context("Failed to write .git/REBASE_ONTO")?;
     write_todo(&items)?;
 
-    // Check out upstream's tree before replaying anything on top of it.
     let checkout = || -> anyhow::Result<()> {
-        let target_tree = resolve_tree_from_source(&upstream_commit)?;
-        let head_tree = resolve_tree_from_source(&our_commit)?;
+        let target_tree = resolve_tree_from_source(onto)?;
+        let head_tree = resolve_tree_from_source(orig_head)?;
         let index_entries = read_index().unwrap_or_default();
         let index_map: BTreeMap<String, [u8; 20]> =
             index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
@@ -399,7 +412,7 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
         check_switch_safety(&target_tree, &head_tree, &index_map)?;
         sync_working_tree(&target_tree, &head_tree, &index_map)?;
         update_index_from_tree(&target_tree, &head_tree)?;
-        refs::set_head_detached(&upstream_commit)?;
+        refs::set_head_detached(onto)?;
         Ok(())
     };
     if let Err(e) = checkout() {
@@ -407,7 +420,7 @@ pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bo
         return Err(e);
     }
 
-    println!("Rebasing {} commit(s) onto {}...", items.len(), short(&upstream_commit));
+    println!("Rebasing {} commit(s) onto {}...", items.len(), short(onto));
 
     process_rebase_todo()
 }
@@ -497,10 +510,6 @@ fn rebase_abort() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// the replay loop
-// ---------------------------------------------------------------------------
 
 /// Drives the replay against the stored todo, one item at a time, until the
 /// list empties (success) or something pauses it (conflict, empty message,
@@ -742,7 +751,7 @@ fn cleanup_rebase_state() {
 /// (exclusive), collecting the commits to replay in oldest-first order.
 /// Bails if a merge commit is encountered before reaching `base`, rather
 /// than silently dropping whatever a second parent would have contributed.
-fn collect_commits_to_replay(tip: &str, base: &str) -> anyhow::Result<Vec<String>> {
+pub(crate) fn collect_commits_to_replay(tip: &str, base: &str) -> anyhow::Result<Vec<String>> {
     let mut commits = Vec::new();
     let mut current = tip.to_string();
 

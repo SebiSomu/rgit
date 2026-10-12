@@ -234,6 +234,20 @@ pub enum Commands {
         #[arg(required = true, num_args = 1..=2)]
         args: Vec<String>,
     },
+    Archive {
+        #[arg(short = 'f', long = "format")]
+        format: Option<String>,
+        #[arg(short = 'l', long = "list")]
+        list: bool,
+        #[arg(long = "prefix")]
+        prefix: Option<String>,
+        #[arg(short = 'o', long = "output")]
+        output: Option<PathBuf>,
+        #[arg(value_name = "TREE-ISH")]
+        tree_ish: Option<String>,
+        #[arg(value_name = "PATH")]
+        paths: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -353,6 +367,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Blame { line_range, args } => {
             crate::commands::blame(args, line_range)?;
+        }
+        Commands::Archive { format, list, prefix, output, tree_ish, paths } => {
+            crate::commands::archive(format, list, prefix, output, tree_ish, paths)?;
         }
     }
 

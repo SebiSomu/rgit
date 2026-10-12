@@ -18,6 +18,7 @@ pub mod fetch;
 pub mod clone;
 pub mod remote;
 pub mod blame;
+pub mod archive;
 
 pub use objects::*;
 pub use diff::*;
@@ -37,3 +38,4 @@ pub use fetch::*;
 pub use clone::*;
 pub use remote::*;
 pub use blame::*;
+pub use archive::*;

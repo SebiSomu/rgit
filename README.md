@@ -22,6 +22,8 @@ A lightweight, fully functional Git implementation written in Rust.
   - `github.rs`: GitHub Git Data API integration (blobs, trees, commits, refs).
   - `clone.rs`: Skeleton creation, remote setup, and initial worktree checkout.
   - `remote.rs`: Remote configuration queries, tracking branch management, and ref directory maintenance.
+  - `blame.rs`: Line attribution algorithm, diff-mapping, tree lookups, and date formatting.
+  - `archive.rs`: Packing tree structures into tar, compressed tar.gz, and zip archives with prefix and path filtering.
   - `config.rs`: INI parser/writer for local (`.git/config`) and global (`~/.rgitconfig`).
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
@@ -51,6 +53,7 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`tag`** (`<name> [<commit>]`, `-d`, `-l`): Creates, lists, or deletes lightweight tags.
 - **`describe [<commit>]`**: Finds the most recent reachable tag and formats a descriptive revision identifier.
 - **`blame`** (`[-L <start>,<end>] [<rev>] [--] <file>`): Shows line-by-line commit attribution, author info, timestamps, and detects uncommitted lines.
+- **`archive`** (`[-f|--format <fmt>]`, `[-l|--list]`, `[--prefix <prefix>]`, `[-o|--output <file>]`, `<tree-ish> [<paths...>]`): Exports files from a tree, commit, tag, or ref into a `tar`, `tar.gz`/`tgz`, or `zip` archive with directory hierarchy and commit timestamps preserved.
 
 ### Branching & Navigation
 

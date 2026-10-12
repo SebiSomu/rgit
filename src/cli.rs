@@ -228,6 +228,12 @@ pub enum Commands {
         #[command(subcommand)]
         action: Option<RemoteAction>,
     },
+    Blame {
+        #[arg(short = 'L', value_name = "START,END")]
+        line_range: Option<String>,
+        #[arg(required = true, num_args = 1..=2)]
+        args: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -344,6 +350,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Remote { verbose, action } => {
             crate::commands::remote(verbose, action)?;
+        }
+        Commands::Blame { line_range, args } => {
+            crate::commands::blame(args, line_range)?;
         }
     }
 

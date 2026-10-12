@@ -50,6 +50,7 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`diff`** (`--staged`, `[<commit> [<commit>]]`): Computes line-by-line Myers diffs between working tree, index, or commits.
 - **`tag`** (`<name> [<commit>]`, `-d`, `-l`): Creates, lists, or deletes lightweight tags.
 - **`describe [<commit>]`**: Finds the most recent reachable tag and formats a descriptive revision identifier.
+- **`blame`** (`[-L <start>,<end>] [<rev>] [--] <file>`): Shows line-by-line commit attribution, author info, timestamps, and detects uncommitted lines.
 
 ### Branching & Navigation
 

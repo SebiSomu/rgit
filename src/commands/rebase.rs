@@ -5,23 +5,41 @@ use crate::helpers::merge::find_merge_base;
 use crate::helpers::resolve_tree_from_source;
 use crate::helpers::rebase::{
     begin_replay, cleanup_rebase_state, collect_commits_to_replay, edit_todo, rebase_abort,
-    rebase_continue, rebase_in_progress, subject_of,
+    rebase_continue, rebase_edit_todo, rebase_in_progress, rebase_skip, subject_of,
 };
 use crate::index::read_index;
 use crate::objects::{Action, TodoItem};
 use crate::refs;
 
-/// `rgit rebase [-i] <upstream>` / `--continue` / `--abort`
-pub fn rebase(upstream: Option<String>, interactive: bool, cont: bool, abort: bool) -> anyhow::Result<()> {
+/// `rgit rebase [-i] <upstream>` / `--continue` / `--abort` / `--skip` / `--edit-todo`
+pub fn rebase(
+    upstream: Option<String>,
+    interactive: bool,
+    cont: bool,
+    abort: bool,
+    skip: bool,
+    edit_todo_flag: bool,
+) -> anyhow::Result<()> {
+    let mode_count = [abort, cont, skip, edit_todo_flag].iter().filter(|&&b| b).count();
+    if mode_count > 1 {
+        anyhow::bail!("fatal: cannot combine --continue, --abort, --skip, or --edit-todo");
+    }
+
     if abort {
         return rebase_abort();
     }
     if cont {
         return rebase_continue();
     }
+    if skip {
+        return rebase_skip();
+    }
+    if edit_todo_flag {
+        return rebase_edit_todo();
+    }
 
     let upstream = upstream.ok_or_else(|| {
-        anyhow::anyhow!("fatal: rebase requires an <upstream>, or --continue / --abort")
+        anyhow::anyhow!("fatal: rebase requires an <upstream>, or --continue / --abort / --skip / --edit-todo")
     })?;
 
     if rebase_in_progress() {

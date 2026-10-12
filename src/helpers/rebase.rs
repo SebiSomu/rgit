@@ -111,8 +111,14 @@ pub fn render_todo_for_editing(items: &[TodoItem], base: &str, tip: &str, onto: 
 /// Parses the user-edited todo. Commits are matched by hash prefix against candidates.
 // Used by `rebase`.
 pub fn parse_edited_todo(content: &str, candidates: &[TodoItem]) -> anyhow::Result<Vec<TodoItem>> {
+    parse_edited_todo_with_meld(content, candidates, false)
+}
+
+/// Parses the user-edited todo with optional permission to meld the first item into HEAD.
+// Used by `rebase`.
+pub fn parse_edited_todo_with_meld(content: &str, candidates: &[TodoItem], allow_first_meld: bool) -> anyhow::Result<Vec<TodoItem>> {
     let mut items: Vec<TodoItem> = Vec::new();
-    let mut have_prev = false;
+    let mut have_prev = allow_first_meld;
 
     for (n, raw) in content.trim_start_matches('\u{feff}').lines().enumerate() {
         let line = raw.trim();
@@ -389,6 +395,107 @@ pub fn rebase_abort() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Skips the current commit in an in-progress rebase, resetting the working tree
+/// and staging index to HEAD and continuing replay.
+// Used by the `rebase` command.
+pub fn rebase_skip() -> anyhow::Result<()> {
+    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+        anyhow::bail!("fatal: no rebase in progress");
+    }
+
+    if Path::new(REBASE_PAUSE_PATH).exists() {
+        let _ = fs::remove_file(REBASE_PAUSE_PATH);
+        let current_head = refs::resolve_head_commit()?
+            .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD"))?;
+        let (obj_type, content) = read_object(&current_head)?;
+        if obj_type == "commit" {
+            let parents = commit_parents(&String::from_utf8_lossy(&content));
+            if let Some(parent) = parents.first() {
+                refs::set_head_detached(parent)?;
+                let parent_tree = resolve_tree_from_source(parent)?;
+                let index_entries = read_index().unwrap_or_default();
+                let mut tracked_paths: std::collections::BTreeSet<String> =
+                    index_entries.iter().map(|e| e.path.clone()).collect();
+                tracked_paths.extend(parent_tree.keys().cloned());
+                hard_reset_working_tree(&parent_tree, &tracked_paths)?;
+                let mut new_entries = build_index_entries_for_tree(&parent_tree, true)?;
+                write_index(&mut new_entries)?;
+                println!("Skipped commit {}.", short_hash(&current_head));
+                return process_rebase_todo();
+            }
+        }
+    }
+
+    let todo = read_todo()?;
+    let current_head = refs::resolve_head_commit()?
+        .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD -- this should not happen"))?;
+    let head_tree = resolve_tree_from_source(&current_head)?;
+
+    let mut tracked_paths: std::collections::BTreeSet<String> =
+        read_index().unwrap_or_default().into_iter().map(|e| e.path).collect();
+    tracked_paths.extend(head_tree.keys().cloned());
+
+    if let Some((item, rest)) = todo.split_first() {
+        if let Ok(their_tree) = resolve_tree_from_source(&item.hash) {
+            tracked_paths.extend(their_tree.keys().cloned());
+        }
+        hard_reset_working_tree(&head_tree, &tracked_paths)?;
+        let mut new_index_entries = build_index_entries_for_tree(&head_tree, true)?;
+        write_index(&mut new_index_entries)?;
+
+        println!("Skipped {}... {}", short_hash(&item.hash), item.subject);
+        write_todo(rest)?;
+    } else {
+        hard_reset_working_tree(&head_tree, &tracked_paths)?;
+        let mut new_index_entries = build_index_entries_for_tree(&head_tree, true)?;
+        write_index(&mut new_index_entries)?;
+    }
+
+    process_rebase_todo()
+}
+
+/// Allows the user to view and edit the remainder of the in-progress rebase todo list.
+// Used by the `rebase` command.
+pub fn rebase_edit_todo() -> anyhow::Result<()> {
+    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+        anyhow::bail!("fatal: no rebase in progress");
+    }
+
+    let items = read_todo()?;
+    if items.is_empty() {
+        println!("The todo list is empty; nothing to edit.");
+        return Ok(());
+    }
+
+    let onto = fs::read_to_string(REBASE_ONTO_PATH)
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let orig_head = fs::read_to_string(REBASE_ORIG_HEAD_PATH)
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let current_head = refs::resolve_head_commit()?
+        .unwrap_or_else(|| orig_head.clone());
+
+    let path = Path::new(REBASE_TODO_PATH);
+    fs::write(path, render_todo_for_editing(&items, &current_head, &orig_head, &onto))
+        .context("Failed to write .git/REBASE_TODO")?;
+
+    run_editor(path, true)?;
+
+    let edited = fs::read_to_string(path).context("Failed to read the edited todo list")?;
+    let allow_first_meld = current_head != onto;
+    match parse_edited_todo_with_meld(&edited, &items, allow_first_meld) {
+        Ok(new_items) => {
+            write_todo(&new_items)?;
+            Ok(())
+        }
+        Err(e) => {
+            let _ = write_todo(&items);
+            Err(e)
+        }
+    }
+}
+
 /// Drives the replay loop against the stored todo list.
 // Used by `rebase`.
 pub fn process_rebase_todo() -> anyhow::Result<()> {
@@ -659,3 +766,46 @@ pub fn collect_commits_to_replay(tip: &str, base: &str) -> anyhow::Result<Vec<St
     commits.reverse();
     Ok(commits)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_word() {
+        assert_eq!(split_word("pick 1234567 initial commit"), ("pick", "1234567 initial commit"));
+        assert_eq!(split_word("  drop   abcd  "), ("drop", "abcd  "));
+        assert_eq!(split_word("word"), ("word", ""));
+    }
+
+    #[test]
+    fn test_parse_edited_todo_meld() {
+        let candidates = vec![
+            TodoItem {
+                action: Action::Pick,
+                hash: "1111111111111111111111111111111111111111".to_string(),
+                subject: "first".to_string(),
+            },
+            TodoItem {
+                action: Action::Pick,
+                hash: "2222222222222222222222222222222222222222".to_string(),
+                subject: "second".to_string(),
+            },
+        ];
+
+        // Without allow_first_meld, first item cannot be squash/fixup:
+        let text_squash_first = "squash 1111111 first\npick 2222222 second\n";
+        assert!(parse_edited_todo_with_meld(text_squash_first, &candidates, false).is_err());
+
+        // With allow_first_meld = true, first item can be squash/fixup (into HEAD):
+        let parsed = parse_edited_todo_with_meld(text_squash_first, &candidates, true).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].action, Action::Squash);
+        assert_eq!(parsed[1].action, Action::Pick);
+
+        // Standard pick followed by squash works in both:
+        let text_normal = "pick 1111111 first\nsquash 2222222 second\n";
+        assert!(parse_edited_todo(text_normal, &candidates).is_ok());
+    }
+}
+

@@ -191,12 +191,16 @@ pub enum Commands {
     },
     Rebase {
         upstream: Option<String>,
-        #[arg(short = 'i', long = "interactive", conflicts_with_all = ["cont", "abort"])]
+        #[arg(short = 'i', long = "interactive", conflicts_with_all = ["cont", "abort", "skip", "edit_todo"])]
         interactive: bool,
-        #[arg(long = "continue", conflicts_with = "abort")]
+        #[arg(long = "continue")]
         cont: bool,
-        #[arg(long = "abort", conflicts_with = "cont")]
+        #[arg(long = "abort")]
         abort: bool,
+        #[arg(long = "skip")]
+        skip: bool,
+        #[arg(long = "edit-todo")]
+        edit_todo: bool,
     },
     Push {
         remote: Option<String>,
@@ -347,8 +351,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Config { key, value, global, list, unset } => {
             crate::commands::config(key, value, global, list, unset)?;
         }
-       Commands::Rebase { upstream, interactive, cont, abort } => {
-            crate::commands::rebase(upstream, interactive, cont, abort)?;
+       Commands::Rebase { upstream, interactive, cont, abort, skip, edit_todo } => {
+            crate::commands::rebase(upstream, interactive, cont, abort, skip, edit_todo)?;
         }
         Commands::Push { remote, refspec, force, set_upstream } => {
             crate::commands::push(remote, refspec, force, set_upstream)?;

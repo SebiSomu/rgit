@@ -519,3 +519,48 @@ impl ReflogEntry {
         })
     }
 }
+
+/// A loose object file found in `.git/objects/xx/`: what it is called, where it lives, how
+/// large the compressed file is and when it was last modified (which is how `gc` decides an
+/// unreferenced object is old enough to prune).
+// Used by: src/helpers/gc.rs, src/commands/gc.rs
+// Used by command/helper: `list_loose_objects`, `plan_gc`, `remove_loose_object`, and the `gc` command
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LooseObject {
+    /// Full 40-digit hash of the object.
+    pub hash: String,
+    /// Path of the object file inside `.git/objects`.
+    pub path: PathBuf,
+    /// Size of the compressed object file, in bytes.
+    pub size: u64,
+    /// Last-modified time of the file, as seconds since the Unix epoch.
+    pub modified: u64,
+}
+
+/// What a `gc` run found: how many loose objects exist, how many are reachable, which
+/// unreachable ones were (or, in a dry run, would be) pruned, and how many reflog entries
+/// expired.
+// Used by: src/helpers/gc.rs, src/commands/gc.rs
+// Used by command/helper: `plan_gc` and the `gc` command
+#[derive(Debug, Clone, Default)]
+pub struct GcReport {
+    /// Loose objects in the repository.
+    pub total_objects: usize,
+    /// Of those, the ones reachable from a ref, HEAD, the index, the stash, an operation in progress or a live reflog entry.
+    pub reachable_objects: usize,
+    /// Of those, the ones nothing leads to.
+    pub unreachable_objects: usize,
+    /// Unreachable objects that were spared: too new, referenced by a too-new object, or pruning is off.
+    pub kept_unreachable: usize,
+    /// Unreachable objects that were (or would be) deleted.
+    pub pruned: Vec<LooseObject>,
+    /// Reflog entries that were (or would be) expired.
+    pub reflog_entries_expired: usize,
+}
+
+impl GcReport {
+    /// Total size in bytes of the objects that were (or would be) pruned.
+    pub fn pruned_bytes(&self) -> u64 {
+        self.pruned.iter().map(|o| o.size).sum()
+    }
+}

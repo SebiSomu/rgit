@@ -256,6 +256,14 @@ pub enum Commands {
         #[command(subcommand)]
         action: Option<ReflogAction>,
     },
+    Gc {
+        #[arg(long = "prune", default_value = "14")]
+        prune: String,
+        #[arg(long = "reflog-expire", default_value = "90")]
+        reflog_expire: String,
+        #[arg(short = 'n', long = "dry-run")]
+        dry_run: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -381,6 +389,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Reflog { action } => {
             crate::commands::reflog(action)?;
+        }
+        Commands::Gc { prune, reflog_expire, dry_run } => {
+            crate::commands::gc(prune, reflog_expire, dry_run)?;
         }
     }
 

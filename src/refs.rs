@@ -57,8 +57,17 @@ pub fn resolve_head_commit() -> Result<Option<String>> {
 /// Sets HEAD directly to a raw commit hash, entering detached HEAD state.
 // Used by `commit`, `switch`, and `checkout` commands.
 pub fn set_head_detached(hash: &str) -> Result<()> {
+    let old_commit = resolve_head_commit().ok().flatten();
+    let was_on_branch = matches!(resolve_head(), Ok(HeadState::Branch(_)));
+
     fs::write(".git/HEAD", format!("{}\n", hash))
         .context("Failed to write detached HEAD")?;
+
+    if was_on_branch {
+        crate::helpers::reflog::record_head_move(old_commit.as_deref(), Some(hash));
+    } else {
+        crate::helpers::reflog::record_ref_update("HEAD", old_commit.as_deref(), Some(hash));
+    }
     Ok(())
 }
 
@@ -82,6 +91,7 @@ pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
 // Used by `commit`, `branch`, `switch`, and `checkout`.
 pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
     let path = format!(".git/{}", ref_name);
+    let old_hash = read_ref(ref_name).ok().flatten();
 
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent)?;
@@ -89,6 +99,17 @@ pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
 
     fs::write(&path, format!("{}\n", hash))
         .with_context(|| format!("Failed to write ref: {}", ref_name))?;
+
+    if old_hash.as_deref() != Some(hash) {
+        crate::helpers::reflog::record_ref_update(ref_name, old_hash.as_deref(), Some(hash));
+
+        // A branch that HEAD points at takes HEAD along with it.
+        if let Ok(HeadState::Branch(current)) = resolve_head() {
+            if ref_name == format!("refs/heads/{}", current) {
+                crate::helpers::reflog::record_ref_update("HEAD", old_hash.as_deref(), Some(hash));
+            }
+        }
+    }
 
     Ok(())
 }
@@ -172,8 +193,16 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
 /// Updates `.git/HEAD` to point to a specific local branch ref.
 // Used by `switch`, `checkout`, and `branch -m` (active branch rename).
 pub fn set_head(branch_name: &str) -> Result<()> {
+    let old_commit = resolve_head_commit().ok().flatten();
+    let already_there = matches!(resolve_head(), Ok(HeadState::Branch(b)) if b == branch_name);
+
     fs::write(".git/HEAD", format!("ref: refs/heads/{}\n", branch_name))
         .context("Failed to update HEAD")?;
+
+    if !already_there {
+        let new_commit = read_ref(&format!("refs/heads/{}", branch_name)).ok().flatten();
+        crate::helpers::reflog::record_head_move(old_commit.as_deref(), new_commit.as_deref());
+    }
     Ok(())
 }
 
@@ -189,6 +218,7 @@ pub fn delete_branch(name: &str) -> Result<()> {
 
     fs::remove_file(&fs_path)
         .with_context(|| format!("Failed to delete branch '{}'", name))?;
+    crate::helpers::reflog::delete_reflog(&ref_path);
 
     let mut parent = Path::new(&fs_path).parent();
     while let Some(p) = parent {
@@ -234,6 +264,7 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
     }
 
     fs::rename(&old_path, &new_path).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
+    crate::helpers::reflog::rename_reflog(&old_ref, &new_ref);
 
     let head_content = fs::read_to_string(".git/HEAD").unwrap_or_default();
     let current_ref = format!("ref: {}", old_ref);

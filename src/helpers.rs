@@ -19,6 +19,7 @@ pub mod clone;
 pub mod remote;
 pub mod blame;
 pub mod archive;
+pub mod reflog;
 
 pub use objects::*;
 pub use diff::*;

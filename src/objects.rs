@@ -136,6 +136,28 @@ pub enum BisectAction {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum ReflogAction {
+    Show {
+        reference: Option<String>,
+        #[arg(short = 'n', long = "max-count")]
+        max_count: Option<usize>,
+    },
+    Exists {
+        reference: String,
+    },
+    Delete {
+        entries: Vec<String>,
+    },
+    Expire {
+        #[arg(long = "all", conflicts_with = "reference")]
+        all: bool,
+        #[arg(long = "expire", default_value = "90")]
+        expire: String,
+        reference: Option<String>,
+    },
+}
+
 /// Defines the working tree and staging index update mode for `reset`.
 // Used by: src/commands/reset.rs
 // Used by command/helper: The `reset` command
@@ -437,5 +459,63 @@ impl ArchiveFormat {
             ArchiveFormat::TarGz => "tar.gz",
             ArchiveFormat::Zip => "zip",
         }
+    }
+}
+
+/// One line of a reflog: a ref moving from one commit to another, who did it, when, and why.
+/// Stored one per line in `.git/logs/<ref>` in git's own format:
+/// `<old> <new> <name> <<email>> <timestamp> <tz>\t<message>`.
+// Used by: src/helpers/reflog.rs, src/commands/reflog.rs
+// Used by command/helper: `append_reflog_entry`, `read_reflog`, `write_reflog`, `expire_reflog`, `format_reflog_output`, and the `reflog` command
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReflogEntry {
+    /// Hash the ref pointed at before (all zeros if it was just created).
+    pub old_hash: String,
+    /// Hash the ref points at after (all zeros if it was deleted).
+    pub new_hash: String,
+    /// `Name <email>` of whoever made the move.
+    pub identity: String,
+    /// When the move happened, as seconds since the Unix epoch.
+    pub timestamp: u64,
+    /// Timezone offset of `timestamp`, as `+HHMM` / `-HHMM`.
+    pub tz: String,
+    /// What caused the move, e.g. `commit -m fix typo` or `switch feature`.
+    pub message: String,
+}
+
+impl ReflogEntry {
+    /// Renders the entry as one line of a reflog file (without the trailing newline).
+    pub fn to_line(&self) -> String {
+        format!(
+            "{} {} {} {} {}\t{}",
+            self.old_hash, self.new_hash, self.identity, self.timestamp, self.tz, self.message
+        )
+    }
+
+    /// Parses one line of a reflog file; `None` if it is malformed.
+    pub fn parse(line: &str) -> Option<ReflogEntry> {
+        let (head, message) = line.split_once('\t').unwrap_or((line, ""));
+        let old_hash = head.get(0..40)?;
+        let new_hash = head.get(41..81)?;
+        let is_hash = |h: &str| h.chars().all(|c| c.is_ascii_hexdigit());
+        if !is_hash(old_hash) || !is_hash(new_hash) || head.as_bytes().get(40) != Some(&b' ') {
+            return None;
+        }
+
+        let rest = head.get(82..)?;
+        let close = rest.rfind('>')?;
+        let identity = rest[..=close].trim().to_string();
+        let mut tail = rest[close + 1..].split_whitespace();
+        let timestamp: u64 = tail.next()?.parse().ok()?;
+        let tz = tail.next().unwrap_or("+0000").to_string();
+
+        Some(ReflogEntry {
+            old_hash: old_hash.to_string(),
+            new_hash: new_hash.to_string(),
+            identity,
+            timestamp,
+            tz,
+            message: message.to_string(),
+        })
     }
 }

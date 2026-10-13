@@ -22,6 +22,7 @@ pub mod pull;
 pub mod remote;
 pub mod blame;
 pub mod archive;
+pub mod reflog;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -47,3 +48,4 @@ pub use pull::*;
 pub use remote::*;
 pub use blame::*;
 pub use archive::*;
+pub use reflog::*;

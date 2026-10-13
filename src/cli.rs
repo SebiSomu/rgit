@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use crate::objects::{BisectAction, RemoteAction, StashAction};
+pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -252,6 +252,10 @@ pub enum Commands {
         #[arg(value_name = "PATH")]
         paths: Vec<String>,
     },
+    Reflog {
+        #[command(subcommand)]
+        action: Option<ReflogAction>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -374,6 +378,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Archive { format, list, prefix, output, tree_ish, paths } => {
             crate::commands::archive(format, list, prefix, output, tree_ish, paths)?;
+        }
+        Commands::Reflog { action } => {
+            crate::commands::reflog(action)?;
         }
     }
 

@@ -307,7 +307,12 @@ pub enum Commands {
         #[arg(last = true)]
         path_specs: Vec<String>,
     },
-
+    CountObjects {
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        #[arg(short = 'H', long = "human-readable")]
+        human_readable: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -492,6 +497,9 @@ pub fn handle_commands() -> Result<()> {
             };
 
             crate::commands::grep(pattern, revisions, final_path_specs, options)?;
+        }
+        Commands::CountObjects { verbose, human_readable } => {
+            crate::commands::count_objects(verbose, human_readable)?;
         }
     }
 

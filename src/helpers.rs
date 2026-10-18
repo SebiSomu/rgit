@@ -23,6 +23,7 @@ pub mod reflog;
 pub mod gc;
 pub mod fsck;
 pub mod grep;
+pub mod count_objects;
 
 pub use objects::*;
 pub use diff::*;
@@ -47,4 +48,4 @@ pub use fsck::*;
 pub use gc::*;
 pub use reflog::*;
 pub use grep::*;
-
+pub use count_objects::*;

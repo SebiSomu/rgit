@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use crate::helpers::{build_merge_commit, check_switch_safety, find_merge_base, generate_conflict_markers, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree, write_tree_from_index_prefix};
+use crate::helpers::{build_merge_commit, check_switch_safety, find_all_merge_bases, find_merge_base, generate_conflict_markers, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree, write_tree_from_index_prefix};
 use crate::index::{build_entry, read_index, write_index};
 use crate::objects::MergeConflict;
 use crate::refs;
@@ -173,6 +173,78 @@ pub fn merge(branch: String) -> anyhow::Result<()> {
 
     println!("Merge made by the 'ort' strategy.");
     println!("[{} {}] {}", current_branch, short_hash, merge_msg);
+
+    Ok(())
+}
+
+pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<String>) -> anyhow::Result<()> {
+    if is_ancestor {
+        if commits.len() != 2 {
+            anyhow::bail!("fatal: --is-ancestor takes exactly two commits");
+        }
+        let commit1 = resolve_commit_from_source(&commits[0])?;
+        let commit2 = resolve_commit_from_source(&commits[1])?;
+        if is_reachable(&commit2, &commit1)? {
+            return Ok(());
+        } else {
+            std::process::exit(1);
+        }
+    }
+
+    if commits.len() < 2 {
+        anyhow::bail!("fatal: merge-base requires at least two commits");
+    }
+
+    let resolved: Vec<String> = commits
+        .iter()
+        .map(|c| resolve_commit_from_source(c))
+        .collect::<Result<_, _>>()?;
+
+    if all {
+        let mut current_bases = vec![resolved[0].clone()];
+        for next_commit in &resolved[1..] {
+            let mut next_round_bases = Vec::new();
+            for base in &current_bases {
+                let bases = find_all_merge_bases(base, next_commit)?;
+                for b in bases {
+                    if !next_round_bases.contains(&b) {
+                        next_round_bases.push(b);
+                    }
+                }
+            }
+
+            let mut maximal_bases = Vec::new();
+            for (i, c1) in next_round_bases.iter().enumerate() {
+                let mut dominated = false;
+                for (j, c2) in next_round_bases.iter().enumerate() {
+                    if i != j && is_reachable(c2, c1)? {
+                        dominated = true;
+                        break;
+                    }
+                }
+                if !dominated && !maximal_bases.contains(c1) {
+                    maximal_bases.push(c1.clone());
+                }
+            }
+            current_bases = maximal_bases;
+            if current_bases.is_empty() {
+                std::process::exit(1);
+            }
+        }
+
+        for base in current_bases {
+            println!("{}", base);
+        }
+    } else {
+        let mut current_base = resolved[0].clone();
+        for next_commit in &resolved[1..] {
+            match find_merge_base(&current_base, next_commit)? {
+                Some(base) => current_base = base,
+                None => std::process::exit(1),
+            }
+        }
+        println!("{}", current_base);
+    }
 
     Ok(())
 }

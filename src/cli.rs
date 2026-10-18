@@ -94,6 +94,16 @@ pub enum Commands {
     Merge {
         branch: String
     },
+    MergeBase {
+        #[arg(short = 'a', long = "all", conflicts_with = "is_ancestor")]
+        all: bool,
+        #[arg(long = "is-ancestor", conflicts_with_all = ["all", "octopus"])]
+        is_ancestor: bool,
+        #[arg(long = "octopus", conflicts_with = "is_ancestor")]
+        octopus: bool,
+        #[arg(required = true)]
+        commits: Vec<String>,
+    },
     Rm {
         files: Vec<PathBuf>,
         #[arg(short = 'f', long = "force")]
@@ -323,6 +333,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Merge { branch } => {
             crate::commands::merge(branch)?;
+        }
+        Commands::MergeBase { all, is_ancestor, octopus, commits } => {
+            crate::commands::merge_base(all, is_ancestor, octopus, commits)?;
         }
         Commands::Rm { files, force, cached, recursive } => {
             crate::commands::rm(files, force, cached, recursive)?;

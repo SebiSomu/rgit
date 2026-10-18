@@ -84,13 +84,13 @@ pub fn generate_conflict_markers(ours_content: &[u8], theirs_content: &[u8], bra
     out.into_bytes()
 }
 
-/// Finds the best common ancestor (merge base) between two commits using BFS.
-// Used by the `merge` command for 3-way merges.
-pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<String>> {
+/// Finds all best common ancestors (merge bases) between two commits.
+// Used by `merge_base`.
+pub fn find_all_merge_bases(commit_a: &str, commit_b: &str) -> anyhow::Result<Vec<String>> {
     use std::collections::{HashSet, VecDeque};
 
     if commit_a == commit_b {
-        return Ok(Some(commit_a.to_string()));
+        return Ok(vec![commit_a.to_string()]);
     }
 
     let mut ancestors_a = HashSet::new();
@@ -98,10 +98,9 @@ pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<
     queue_a.push_back(commit_a.to_string());
 
     while let Some(hash) = queue_a.pop_front() {
-        if ancestors_a.contains(&hash) {
+        if !ancestors_a.insert(hash.clone()) {
             continue;
         }
-        ancestors_a.insert(hash.clone());
 
         let (object_type, content) = read_object(&hash)?;
         if object_type != "commit" {
@@ -122,15 +121,16 @@ pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<
     let mut visited_b = HashSet::new();
     let mut queue_b = VecDeque::new();
     queue_b.push_back(commit_b.to_string());
+    let mut candidates = Vec::new();
 
     while let Some(hash) = queue_b.pop_front() {
-        if visited_b.contains(&hash) {
+        if !visited_b.insert(hash.clone()) {
             continue;
         }
-        visited_b.insert(hash.clone());
 
         if ancestors_a.contains(&hash) {
-            return Ok(Some(hash));
+            candidates.push(hash);
+            continue;
         }
 
         let (object_type, content) = read_object(&hash)?;
@@ -149,8 +149,30 @@ pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<
         }
     }
 
-    Ok(None)
+    let mut merge_bases = Vec::new();
+    for (i, c1) in candidates.iter().enumerate() {
+        let mut dominated = false;
+        for (j, c2) in candidates.iter().enumerate() {
+            if i != j && crate::helpers::commit::is_reachable(c2, c1)? {
+                dominated = true;
+                break;
+            }
+        }
+        if !dominated && !merge_bases.contains(c1) {
+            merge_bases.push(c1.clone());
+        }
+    }
+
+    Ok(merge_bases)
 }
+
+/// Finds the best common ancestor (merge base) between two commits using BFS.
+// Used by `merge` and `merge_base`.
+pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<String>> {
+    let bases = find_all_merge_bases(commit_a, commit_b)?;
+    Ok(bases.into_iter().next())
+}
+
 
 /// Builds and writes a merge commit object containing two parent hashes.
 // Used by the `merge` command when creating a 3-way merge commit.

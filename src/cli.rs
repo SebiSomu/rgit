@@ -274,6 +274,16 @@ pub enum Commands {
         #[arg(short = 'n', long = "dry-run")]
         dry_run: bool,
     },
+    Fsck {
+        #[arg(long = "connectivity-only")]
+        connectivity_only: bool,
+        #[arg(long = "no-dangling")]
+        no_dangling: bool,
+        #[arg(long = "unreachable")]
+        unreachable: bool,
+        #[arg(long = "no-reflogs")]
+        no_reflogs: bool,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -405,6 +415,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Gc { prune, reflog_expire, dry_run } => {
             crate::commands::gc(prune, reflog_expire, dry_run)?;
+        }
+        Commands::Fsck { connectivity_only, no_dangling, unreachable, no_reflogs } => {
+            crate::commands::fsck(connectivity_only, no_dangling, unreachable, no_reflogs)?;
         }
     }
 

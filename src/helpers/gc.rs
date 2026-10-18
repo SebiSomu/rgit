@@ -16,7 +16,7 @@ use crate::objects::{GcReport, LooseObject};
 ///
 /// ANY NEW FEATURE THAT SAVES A COMMIT HASH IN A `.git/` FILE MUST BE ADDED HERE, or `gc` will
 /// treat what it points at as garbage.
-const GC_STRICT_STATE_FILES: &[&str] = &[
+pub(crate) const GC_STRICT_STATE_FILES: &[&str] = &[
     "HEAD",
     "packed-refs",
     "STASH_LIST",
@@ -34,7 +34,7 @@ const GC_STRICT_STATE_FILES: &[&str] = &[
 
 /// State files that only record history ("what was fetched last"). Their objects are kept if
 /// present, but a missing one is not an error.
-const GC_LENIENT_STATE_FILES: &[&str] = &["FETCH_HEAD", "ORIG_HEAD"];
+pub(crate) const GC_LENIENT_STATE_FILES: &[&str] = &["FETCH_HEAD", "ORIG_HEAD"];
 
 /// Turns an expiry setting (`<days>`, `now` or `never`) into the Unix timestamp before which
 /// things count as expired, or `None` if nothing ever expires. `now` expires everything that
@@ -56,7 +56,7 @@ pub fn expiry_cutoff(spec: &str, now: u64) -> Result<Option<u64>> {
 /// Refuses to run in a repository that has packfiles. `gc` only understands loose objects, and
 /// objects inside a pack would look unreachable and missing, so nothing is safe to prune.
 // Used by `plan_gc`.
-fn check_no_pack_files() -> Result<()> {
+pub(crate) fn check_no_pack_files() -> Result<()> {
     let pack_dir = Path::new(".git/objects/pack");
     if !pack_dir.is_dir() {
         return Ok(());
@@ -85,7 +85,7 @@ fn hashes_in_text(text: &str) -> Vec<String> {
 
 /// Returns the hashes named in a file, or nothing if the file doesn't exist.
 // Used by `collect_strict_gc_roots` and `collect_lenient_gc_roots`.
-fn hashes_in_file(path: &Path) -> Result<Vec<String>> {
+pub(crate) fn hashes_in_file(path: &Path) -> Result<Vec<String>> {
     if !path.is_file() {
         return Ok(Vec::new());
     }

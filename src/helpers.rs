@@ -21,6 +21,7 @@ pub mod blame;
 pub mod archive;
 pub mod reflog;
 pub mod gc;
+pub mod fsck;
 
 pub use objects::*;
 pub use diff::*;
@@ -41,3 +42,6 @@ pub use clone::*;
 pub use remote::*;
 pub use blame::*;
 pub use archive::*;
+pub use fsck::*;
+pub use gc::*;
+pub use reflog::*;

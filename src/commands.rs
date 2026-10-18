@@ -24,6 +24,7 @@ pub mod blame;
 pub mod archive;
 pub mod reflog;
 pub mod gc;
+pub mod fsck;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -51,3 +52,4 @@ pub use blame::*;
 pub use archive::*;
 pub use reflog::*;
 pub use gc::*;
+pub use fsck::*;

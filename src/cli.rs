@@ -7,7 +7,7 @@ pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashA
 #[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Box<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -284,12 +284,36 @@ pub enum Commands {
         #[arg(long = "no-reflogs")]
         no_reflogs: bool,
     },
+    Grep {
+        #[arg(short = 'i', long = "ignore-case")]
+        ignore_case: bool,
+        #[arg(short = 'v', long = "invert-match")]
+        invert_match: bool,
+        #[arg(short = 'n', long = "line-number")]
+        line_number: bool,
+        #[arg(short = 'c', long = "count")]
+        count: bool,
+        #[arg(short = 'l', long = "files-with-matches")]
+        files_with_matches: bool,
+        #[arg(short = 'L', long = "files-without-match")]
+        files_without_match: bool,
+        #[arg(short = 'F', long = "fixed-strings")]
+        fixed_strings: bool,
+        #[arg(long = "cached")]
+        cached: bool,
+        #[arg(short = 'e')]
+        pattern_flag: Option<String>,
+        args: Vec<String>,
+        #[arg(last = true)]
+        path_specs: Vec<String>,
+    },
+
 }
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
+    match *cli.command {
         Commands::Init => {
             crate::commands::init()?;
         }
@@ -418,6 +442,56 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Fsck { connectivity_only, no_dangling, unreachable, no_reflogs } => {
             crate::commands::fsck(connectivity_only, no_dangling, unreachable, no_reflogs)?;
+        }
+        Commands::Grep {
+            ignore_case,
+            invert_match,
+            line_number,
+            count,
+            files_with_matches,
+            files_without_match,
+            fixed_strings,
+            cached,
+            pattern_flag,
+            args,
+            path_specs,
+        } => {
+            let (pattern, remaining_args) = if let Some(p) = pattern_flag {
+                (p, args)
+            } else {
+                if args.is_empty() {
+                    anyhow::bail!("fatal: no pattern given");
+                }
+                (args[0].clone(), args[1..].to_vec())
+            };
+
+            let mut revisions = Vec::new();
+            let mut final_path_specs = path_specs;
+
+            if final_path_specs.is_empty() {
+                for arg in remaining_args {
+                    if crate::helpers::resolve_commit_from_source(&arg).is_ok() {
+                        revisions.push(arg);
+                    } else {
+                        final_path_specs.push(arg);
+                    }
+                }
+            } else {
+                revisions.extend(remaining_args);
+            }
+
+            let options = crate::objects::GrepOptions {
+                ignore_case,
+                invert_match,
+                line_number,
+                count,
+                files_with_matches,
+                files_without_match,
+                fixed_strings,
+                cached,
+            };
+
+            crate::commands::grep(pattern, revisions, final_path_specs, options)?;
         }
     }
 

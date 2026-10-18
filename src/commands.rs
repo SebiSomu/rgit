@@ -25,6 +25,7 @@ pub mod archive;
 pub mod reflog;
 pub mod gc;
 pub mod fsck;
+pub mod grep;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -53,3 +54,5 @@ pub use archive::*;
 pub use reflog::*;
 pub use gc::*;
 pub use fsck::*;
+pub use grep::*;
+

@@ -22,6 +22,7 @@ pub mod archive;
 pub mod reflog;
 pub mod gc;
 pub mod fsck;
+pub mod grep;
 
 pub use objects::*;
 pub use diff::*;
@@ -45,3 +46,5 @@ pub use archive::*;
 pub use fsck::*;
 pub use gc::*;
 pub use reflog::*;
+pub use grep::*;
+

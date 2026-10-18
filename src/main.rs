@@ -8,5 +8,11 @@ pub mod refs;
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    cli::handle_commands()
+    let stack_size = 64 * 1024 * 1024; // 64 MB — the Commands enum is large enough to overflow the default 8 MB stack
+    let builder = std::thread::Builder::new().stack_size(stack_size);
+    let handler = builder.spawn(|| {
+        cli::handle_commands()
+    }).expect("failed to spawn main thread");
+
+    handler.join().expect("main thread panicked")
 }

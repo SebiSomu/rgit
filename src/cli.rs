@@ -452,6 +452,11 @@ pub enum Commands {
         #[arg(value_name = "MBOX")]
         mboxes: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    RevList {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -807,6 +812,9 @@ pub fn handle_commands() -> Result<()> {
                 keep_subject,
             };
             crate::commands::am(opts)?;
+        }
+        Commands::RevList { args } => {
+            crate::commands::rev_list(args)?;
         }
     }
 

@@ -336,6 +336,17 @@ pub enum Commands {
         sq: bool,
         revs: Vec<String>,
     },
+    Shortlog {
+        #[arg(short = 's', long = "summary")]
+        summary: bool,
+        #[arg(short = 'n', long = "numbered")]
+        numbered: bool,
+        #[arg(short = 'e', long = "email")]
+        email: bool,
+        #[arg(long = "all")]
+        all: bool,
+        rev: Option<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -551,6 +562,22 @@ pub fn handle_commands() -> Result<()> {
                 revs,
             };
             crate::commands::rev_parse(opts)?;
+        }
+        Commands::Shortlog {
+            summary,
+            numbered,
+            email,
+            all,
+            rev,
+        } => {
+            let opts = crate::objects::ShortlogOptions {
+                summary,
+                numbered,
+                email,
+                all,
+                rev,
+            };
+            crate::commands::shortlog(opts)?;
         }
     }
 

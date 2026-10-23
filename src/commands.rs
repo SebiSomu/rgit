@@ -27,6 +27,7 @@ pub mod gc;
 pub mod fsck;
 pub mod grep;
 pub mod count_objects;
+pub mod rev_parse;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -57,4 +58,5 @@ pub use gc::*;
 pub use fsck::*;
 pub use grep::*;
 pub use count_objects::*;
+pub use rev_parse::*;
 

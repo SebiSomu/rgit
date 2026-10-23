@@ -313,6 +313,29 @@ pub enum Commands {
         #[arg(short = 'H', long = "human-readable")]
         human_readable: bool,
     },
+    RevParse {
+        #[arg(long = "git-dir")]
+        git_dir: bool,
+        #[arg(long = "show-toplevel")]
+        show_toplevel: bool,
+        #[arg(long = "is-inside-work-tree")]
+        is_inside_work_tree: bool,
+        #[arg(long = "is-bare-repository")]
+        is_bare_repository: bool,
+        #[arg(long = "abbrev-ref")]
+        abbrev_ref: bool,
+        #[arg(long = "symbolic-full-name")]
+        symbolic_full_name: bool,
+        #[arg(long = "verify")]
+        verify: bool,
+        #[arg(short = 'q', long = "quiet")]
+        quiet: bool,
+        #[arg(long = "short", num_args = 0..=1, default_missing_value = "7", require_equals = true, value_name = "N")]
+        short: Option<usize>,
+        #[arg(long = "sq")]
+        sq: bool,
+        revs: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -500,6 +523,34 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::CountObjects { verbose, human_readable } => {
             crate::commands::count_objects(verbose, human_readable)?;
+        }
+        Commands::RevParse {
+            git_dir,
+            show_toplevel,
+            is_inside_work_tree,
+            is_bare_repository,
+            abbrev_ref,
+            symbolic_full_name,
+            verify,
+            quiet,
+            short,
+            sq,
+            revs,
+        } => {
+            let opts = crate::objects::RevParseOptions {
+                git_dir,
+                show_toplevel,
+                is_inside_work_tree,
+                is_bare_repository,
+                abbrev_ref,
+                symbolic_full_name,
+                verify,
+                quiet,
+                short,
+                sq,
+                revs,
+            };
+            crate::commands::rev_parse(opts)?;
         }
     }
 

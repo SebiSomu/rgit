@@ -385,6 +385,30 @@ pub enum Commands {
         #[arg(value_name = "PATHNAME")]
         paths: Vec<String>,
     },
+    Apply {
+        #[arg(long = "check")]
+        check: bool,
+        #[arg(long = "stat")]
+        stat: bool,
+        #[arg(long = "numstat")]
+        numstat: bool,
+        #[arg(long = "summary")]
+        summary: bool,
+        #[arg(long = "apply")]
+        apply: bool,
+        #[arg(long = "cached")]
+        cached: bool,
+        #[arg(long = "index")]
+        index: bool,
+        #[arg(short = 'R', long = "reverse")]
+        reverse: bool,
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        #[arg(short = 'p', value_name = "N", default_value = "1")]
+        strip: usize,
+        #[arg(value_name = "PATCH")]
+        patches: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -662,6 +686,34 @@ pub fn handle_commands() -> Result<()> {
                 paths,
             };
             crate::commands::check_ignore(opts)?;
+        }
+        Commands::Apply {
+            check,
+            stat,
+            numstat,
+            summary,
+            apply,
+            cached,
+            index,
+            reverse,
+            verbose,
+            strip,
+            patches,
+        } => {
+            let opts = crate::objects::ApplyOptions {
+                check,
+                stat,
+                numstat,
+                summary,
+                apply,
+                cached,
+                index,
+                reverse,
+                verbose,
+                strip,
+                patches,
+            };
+            crate::commands::apply(opts)?;
         }
     }
 

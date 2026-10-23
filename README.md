@@ -25,6 +25,20 @@ A lightweight, fully functional Git implementation written in Rust.
   - `blame.rs`: Line attribution algorithm, diff-mapping, tree lookups, and date formatting.
   - `archive.rs`: Packing tree structures into tar, compressed tar.gz, and zip archives with prefix and path filtering.
   - `config.rs`: INI parser/writer for local (`.git/config`) and global (`~/.rgitconfig`).
+  - `checkout.rs`: Working tree sync, switch safety checks, and index resets.
+  - `gitignore.rs`: `.gitignore` parsing, glob matching, and ignore-aware file collection.
+  - `state_files.rs`: In-progress operation state files and stash list storage/apply logic.
+  - `clean.rs`: Directory walker for untracked/ignored cleanup candidates.
+  - `bisect.rs`: Ancestor collection, candidate ordering, good/bad/skip marking, and bisect checkouts.
+  - `banana_split.rs`: Path grouping for per-file / per-directory commit splitting.
+  - `reflog.rs`: Reflog append, parsing, `<ref>@{n}` resolution, entry deletion, and expiry.
+  - `gc.rs`: Reachability roots, unreachable loose object detection, and pruning.
+  - `fsck.rs`: Object integrity checks, connectivity walks, and dangling object reports.
+  - `grep.rs`: Regex/fixed-string matcher construction, pathspec filtering, and content search.
+  - `count_objects.rs`: Loose/packed object statistics and human-readable size formatting.
+  - `rev_parse.rs`: Revision syntax resolution (`HEAD~2`, `HEAD^`, `@{n}`, `<ref>@{n}`) and repository property queries.
+  - `shortlog.rs`: Author grouping of reachable commits.
+  - `ls_files.rs`: Worktree-vs-index comparison, untracked/ignored file walker, and pathspec matching.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Domain models, shared type aliases, and CLI subcommand enums.
@@ -48,6 +62,8 @@ A lightweight, fully functional Git implementation written in Rust.
 
 - **`commit`** (`-m <message>`): Writes tree and commit objects from the current index.
 - **`log`** (`--oneline`): Walks commit parent graphs and displays chronological commit logs.
+- **`shortlog`** (`-s|--summary`, `-n|--numbered`, `-e|--email`, `--all`, `[<rev>]`): Summarizes history grouped by author, with commit counts and subject lines.
+- **`grep`** (`-i`, `-v`, `-n`, `-c`, `-l|-L`, `-F`, `--cached`, `-e <pattern>`, `<pattern> [<rev>...] [-- <path>...]`): Searches tracked files, the index, or historical revisions using regex or fixed-string patterns.
 - **`show [<commit>]`**: Displays commit metadata, message, and unified patch diff.
 - **`diff`** (`--staged`, `[<commit> [<commit>]]`): Computes line-by-line Myers diffs between working tree, index, or commits.
 - **`tag`** (`<name> [<commit>]`, `-d`, `-l`): Creates, lists, or deletes lightweight tags.
@@ -64,14 +80,16 @@ A lightweight, fully functional Git implementation written in Rust.
 ### Merging, Replaying & Rebasing
 
 - **`merge <branch>`**: Performs fast-forward or 3-way tree merges with conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
-- **`rebase`** (`<upstream>`, `-i`, `--continue`, `--abort`): Full interactive rebase with `pick`, `reword`, `edit`, `squash`, `fixup`, and `drop` instructions.
+- **`merge-base`** (`<commit> <commit>...`, `-a|--all`, `--is-ancestor`): Finds the best common ancestor(s) of commits, or checks ancestry via exit code.
+- **`rebase`** (`<upstream>`, `-i`, `--continue`, `--abort`, `--skip`, `--edit-todo`): Full interactive rebase with `pick`, `reword`, `edit`, `squash`, `fixup`, and `drop` instructions.
 - **`cherry-pick <commit>`** (`--no-commit`, `--continue`, `--abort`): Replays a single commit onto current HEAD with state recording.
 - **`revert <commit>`** (`--no-commit`, `--continue`, `--abort`): Inverts and applies target commit changes.
 
-### Staste & Recovery
+### State & Recovery
 
 - **`reset`** (`--soft`, `--mixed`, `--hard`, `[-- <paths...>]`): Moves HEAD, restores the index, and synchronizes the working tree.
 - **`stash`** (`push`, `pop`, `apply`, `list`, `drop`, `show`, `clear`): Stashes and restores working directory and index state.
+- **`reflog`** (`show [<ref>] [-n <count>]`, `exists <ref>`, `delete <ref>@{<n>}...`, `expire [--all] [--expire <days|now|never>] [<ref>]`): Records every move of `HEAD`, branches, and remote-tracking branches so lost commits can be recovered (e.g. `reset --hard HEAD@{1}`).
 
 ### Remote Repositories & Collaboration
 
@@ -91,6 +109,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`config`** (`[--global]`, `<key> [<value>]`, `--list`, `--unset`): Reads, writes, lists, and unsets local (`.git/config`) and global (`~/.rgitconfig`) configurations.
 - **`bisect`** (`start`, `bad`, `good`, `skip`, `reset`, `log`, `run`): Automated binary search to locate the regression-introducing commit.
 - **`banana-split <commit>`** (`--by-dir`, `-n|--dry-run`): Custom tool that splits a commit into atomic per-path or per-directory commits.
+- **`gc`** (`--prune <days|now|never>`, `--reflog-expire <days|now|never>`, `-n|--dry-run`): Expires old reflog entries and deletes unreachable loose objects past the prune window, keeping anything reachable from refs, the index, the stash, in-progress operations, or live reflogs.
+- **`fsck`** (`--connectivity-only`, `--no-dangling`, `--unreachable`, `--no-reflogs`): Verifies object integrity and connectivity, validates refs and the index, and reports dangling or unreachable objects.
+- **`count-objects`** (`-v|--verbose`, `-H|--human-readable`): Reports loose object count and disk usage; verbose mode adds pack, prune-packable, and garbage statistics.
 
 ### Plumbing Commands
 
@@ -98,7 +119,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`cat-file`** (`-p <hash>`): Decompresses and displays object type and contents.
 - **`write-tree`**: Serializes current staging index into tree objects.
 - **`ls-tree`** (`--name-only <tree>`): Inspects tree contents and modes.
+- **`ls-files`** (`-c`, `-m`, `-d`, `-o`, `-i`, `--exclude-standard`, `-s`, `-t`, `-z`, `[<pathspec>...]`): Lists tracked index entries, modified/deleted tracked files, and untracked or ignored working-tree files.
 - **`commit-tree <tree> [-p <parent>] -m <msg>`**: Directly writes a commit object from tree and parent hashes.
+- **`rev-parse`** (`--git-dir`, `--show-toplevel`, `--is-inside-work-tree`, `--is-bare-repository`, `--abbrev-ref`, `--symbolic-full-name`, `--verify [-q]`, `--short[=N]`, `--sq`, `<rev>...`): Resolves revision syntax (`HEAD~2`, `HEAD^`, branches, tags, short hashes) to object hashes or symbolic names, and queries repository properties.
 
 ---
 

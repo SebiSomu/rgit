@@ -35,12 +35,12 @@ src/
 ├── commands.rs               # Root module declaring and re-exporting subcommands
 ├── commands/                 # High-level CLI command entry points
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
-│   ├── commit.rs             # commit, commit-tree
+│   ├── commit.rs             # commit, commit-tree, log
 │   ├── staging.rs            # add, status, rm, mv
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
 │   ├── diff.rs               # diff
-│   ├── merge.rs              # merge
+│   ├── merge.rs              # merge, merge-base
 │   ├── reset.rs              # reset
 │   ├── clean.rs              # clean
 │   ├── cherry_pick.rs        # cherry-pick (--continue, --abort)
@@ -49,7 +49,7 @@ src/
 │   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
 │   ├── tag.rs                # tag, show, describe
 │   ├── config.rs             # config (get, set, unset, list)
-│   ├── rebase.rs             # rebase (-i, --continue, --abort)
+│   ├── rebase.rs             # rebase (-i, --continue, --abort, --skip, --edit-todo)
 │   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
 │   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
 │   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
@@ -57,7 +57,15 @@ src/
 │   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
 │   ├── remote.rs             # remote (list, verbose, add, remove/rm, rename, get-url, set-url, show)
 │   ├── blame.rs              # blame (line-by-line commit attribution, -L ranges, uncommitted changes)
-│   └── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
+│   ├── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
+│   ├── reflog.rs             # reflog (show, exists, delete, expire)
+│   ├── gc.rs                 # gc (reflog expiry + unreachable loose object pruning, --dry-run)
+│   ├── fsck.rs               # fsck (object integrity, connectivity, dangling/unreachable reports)
+│   ├── grep.rs               # grep (worktree, --cached, and revision search with regex/fixed strings)
+│   ├── count_objects.rs      # count-objects (-v, -H)
+│   ├── rev_parse.rs          # rev-parse (revision resolution & repository property queries)
+│   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
+│   └── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -66,7 +74,7 @@ src/
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
 │   ├── merge.rs              # Three-way tree merge & conflict marker formatting
-│   ├── state_files.rs        # In-progress operation state readers/writers (.git state files)
+│   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
 │   ├── banana_split.rs       # Path grouping helpers for banana-split
@@ -77,9 +85,16 @@ src/
 │   ├── clone.rs              # Source classification, skeleton repo creation, target dir prep/cleanup, worktree checkout
 │   ├── remote.rs             # Remote config queries, name validation, ref directory manipulation, tracking branch collection
 │   ├── blame.rs              # Line attribution algorithm, diff-mapping, tree lookups, date formatting
-│   └── archive.rs            # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
-
-
+│   ├── archive.rs            # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
+│   ├── reflog.rs             # Reflog append/parse, <ref>@{n} resolution, entry deletion and expiry
+│   ├── gc.rs                 # Reachability roots, unreachable loose object detection, pruning
+│   ├── fsck.rs               # Object integrity checks, connectivity walks, dangling object reports
+│   ├── grep.rs               # Matcher construction, pathspec filtering, content search
+│   ├── count_objects.rs      # Loose/packed object statistics, human-readable sizes
+│   ├── rev_parse.rs          # Revision syntax resolution, worktree root discovery, property queries
+│   ├── shortlog.rs           # Author grouping of reachable commits
+│   └── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
+│
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
 ├── index.rs                  # Binary staging index (.git/index) reader and writer

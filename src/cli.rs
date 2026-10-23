@@ -347,6 +347,28 @@ pub enum Commands {
         all: bool,
         rev: Option<String>,
     },
+    LsFiles {
+        #[arg(short = 'c', long = "cached")]
+        cached: bool,
+        #[arg(short = 'd', long = "deleted")]
+        deleted: bool,
+        #[arg(short = 'm', long = "modified")]
+        modified: bool,
+        #[arg(short = 'o', long = "others")]
+        others: bool,
+        #[arg(short = 'i', long = "ignored")]
+        ignored: bool,
+        #[arg(long = "exclude-standard")]
+        exclude_standard: bool,
+        #[arg(short = 's', long = "stage")]
+        stage: bool,
+        #[arg(short = 't')]
+        show_tags: bool,
+        #[arg(short = 'z')]
+        null_terminated: bool,
+        #[arg(value_name = "PATHSPEC")]
+        pathspecs: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -578,6 +600,32 @@ pub fn handle_commands() -> Result<()> {
                 rev,
             };
             crate::commands::shortlog(opts)?;
+        }
+        Commands::LsFiles {
+            cached,
+            deleted,
+            modified,
+            others,
+            ignored,
+            exclude_standard,
+            stage,
+            show_tags,
+            null_terminated,
+            pathspecs,
+        } => {
+            let opts = crate::objects::LsFilesOptions {
+                cached,
+                deleted,
+                modified,
+                others,
+                ignored,
+                exclude_standard,
+                stage,
+                show_tags,
+                null_terminated,
+                pathspecs,
+            };
+            crate::commands::ls_files(opts)?;
         }
     }
 

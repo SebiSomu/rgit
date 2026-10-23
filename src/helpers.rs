@@ -26,6 +26,7 @@ pub mod grep;
 pub mod count_objects;
 pub mod rev_parse;
 pub mod shortlog;
+pub mod ls_files;
 
 pub use objects::*;
 pub use diff::*;
@@ -53,4 +54,5 @@ pub use grep::*;
 pub use count_objects::*;
 pub use rev_parse::*;
 pub use shortlog::*;
+pub use ls_files::*;
 

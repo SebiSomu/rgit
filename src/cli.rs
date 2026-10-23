@@ -385,6 +385,25 @@ pub enum Commands {
         #[arg(value_name = "PATHNAME")]
         paths: Vec<String>,
     },
+    CheckRefFormat {
+        #[arg(long = "normalize", visible_alias = "print")]
+        normalize: bool,
+        #[arg(long = "allow-onelevel", overrides_with = "no_allow_onelevel")]
+        allow_onelevel: bool,
+        #[arg(long = "no-allow-onelevel", overrides_with = "allow_onelevel")]
+        no_allow_onelevel: bool,
+        #[arg(long = "refspec-pattern")]
+        refspec_pattern: bool,
+        #[arg(
+            long = "branch",
+            value_name = "BRANCHNAME",
+            allow_hyphen_values = true,
+            conflicts_with_all = ["normalize", "allow_onelevel", "no_allow_onelevel", "refspec_pattern", "refname"]
+        )]
+        branch: Option<String>,
+        #[arg(value_name = "REFNAME", required_unless_present = "branch")]
+        refname: Option<String>,
+    },
     Apply {
         #[arg(long = "check")]
         check: bool,
@@ -738,6 +757,23 @@ pub fn handle_commands() -> Result<()> {
                 paths,
             };
             crate::commands::check_ignore(opts)?;
+        }
+        Commands::CheckRefFormat {
+            normalize,
+            allow_onelevel,
+            no_allow_onelevel: _,
+            refspec_pattern,
+            branch,
+            refname,
+        } => {
+            let opts = crate::objects::CheckRefFormatOptions {
+                normalize,
+                allow_onelevel,
+                refspec_pattern,
+                branch,
+                refname,
+            };
+            crate::commands::check_ref_format(opts)?;
         }
         Commands::Apply {
             check,

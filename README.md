@@ -42,9 +42,13 @@ A lightweight, fully functional Git implementation written in Rust.
   - `apply.rs`: Patch parsing (git, traditional, mailbox, binary), hunk placement with line-ending preservation, git binary delta decoding, all-or-nothing check/write shared with `am`, and diffstat/numstat/summary formatting.
   - `format_patch.rs`: Commit parsing and selection, RFC 2822/2047 mail headers, git-compatible unified diffs (xdiff hunk compaction, indent heuristic, funcname headers), diffstat, and binary literal encoding.
   - `am.rs`: Mailbox splitting, header decoding, subject cleanup, commit creation with original author, and `.git/rebase-apply/` session state.
+  - `rev_list.rs`: Argument parsing, ref collection, a flag-for-flag port of git's revision walk (`limit_list`, `process_parents`, `try_to_simplify_commit`, `rewrite_one`), topological sort, commit filters, and `--format` expansion.
+  - `check_ref_format.rs`: Git's ref name rules (component, `..`, `@{`, `.lock`, forbidden bytes, refspec `*`), slash normalization, and branch shorthand checks.
   - `check_ignore.rs`: Source-tracked `.gitignore` rule loading, deciding-rule lookup (including ignored parent directories), and path normalization.
+  - `worktree.rs`: Worktree enumeration (HEAD, locked, prunable), path/suffix lookup, `.git/worktrees/<id>/` admin directories, checkout into a new worktree, dirty checks, prune/move, and `list` / `--porcelain` formatting.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
+- **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
 - **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Domain models, shared type aliases, and CLI subcommand enums.
 - **[`src/bin/rtest.rs`](file:///c:/rgit-main/src/bin/rtest.rs)**: Isolated sandbox test harness executing `rgit` in `test-sandbox/`.
 
@@ -83,6 +87,7 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`branch`** (`[<name>]`, `-d`, `-D`, `-m`): Lists, creates, renames, and safely deletes branches with ancestor checks.
 - **`switch`** (`<branch>`, `-c`, `--detach`, `-f`): Modern branch switching and detached HEAD transitions with worktree safety.
 - **`checkout`** (`<branch|commit>`, `-b`, `--detach`, `-f`): Classic branch, commit, and revision switching interface.
+- **`worktree`** (`add [-b|-B <branch>] [-d] [-f] [--lock [--reason]] <path> [<commit-ish>]`, `list [--porcelain|-v]`, `remove [-f [-f]]`, `move`, `lock [--reason]`, `unlock`, `prune [-n] [-v]`): Manages multiple working trees attached to one repository using git's on-disk layout (`<path>/.git` file → `.git/worktrees/<id>/`), so real git can use them too. Each worktree has its own HEAD, index and in-progress state; objects, refs, config and stashes are shared. A branch can be checked out in only one worktree at a time (`switch`, `checkout` and `branch -d` respect this), `branch -m` updates other worktrees' HEADs, and `gc`/`fsck` treat every worktree's HEAD, index and state files as roots.
 
 ### Merging, Replaying & Rebasing
 
@@ -128,8 +133,10 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`ls-tree`** (`--name-only <tree>`): Inspects tree contents and modes.
 - **`ls-files`** (`-c`, `-m`, `-d`, `-o`, `-i`, `--exclude-standard`, `-s`, `-t`, `-z`, `[<pathspec>...]`): Lists tracked index entries, modified/deleted tracked files, and untracked or ignored working-tree files.
 - **`check-ignore`** (`-q`, `-v`, `-n`, `--no-index`, `--stdin`, `-z`, `<pathname>...`): Reports which paths are excluded by `.gitignore` rules; `-v` shows the deciding rule as `<source>:<line>:<pattern>`. Exits 0 if any path is ignored, 1 if none, 128 on usage errors.
+- **`check-ref-format`** (`--normalize|--print`, `--[no-]allow-onelevel`, `--refspec-pattern`, `<refname>`; `--branch <name>`): Validates a ref name against git's naming rules, exiting 0 if valid and 1 if not; `--normalize` collapses slashes and prints the result, and `--branch` checks and prints a branch name (exit 128 if invalid). Works outside a repository.
 - **`commit-tree <tree> [-p <parent>] -m <msg>`**: Directly writes a commit object from tree and parent hashes.
 - **`rev-parse`** (`--git-dir`, `--show-toplevel`, `--is-inside-work-tree`, `--is-bare-repository`, `--abbrev-ref`, `--symbolic-full-name`, `--verify [-q]`, `--short[=N]`, `--sq`, `<rev>...`): Resolves revision syntax (`HEAD~2`, `HEAD^`, branches, tags, short hashes, `<ref>@{n}`, `^{type}`) to object hashes or symbolic names, and queries repository properties.
+- **`rev-list`** (`<rev>...`, `^rev`, `A..B`, `A...B`, `--not`, `--all|--branches|--tags|--remotes`, `-n|--max-count`, `--skip`, `--reverse`, `--count`, `--topo-order|--date-order`, `--first-parent`, `--merges|--no-merges|--min-parents|--max-parents`, `--since|--until`, `--author|--committer|--grep` (`-i`, `-F`, `--all-match`, `--invert-grep`), `--parents`, `--timestamp`, `--left-right`, `--abbrev-commit`, `--oneline`, `--format`, `[--] <path>...`): Walks the commit graph exactly like git's revision machinery (date-ordered walk, gradual UNINTERESTING marking, path-limited history simplification with parent rewriting, topological sorting) and prints matching commits.
 
 ---
 

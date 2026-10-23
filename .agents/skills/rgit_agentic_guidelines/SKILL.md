@@ -67,9 +67,12 @@ src/
 │   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
 │   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
 │   ├── check_ignore.rs       # check-ignore (-q, -v, -n, --no-index, --stdin, -z)
+│   ├── check_ref_format.rs   # check-ref-format (--normalize/--print, --[no-]allow-onelevel, --refspec-pattern, --branch)
 │   ├── apply.rs              # apply (--check, --stat, --numstat, --summary, --cached, --index, -R, -v, -p<n>)
 │   ├── format_patch.rs       # format-patch (-<n>, --root, --stdout, -o, -n/-N, --start-number, --subject-prefix, -k, --signature)
-│   └── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
+│   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
+│   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
+│   └── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -99,12 +102,16 @@ src/
 │   ├── shortlog.rs           # Author grouping of reachable commits
 │   ├── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
 │   ├── check_ignore.rs       # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
+│   ├── check_ref_format.rs   # Git ref name rules, slash normalization, branch shorthand validation
 │   ├── apply.rs              # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
 │   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
-│   └── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
+│   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
+│   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters
+│   └── worktree.rs           # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
+├── repo.rs                   # Repository path resolution (`repo::path(".git/...")`), main vs linked worktree
 ├── index.rs                  # Binary staging index (.git/index) reader and writer
 └── bin/
     └── rtest.rs              # Isolated test runner executing rgit within test-sandbox/
@@ -118,6 +125,7 @@ src/
 4. **[objects.rs](file:///c:/rgit-main/src/objects.rs)**: Single source of truth for all domain structures, enums, AST items, and shared type aliases used across commands and helpers.
 5. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
 6. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).
+7. **[repo.rs](file:///c:/rgit-main/src/repo.rs)**: Resolves every path inside `.git`. **Never open `.git/...` paths directly**: wrap them in `crate::repo::path(".git/...")`, which returns them unchanged in a main worktree and routes them to the shared `.git` (objects, refs, config, logs/refs, STASH_LIST) or to `.git/worktrees/<id>/` (HEAD, index, MERGE_*/REBASE_*/BISECT_* state) inside a linked worktree.
 7. **[bin/rtest.rs](file:///c:/rgit-main/src/bin/rtest.rs)**: Test harness that cleans and targets `test-sandbox/` for all manual or agentic testing.
 
 ---

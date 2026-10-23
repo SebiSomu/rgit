@@ -30,6 +30,7 @@ pub(crate) const GC_STRICT_STATE_FILES: &[&str] = &[
     "BISECT_BAD",
     "BISECT_GOOD",
     "BISECT_SKIP",
+    "rebase-apply/orig-head",
 ];
 
 /// State files that only record history ("what was fetched last"). Their objects are kept if

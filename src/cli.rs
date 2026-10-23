@@ -409,6 +409,49 @@ pub enum Commands {
         #[arg(value_name = "PATCH")]
         patches: Vec<String>,
     },
+    #[command(allow_negative_numbers = true)]
+    FormatPatch {
+        #[arg(long = "max-count")]
+        max_count: Option<usize>,
+        #[arg(long = "root")]
+        root: bool,
+        #[arg(long = "stdout")]
+        stdout: bool,
+        #[arg(short = 'o', long = "output-directory")]
+        output_directory: Option<String>,
+        #[arg(short = 'n', long = "numbered", conflicts_with = "no_numbered")]
+        numbered: bool,
+        #[arg(short = 'N', long = "no-numbered")]
+        no_numbered: bool,
+        #[arg(long = "start-number", default_value = "1")]
+        start_number: usize,
+        #[arg(long = "subject-prefix", default_value = "PATCH")]
+        subject_prefix: String,
+        #[arg(short = 'k', long = "keep-subject", conflicts_with = "numbered")]
+        keep_subject: bool,
+        #[arg(long = "signature")]
+        signature: Option<String>,
+        #[arg(long = "no-signature")]
+        no_signature: bool,
+        #[arg(value_name = "REVISION")]
+        revs: Vec<String>,
+    },
+    Am {
+        #[arg(long = "continue", short = 'r', alias = "resolved", conflicts_with_all = ["skip", "abort", "quit", "show_current_patch"])]
+        cont: bool,
+        #[arg(long = "skip", conflicts_with_all = ["abort", "quit", "show_current_patch"])]
+        skip: bool,
+        #[arg(long = "abort", conflicts_with_all = ["quit", "show_current_patch"])]
+        abort: bool,
+        #[arg(long = "quit", conflicts_with = "show_current_patch")]
+        quit: bool,
+        #[arg(long = "show-current-patch", num_args = 0..=1, default_missing_value = "raw", require_equals = true, value_name = "raw|diff")]
+        show_current_patch: Option<String>,
+        #[arg(short = 'k', long = "keep-subject")]
+        keep_subject: bool,
+        #[arg(value_name = "MBOX")]
+        mboxes: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -714,6 +757,56 @@ pub fn handle_commands() -> Result<()> {
                 patches,
             };
             crate::commands::apply(opts)?;
+        }
+        Commands::FormatPatch {
+            max_count,
+            root,
+            stdout,
+            output_directory,
+            numbered,
+            no_numbered,
+            start_number,
+            subject_prefix,
+            keep_subject,
+            signature,
+            no_signature,
+            revs,
+        } => {
+            let opts = crate::objects::FormatPatchOptions {
+                revs,
+                max_count,
+                root,
+                stdout,
+                output_directory,
+                numbered,
+                no_numbered,
+                start_number,
+                subject_prefix,
+                keep_subject,
+                signature,
+                no_signature,
+            };
+            crate::commands::format_patch(opts)?;
+        }
+        Commands::Am {
+            cont,
+            skip,
+            abort,
+            quit,
+            show_current_patch,
+            keep_subject,
+            mboxes,
+        } => {
+            let opts = crate::objects::AmOptions {
+                mboxes,
+                cont,
+                skip,
+                abort,
+                quit,
+                show_current_patch,
+                keep_subject,
+            };
+            crate::commands::am(opts)?;
         }
     }
 

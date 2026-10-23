@@ -39,7 +39,9 @@ A lightweight, fully functional Git implementation written in Rust.
   - `rev_parse.rs`: Revision syntax resolution (`HEAD~2`, `HEAD^`, `<ref>@{n}`, short hashes) and repository property queries.
   - `shortlog.rs`: Author grouping of reachable commits.
   - `ls_files.rs`: Worktree-vs-index comparison, untracked/ignored file walker, and pathspec matching.
-  - `apply.rs`: Patch parsing (git, traditional, mailbox), hunk placement with line-ending preservation, diffstat/numstat/summary formatting, and patched file I/O.
+  - `apply.rs`: Patch parsing (git, traditional, mailbox, binary), hunk placement with line-ending preservation, git binary delta decoding, all-or-nothing check/write shared with `am`, and diffstat/numstat/summary formatting.
+  - `format_patch.rs`: Commit parsing and selection, RFC 2822/2047 mail headers, git-compatible unified diffs (xdiff hunk compaction, indent heuristic, funcname headers), diffstat, and binary literal encoding.
+  - `am.rs`: Mailbox splitting, header decoding, subject cleanup, commit creation with original author, and `.git/rebase-apply/` session state.
   - `check_ignore.rs`: Source-tracked `.gitignore` rule loading, deciding-rule lookup (including ignored parent directories), and path normalization.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
@@ -68,7 +70,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`grep`** (`-i`, `-v`, `-n`, `-c`, `-l|-L`, `-F`, `--cached`, `-e <pattern>`, `<pattern> [<rev>...] [-- <path>...]`): Searches tracked files, the index, or historical revisions using regex or fixed-string patterns.
 - **`show [<commit>]`**: Displays commit metadata, message, and unified patch diff.
 - **`diff`** (`--staged`, `[<commit> [<commit>]]`): Computes line-by-line Myers diffs between working tree, index, or commits.
-- **`apply`** (`--check`, `--stat`, `--numstat`, `--summary`, `--apply`, `--cached`, `--index`, `-R`, `-v`, `-p<n>`, `[<patch>...]`): Applies unified or git-style diffs (including `format-patch` mail) to the working tree and/or index, all-or-nothing, with offset hunk placement, creations, deletions, renames, copies, mode changes, and CRLF/no-final-newline preservation.
+- **`apply`** (`--check`, `--stat`, `--numstat`, `--summary`, `--apply`, `--cached`, `--index`, `-R`, `-v`, `-p<n>`, `[<patch>...]`): Applies unified or git-style diffs (including `format-patch` mail) to the working tree and/or index, all-or-nothing, with offset hunk placement, creations, deletions, renames, copies, mode changes, `GIT binary patch` literals and deltas, and CRLF/no-final-newline preservation.
+- **`format-patch`** (`-<n>`, `--root`, `--stdout`, `-o <dir>`, `-n|-N`, `--start-number`, `--subject-prefix`, `-k`, `--signature`/`--no-signature`, `<since>|<A..B>`): Exports commits as mailbox patches (`NNNN-subject.patch`) with RFC 2047 headers, diffstat and summary, git-identical hunks (function-name headers, indent heuristic), and binary literals.
+- **`am`** (`[<mbox>...]`, `-k`, `--continue`, `--skip`, `--abort`, `--quit`, `--show-current-patch[=raw|diff]`): Applies a mailbox of patches as commits that keep the original author, date, and message; stops on conflicts with resumable state in `.git/rebase-apply/`.
 - **`tag`** (`<name> [<commit>]`, `-d`, `-l`): Creates, lists, or deletes lightweight tags.
 - **`describe [<commit>]`**: Finds the most recent reachable tag and formats a descriptive revision identifier.
 - **`blame`** (`[-L <start>,<end>] [<rev>] [--] <file>`): Shows line-by-line commit attribution, author info, timestamps, and detects uncommitted lines.

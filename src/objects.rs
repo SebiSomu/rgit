@@ -883,12 +883,35 @@ pub struct FilePatch {
     pub similarity: Option<u32>,
     pub is_binary: bool,
     pub hunks: Vec<PatchHunk>,
+    /// Full `index <old>..<new>` blob hashes, required to verify binary patches.
+    pub index_hashes: Option<(String, String)>,
+    /// `GIT binary patch` data: the forward hunk, then the optional reverse hunk.
+    pub binary_hunks: Vec<BinaryHunk>,
+}
+
+/// One decoded hunk of a `GIT binary patch`: either the full new content (`literal`) or a
+/// git delta against the old content (`delta`), already inflated from zlib + base85.
+// Used by: src/helpers/apply.rs
+// Used by command/helper: `parse_patch`, `apply_git_delta`, `check_file_patch`, and `FilePatch::reversed`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BinaryHunk {
+    pub is_delta: bool,
+    pub size: usize,
+    pub data: Vec<u8>,
 }
 
 impl FilePatch {
     /// The name git uses when reporting on this patch: the old path, or the new one for creations.
     pub fn display_name(&self) -> &str {
         self.old_path.as_deref().or(self.new_path.as_deref()).unwrap_or("")
+    }
+
+    /// The name shown by `apply -v`: `old => new` for renames, otherwise `display_name`.
+    pub fn verbose_name(&self) -> String {
+        match (&self.old_path, &self.new_path) {
+            (Some(old), Some(new)) if self.is_rename && old != new => format!("{} => {}", old, new),
+            _ => self.display_name().to_string(),
+        }
     }
 
     /// The name used by `--stat` / `--numstat`: the new path, or the old one for deletions.
@@ -923,6 +946,8 @@ impl FilePatch {
             is_copy: self.is_copy,
             similarity: self.similarity,
             is_binary: self.is_binary,
+            index_hashes: self.index_hashes.as_ref().map(|(old, new)| (new.clone(), old.clone())),
+            binary_hunks: self.binary_hunks.iter().rev().take(if self.binary_hunks.len() == 2 { 2 } else { 0 }).cloned().collect(),
             hunks: self
                 .hunks
                 .iter()
@@ -969,4 +994,124 @@ pub struct HunkFailure {
     pub hunk_number: usize,
     pub old_start: usize,
     pub searched_for: String,
+}
+
+/// Planned results of checking a set of file patches, keyed by path: `Some((content, mode))`
+/// for a file to write, `None` for a file to delete. Nothing touches disk until every patch
+/// in the set has been checked, which is what makes `apply` and `am` all-or-nothing.
+// Used by: src/helpers/apply.rs, src/commands/apply.rs, src/commands/am.rs
+// Used by command/helper: `check_file_patch`, `load_patch_target`, `patch_target_exists`, `write_planned_changes`, and the `apply`/`am` commands
+pub type PlannedChanges = std::collections::BTreeMap<String, Option<(Vec<u8>, u32)>>;
+
+/// Options for the `format-patch` command, which turns commits into mailbox-style patch files.
+// Used by: src/cli.rs, src/commands/format_patch.rs
+// Used by command/helper: the `format_patch` command (commit selection, numbering, and output)
+#[derive(Debug, Clone, Default)]
+pub struct FormatPatchOptions {
+    /// `<since>`, `<rev-range>` (`A..B`), or a tip when combined with `-<n>` / `--root`.
+    pub revs: Vec<String>,
+    /// `-<n>` / `--max-count <n>`: only the last `n` commits.
+    pub max_count: Option<usize>,
+    /// `--root`: treat a single revision as a tip and include everything reachable from it.
+    pub root: bool,
+    /// `--stdout`: print all patches to standard output instead of writing files.
+    pub stdout: bool,
+    /// `-o` / `--output-directory <dir>`: where to write the patch files.
+    pub output_directory: Option<String>,
+    /// `-n` / `--numbered`: always use `[PATCH n/m]`, even for a single patch.
+    pub numbered: bool,
+    /// `-N` / `--no-numbered`: always use `[PATCH]`.
+    pub no_numbered: bool,
+    /// `--start-number <n>`: number of the first patch (default 1).
+    pub start_number: usize,
+    /// `--subject-prefix <prefix>`: replaces `PATCH` in the subject prefix.
+    pub subject_prefix: String,
+    /// `-k` / `--keep-subject`: no `[PATCH]` prefix at all.
+    pub keep_subject: bool,
+    /// `--signature <text>`: signature after the `-- ` line (default `rgit <version>`).
+    pub signature: Option<String>,
+    /// `--no-signature`: omit the signature block entirely.
+    pub no_signature: bool,
+}
+
+/// An author or committer identity from a commit object: name, email, Unix timestamp, and
+/// the `+HHMM` timezone it was recorded in.
+// Used by: src/helpers/format_patch.rs, src/helpers/am.rs, src/commands/format_patch.rs, src/commands/am.rs
+// Used by command/helper: `parse_commit_object`, `format_rfc2822_date`, `parse_mail`, `build_commit_with_author`, and the `format_patch`/`am` commands
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommitSignature {
+    pub name: String,
+    pub email: String,
+    pub timestamp: i64,
+    pub tz: String,
+}
+
+/// A commit object parsed into its parts: tree, parents, author, committer, and raw message.
+// Used by: src/helpers/format_patch.rs, src/commands/format_patch.rs
+// Used by command/helper: `parse_commit_object`, `select_patch_commits`, and the `format_patch` command
+#[derive(Debug, Clone, Default)]
+pub struct ParsedCommit {
+    pub hash: String,
+    pub tree: String,
+    pub parents: Vec<String>,
+    pub author: CommitSignature,
+    pub committer: CommitSignature,
+    pub message: String,
+}
+
+/// One file's contribution to a `--stat` block: display name, added/deleted line counts,
+/// and `(old_size, new_size)` in bytes for binary files.
+// Used by: src/helpers/format_patch.rs
+// Used by command/helper: `diff_tree_file` and `format_diffstat`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiffStatEntry {
+    pub name: String,
+    pub added: usize,
+    pub deleted: usize,
+    pub binary_sizes: Option<(usize, usize)>,
+}
+
+/// The git-format diff of one path between two trees: the full `diff --git` section, its
+/// diffstat entry, and its `--summary` line (creation, deletion, or mode change), if any.
+// Used by: src/helpers/format_patch.rs, src/commands/format_patch.rs
+// Used by command/helper: `diff_tree_file`, `diff_commit_against_parent`, and the `format_patch` command
+#[derive(Debug, Clone, Default)]
+pub struct FileDiff {
+    pub text: String,
+    pub stat: DiffStatEntry,
+    pub summary: Option<String>,
+}
+
+/// Options for the `am` command, which applies a mailbox of patches as commits.
+// Used by: src/cli.rs, src/commands/am.rs
+// Used by command/helper: the `am` command (input, resume actions, and subject handling)
+#[derive(Debug, Clone, Default)]
+pub struct AmOptions {
+    /// Mailbox files (or `format-patch` files) to read; standard input when empty.
+    pub mboxes: Vec<String>,
+    /// `--continue` / `-r` / `--resolved`: commit the resolved index for the stopped patch and go on.
+    pub cont: bool,
+    /// `--skip`: drop the stopped patch and go on with the rest.
+    pub skip: bool,
+    /// `--abort`: restore the branch, index, and working tree to where `am` started.
+    pub abort: bool,
+    /// `--quit`: forget the session but keep HEAD, index, and working tree as they are.
+    pub quit: bool,
+    /// `--show-current-patch[=raw|diff]`: print the stopped patch's mail or just its diff.
+    pub show_current_patch: Option<String>,
+    /// `-k` / `--keep-subject`: keep `[PATCH]` and other bracketed prefixes in the subject.
+    pub keep_subject: bool,
+}
+
+/// A patch email decoded by `am`: author identity and date (from `From:`/`Date:`, possibly
+/// overridden by in-body headers), the cleaned subject, the final commit message, and the
+/// diff text that follows the `---` separator.
+// Used by: src/helpers/am.rs, src/commands/am.rs
+// Used by command/helper: `parse_mail`, `commit_mail`, and the `am` command
+#[derive(Debug, Clone, Default)]
+pub struct MailPatch {
+    pub author: CommitSignature,
+    pub subject: String,
+    pub message: String,
+    pub patch: String,
 }

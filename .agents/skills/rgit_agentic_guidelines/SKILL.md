@@ -67,7 +67,9 @@ src/
 │   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
 │   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
 │   ├── check_ignore.rs       # check-ignore (-q, -v, -n, --no-index, --stdin, -z)
-│   └── apply.rs              # apply (--check, --stat, --numstat, --summary, --cached, --index, -R, -v, -p<n>)
+│   ├── apply.rs              # apply (--check, --stat, --numstat, --summary, --cached, --index, -R, -v, -p<n>)
+│   ├── format_patch.rs       # format-patch (-<n>, --root, --stdout, -o, -n/-N, --start-number, --subject-prefix, -k, --signature)
+│   └── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -97,7 +99,9 @@ src/
 │   ├── shortlog.rs           # Author grouping of reachable commits
 │   ├── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
 │   ├── check_ignore.rs       # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
-│   └── apply.rs              # Patch parsing, hunk placement, line-ending preservation, diffstat, patched file I/O
+│   ├── apply.rs              # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
+│   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
+│   └── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

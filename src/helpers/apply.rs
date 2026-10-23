@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{hash_content, read_object};
-use crate::index::IndexEntry;
-use crate::objects::{ApplyOptions, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine};
+use crate::helpers::{hash_content, read_object, write_object};
+use crate::index::{build_entry, write_index, IndexEntry};
+use crate::objects::{ApplyOptions, BinaryHunk, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine, PlannedChanges};
 
 /// Reads the patch text from the given files, concatenated in order, or from standard input
 /// when no file (or `-`) is given.
@@ -114,11 +114,47 @@ fn parse_git_patch(lines: &[&str], start: usize, header_rest: &str, strip: usize
             patch.similarity = s.trim_end_matches('%').parse().ok();
         } else if line.starts_with("dissimilarity index ") {
         } else if let Some(idx) = line.strip_prefix("index ") {
+            if let Some((old, new)) = idx.split_whitespace().next().and_then(|r| r.split_once("..")) {
+                if old.len() == 40 && new.len() == 40 {
+                    patch.index_hashes = Some((old.to_string(), new.to_string()));
+                }
+            }
             if let Some(mode) = idx.split_whitespace().nth(1) {
                 patch.old_mode = patch.old_mode.or(parse_mode(mode));
                 patch.new_mode = patch.new_mode.or(parse_mode(mode));
             }
-        } else if line.starts_with("Binary files ") || line == "GIT binary patch" {
+        } else if line == "GIT binary patch" {
+            patch.is_binary = true;
+            i += 1;
+            for _ in 0..2 {
+                if i >= lines.len() {
+                    break;
+                }
+                let header = trim_cr(lines[i]);
+                let (is_delta, size) = match (header.strip_prefix("literal "), header.strip_prefix("delta ")) {
+                    (Some(n), _) => (false, n),
+                    (_, Some(n)) => (true, n),
+                    _ => break,
+                };
+                let size: usize = size.trim().parse().map_err(|_| anyhow::anyhow!("error: corrupt binary patch at line {}", i + 1))?;
+                i += 1;
+                let mut deflated = Vec::new();
+                while i < lines.len() && !trim_cr(lines[i]).is_empty() {
+                    deflated.extend(decode_base85_line(trim_cr(lines[i])).ok_or_else(|| anyhow::anyhow!("error: corrupt binary patch at line {}", i + 1))?);
+                    i += 1;
+                }
+                i += 1;
+                let mut data = Vec::new();
+                flate2::read::ZlibDecoder::new(&deflated[..])
+                    .read_to_end(&mut data)
+                    .map_err(|_| anyhow::anyhow!("error: corrupt binary patch at line {}", i))?;
+                if data.len() != size {
+                    anyhow::bail!("error: corrupt binary patch at line {}", i);
+                }
+                patch.binary_hunks.push(BinaryHunk { is_delta, size, data });
+            }
+            break;
+        } else if line.starts_with("Binary files ") {
             patch.is_binary = true;
             i += 1;
             while i < lines.len() && !trim_cr(lines[i]).starts_with("diff --git ") {
@@ -165,6 +201,91 @@ fn parse_git_patch(lines: &[&str], start: usize, header_rest: &str, strip: usize
     let (hunks, next) = parse_hunks(lines, i)?;
     patch.hunks = hunks;
     Ok((patch, next))
+}
+
+fn decode_base85_line(line: &str) -> Option<Vec<u8>> {
+    let bytes = line.as_bytes();
+    let len = match *bytes.first()? {
+        c @ b'A'..=b'Z' => (c - b'A' + 1) as usize,
+        c @ b'a'..=b'z' => (c - b'a' + 27) as usize,
+        _ => return None,
+    };
+    let encoded = &bytes[1..];
+    if encoded.len() % 5 != 0 || encoded.len() / 5 * 4 < len {
+        return None;
+    }
+    let mut out = Vec::new();
+    for group in encoded.chunks(5) {
+        let mut value: u64 = 0;
+        for &c in group {
+            let digit = BASE85_DIGITS.iter().position(|&d| d == c)? as u64;
+            value = value * 85 + digit;
+        }
+        if value > u32::MAX as u64 {
+            return None;
+        }
+        out.extend_from_slice(&(value as u32).to_be_bytes());
+    }
+    out.truncate(len);
+    Some(out)
+}
+
+const BASE85_DIGITS: &[u8; 85] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
+
+/// Applies a git binary delta (source size, target size, then copy/insert instructions) to
+/// `base`, returning `None` when the delta is malformed or doesn't match the base.
+// Used by `apply` for `GIT binary patch` hunks of type `delta`.
+pub fn apply_git_delta(base: &[u8], delta: &[u8]) -> Option<Vec<u8>> {
+    let mut pos = 0;
+    let read_varint = |pos: &mut usize| -> Option<usize> {
+        let mut value = 0usize;
+        let mut shift = 0;
+        loop {
+            let byte = *delta.get(*pos)?;
+            *pos += 1;
+            value |= ((byte & 0x7f) as usize) << shift;
+            shift += 7;
+            if byte & 0x80 == 0 {
+                return Some(value);
+            }
+        }
+    };
+    let source_size = read_varint(&mut pos)?;
+    let target_size = read_varint(&mut pos)?;
+    if source_size != base.len() {
+        return None;
+    }
+    let mut out = Vec::with_capacity(target_size);
+    while pos < delta.len() {
+        let cmd = delta[pos];
+        pos += 1;
+        if cmd & 0x80 != 0 {
+            let mut offset = 0usize;
+            let mut size = 0usize;
+            for bit in 0..4 {
+                if cmd & (1 << bit) != 0 {
+                    offset |= (*delta.get(pos)? as usize) << (8 * bit);
+                    pos += 1;
+                }
+            }
+            for bit in 0..3 {
+                if cmd & (0x10 << bit) != 0 {
+                    size |= (*delta.get(pos)? as usize) << (8 * bit);
+                    pos += 1;
+                }
+            }
+            if size == 0 {
+                size = 0x10000;
+            }
+            out.extend_from_slice(base.get(offset..offset.checked_add(size)?)?);
+        } else if cmd != 0 {
+            out.extend_from_slice(delta.get(pos..pos + cmd as usize)?);
+            pos += cmd as usize;
+        } else {
+            return None;
+        }
+    }
+    (out.len() == target_size).then_some(out)
 }
 
 fn parse_hunks(lines: &[&str], mut i: usize) -> anyhow::Result<(Vec<PatchHunk>, usize)> {
@@ -612,7 +733,7 @@ pub fn worktree_file_mode(path: &Path) -> u32 {
 /// Writes patched content to the working tree, creating parent directories and applying the
 /// executable bit for mode `100755` (Unix only).
 // Used by `apply`.
-pub fn write_worktree_file(path: &str, content: &str, mode: u32) -> anyhow::Result<()> {
+pub fn write_worktree_file(path: &str, content: &[u8], mode: u32) -> anyhow::Result<()> {
     let target = Path::new(path);
     if let Some(parent) = target.parent() {
         if !parent.as_os_str().is_empty() {
@@ -649,7 +770,7 @@ pub fn remove_worktree_file(path: &str) -> anyhow::Result<()> {
 /// working-tree file must also be tracked and match its index entry. Returns `Ok(None)` when
 /// the file does not exist, and git-style error text when it cannot be used.
 // Used by `apply`.
-pub fn load_patch_target(path: &str, opts: &ApplyOptions, index_map: &HashMap<String, IndexEntry>, pending: &BTreeMap<String, Option<(String, u32)>>) -> Result<Option<(String, u32)>, String> {
+pub fn load_patch_target(path: &str, opts: &ApplyOptions, index_map: &HashMap<String, IndexEntry>, pending: &PlannedChanges) -> Result<Option<(Vec<u8>, u32)>, String> {
     if let Some(state) = pending.get(path) {
         return Ok(state.clone());
     }
@@ -657,13 +778,9 @@ pub fn load_patch_target(path: &str, opts: &ApplyOptions, index_map: &HashMap<St
     let read_blob = |entry: &IndexEntry| -> Result<Vec<u8>, String> {
         read_object(&hex::encode(entry.hash)).map(|(_, data)| data).map_err(|e| format!("error: {}: {}", path, e))
     };
-    let to_text = |bytes: Vec<u8>| -> Result<String, String> {
-        String::from_utf8(bytes).map_err(|_| format!("error: {}: cannot apply a text patch to a binary file", path))
-    };
-
     if opts.cached {
         return match index_map.get(path) {
-            Some(entry) => Ok(Some((to_text(read_blob(entry)?)?, entry.mode))),
+            Some(entry) => Ok(Some((read_blob(entry)?, entry.mode))),
             None => Ok(None),
         };
     }
@@ -685,13 +802,13 @@ pub fn load_patch_target(path: &str, opts: &ApplyOptions, index_map: &HashMap<St
     }
 
     let mode = index_map.get(path).map(|e| e.mode).unwrap_or_else(|| worktree_file_mode(file));
-    Ok(Some((to_text(bytes)?, mode)))
+    Ok(Some((bytes, mode)))
 }
 
 /// Reports whether a patch's target path already exists, taking earlier patches in the same
 /// run into account and checking the index or working tree depending on the apply mode.
 // Used by `apply` before creating, renaming, or copying a file.
-pub fn patch_target_exists(path: &str, opts: &ApplyOptions, index_map: &HashMap<String, IndexEntry>, pending: &BTreeMap<String, Option<(String, u32)>>) -> bool {
+pub fn patch_target_exists(path: &str, opts: &ApplyOptions, index_map: &HashMap<String, IndexEntry>, pending: &PlannedChanges) -> bool {
     if let Some(state) = pending.get(path) {
         return state.is_some();
     }
@@ -719,4 +836,176 @@ pub fn cached_index_entry(path: &str, hash: [u8; 20], size: usize) -> IndexEntry
         hash,
         path: path.to_string(),
     }
+}
+
+/// Checks one file patch against the current state (earlier patches in `pending`, then the
+/// index or working tree) and, when every hunk applies, records the resulting file contents
+/// (or deletion) in `pending`. Problems are reported on stderr with git's messages, and
+/// `false` is returned; nothing is written to disk here.
+// Used by `apply` and `am`.
+pub fn check_file_patch(patch: &FilePatch, opts: &ApplyOptions, index_map: &HashMap<String, IndexEntry>, pending: &mut PlannedChanges) -> bool {
+    let name = patch.display_name().to_string();
+    let fail = |messages: &[String]| {
+        for m in messages {
+            eprintln!("{}", m);
+        }
+        false
+    };
+
+    for path in [&patch.old_path, &patch.new_path].into_iter().flatten() {
+        if path.is_empty() || Path::new(path).is_absolute() || path.split('/').any(|c| c == ".." || c == ".git") {
+            return fail(&[format!("error: invalid path '{}'", path)]);
+        }
+    }
+
+    let source = if patch.is_new {
+        None
+    } else {
+        let old_path = patch.old_path.as_deref().unwrap_or("");
+        match load_patch_target(old_path, opts, index_map, pending) {
+            Ok(Some(state)) => Some(state),
+            Ok(None) => {
+                let reason = if opts.cached || opts.index { "does not exist in index" } else { "No such file or directory" };
+                return fail(&[format!("error: {}: {}", old_path, reason)]);
+            }
+            Err(message) => return fail(&[message]),
+        }
+    };
+
+    let creates_new_path = patch.is_new || patch.is_rename || patch.is_copy;
+    if let (true, Some(new_path)) = (creates_new_path, &patch.new_path) {
+        let same_as_source = patch.old_path.as_deref() == Some(new_path.as_str());
+        if !same_as_source && patch_target_exists(new_path, opts, index_map, pending) {
+            let place = if opts.cached || opts.index { "index" } else { "working directory" };
+            return fail(&[format!("error: {}: already exists in {}", new_path, place)]);
+        }
+    }
+
+    let (old_content, old_mode) = source.unwrap_or_default();
+    let content = if patch.is_binary {
+        match apply_binary_patch(patch, &old_content) {
+            Ok(bytes) => bytes,
+            Err(message) => return fail(&[message, format!("error: {}: patch does not apply", name)]),
+        }
+    } else {
+        let text = match String::from_utf8(old_content) {
+            Ok(text) => text,
+            Err(_) => return fail(&[format!("error: {}: cannot apply a text patch to a binary file", name)]),
+        };
+        match apply_text_hunks(patch, &text, &name, opts.verbose) {
+            Some(bytes) => bytes,
+            None => return false,
+        }
+    };
+
+    if patch.is_delete {
+        if !content.is_empty() {
+            return fail(&["error: removal patch leaves file contents".to_string(), format!("error: {}: patch does not apply", name)]);
+        }
+    }
+
+    if patch.is_delete || patch.is_rename {
+        if let Some(old_path) = &patch.old_path {
+            pending.insert(old_path.clone(), None);
+        }
+    }
+    if !patch.is_delete {
+        if let Some(new_path) = &patch.new_path {
+            let base_mode = if patch.is_new { 0o100644 } else { old_mode };
+            let mode = patch.new_mode.unwrap_or(if base_mode == 0 { 0o100644 } else { base_mode });
+            pending.insert(new_path.clone(), Some((content, mode)));
+        }
+    }
+    true
+}
+
+fn apply_text_hunks(patch: &FilePatch, text: &str, name: &str, verbose: bool) -> Option<Vec<u8>> {
+    let image = split_image(text);
+    let (result, offsets) = match apply_hunks(image, &patch.hunks) {
+        Ok(applied) => applied,
+        Err(failure) => {
+            let mut messages = Vec::new();
+            if verbose {
+                messages.push(format!("error: while searching for:\n{}", failure.searched_for));
+            }
+            messages.push(format!("error: patch failed: {}:{}", name, failure.old_start));
+            messages.push(format!("error: {}: patch does not apply", name));
+            for m in messages {
+                eprintln!("{}", m);
+            }
+            return None;
+        }
+    };
+
+    if verbose {
+        for (hunk, line, offset) in offsets {
+            let unit = if offset == 1 { "line" } else { "lines" };
+            eprintln!("Hunk #{} succeeded at {} (offset {} {}).", hunk, line, offset, unit);
+        }
+    }
+
+    Some(join_image(&result).into_bytes())
+}
+
+fn apply_binary_patch(patch: &FilePatch, old: &[u8]) -> Result<Vec<u8>, String> {
+    let name = patch.display_name();
+    let (old_hash, new_hash) = match (&patch.index_hashes, patch.binary_hunks.first()) {
+        (Some(hashes), Some(_)) => hashes,
+        _ => return Err(format!("error: cannot apply binary patch to '{}' without full index line", name)),
+    };
+    let zero = "0".repeat(40);
+    let current = hex::encode(hash_content("blob", old));
+    if *old_hash != zero && current != *old_hash {
+        return Err(format!("error: the patch applies to '{}' ({}), which does not match the current contents.", name, current));
+    }
+    let hunk = &patch.binary_hunks[0];
+    let result = if hunk.is_delta {
+        apply_git_delta(old, &hunk.data).ok_or_else(|| format!("error: binary patch does not apply to '{}'", name))?
+    } else {
+        hunk.data.clone()
+    };
+    let actual = hex::encode(hash_content("blob", &result));
+    if *new_hash != zero && actual != *new_hash {
+        return Err(format!("error: binary patch to '{}' creates incorrect result (expecting {}, got {})", name, new_hash, actual));
+    }
+    Ok(result)
+}
+
+/// Writes the planned results of a successful patch check: removes deleted files and writes
+/// patched ones in the working tree (unless `cached`), then updates the index when `use_index`
+/// (blobs are written to the object store; `--cached` entries get zeroed stat data).
+// Used by `apply` and `am`.
+pub fn write_planned_changes(pending: &PlannedChanges, cached: bool, use_index: bool, index_entries: Vec<IndexEntry>) -> anyhow::Result<()> {
+    if !cached {
+        for (path, state) in pending {
+            if state.is_none() && Path::new(path).exists() {
+                remove_worktree_file(path)?;
+            }
+        }
+        for (path, state) in pending {
+            if let Some((content, mode)) = state {
+                write_worktree_file(path, content, *mode)?;
+            }
+        }
+    }
+
+    if use_index {
+        let mut entries: Vec<IndexEntry> = index_entries.into_iter().filter(|e| !pending.contains_key(&e.path)).collect();
+        for (path, state) in pending {
+            if let Some((content, mode)) = state {
+                let hash_hex = write_object("blob", content)?;
+                let mut hash = [0u8; 20];
+                hash.copy_from_slice(&hex::decode(&hash_hex)?);
+                let mut entry = if cached {
+                    cached_index_entry(path, hash, content.len())
+                } else {
+                    build_entry(path, hash, &fs::metadata(path)?)
+                };
+                entry.mode = *mode;
+                entries.push(entry);
+            }
+        }
+        write_index(&mut entries)?;
+    }
+    Ok(())
 }

@@ -29,6 +29,8 @@ pub mod shortlog;
 pub mod ls_files;
 pub mod check_ignore;
 pub mod apply;
+pub mod format_patch;
+pub mod am;
 
 pub use objects::*;
 pub use diff::*;
@@ -59,4 +61,6 @@ pub use shortlog::*;
 pub use ls_files::*;
 pub use check_ignore::*;
 pub use apply::*;
+pub use format_patch::*;
+pub use am::*;
 

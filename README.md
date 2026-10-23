@@ -36,9 +36,10 @@ A lightweight, fully functional Git implementation written in Rust.
   - `fsck.rs`: Object integrity checks, connectivity walks, and dangling object reports.
   - `grep.rs`: Regex/fixed-string matcher construction, pathspec filtering, and content search.
   - `count_objects.rs`: Loose/packed object statistics and human-readable size formatting.
-  - `rev_parse.rs`: Revision syntax resolution (`HEAD~2`, `HEAD^`, `@{n}`, `<ref>@{n}`) and repository property queries.
+  - `rev_parse.rs`: Revision syntax resolution (`HEAD~2`, `HEAD^`, `<ref>@{n}`, short hashes) and repository property queries.
   - `shortlog.rs`: Author grouping of reachable commits.
   - `ls_files.rs`: Worktree-vs-index comparison, untracked/ignored file walker, and pathspec matching.
+  - `check_ignore.rs`: Source-tracked `.gitignore` rule loading, deciding-rule lookup (including ignored parent directories), and path normalization.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/objects.rs`](file:///c:/rgit-main/src/objects.rs)**: Domain models, shared type aliases, and CLI subcommand enums.
@@ -120,8 +121,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`write-tree`**: Serializes current staging index into tree objects.
 - **`ls-tree`** (`--name-only <tree>`): Inspects tree contents and modes.
 - **`ls-files`** (`-c`, `-m`, `-d`, `-o`, `-i`, `--exclude-standard`, `-s`, `-t`, `-z`, `[<pathspec>...]`): Lists tracked index entries, modified/deleted tracked files, and untracked or ignored working-tree files.
+- **`check-ignore`** (`-q`, `-v`, `-n`, `--no-index`, `--stdin`, `-z`, `<pathname>...`): Reports which paths are excluded by `.gitignore` rules; `-v` shows the deciding rule as `<source>:<line>:<pattern>`. Exits 0 if any path is ignored, 1 if none, 128 on usage errors.
 - **`commit-tree <tree> [-p <parent>] -m <msg>`**: Directly writes a commit object from tree and parent hashes.
-- **`rev-parse`** (`--git-dir`, `--show-toplevel`, `--is-inside-work-tree`, `--is-bare-repository`, `--abbrev-ref`, `--symbolic-full-name`, `--verify [-q]`, `--short[=N]`, `--sq`, `<rev>...`): Resolves revision syntax (`HEAD~2`, `HEAD^`, branches, tags, short hashes) to object hashes or symbolic names, and queries repository properties.
+- **`rev-parse`** (`--git-dir`, `--show-toplevel`, `--is-inside-work-tree`, `--is-bare-repository`, `--abbrev-ref`, `--symbolic-full-name`, `--verify [-q]`, `--short[=N]`, `--sq`, `<rev>...`): Resolves revision syntax (`HEAD~2`, `HEAD^`, branches, tags, short hashes, `<ref>@{n}`, `^{type}`) to object hashes or symbolic names, and queries repository properties.
 
 ---
 

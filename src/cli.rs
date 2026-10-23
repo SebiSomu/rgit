@@ -369,6 +369,22 @@ pub enum Commands {
         #[arg(value_name = "PATHSPEC")]
         pathspecs: Vec<String>,
     },
+    CheckIgnore {
+        #[arg(short = 'q', long = "quiet")]
+        quiet: bool,
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        #[arg(short = 'n', long = "non-matching")]
+        non_matching: bool,
+        #[arg(long = "no-index")]
+        no_index: bool,
+        #[arg(long = "stdin")]
+        stdin: bool,
+        #[arg(short = 'z')]
+        null_terminated: bool,
+        #[arg(value_name = "PATHNAME")]
+        paths: Vec<String>,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -626,6 +642,26 @@ pub fn handle_commands() -> Result<()> {
                 pathspecs,
             };
             crate::commands::ls_files(opts)?;
+        }
+        Commands::CheckIgnore {
+            quiet,
+            verbose,
+            non_matching,
+            no_index,
+            stdin,
+            null_terminated,
+            paths,
+        } => {
+            let opts = crate::objects::CheckIgnoreOptions {
+                quiet,
+                verbose,
+                non_matching,
+                no_index,
+                stdin,
+                null_terminated,
+                paths,
+            };
+            crate::commands::check_ignore(opts)?;
         }
     }
 

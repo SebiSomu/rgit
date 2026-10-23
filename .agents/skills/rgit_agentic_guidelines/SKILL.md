@@ -65,7 +65,8 @@ src/
 │   ├── count_objects.rs      # count-objects (-v, -H)
 │   ├── rev_parse.rs          # rev-parse (revision resolution & repository property queries)
 │   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
-│   └── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
+│   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
+│   └── check_ignore.rs       # check-ignore (-q, -v, -n, --no-index, --stdin, -z)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -93,7 +94,8 @@ src/
 │   ├── count_objects.rs      # Loose/packed object statistics, human-readable sizes
 │   ├── rev_parse.rs          # Revision syntax resolution, worktree root discovery, property queries
 │   ├── shortlog.rs           # Author grouping of reachable commits
-│   └── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
+│   ├── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
+│   └── check_ignore.rs       # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

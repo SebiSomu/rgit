@@ -108,44 +108,44 @@ pub fn is_path_ignored(rules: &[GitIgnoreRule], rel_path: &str, is_dir: bool) ->
     let mut ignored = false;
 
     for rule in rules {
-        if rule.dir_only && !is_dir {
-            continue;
-        }
-
-        let target_subpath = if rule.base_dir.is_empty() {
-            rel_path
-        } else {
-            if rel_path == rule.base_dir {
-                ""
-            } else if rel_path.starts_with(&format!("{}/", rule.base_dir)) {
-                &rel_path[rule.base_dir.len() + 1..]
-            } else {
-                continue;
-            }
-        };
-
-        let matched = if rule.has_slash {
-            glob_match(&rule.pattern, target_subpath)
-        } else {
-            let filename = Path::new(rel_path)
-                .file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_default();
-            if glob_match(&rule.pattern, &filename) {
-                true
-            } else {
-                target_subpath
-                    .split('/')
-                    .any(|part| glob_match(&rule.pattern, part))
-            }
-        };
-
-        if matched {
+        if ignore_rule_matches(rule, rel_path, is_dir) {
             ignored = !rule.negated;
         }
     }
 
     ignored
+}
+
+/// Checks whether a single `.gitignore` rule's pattern matches a relative path, regardless of
+/// whether the rule is negated.
+// Used by `is_path_ignored` and by `check-ignore` to find the exact rule that matched.
+pub fn ignore_rule_matches(rule: &GitIgnoreRule, rel_path: &str, is_dir: bool) -> bool {
+    if rule.dir_only && !is_dir {
+        return false;
+    }
+
+    let target_subpath = if rule.base_dir.is_empty() {
+        rel_path
+    } else if rel_path == rule.base_dir {
+        ""
+    } else if rel_path.starts_with(&format!("{}/", rule.base_dir)) {
+        &rel_path[rule.base_dir.len() + 1..]
+    } else {
+        return false;
+    };
+
+    if rule.has_slash {
+        glob_match(&rule.pattern, target_subpath)
+    } else {
+        let filename = Path::new(rel_path)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        glob_match(&rule.pattern, &filename)
+            || target_subpath
+                .split('/')
+                .any(|part| glob_match(&rule.pattern, part))
+    }
 }
 
 /// Recursively collects all files under the given path, respecting `.gitignore` rules

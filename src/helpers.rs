@@ -27,6 +27,7 @@ pub mod count_objects;
 pub mod rev_parse;
 pub mod shortlog;
 pub mod ls_files;
+pub mod check_ignore;
 
 pub use objects::*;
 pub use diff::*;
@@ -55,4 +56,5 @@ pub use count_objects::*;
 pub use rev_parse::*;
 pub use shortlog::*;
 pub use ls_files::*;
+pub use check_ignore::*;
 

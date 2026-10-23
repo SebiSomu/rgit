@@ -62,7 +62,7 @@ pub fn local_has_object(hash: &str) -> bool {
     if hash.len() < 3 {
         return false;
     }
-    Path::new(&format!(".git/objects/{}/{}", &hash[..2], &hash[2..])).exists()
+    crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..])).exists()
 }
 
 /// BFS-walks a commit graph from `remote_commit` using the remote's object store and
@@ -212,7 +212,7 @@ pub fn fetch_object_from_remote(hash: &str, remote_git_dir: &Path) -> Result<()>
         .join("objects")
         .join(&hash[..2])
         .join(&hash[2..]);
-    let local_dir = PathBuf::from(format!(".git/objects/{}", &hash[..2]));
+    let local_dir = crate::repo::path(format!(".git/objects/{}", &hash[..2]));
     let local_path = local_dir.join(&hash[2..]);
 
     fs::create_dir_all(&local_dir)?;
@@ -227,7 +227,7 @@ pub fn fetch_object_from_remote(hash: &str, remote_git_dir: &Path) -> Result<()>
 /// doesn't exist yet.
 // Used by `fetch`.
 pub fn read_local_remote_tracking_ref(remote_name: &str, branch_name: &str) -> Option<String> {
-    let path = format!(".git/refs/remotes/{}/{}", remote_name, branch_name);
+    let path = crate::repo::path(format!(".git/refs/remotes/{}/{}", remote_name, branch_name));
     fs::read_to_string(&path)
         .ok()
         .map(|s| s.trim().to_string())
@@ -238,8 +238,8 @@ pub fn read_local_remote_tracking_ref(remote_name: &str, branch_name: &str) -> O
 /// new commit SHA.
 // Used by `fetch`.
 pub fn write_local_remote_tracking_ref(remote_name: &str, branch_name: &str, sha: &str) -> Result<()> {
-    let ref_path = format!(".git/refs/remotes/{}/{}", remote_name, branch_name);
-    let path = Path::new(&ref_path);
+    let ref_path = crate::repo::path(format!(".git/refs/remotes/{}/{}", remote_name, branch_name));
+    let path = ref_path.as_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -258,7 +258,7 @@ pub fn write_fetch_head(entries: &[(String, String, String)]) -> Result<()> {
         let merge_flag = if i == 0 { "" } else { "\tnot-for-merge" };
         lines.push(format!("{}\t{}branch '{}' of {}", sha, merge_flag, branch, remote_url));
     }
-    fs::write(".git/FETCH_HEAD", lines.join("\n") + "\n")
+    fs::write(crate::repo::path(".git/FETCH_HEAD"), lines.join("\n") + "\n")
         .context("Failed to write FETCH_HEAD")?;
     Ok(())
 }

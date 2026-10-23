@@ -51,7 +51,7 @@ fn current_reflog_action() -> String {
 /// Returns the path of the reflog file for a ref (`HEAD`, `refs/heads/main`, ...).
 // Used by every function in this file that reads or writes a reflog.
 fn reflog_file(ref_name: &str) -> String {
-    format!("{}/{}", LOGS_DIR, ref_name)
+    crate::repo::path(format!("{}/{}", LOGS_DIR, ref_name)).to_string_lossy().into_owned()
 }
 
 /// Says whether updates to `ref_name` get a reflog: `HEAD`, branches and remote-tracking
@@ -114,12 +114,18 @@ pub fn record_head_move(old_hash: Option<&str>, new_hash: Option<&str>) {
 /// an empty one; lines that don't parse are skipped.
 // Used by the `reflog` command and `resolve_reflog_revision`.
 pub fn read_reflog(ref_name: &str) -> Result<Vec<ReflogEntry>> {
-    let path = reflog_file(ref_name);
-    if !Path::new(&path).exists() {
+    read_reflog_file(Path::new(&reflog_file(ref_name)))
+}
+
+/// Reads a reflog file at an explicit location (e.g. another worktree's `logs/HEAD`), newest
+/// entry first, like `read_reflog`.
+// Used by `read_reflog` and `gc` (HEAD reflogs of every worktree).
+pub fn read_reflog_file(path: &Path) -> Result<Vec<ReflogEntry>> {
+    if !path.exists() {
         return Ok(Vec::new());
     }
 
-    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut entries: Vec<ReflogEntry> = content.lines().filter_map(ReflogEntry::parse).collect();
     entries.reverse();
     Ok(entries)
@@ -148,10 +154,10 @@ pub fn write_reflog(ref_name: &str, entries: &[ReflogEntry]) -> Result<()> {
 /// so deleting `feature/login`'s log doesn't leave an empty `feature/` folder.
 // Used by `delete_reflog` and `rename_reflog`.
 fn prune_empty_log_dirs(file_path: &str) {
-    let root = Path::new(LOGS_DIR);
+    let root = crate::repo::path(LOGS_DIR);
     let mut parent = Path::new(file_path).parent();
     while let Some(dir) = parent {
-        if dir == root || !dir.starts_with(root) {
+        if dir == root || !dir.starts_with(&root) {
             break;
         }
         let is_empty = fs::read_dir(dir).map(|mut d| d.next().is_none()).unwrap_or(false);
@@ -206,12 +212,16 @@ pub fn list_reflog_refs() -> Result<Vec<String>> {
         Ok(())
     }
 
-    let root = Path::new(LOGS_DIR);
-    if !root.exists() {
-        return Ok(Vec::new());
-    }
+    // `HEAD`'s log belongs to this worktree while branch logs are shared, so in a linked
+    // worktree the two live in different directories.
     let mut refs = Vec::new();
-    walk(root, "", &mut refs)?;
+    if Path::new(&reflog_file("HEAD")).is_file() {
+        refs.push("HEAD".to_string());
+    }
+    let refs_root = crate::repo::path(format!("{}/refs", LOGS_DIR));
+    if refs_root.is_dir() {
+        walk(&refs_root, "refs", &mut refs)?;
+    }
     refs.sort();
     Ok(refs)
 }

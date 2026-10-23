@@ -24,8 +24,8 @@ pub fn write_object(object_type: &str, content: &[u8]) -> anyhow::Result<String>
     let hash = hasher.finalize();
     let hash_hex = hex::encode(hash);
 
-    let dir = format!(".git/objects/{}", &hash_hex[..2]);
-    let path = format!("{}/{}", dir, &hash_hex[2..]);
+    let dir = crate::repo::path(format!(".git/objects/{}", &hash_hex[..2]));
+    let path = dir.join(&hash_hex[2..]);
 
     fs::create_dir_all(&dir)?;
 
@@ -50,7 +50,7 @@ pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
 
     let dir = &hash[0..2];
     let file_name = &hash[2..];
-    let path = format!(".git/objects/{}/{}", dir, file_name);
+    let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));
     let compressed_data = fs::read(&path).context("Failed to read object file (does this hash exist?)")?;
     let mut decoder = ZlibDecoder::new(&compressed_data[..]);
     let mut decompressed_data = Vec::new();

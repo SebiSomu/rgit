@@ -13,13 +13,22 @@ use crate::refs::{
 pub fn find_work_tree_root() -> Result<PathBuf> {
     let mut dir = std::env::current_dir().context("Cannot determine current directory")?;
     loop {
-        if dir.join(".git").is_dir() {
+        if is_work_tree_top(&dir) {
             return Ok(dir);
         }
         if !dir.pop() {
             anyhow::bail!("fatal: not a git repository (or any of the parent directories): .git");
         }
     }
+}
+
+/// Says whether `dir` is the top of a worktree: it holds a `.git` directory (main worktree) or
+/// a `.git` file pointing elsewhere (linked worktree).
+// Used by `find_work_tree_root` and `is_inside_work_tree`.
+fn is_work_tree_top(dir: &Path) -> bool {
+    let dot_git = dir.join(".git");
+    dot_git.is_dir()
+        || std::fs::read_to_string(&dot_git).is_ok_and(|s| s.starts_with("gitdir:"))
 }
 
 /// Returns `true` if the current working directory is inside a git work-tree.
@@ -30,7 +39,7 @@ pub fn is_inside_work_tree() -> bool {
         Err(_) => return false,
     };
     loop {
-        if dir.join(".git").is_dir() {
+        if is_work_tree_top(&dir) {
             return true;
         }
         if !dir.pop() {
@@ -244,7 +253,7 @@ fn resolve_base_name(name: &str) -> Result<String> {
                 return Ok(name.to_string());
             }
         } else {
-            let prefix_dir = format!(".git/objects/{}", &name[..2]);
+            let prefix_dir = crate::repo::path(format!(".git/objects/{}", &name[..2]));
             if let Ok(entries) = std::fs::read_dir(prefix_dir) {
                 let rest = &name[2..];
                 let mut matches = Vec::new();
@@ -302,7 +311,7 @@ pub fn abbrev_ref_for(hash: &str) -> Result<String> {
             }
         }
     }
-    let remotes_dir = Path::new(".git/refs/remotes");
+    let remotes_dir = &crate::repo::path(".git/refs/remotes");
     if remotes_dir.is_dir() {
         for entry in std::fs::read_dir(remotes_dir)
             .with_context(|| "Failed to read .git/refs/remotes")?
@@ -354,7 +363,7 @@ pub fn symbolic_full_name_for(hash: &str) -> Result<String> {
             }
         }
     }
-    let remotes_dir = Path::new(".git/refs/remotes");
+    let remotes_dir = &crate::repo::path(".git/refs/remotes");
     if remotes_dir.is_dir() {
         for entry in std::fs::read_dir(remotes_dir)
             .with_context(|| "Failed to read .git/refs/remotes")?

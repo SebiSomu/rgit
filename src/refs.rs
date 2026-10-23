@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
+use crate::repo;
+
 #[derive(Debug, Clone)]
 pub enum HeadState {
     Branch(String),
@@ -12,7 +14,7 @@ pub enum HeadState {
 /// or a raw commit hash.
 // Used by `commit`, `log`, `status`, `switch`, and `checkout`.
 pub fn resolve_head() -> Result<HeadState> {
-    let head_content = fs::read_to_string(".git/HEAD")
+    let head_content = fs::read_to_string(repo::path(".git/HEAD"))
         .context("Failed to read .git/HEAD — is this an rgit repository?")?;
     let trimmed = head_content.trim();
 
@@ -31,7 +33,7 @@ pub fn resolve_head() -> Result<HeadState> {
 /// Returns an error if HEAD is in a detached state.
 // Used by commands requiring a current local branch (like `switch`, `checkout`, `commit`, `log`, and `status`).
 pub fn current_branch_ref() -> Result<String> {
-    let head_content = fs::read_to_string(".git/HEAD")
+    let head_content = fs::read_to_string(repo::path(".git/HEAD"))
         .context("Failed to read .git/HEAD — is this an rgit repository?")?;
 
     head_content
@@ -60,7 +62,7 @@ pub fn set_head_detached(hash: &str) -> Result<()> {
     let old_commit = resolve_head_commit().ok().flatten();
     let was_on_branch = matches!(resolve_head(), Ok(HeadState::Branch(_)));
 
-    fs::write(".git/HEAD", format!("{}\n", hash))
+    fs::write(repo::path(".git/HEAD"), format!("{}\n", hash))
         .context("Failed to write detached HEAD")?;
 
     if was_on_branch {
@@ -75,7 +77,7 @@ pub fn set_head_detached(hash: &str) -> Result<()> {
 /// Returns `None` if the reference does not exist.
 // Used widely by branch management, switching, checkout, commits, and logs.
 pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
-    let path = format!(".git/{}", ref_name);
+    let path = repo::path(format!(".git/{}", ref_name));
 
     if !Path::new(&path).exists() {
         return Ok(None);
@@ -90,7 +92,7 @@ pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
 /// Creates parent directories if needed.
 // Used by `commit`, `branch`, `switch`, and `checkout`.
 pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
-    let path = format!(".git/{}", ref_name);
+    let path = repo::path(format!(".git/{}", ref_name));
     let old_hash = read_ref(ref_name).ok().flatten();
 
     if let Some(parent) = Path::new(&path).parent() {
@@ -117,14 +119,14 @@ pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
 /// Returns a sorted list of all branch names located in `.git/refs/heads/`.
 // Used by the `branch` command (list mode).
 pub fn list_branches() -> Result<Vec<String>> {
-    let heads_dir = ".git/refs/heads";
+    let heads_dir = repo::path(".git/refs/heads");
 
-    if !Path::new(heads_dir).exists() {
+    if !heads_dir.exists() {
         return Ok(Vec::new());
     }
 
     let mut branches = Vec::new();
-    collect_branches(Path::new(heads_dir), "", &mut branches)?;
+    collect_branches(&heads_dir, "", &mut branches)?;
     branches.sort();
     Ok(branches)
 }
@@ -159,20 +161,21 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
     }
 
     let ref_name = format!("refs/heads/{}", name);
-    let path = format!(".git/{}", ref_name);
+    let path = repo::path(format!(".git/{}", ref_name));
 
     if Path::new(&path).exists() {
         anyhow::bail!("fatal: a branch named '{}' already exists", name);
     }
 
+    let heads_root = repo::path(".git/refs/heads");
     let mut ancestor = Path::new(&path).parent();
     while let Some(p) = ancestor {
-        if p == Path::new(".git/refs/heads") {
+        if p == heads_root {
             break;
         }
         if p.is_file() {
             let conflict = p
-                .strip_prefix(".git/refs/heads/")
+                .strip_prefix(&heads_root)
                 .unwrap_or(p)
                 .display()
                 .to_string();
@@ -196,7 +199,7 @@ pub fn set_head(branch_name: &str) -> Result<()> {
     let old_commit = resolve_head_commit().ok().flatten();
     let already_there = matches!(resolve_head(), Ok(HeadState::Branch(b)) if b == branch_name);
 
-    fs::write(".git/HEAD", format!("ref: refs/heads/{}\n", branch_name))
+    fs::write(repo::path(".git/HEAD"), format!("ref: refs/heads/{}\n", branch_name))
         .context("Failed to update HEAD")?;
 
     if !already_there {
@@ -210,7 +213,7 @@ pub fn set_head(branch_name: &str) -> Result<()> {
 // Used by `branch -d` and `branch -D` commands.
 pub fn delete_branch(name: &str) -> Result<()> {
     let ref_path = format!("refs/heads/{}", name);
-    let fs_path = format!(".git/{}", ref_path);
+    let fs_path = repo::path(format!(".git/{}", ref_path));
 
     if !Path::new(&fs_path).exists() {
         anyhow::bail!("error: branch '{}' not found.", name);
@@ -222,7 +225,7 @@ pub fn delete_branch(name: &str) -> Result<()> {
 
     let mut parent = Path::new(&fs_path).parent();
     while let Some(p) = parent {
-        if p == Path::new(".git/refs/heads") || p == Path::new(".git/refs") {
+        if p == repo::path(".git/refs/heads") || p == repo::path(".git/refs") {
             break;
         }
         let is_empty = fs::read_dir(p)
@@ -249,8 +252,8 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
 
     let old_ref = format!("refs/heads/{}", old);
     let new_ref = format!("refs/heads/{}", new);
-    let old_path = format!(".git/{}", old_ref);
-    let new_path = format!(".git/{}", new_ref);
+    let old_path = repo::path(format!(".git/{}", old_ref));
+    let new_path = repo::path(format!(".git/{}", new_ref));
 
     if !Path::new(&old_path).exists() {
         anyhow::bail!("error: branch '{}' not found.", old);
@@ -266,10 +269,22 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
     fs::rename(&old_path, &new_path).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
     crate::helpers::reflog::rename_reflog(&old_ref, &new_ref);
 
-    let head_content = fs::read_to_string(".git/HEAD").unwrap_or_default();
+    let head_content = fs::read_to_string(repo::path(".git/HEAD")).unwrap_or_default();
     let current_ref = format!("ref: {}", old_ref);
     if head_content.trim() == current_ref {
         set_head(new)?;
+    }
+
+    // Other worktrees that have the branch checked out follow the rename too.
+    let own_git_dir = repo::normalize(&repo::git_dir());
+    for git_dir in crate::helpers::worktree::all_worktree_git_dirs()? {
+        let head_file = git_dir.join("HEAD");
+        if git_dir != own_git_dir
+            && fs::read_to_string(&head_file).is_ok_and(|c| c.trim() == current_ref)
+        {
+            fs::write(&head_file, format!("ref: {}\n", new_ref))
+                .with_context(|| format!("Failed to update {}", head_file.display()))?;
+        }
     }
 
     Ok(())
@@ -328,14 +343,14 @@ pub fn is_valid_branch_name(name: &str) -> bool {
 /// name) rather than duplicating the recursive-directory logic.
 // Used by the `tag` command (list mode).
 pub fn list_tags() -> Result<Vec<String>> {
-    let tags_dir = ".git/refs/tags";
+    let tags_dir = repo::path(".git/refs/tags");
 
-    if !Path::new(tags_dir).exists() {
+    if !tags_dir.exists() {
         return Ok(Vec::new());
     }
 
     let mut tags = Vec::new();
-    collect_branches(Path::new(tags_dir), "", &mut tags)?;
+    collect_branches(&tags_dir, "", &mut tags)?;
     tags.sort();
     Ok(tags)
 }
@@ -350,20 +365,21 @@ pub fn create_tag(name: &str, commit_hash: &str) -> Result<()> {
     }
 
     let ref_name = format!("refs/tags/{}", name);
-    let path = format!(".git/{}", ref_name);
+    let path = repo::path(format!(".git/{}", ref_name));
 
     if Path::new(&path).exists() {
         anyhow::bail!("fatal: tag '{}' already exists", name);
     }
 
+    let tags_root = repo::path(".git/refs/tags");
     let mut ancestor = Path::new(&path).parent();
     while let Some(p) = ancestor {
-        if p == Path::new(".git/refs/tags") {
+        if p == tags_root {
             break;
         }
         if p.is_file() {
             let conflict = p
-                .strip_prefix(".git/refs/tags/")
+                .strip_prefix(&tags_root)
                 .unwrap_or(p)
                 .display()
                 .to_string();
@@ -384,7 +400,7 @@ pub fn create_tag(name: &str, commit_hash: &str) -> Result<()> {
 // Used by `tag -d`.
 pub fn delete_tag(name: &str) -> Result<()> {
     let ref_path = format!("refs/tags/{}", name);
-    let fs_path = format!(".git/{}", ref_path);
+    let fs_path = repo::path(format!(".git/{}", ref_path));
 
     if !Path::new(&fs_path).exists() {
         anyhow::bail!("error: tag '{}' not found.", name);
@@ -395,7 +411,7 @@ pub fn delete_tag(name: &str) -> Result<()> {
 
     let mut parent = Path::new(&fs_path).parent();
     while let Some(p) = parent {
-        if p == Path::new(".git/refs/tags") || p == Path::new(".git/refs") {
+        if p == repo::path(".git/refs/tags") || p == repo::path(".git/refs") {
             break;
         }
         let is_empty = fs::read_dir(p)
@@ -416,13 +432,13 @@ pub fn delete_tag(name: &str) -> Result<()> {
 /// `.git/refs/remotes/<remote_name>/`, skipping the `HEAD` entry that `fetch` records there.
 // Used by `clone`.
 pub fn list_remote_tracking_branches(remote_name: &str) -> Result<Vec<String>> {
-    let dir = format!(".git/refs/remotes/{}", remote_name);
-    if !Path::new(&dir).exists() {
+    let dir = repo::path(format!(".git/refs/remotes/{}", remote_name));
+    if !dir.exists() {
         return Ok(Vec::new());
     }
  
     let mut branches = Vec::new();
-    collect_branches(Path::new(&dir), "", &mut branches)?;
+    collect_branches(&dir, "", &mut branches)?;
     branches.retain(|b| b != "HEAD");
     branches.sort();
     Ok(branches)

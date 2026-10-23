@@ -4,6 +4,7 @@ pub mod commands;
 mod helpers;
 mod index;
 pub mod refs;
+pub mod repo;
 
 use anyhow::Result;
 

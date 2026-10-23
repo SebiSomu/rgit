@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use crate::helpers::{check_switch_safety, flatten_tree, is_reachable, read_object, sync_working_tree, tree_hash_of_commit, update_index_from_tree};
+use crate::helpers::worktree::worktree_using_branch;
 use crate::index::read_index;
 use crate::refs;
 
@@ -32,6 +33,13 @@ pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Op
                     branch_name
                 );
             }
+        }
+        if let Some(user) = worktree_using_branch(&format!("refs/heads/{}", branch_name), false)? {
+            anyhow::bail!(
+                "error: cannot delete branch '{}' used by worktree at '{}'",
+                branch_name,
+                user.display_path()
+            );
         }
 
         if delete && !force_delete {
@@ -140,6 +148,9 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow
                 println!("Already on '{}'", branch);
                 return Ok(());
             }
+        }
+        if let Some(user) = worktree_using_branch(&format!("refs/heads/{}", branch), false)? {
+            anyhow::bail!("fatal: '{}' is already used by worktree at '{}'", branch, user.display_path());
         }
     }
 

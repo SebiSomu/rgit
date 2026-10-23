@@ -10,7 +10,8 @@ use crate::helpers::gc::{
     GC_STRICT_STATE_FILES,
 };
 use crate::helpers::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
-use crate::index::read_index;
+use crate::helpers::worktree::all_worktree_git_dirs;
+use crate::index::{read_index, read_index_from};
 use crate::objects::{FsckIssue, FsckNode, FsckReport, LooseObject};
 
 /// Modes a tree entry may have: regular file, executable, symlink, directory, submodule.
@@ -264,14 +265,17 @@ fn read_ref_files(dir: &Path, prefix: &str, out: &mut Vec<(String, String)>) -> 
 /// reported by the connectivity walk, which knows how it is rooted.)
 // Used by `run_fsck_checks`.
 pub fn check_refs(graph: &HashMap<String, FsckNode>, issues: &mut Vec<FsckIssue>) -> Result<()> {
-    let wants_commit = |name: &str| name == "HEAD" || name.starts_with("refs/heads/") || name.starts_with("refs/remotes/");
+    let wants_commit = |name: &str| name.ends_with("HEAD") || name.starts_with("refs/heads/") || name.starts_with("refs/remotes/");
 
     let mut refs = Vec::new();
-    if Path::new(".git/HEAD").is_file() {
-        let head = fs::read_to_string(".git/HEAD").context("Failed to read .git/HEAD")?;
-        refs.push(("HEAD".to_string(), head.trim().to_string()));
+    for (label, git_dir) in labeled_worktree_git_dirs()? {
+        let head_file = git_dir.join("HEAD");
+        if head_file.is_file() {
+            let head = fs::read_to_string(&head_file).with_context(|| format!("Failed to read {}", head_file.display()))?;
+            refs.push((format!("{}HEAD", label), head.trim().to_string()));
+        }
     }
-    read_ref_files(Path::new(".git/refs"), "refs", &mut refs)?;
+    read_ref_files(&crate::repo::path(".git/refs"), "refs", &mut refs)?;
 
     for (name, content) in refs {
         if content.starts_with("ref: ") {
@@ -288,6 +292,24 @@ pub fn check_refs(graph: &HashMap<String, FsckNode>, issues: &mut Vec<FsckIssue>
         }
     }
     Ok(())
+}
+
+/// Pairs every worktree's private `.git` directory with the prefix its HEAD, index and state
+/// files are reported under: nothing for the main worktree, `worktrees/<id>/` for linked ones.
+// Used by `check_refs` and `collect_labeled_roots`.
+fn labeled_worktree_git_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
+    Ok(all_worktree_git_dirs()?
+        .into_iter()
+        .enumerate()
+        .map(|(i, dir)| {
+            let label = if i == 0 {
+                String::new()
+            } else {
+                format!("worktrees/{}/", dir.file_name().unwrap_or_default().to_string_lossy())
+            };
+            (label, dir)
+        })
+        .collect())
 }
 
 /// Validates the index: paths strictly ascending (so no duplicates), sane modes, and every entry
@@ -336,30 +358,37 @@ pub fn check_index(graph: &HashMap<String, FsckNode>, issues: &mut Vec<FsckIssue
 // Used by `run_fsck_checks`.
 pub fn collect_labeled_roots(include_reflogs: bool) -> Result<Vec<(String, String, bool)>> {
     let mut roots = Vec::new();
+    let worktree_dirs = labeled_worktree_git_dirs()?;
 
-    for name in GC_STRICT_STATE_FILES {
-        for hash in hashes_in_file(&Path::new(".git").join(name))? {
-            roots.push((hash, name.to_string(), true));
+    for (label, git_dir) in &worktree_dirs {
+        for name in GC_STRICT_STATE_FILES {
+            for hash in hashes_in_file(&git_dir.join(name))? {
+                roots.push((hash, format!("{}{}", label, name), true));
+            }
         }
     }
 
     let mut ref_files = Vec::new();
-    read_ref_files(Path::new(".git/refs"), "refs", &mut ref_files)?;
+    read_ref_files(&crate::repo::path(".git/refs"), "refs", &mut ref_files)?;
     for (name, content) in ref_files {
         if is_object_hash(&content) {
             roots.push((content, name, true));
         }
     }
 
-    for entry in read_index().unwrap_or_default() {
-        if entry.mode != 0o160000 {
-            roots.push((hex::encode(entry.hash), format!("index entry '{}'", entry.path), true));
+    for (label, git_dir) in &worktree_dirs {
+        for entry in read_index_from(&git_dir.join("index")).unwrap_or_default() {
+            if entry.mode != 0o160000 {
+                roots.push((hex::encode(entry.hash), format!("{}index entry '{}'", label, entry.path), true));
+            }
         }
     }
 
-    for name in GC_LENIENT_STATE_FILES {
-        for hash in hashes_in_file(&Path::new(".git").join(name))? {
-            roots.push((hash, name.to_string(), false));
+    for (label, git_dir) in &worktree_dirs {
+        for name in GC_LENIENT_STATE_FILES {
+            for hash in hashes_in_file(&git_dir.join(name))? {
+                roots.push((hash, format!("{}{}", label, name), false));
+            }
         }
     }
 

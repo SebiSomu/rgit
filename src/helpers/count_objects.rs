@@ -94,11 +94,11 @@ pub fn format_human_readable_size(bytes: u64) -> String {
 /// objects, packfiles, indexed objects, and garbage files.
 // Used by: the `count-objects` command
 pub fn collect_object_counts(verbose: bool) -> Result<ObjectCountReport> {
-    if !Path::new(".git").is_dir() {
+    if !crate::repo::exists() {
         anyhow::bail!("fatal: not a git repository (or any of the parent directories): .git");
     }
 
-    let objects_dir = Path::new(".git/objects");
+    let objects_dir = &crate::repo::path(".git/objects");
     if !objects_dir.is_dir() {
         return Ok(ObjectCountReport::default());
     }

@@ -50,7 +50,7 @@ pub fn subject_of(hash: &str) -> anyhow::Result<String> {
 // Used by `rebase`.
 pub fn read_todo() -> anyhow::Result<Vec<TodoItem>> {
     let mut items = Vec::new();
-    for line in read_lines_set(REBASE_TODO_PATH)? {
+    for line in read_lines_set(crate::repo::path(REBASE_TODO_PATH))? {
         let (first, rest) = split_word(&line);
         if let Some(action) = Action::parse(first) {
             let (hash, subject) = split_word(rest);
@@ -68,14 +68,14 @@ pub fn read_todo() -> anyhow::Result<Vec<TodoItem>> {
 // Used by `rebase`.
 pub fn write_todo(items: &[TodoItem]) -> anyhow::Result<()> {
     if items.is_empty() {
-        let _ = fs::remove_file(REBASE_TODO_PATH);
+        let _ = fs::remove_file(crate::repo::path(REBASE_TODO_PATH));
         return Ok(());
     }
     let mut content = String::new();
     for item in items {
         content.push_str(&format!("{} {} {}\n", item.action.name(), item.hash, item.subject));
     }
-    fs::write(REBASE_TODO_PATH, content).context("Failed to write .git/REBASE_TODO")?;
+    fs::write(crate::repo::path(REBASE_TODO_PATH), content).context("Failed to write .git/REBASE_TODO")?;
     Ok(())
 }
 
@@ -207,7 +207,7 @@ pub fn run_editor(file: &Path, sequence: bool) -> anyhow::Result<()> {
 /// Interactively edits the list of commits to rebase.
 // Used by `rebase`.
 pub fn edit_todo(items: &[TodoItem], base: &str, tip: &str, onto: &str) -> anyhow::Result<Vec<TodoItem>> {
-    let path = Path::new(REBASE_TODO_PATH);
+    let path = &crate::repo::path(REBASE_TODO_PATH);
     fs::write(path, render_todo_for_editing(items, base, tip, onto))
         .context("Failed to write .git/REBASE_TODO")?;
     run_editor(path, true)?;
@@ -218,7 +218,7 @@ pub fn edit_todo(items: &[TodoItem], base: &str, tip: &str, onto: &str) -> anyho
 /// Opens an editor on `initial`, returns the message with `#` lines removed.
 // Used by `rebase`.
 pub fn edit_message(initial: &str) -> anyhow::Result<String> {
-    let path = Path::new(REBASE_MSG_PATH);
+    let path = &crate::repo::path(REBASE_MSG_PATH);
     let mut buf = initial.trim_end().to_string();
     buf.push_str(
         "\n\n# Edit the commit message. Lines starting with '#' are ignored.\n\
@@ -250,7 +250,7 @@ pub fn edit_message(initial: &str) -> anyhow::Result<String> {
 /// Checks whether a rebase is currently paused or in progress.
 // Used by `rebase` and `banana_split`.
 pub fn rebase_in_progress() -> bool {
-    Path::new(REBASE_TODO_PATH).exists() || Path::new(REBASE_ORIG_HEAD_PATH).exists()
+    crate::repo::path(REBASE_TODO_PATH).exists() || crate::repo::path(REBASE_ORIG_HEAD_PATH).exists()
 }
 
 /// Replays commits onto `onto` using the rebase engine.
@@ -276,11 +276,11 @@ pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, i
         refs::HeadState::Branch(branch_name) => format!("refs/heads/{}", branch_name),
         refs::HeadState::Detached(_) => "HEAD".to_string(),
     };
-    fs::write(REBASE_BRANCH_PATH, format!("{}\n", branch_marker))
+    fs::write(crate::repo::path(REBASE_BRANCH_PATH), format!("{}\n", branch_marker))
         .context("Failed to write .git/REBASE_BRANCH")?;
-    fs::write(REBASE_ORIG_HEAD_PATH, format!("{}\n", orig_head))
+    fs::write(crate::repo::path(REBASE_ORIG_HEAD_PATH), format!("{}\n", orig_head))
         .context("Failed to write .git/REBASE_ORIG_HEAD")?;
-    fs::write(REBASE_ONTO_PATH, format!("{}\n", onto))
+    fs::write(crate::repo::path(REBASE_ONTO_PATH), format!("{}\n", onto))
         .context("Failed to write .git/REBASE_ONTO")?;
     write_todo(&items)?;
 
@@ -310,13 +310,13 @@ pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, i
 /// Continues an in-progress rebase after conflict resolution or an edit pause.
 // Used by `rebase`.
 pub fn rebase_continue() -> anyhow::Result<()> {
-    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+    if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         anyhow::bail!("fatal: no rebase in progress");
     }
 
-    if Path::new(REBASE_PAUSE_PATH).exists() {
+    if crate::repo::path(REBASE_PAUSE_PATH).exists() {
         ensure_working_tree_clean("continue the rebase")?;
-        let _ = fs::remove_file(REBASE_PAUSE_PATH);
+        let _ = fs::remove_file(crate::repo::path(REBASE_PAUSE_PATH));
         return process_rebase_todo();
     }
 
@@ -350,15 +350,15 @@ pub fn rebase_continue() -> anyhow::Result<()> {
 /// Aborts an in-progress rebase, resetting the working tree and HEAD to the original state.
 // Used by `rebase`.
 pub fn rebase_abort() -> anyhow::Result<()> {
-    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+    if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         anyhow::bail!("fatal: no rebase in progress");
     }
 
-    let orig_head = fs::read_to_string(REBASE_ORIG_HEAD_PATH)
+    let orig_head = fs::read_to_string(crate::repo::path(REBASE_ORIG_HEAD_PATH))
         .context("Failed to read .git/REBASE_ORIG_HEAD")?
         .trim()
         .to_string();
-    let branch_marker = fs::read_to_string(REBASE_BRANCH_PATH)
+    let branch_marker = fs::read_to_string(crate::repo::path(REBASE_BRANCH_PATH))
         .context("Failed to read .git/REBASE_BRANCH")?
         .trim()
         .to_string();
@@ -399,12 +399,12 @@ pub fn rebase_abort() -> anyhow::Result<()> {
 /// and staging index to HEAD and continuing replay.
 // Used by the `rebase` command.
 pub fn rebase_skip() -> anyhow::Result<()> {
-    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+    if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         anyhow::bail!("fatal: no rebase in progress");
     }
 
-    if Path::new(REBASE_PAUSE_PATH).exists() {
-        let _ = fs::remove_file(REBASE_PAUSE_PATH);
+    if crate::repo::path(REBASE_PAUSE_PATH).exists() {
+        let _ = fs::remove_file(crate::repo::path(REBASE_PAUSE_PATH));
         let current_head = refs::resolve_head_commit()?
             .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD"))?;
         let (obj_type, content) = read_object(&current_head)?;
@@ -457,7 +457,7 @@ pub fn rebase_skip() -> anyhow::Result<()> {
 /// Allows the user to view and edit the remainder of the in-progress rebase todo list.
 // Used by the `rebase` command.
 pub fn rebase_edit_todo() -> anyhow::Result<()> {
-    if !Path::new(REBASE_ORIG_HEAD_PATH).exists() {
+    if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         anyhow::bail!("fatal: no rebase in progress");
     }
 
@@ -467,16 +467,16 @@ pub fn rebase_edit_todo() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let onto = fs::read_to_string(REBASE_ONTO_PATH)
+    let onto = fs::read_to_string(crate::repo::path(REBASE_ONTO_PATH))
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    let orig_head = fs::read_to_string(REBASE_ORIG_HEAD_PATH)
+    let orig_head = fs::read_to_string(crate::repo::path(REBASE_ORIG_HEAD_PATH))
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
     let current_head = refs::resolve_head_commit()?
         .unwrap_or_else(|| orig_head.clone());
 
-    let path = Path::new(REBASE_TODO_PATH);
+    let path = &crate::repo::path(REBASE_TODO_PATH);
     fs::write(path, render_todo_for_editing(&items, &current_head, &orig_head, &onto))
         .context("Failed to write .git/REBASE_TODO")?;
 
@@ -617,7 +617,7 @@ pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_
         .trim_end()
         .to_string();
 
-    let onto = fs::read_to_string(REBASE_ONTO_PATH)
+    let onto = fs::read_to_string(crate::repo::path(REBASE_ONTO_PATH))
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
     let melds = matches!(item.action, Action::Squash | Action::Fixup) && current_head != onto;
@@ -682,7 +682,7 @@ pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_
     write_todo(rest)?;
 
     if item.action == Action::Edit {
-        fs::write(REBASE_PAUSE_PATH, "edit\n").context("Failed to write .git/REBASE_PAUSE")?;
+        fs::write(crate::repo::path(REBASE_PAUSE_PATH), "edit\n").context("Failed to write .git/REBASE_PAUSE")?;
         println!("Stopped at {}... {}", short_hash(&new_commit), item.subject);
         println!("hint: add further commits if you like, then run 'rgit rebase --continue'");
         return Ok(ItemResult::PausedForEdit);
@@ -697,7 +697,7 @@ pub fn finish_rebase() -> anyhow::Result<()> {
     let final_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD -- this should not happen"))?;
 
-    let branch_marker = fs::read_to_string(REBASE_BRANCH_PATH)
+    let branch_marker = fs::read_to_string(crate::repo::path(REBASE_BRANCH_PATH))
         .context("fatal: missing .git/REBASE_BRANCH for the in-progress rebase")?
         .trim()
         .to_string();
@@ -727,7 +727,7 @@ pub fn cleanup_rebase_state() {
         REBASE_PAUSE_PATH,
         REBASE_MSG_PATH,
     ] {
-        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(crate::repo::path(path));
     }
 }
 

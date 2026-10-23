@@ -32,6 +32,7 @@ pub mod apply;
 pub mod format_patch;
 pub mod am;
 pub mod rev_list;
+pub mod worktree;
 
 pub use objects::*;
 pub use diff::*;

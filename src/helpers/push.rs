@@ -155,7 +155,7 @@ pub fn copy_object_to_remote(hash: &str, remote_git_dir: &Path) -> Result<()> {
     if hash.len() < 3 {
         anyhow::bail!("Invalid object hash: {}", hash);
     }
-    let local_path = format!(".git/objects/{}/{}", &hash[..2], &hash[2..]);
+    let local_path = crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]));
     let remote_dir = remote_git_dir.join("objects").join(&hash[..2]);
     let remote_path = remote_dir.join(&hash[2..]);
 
@@ -232,7 +232,7 @@ pub fn write_remote_tracking_ref(remote_name: &str, branch_name: &str, hash: &st
 // Used by `push`.
 pub fn delete_remote_tracking_ref(remote_name: &str, branch_name: &str) -> Result<()> {
     let ref_name = format!("refs/remotes/{}/{}", remote_name, branch_name);
-    let path = format!(".git/{}", ref_name);
+    let path = crate::repo::path(format!(".git/{}", ref_name));
     if Path::new(&path).exists() {
         fs::remove_file(&path)?;
     }
@@ -242,7 +242,7 @@ pub fn delete_remote_tracking_ref(remote_name: &str, branch_name: &str) -> Resul
 /// Configures upstream tracking for a local branch in `.git/config`.
 // Used by `push`.
 pub fn set_upstream_branch(local_branch: &str, remote_name: &str, remote_branch: &str) -> Result<()> {
-    let config_path = Path::new(crate::helpers::config::LOCAL_CONFIG_PATH);
+    let config_path = &crate::repo::path(crate::helpers::config::LOCAL_CONFIG_PATH);
     crate::helpers::config::set_in(config_path, &format!("branch.{}.remote", local_branch), remote_name)?;
     crate::helpers::config::set_in(config_path, &format!("branch.{}.merge", local_branch), &format!("refs/heads/{}", remote_branch))?;
     Ok(())

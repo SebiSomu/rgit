@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 use crate::helpers::{build_commit, build_merge_commit, read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::index::read_index;
 use crate::refs;
@@ -15,8 +14,8 @@ pub fn commit(message: String) -> anyhow::Result<()> {
     let head_state = refs::resolve_head()?;
     let parent_hash = refs::resolve_head_commit()?;
 
-    let second_parent = if Path::new(".git/MERGE_HEAD").exists() {
-        let content = fs::read_to_string(".git/MERGE_HEAD")?;
+    let second_parent = if crate::repo::path(".git/MERGE_HEAD").exists() {
+        let content = fs::read_to_string(crate::repo::path(".git/MERGE_HEAD"))?;
         Some(content.trim().to_string())
     } else {
         None
@@ -34,11 +33,11 @@ pub fn commit(message: String) -> anyhow::Result<()> {
         build_commit(tree_hash, parent_hash.clone(), &message)?
     };
 
-    if Path::new(".git/MERGE_HEAD").exists() {
-        let _ = fs::remove_file(".git/MERGE_HEAD");
+    if crate::repo::path(".git/MERGE_HEAD").exists() {
+        let _ = fs::remove_file(crate::repo::path(".git/MERGE_HEAD"));
     }
-    if Path::new(".git/MERGE_MSG").exists() {
-        let _ = fs::remove_file(".git/MERGE_MSG");
+    if crate::repo::path(".git/MERGE_MSG").exists() {
+        let _ = fs::remove_file(crate::repo::path(".git/MERGE_MSG"));
     }
 
     let short_hash = &commit_hash[..7];

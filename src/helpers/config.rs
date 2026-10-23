@@ -244,7 +244,7 @@ pub fn get_from(path: &Path, key: &str) -> Result<Option<String>> {
 }
 
 pub fn get_config_value(key: &str) -> Result<Option<String>> {
-    if let Some(v) = get_from(Path::new(LOCAL_CONFIG_PATH), key)? {
+    if let Some(v) = get_from(&crate::repo::path(LOCAL_CONFIG_PATH), key)? {
         return Ok(Some(v));
     }
     match global_config_path() {

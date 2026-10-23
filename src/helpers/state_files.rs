@@ -12,11 +12,12 @@ use crate::refs;
 
 pub const STASH_LIST_PATH: &str = ".git/STASH_LIST";
 
-pub fn read_lines_set(path: &str) -> anyhow::Result<Vec<String>> {
-    if !Path::new(path).exists() {
+pub fn read_lines_set(path: impl AsRef<Path>) -> anyhow::Result<Vec<String>> {
+    let path = path.as_ref();
+    if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     Ok(content
         .lines()
         .map(|l| l.trim().to_string())
@@ -24,24 +25,25 @@ pub fn read_lines_set(path: &str) -> anyhow::Result<Vec<String>> {
         .collect())
 }
 
-pub fn append_line(path: &str, line: &str) -> anyhow::Result<()> {
+pub fn append_line(path: impl AsRef<Path>, line: &str) -> anyhow::Result<()> {
     use std::io::Write as _;
+    let path = path.as_ref();
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
-        .with_context(|| format!("Failed to open {}", path))?;
+        .with_context(|| format!("Failed to open {}", path.display()))?;
     writeln!(file, "{}", line)?;
     Ok(())
 }
 
 /// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
 pub fn read_stash_list() -> anyhow::Result<Vec<StashEntry>> {
-    if !Path::new(STASH_LIST_PATH).exists() {
+    if !crate::repo::path(STASH_LIST_PATH).exists() {
         return Ok(Vec::new());
     }
 
-    let content = fs::read_to_string(STASH_LIST_PATH).context("Failed to read .git/STASH_LIST")?;
+    let content = fs::read_to_string(crate::repo::path(STASH_LIST_PATH)).context("Failed to read .git/STASH_LIST")?;
     let mut entries: Vec<StashEntry> = content
         .lines()
         .filter(|l| !l.is_empty())
@@ -61,8 +63,8 @@ pub fn read_stash_list() -> anyhow::Result<Vec<StashEntry>> {
 /// `stash@{0}`), matching what `read_stash_list` returns.
 pub fn write_stash_list(entries: &[StashEntry]) -> anyhow::Result<()> {
     if entries.is_empty() {
-        if Path::new(STASH_LIST_PATH).exists() {
-            fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
+        if crate::repo::path(STASH_LIST_PATH).exists() {
+            fs::remove_file(crate::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
         }
         return Ok(());
     }
@@ -71,7 +73,7 @@ pub fn write_stash_list(entries: &[StashEntry]) -> anyhow::Result<()> {
     lines.reverse();
     let mut content = lines.join("\n");
     content.push('\n');
-    fs::write(STASH_LIST_PATH, content).context("Failed to write .git/STASH_LIST")?;
+    fs::write(crate::repo::path(STASH_LIST_PATH), content).context("Failed to write .git/STASH_LIST")?;
     Ok(())
 }
 
@@ -81,7 +83,7 @@ pub fn append_stash_entry(hash: &str, message: &str) -> anyhow::Result<()> {
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(STASH_LIST_PATH)
+        .open(crate::repo::path(STASH_LIST_PATH))
         .context("Failed to open .git/STASH_LIST")?;
     writeln!(file, "{} {}", hash, message)?;
     Ok(())

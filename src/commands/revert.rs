@@ -23,7 +23,7 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
         anyhow::anyhow!("fatal: revert requires a <commit>, or --continue / --abort")
     })?;
 
-    if Path::new(".git/REVERT_HEAD").exists() {
+    if crate::repo::path(".git/REVERT_HEAD").exists() {
         anyhow::bail!(
             "fatal: a revert is already in progress\n\
              hint: use 'rgit revert --continue' or 'rgit revert --abort'"
@@ -89,8 +89,8 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
             fs::write(path, &content)?;
         }
 
-        fs::write(".git/REVERT_HEAD", format!("{}\n", revert_commit))?;
-        fs::write(".git/REVERT_MSG", format!("{}\n", final_message))?;
+        fs::write(crate::repo::path(".git/REVERT_HEAD"), format!("{}\n", revert_commit))?;
+        fs::write(crate::repo::path(".git/REVERT_MSG"), format!("{}\n", final_message))?;
 
         println!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
         println!("hint: after resolving the conflicts, mark the corrected paths");
@@ -159,12 +159,12 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
 
 /// `rgit revert --continue`
 fn revert_continue() -> anyhow::Result<()> {
-    if !Path::new(".git/REVERT_HEAD").exists() {
+    if !crate::repo::path(".git/REVERT_HEAD").exists() {
         anyhow::bail!("fatal: no revert in progress");
     }
 
-    let revert_commit = fs::read_to_string(".git/REVERT_HEAD")?.trim().to_string();
-    let final_message = fs::read_to_string(".git/REVERT_MSG")
+    let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();
+    let final_message = fs::read_to_string(crate::repo::path(".git/REVERT_MSG"))
         .context("fatal: missing .git/REVERT_MSG for the in-progress revert")?
         .trim_end_matches('\n')
         .to_string();
@@ -199,8 +199,8 @@ fn revert_continue() -> anyhow::Result<()> {
         }
     }
 
-    let _ = fs::remove_file(".git/REVERT_HEAD");
-    let _ = fs::remove_file(".git/REVERT_MSG");
+    let _ = fs::remove_file(crate::repo::path(".git/REVERT_HEAD"));
+    let _ = fs::remove_file(crate::repo::path(".git/REVERT_MSG"));
 
     println!(
         "[{} {}] revert of {} continued",
@@ -217,11 +217,11 @@ fn revert_continue() -> anyhow::Result<()> {
 
 /// `rgit revert --abort`
 fn revert_abort() -> anyhow::Result<()> {
-    if !Path::new(".git/REVERT_HEAD").exists() {
+    if !crate::repo::path(".git/REVERT_HEAD").exists() {
         anyhow::bail!("fatal: no revert in progress");
     }
 
-    let revert_commit = fs::read_to_string(".git/REVERT_HEAD")?.trim().to_string();
+    let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();
     let our_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
@@ -252,8 +252,8 @@ fn revert_abort() -> anyhow::Result<()> {
     let mut new_index_entries = build_index_entries_for_tree(&our_tree, true)?;
     write_index(&mut new_index_entries)?;
 
-    let _ = fs::remove_file(".git/REVERT_HEAD");
-    let _ = fs::remove_file(".git/REVERT_MSG");
+    let _ = fs::remove_file(crate::repo::path(".git/REVERT_HEAD"));
+    let _ = fs::remove_file(crate::repo::path(".git/REVERT_MSG"));
 
     println!("Revert of {} aborted; HEAD left unchanged.", &revert_commit[..7]);
 

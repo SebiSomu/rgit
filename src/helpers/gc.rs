@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use crate::helpers::fetch::local_has_object;
 use crate::helpers::read_object;
-use crate::helpers::reflog::{expire_reflog, list_reflog_refs, read_reflog, NULL_HASH};
-use crate::index::read_index;
+use crate::helpers::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
+use crate::helpers::worktree::all_worktree_git_dirs;
+use crate::index::read_index_from;
 use crate::objects::{GcReport, LooseObject};
 
 /// State files under `.git/` whose contents name commits that must stay alive: refs HEAD
@@ -58,7 +59,7 @@ pub fn expiry_cutoff(spec: &str, now: u64) -> Result<Option<u64>> {
 /// objects inside a pack would look unreachable and missing, so nothing is safe to prune.
 // Used by `plan_gc`.
 pub(crate) fn check_no_pack_files() -> Result<()> {
-    let pack_dir = Path::new(".git/objects/pack");
+    let pack_dir = &crate::repo::path(".git/objects/pack");
     if !pack_dir.is_dir() {
         return Ok(());
     }
@@ -119,14 +120,16 @@ fn hashes_in_refs_dir(dir: &Path, out: &mut Vec<String>) -> Result<()> {
 pub fn collect_strict_gc_roots() -> Result<Vec<String>> {
     let mut roots = Vec::new();
 
-    for name in GC_STRICT_STATE_FILES {
-        roots.extend(hashes_in_file(&Path::new(".git").join(name))?);
+    // Every worktree has its own HEAD, index and in-progress state; all of them keep objects alive.
+    for git_dir in all_worktree_git_dirs()? {
+        for name in GC_STRICT_STATE_FILES {
+            roots.extend(hashes_in_file(&git_dir.join(name))?);
+        }
+        for entry in read_index_from(&git_dir.join("index")).unwrap_or_default() {
+            roots.push(hex::encode(entry.hash));
+        }
     }
-    hashes_in_refs_dir(Path::new(".git/refs"), &mut roots)?;
-
-    for entry in read_index().unwrap_or_default() {
-        roots.push(hex::encode(entry.hash));
-    }
+    hashes_in_refs_dir(&crate::repo::path(".git/refs"), &mut roots)?;
 
     Ok(roots)
 }
@@ -138,12 +141,21 @@ pub fn collect_strict_gc_roots() -> Result<Vec<String>> {
 pub fn collect_lenient_gc_roots(reflog_cutoff: Option<u64>) -> Result<Vec<String>> {
     let mut roots = Vec::new();
 
-    for name in GC_LENIENT_STATE_FILES {
-        roots.extend(hashes_in_file(&Path::new(".git").join(name))?);
+    let mut reflogs = Vec::new();
+    for git_dir in all_worktree_git_dirs()? {
+        for name in GC_LENIENT_STATE_FILES {
+            roots.extend(hashes_in_file(&git_dir.join(name))?);
+        }
+        reflogs.push(read_reflog_file(&git_dir.join("logs/HEAD"))?);
+    }
+    for ref_name in list_reflog_refs()? {
+        if ref_name != "HEAD" {
+            reflogs.push(read_reflog(&ref_name)?);
+        }
     }
 
-    for ref_name in list_reflog_refs()? {
-        for entry in read_reflog(&ref_name)? {
+    for entries in reflogs {
+        for entry in entries {
             if reflog_cutoff.is_some_and(|cutoff| entry.timestamp < cutoff) {
                 continue;
             }
@@ -239,7 +251,7 @@ pub fn mark_reachable(roots: &[String], visited: &mut HashSet<String>, strict: b
 /// files are ignored.
 // Used by `plan_gc`.
 pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
-    let root = Path::new(".git/objects");
+    let root = &crate::repo::path(".git/objects");
     if !root.is_dir() {
         anyhow::bail!("fatal: not an rgit repository (no .git/objects)");
     }
@@ -390,5 +402,5 @@ pub fn format_byte_size(bytes: u64) -> String {
 // Used by the `gc` command's tests and diagnostics.
 #[allow(dead_code)]
 pub fn loose_object_path(hash: &str) -> PathBuf {
-    Path::new(".git/objects").join(&hash[..2]).join(&hash[2..])
+    crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))
 }

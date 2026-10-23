@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashAction};
+pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashAction, WorktreeAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -457,6 +457,10 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    Worktree {
+        #[command(subcommand)]
+        action: WorktreeAction,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -815,6 +819,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RevList { args } => {
             crate::commands::rev_list(args)?;
+        }
+        Commands::Worktree { action } => {
+            crate::commands::worktree(action)?;
         }
     }
 

@@ -227,7 +227,7 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 // Used by `rev-list`.
 pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) -> anyhow::Result<Vec<String>> {
     let mut refs: BTreeMap<String, String> = BTreeMap::new();
-    if let Ok(packed) = fs::read_to_string(".git/packed-refs") {
+    if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
         for line in packed.lines() {
             if let Some((hash, name)) = line.split_once(' ') {
                 if hash.len() == 40 && !line.starts_with('#') {
@@ -236,7 +236,7 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
             }
         }
     }
-    collect_loose_refs(Path::new(".git/refs"), "refs", &mut refs);
+    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs);
 
     let mut tips = Vec::new();
     for (name, hash) in refs {
@@ -744,7 +744,7 @@ pub fn build_commit_filter(opts: &RevListOptions) -> anyhow::Result<impl Fn(&Par
 /// Shortens a hash to the shortest unique prefix of at least 7 characters among loose objects.
 // Used by `rev-list --abbrev-commit` / `--oneline`.
 pub fn abbreviate_hash(hash: &str) -> String {
-    let others: Vec<String> = fs::read_dir(format!(".git/objects/{}", &hash[..2]))
+    let others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
         .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
         .unwrap_or_default();
     let mut len = 7;

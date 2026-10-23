@@ -96,7 +96,7 @@ fn set_url_cmd(name: &str, new_url: &str) -> Result<()> {
         anyhow::bail!("fatal: No such remote '{}'", name);
     }
 
-    let config_path = Path::new(LOCAL_CONFIG_PATH);
+    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
     let mut entries = read_entries_from(config_path)?;
     let url_key = format!("remote.{}.url", name);
 
@@ -125,7 +125,7 @@ fn show_remote_cmd(name: &str) -> Result<()> {
     println!("  Fetch URL: {}", info.fetch_url.as_deref().unwrap_or("(none)"));
     println!("  Push  URL: {}", info.push_url.as_deref().unwrap_or("(none)"));
 
-    let head_path = format!(".git/refs/remotes/{}/HEAD", name);
+    let head_path = crate::repo::path(format!(".git/refs/remotes/{}/HEAD", name));
     let head_branch = if Path::new(&head_path).exists() {
         fs::read_to_string(&head_path)
             .ok()

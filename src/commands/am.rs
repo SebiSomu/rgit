@@ -197,7 +197,7 @@ fn abort_session() -> Result<()> {
         Some(orig) => advance_head(orig)?,
         None => {
             if let Ok(branch_ref) = refs::current_branch_ref() {
-                let path = format!(".git/{}", branch_ref);
+                let path = crate::repo::path(format!(".git/{}", branch_ref));
                 if Path::new(&path).exists() {
                     fs::remove_file(path)?;
                 }

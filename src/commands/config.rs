@@ -11,7 +11,7 @@ pub fn config(key: Option<String>, value: Option<String>, global: bool, list: bo
             .clone()
             .ok_or_else(|| anyhow::anyhow!("fatal: neither $HOME nor %USERPROFILE% is set; cannot locate the global config"))?
     } else {
-        PathBuf::from(LOCAL_CONFIG_PATH)
+        crate::repo::path(LOCAL_CONFIG_PATH)
     };
 
     if list {
@@ -21,8 +21,8 @@ pub fn config(key: Option<String>, value: Option<String>, global: bool, list: bo
             if let Some(g) = &global_path {
                 print_entries(g)?;
             }
-            if Path::new(".git").is_dir() {
-                print_entries(Path::new(LOCAL_CONFIG_PATH))?;
+            if crate::repo::exists() {
+                print_entries(&crate::repo::path(LOCAL_CONFIG_PATH))?;
             }
         }
         return Ok(());
@@ -62,7 +62,7 @@ pub fn config(key: Option<String>, value: Option<String>, global: bool, list: bo
 }
 
 fn require_repo_unless_global(global: bool) -> anyhow::Result<()> {
-    if !global && !Path::new(".git").is_dir() {
+    if !global && !crate::repo::exists() {
         anyhow::bail!("fatal: not in an rgit repository (no .git directory); use --global to write the global config");
     }
     Ok(())

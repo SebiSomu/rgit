@@ -33,7 +33,7 @@ pub fn hash_object(write: bool, file: PathBuf) -> anyhow::Result<()> {
 pub fn cat_file(pretty_print: bool, object_hash: String) -> anyhow::Result<()> {
     let dir = &object_hash[0..2];
     let file_name = &object_hash[2..];
-    let path = format!(".git/objects/{}/{}", dir, file_name);
+    let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));
 
     let compressed_data = fs::read(&path).context("Failed to read object file")?;
     let mut decoder = ZlibDecoder::new(&compressed_data[..]);

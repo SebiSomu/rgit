@@ -50,7 +50,7 @@ fn clone_into(target_dir: &Path, source: &CloneSource, remote_name: &str, reques
         .with_context(|| format!("Cannot enter '{}'", target_dir.display()))?;
 
     create_repository_skeleton()?;
-    set_in(Path::new(LOCAL_CONFIG_PATH), &format!("remote.{}.url", remote_name), &source.url())?;
+    set_in(&crate::repo::path(LOCAL_CONFIG_PATH), &format!("remote.{}.url", remote_name), &source.url())?;
 
     crate::commands::fetch(Some(remote_name.to_string()), None)?;
 

@@ -346,30 +346,36 @@ pub fn index_differences(index: &[IndexEntry], head: &BTreeMap<String, ([u8; 20]
     paths
 }
 
+/// Resolves a file inside the `am` session directory (`next`, `last`, `orig-head`, `0001`, ...).
+// Used by the `am` session-state helpers in this file.
+fn am_state_file(name: &str) -> std::path::PathBuf {
+    crate::repo::path(format!("{}/{}", AM_STATE_DIR, name))
+}
+
 /// Starts an `am` session: writes each raw mail as `NNNN`, plus `next`, `last`, and
 /// `orig-head` (empty for an unborn branch) under `.git/rebase-apply/`.
 // Used by `am`.
 pub fn write_am_state(messages: &[String], orig_head: Option<&str>) -> anyhow::Result<()> {
-    fs::create_dir_all(AM_STATE_DIR).context("Failed to create .git/rebase-apply")?;
+    fs::create_dir_all(crate::repo::path(AM_STATE_DIR)).context("Failed to create .git/rebase-apply")?;
     for (i, message) in messages.iter().enumerate() {
-        fs::write(format!("{}/{:04}", AM_STATE_DIR, i + 1), message)?;
+        fs::write(am_state_file(&format!("{:04}", i + 1)), message)?;
     }
-    fs::write(format!("{}/last", AM_STATE_DIR), format!("{}\n", messages.len()))?;
-    fs::write(format!("{}/orig-head", AM_STATE_DIR), format!("{}\n", orig_head.unwrap_or("")))?;
+    fs::write(am_state_file("last"), format!("{}\n", messages.len()))?;
+    fs::write(am_state_file("orig-head"), format!("{}\n", orig_head.unwrap_or("")))?;
     set_am_next(1)
 }
 
 /// Records which patch number the session will apply next.
 // Used by `am` after each applied or skipped patch.
 pub fn set_am_next(next: usize) -> anyhow::Result<()> {
-    fs::write(format!("{}/next", AM_STATE_DIR), format!("{}\n", next)).context("Failed to write .git/rebase-apply/next")
+    fs::write(am_state_file("next"), format!("{}\n", next)).context("Failed to write .git/rebase-apply/next")
 }
 
 /// Reads `(next, last)` from an in-progress `am` session.
 // Used by `am`.
 pub fn read_am_progress() -> anyhow::Result<(usize, usize)> {
     let read = |name: &str| -> anyhow::Result<usize> {
-        fs::read_to_string(format!("{}/{}", AM_STATE_DIR, name))?.trim().parse().map_err(|_| anyhow::anyhow!("fatal: corrupt .git/rebase-apply/{}", name))
+        fs::read_to_string(am_state_file(name))?.trim().parse().map_err(|_| anyhow::anyhow!("fatal: corrupt .git/rebase-apply/{}", name))
     };
     Ok((read("next")?, read("last")?))
 }
@@ -377,13 +383,13 @@ pub fn read_am_progress() -> anyhow::Result<(usize, usize)> {
 /// Reads the raw mail for patch number `n` of the session.
 // Used by `am`.
 pub fn read_am_message(n: usize) -> anyhow::Result<String> {
-    fs::read_to_string(format!("{}/{:04}", AM_STATE_DIR, n)).with_context(|| format!("fatal: missing .git/rebase-apply/{:04}", n))
+    fs::read_to_string(am_state_file(&format!("{:04}", n))).with_context(|| format!("fatal: missing .git/rebase-apply/{:04}", n))
 }
 
 /// Reads the commit HEAD pointed at when the session started (`None` for an unborn branch).
 // Used by `am --abort`.
 pub fn read_am_orig_head() -> anyhow::Result<Option<String>> {
-    let text = fs::read_to_string(format!("{}/orig-head", AM_STATE_DIR)).context("fatal: missing .git/rebase-apply/orig-head")?;
+    let text = fs::read_to_string(am_state_file("orig-head")).context("fatal: missing .git/rebase-apply/orig-head")?;
     let hash = text.trim();
     Ok(if hash.is_empty() { None } else { Some(hash.to_string()) })
 }
@@ -391,14 +397,15 @@ pub fn read_am_orig_head() -> anyhow::Result<Option<String>> {
 /// Reports whether an `am` session is in progress.
 // Used by `am`.
 pub fn am_in_progress() -> bool {
-    Path::new(AM_STATE_DIR).is_dir()
+    crate::repo::path(AM_STATE_DIR).is_dir()
 }
 
 /// Deletes the `am` session directory.
 // Used by `am` when a session finishes, and by `--abort` / `--quit`.
 pub fn clear_am_state() -> anyhow::Result<()> {
-    if Path::new(AM_STATE_DIR).exists() {
-        fs::remove_dir_all(AM_STATE_DIR).context("Failed to remove .git/rebase-apply")?;
+    let dir = crate::repo::path(AM_STATE_DIR);
+    if dir.exists() {
+        fs::remove_dir_all(&dir).context("Failed to remove .git/rebase-apply")?;
     }
     Ok(())
 }

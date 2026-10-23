@@ -24,11 +24,18 @@ pub struct IndexEntry {
 }
 
 pub fn read_index() -> Result<Vec<IndexEntry>> {
-    if !Path::new(INDEX_PATH).exists() {
+    read_index_from(&crate::repo::path(INDEX_PATH))
+}
+
+/// Reads an index file at an explicit location, such as another worktree's
+/// `.git/worktrees/<id>/index`. A missing file is an empty index.
+// Used by `read_index` and the `worktree` helpers (gc/fsck roots of every worktree).
+pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
+    if !index_path.exists() {
         return Ok(Vec::new());
     }
 
-    let data = fs::read(INDEX_PATH).context("Failed to read .git/index")?;
+    let data = fs::read(index_path).with_context(|| format!("Failed to read {}", index_path.display()))?;
 
     if data.len() < 12 {
         anyhow::bail!("Corrupt index: file too short");
@@ -145,7 +152,7 @@ pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
     hasher.update(&buf);
     buf.extend_from_slice(&hasher.finalize());
 
-    fs::write(INDEX_PATH, &buf).context("Failed to write .git/index")?;
+    fs::write(crate::repo::path(INDEX_PATH), &buf).context("Failed to write .git/index")?;
 
     Ok(())
 }

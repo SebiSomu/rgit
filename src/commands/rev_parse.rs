@@ -25,6 +25,11 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
 
     if opts.git_dir {
         match find_work_tree_root() {
+            Ok(root) if root.join(".git").is_file() => {
+                // A linked worktree: its git dir is `.git/worktrees/<id>` of the main repository.
+                let git_dir = crate::helpers::worktree::with_current_dir(&root, || Ok(crate::repo::git_dir()))?;
+                println!("{}", crate::repo::to_git_path_string(&git_dir));
+            }
             Ok(root) => {
                 if let Ok(cur) = std::env::current_dir() {
                     if cur == root {

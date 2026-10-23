@@ -130,8 +130,8 @@ pub fn merge(branch: String) -> anyhow::Result<()> {
             fs::write(path, &content)?;
         }
 
-        fs::write(".git/MERGE_HEAD", format!("{}\n", their_commit))?;
-        fs::write(".git/MERGE_MSG", format!("Merge branch '{}'\n", branch))?;
+        fs::write(crate::repo::path(".git/MERGE_HEAD"), format!("{}\n", their_commit))?;
+        fs::write(crate::repo::path(".git/MERGE_MSG"), format!("Merge branch '{}'\n", branch))?;
 
         println!("Automatic merge failed; fix conflicts and then commit the result.");
         return Ok(());

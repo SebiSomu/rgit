@@ -29,7 +29,7 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
         anyhow::anyhow!("fatal: cherry-pick requires a <commit>, or --continue / --abort")
     })?;
 
-    if Path::new(".git/CHERRY_PICK_HEAD").exists() {
+    if crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         anyhow::bail!(
             "fatal: a cherry-pick is already in progress\n\
              hint: use 'rgit cherry-pick --continue' or 'rgit cherry-pick --abort'"
@@ -92,8 +92,8 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
             fs::write(path, &content)?;
         }
 
-        fs::write(".git/CHERRY_PICK_HEAD", format!("{}\n", pick_commit))?;
-        fs::write(".git/CHERRY_PICK_MSG", format!("{}\n", final_message))?;
+        fs::write(crate::repo::path(".git/CHERRY_PICK_HEAD"), format!("{}\n", pick_commit))?;
+        fs::write(crate::repo::path(".git/CHERRY_PICK_MSG"), format!("{}\n", final_message))?;
 
         println!("error: could not apply {}... {}", &pick_commit[..7], subject);
         println!("hint: after resolving the conflicts, mark the corrected paths");
@@ -168,12 +168,12 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
 /// saved to `.git/CHERRY_PICK_MSG` when the conflict was first hit.
 // Used by `cherry-pick --continue`.
 fn cherry_pick_continue() -> anyhow::Result<()> {
-    if !Path::new(".git/CHERRY_PICK_HEAD").exists() {
+    if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         anyhow::bail!("fatal: no cherry-pick in progress");
     }
 
-    let pick_commit = fs::read_to_string(".git/CHERRY_PICK_HEAD")?.trim().to_string();
-    let final_message = fs::read_to_string(".git/CHERRY_PICK_MSG")
+    let pick_commit = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD"))?.trim().to_string();
+    let final_message = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_MSG"))
         .context("fatal: missing .git/CHERRY_PICK_MSG for the in-progress cherry-pick")?
         .trim_end_matches('\n')
         .to_string();
@@ -208,8 +208,8 @@ fn cherry_pick_continue() -> anyhow::Result<()> {
         }
     }
 
-    let _ = fs::remove_file(".git/CHERRY_PICK_HEAD");
-    let _ = fs::remove_file(".git/CHERRY_PICK_MSG");
+    let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_HEAD"));
+    let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_MSG"));
 
     println!(
         "[{} {}] cherry-pick of {} continued",
@@ -229,11 +229,11 @@ fn cherry_pick_continue() -> anyhow::Result<()> {
 /// any partially-applied changes or conflict-marker files it left behind.
 // Used by `cherry-pick --abort`.
 fn cherry_pick_abort() -> anyhow::Result<()> {
-    if !Path::new(".git/CHERRY_PICK_HEAD").exists() {
+    if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         anyhow::bail!("fatal: no cherry-pick in progress");
     }
 
-    let pick_commit = fs::read_to_string(".git/CHERRY_PICK_HEAD")?.trim().to_string();
+    let pick_commit = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD"))?.trim().to_string();
     let our_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
@@ -264,8 +264,8 @@ fn cherry_pick_abort() -> anyhow::Result<()> {
     let mut new_index_entries = build_index_entries_for_tree(&our_tree, true)?;
     write_index(&mut new_index_entries)?;
 
-    let _ = fs::remove_file(".git/CHERRY_PICK_HEAD");
-    let _ = fs::remove_file(".git/CHERRY_PICK_MSG");
+    let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_HEAD"));
+    let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_MSG"));
 
     println!("Cherry-pick of {} aborted; HEAD left unchanged.", &pick_commit[..7]);
 

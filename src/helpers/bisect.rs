@@ -162,7 +162,7 @@ pub fn report_outcome(outcome: &BisectOutcome) -> Result<()> {
 /// and either checks out the next midpoint (`Continue`) or concludes the
 /// search (`Found`). Pure aside from the checkout side effect on `Continue`.
 pub fn bisect_recompute() -> Result<BisectOutcome> {
-    let bad = match fs::read_to_string(crate::commands::bisect::BISECT_BAD_PATH)
+    let bad = match fs::read_to_string(crate::repo::path(crate::commands::bisect::BISECT_BAD_PATH))
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
@@ -171,7 +171,7 @@ pub fn bisect_recompute() -> Result<BisectOutcome> {
         None => return Ok(BisectOutcome::WaitingForBad),
     };
 
-    let goods = read_lines_set(crate::commands::bisect::BISECT_GOOD_PATH)?;
+    let goods = read_lines_set(crate::repo::path(crate::commands::bisect::BISECT_GOOD_PATH))?;
     if goods.is_empty() {
         return Ok(BisectOutcome::WaitingForGood);
     }
@@ -193,7 +193,7 @@ pub fn bisect_recompute() -> Result<BisectOutcome> {
 
     let candidates: HashSet<String> = ancestors_bad.difference(&ancestors_good).cloned().collect();
 
-    let skip_set: HashSet<String> = read_lines_set(crate::commands::bisect::BISECT_SKIP_PATH)?.into_iter().collect();
+    let skip_set: HashSet<String> = read_lines_set(crate::repo::path(crate::commands::bisect::BISECT_SKIP_PATH))?.into_iter().collect();
     let testable: HashSet<String> = candidates.difference(&skip_set).cloned().collect();
 
     if testable.is_empty() {
@@ -221,7 +221,7 @@ pub fn bisect_recompute() -> Result<BisectOutcome> {
 }
 
 pub fn mark_bad(rev: Option<String>) -> Result<BisectOutcome> {
-    if !Path::new(crate::commands::bisect::BISECT_START_PATH).exists() {
+    if !crate::repo::path(crate::commands::bisect::BISECT_START_PATH).exists() {
         anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
     }
 
@@ -231,14 +231,14 @@ pub fn mark_bad(rev: Option<String>) -> Result<BisectOutcome> {
             .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
     };
 
-    fs::write(crate::commands::bisect::BISECT_BAD_PATH, format!("{}\n", target)).context("Failed to write .git/BISECT_BAD")?;
-    append_line(crate::commands::bisect::BISECT_LOG_PATH, &format!("git bisect bad {}", target))?;
+    fs::write(crate::repo::path(crate::commands::bisect::BISECT_BAD_PATH), format!("{}\n", target)).context("Failed to write .git/BISECT_BAD")?;
+    append_line(crate::repo::path(crate::commands::bisect::BISECT_LOG_PATH), &format!("git bisect bad {}", target))?;
 
     bisect_recompute()
 }
 
 pub fn mark_good(rev: Option<String>) -> Result<BisectOutcome> {
-    if !Path::new(crate::commands::bisect::BISECT_START_PATH).exists() {
+    if !crate::repo::path(crate::commands::bisect::BISECT_START_PATH).exists() {
         anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
     }
 
@@ -248,20 +248,20 @@ pub fn mark_good(rev: Option<String>) -> Result<BisectOutcome> {
             .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit"))?,
     };
 
-    let mut goods = read_lines_set(crate::commands::bisect::BISECT_GOOD_PATH)?;
+    let mut goods = read_lines_set(crate::repo::path(crate::commands::bisect::BISECT_GOOD_PATH))?;
     if !goods.iter().any(|g| g == &target) {
         goods.push(target.clone());
         let mut content = goods.join("\n");
         content.push('\n');
-        fs::write(crate::commands::bisect::BISECT_GOOD_PATH, content).context("Failed to write .git/BISECT_GOOD")?;
+        fs::write(crate::repo::path(crate::commands::bisect::BISECT_GOOD_PATH), content).context("Failed to write .git/BISECT_GOOD")?;
     }
-    append_line(crate::commands::bisect::BISECT_LOG_PATH, &format!("git bisect good {}", target))?;
+    append_line(crate::repo::path(crate::commands::bisect::BISECT_LOG_PATH), &format!("git bisect good {}", target))?;
 
     bisect_recompute()
 }
 
 pub fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
-    if !Path::new(crate::commands::bisect::BISECT_START_PATH).exists() {
+    if !crate::repo::path(crate::commands::bisect::BISECT_START_PATH).exists() {
         anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
     }
 
@@ -272,16 +272,16 @@ pub fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
         revs.iter().map(|r| resolve_commit_from_source(r)).collect::<Result<Vec<_>>>()?
     };
 
-    let mut skips = read_lines_set(crate::commands::bisect::BISECT_SKIP_PATH)?;
+    let mut skips = read_lines_set(crate::repo::path(crate::commands::bisect::BISECT_SKIP_PATH))?;
     for target in &targets {
         if !skips.iter().any(|s| s == target) {
             skips.push(target.clone());
         }
-        append_line(crate::commands::bisect::BISECT_LOG_PATH, &format!("git bisect skip {}", target))?;
+        append_line(crate::repo::path(crate::commands::bisect::BISECT_LOG_PATH), &format!("git bisect skip {}", target))?;
     }
     let mut content = skips.join("\n");
     content.push('\n');
-    fs::write(crate::commands::bisect::BISECT_SKIP_PATH, content).context("Failed to write .git/BISECT_SKIP")?;
+    fs::write(crate::repo::path(crate::commands::bisect::BISECT_SKIP_PATH), content).context("Failed to write .git/BISECT_SKIP")?;
 
     bisect_recompute()
 }

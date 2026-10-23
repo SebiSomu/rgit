@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::helpers::{
     build_index_entries_for_tree, commit_subject_line, flatten_tree, hard_reset_working_tree,
@@ -121,11 +121,11 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
         }
     }
 
-    if Path::new(".git/MERGE_HEAD").exists() {
-        let _ = fs::remove_file(".git/MERGE_HEAD");
+    if crate::repo::path(".git/MERGE_HEAD").exists() {
+        let _ = fs::remove_file(crate::repo::path(".git/MERGE_HEAD"));
     }
-    if Path::new(".git/MERGE_MSG").exists() {
-        let _ = fs::remove_file(".git/MERGE_MSG");
+    if crate::repo::path(".git/MERGE_MSG").exists() {
+        let _ = fs::remove_file(crate::repo::path(".git/MERGE_MSG"));
     }
 
     if let ResetMode::Soft = mode {

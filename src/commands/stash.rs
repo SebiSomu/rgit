@@ -193,8 +193,8 @@ pub fn stash_show(stash_ref: Option<String>) -> anyhow::Result<()> {
 
 /// `rgit stash clear`
 pub fn stash_clear() -> anyhow::Result<()> {
-    if Path::new(STASH_LIST_PATH).exists() {
-        fs::remove_file(STASH_LIST_PATH).context("Failed to remove .git/STASH_LIST")?;
+    if crate::repo::path(STASH_LIST_PATH).exists() {
+        fs::remove_file(crate::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
     }
     Ok(())
 }

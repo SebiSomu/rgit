@@ -1,12 +1,24 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
-use crate::helpers::{build_merge_commit, check_switch_safety, find_all_merge_bases, find_merge_base, generate_conflict_markers, is_reachable, read_object, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree, write_tree_from_index_prefix};
-use crate::index::{build_entry, read_index, write_index};
-use crate::objects::MergeConflict;
+use crate::helpers::merge_tree::{merge_base_tree, merge_trees_in_memory};
+use crate::helpers::{build_merge_commit, build_tree_from_map, check_switch_safety, find_all_merge_bases, find_merge_base, is_reachable, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree};
+use crate::index::read_index;
 use crate::refs;
 
+/// `rgit merge <branch>`
+///
+/// Fast-forwards when possible; otherwise merges `<branch>` into the current branch with the
+/// same line-level three-way merge as `merge-tree` (merge bases of criss-cross histories are
+/// merged into a virtual base first). Refuses to start while a merge is in progress or when
+/// local changes would be overwritten. A clean merge is committed with the configured
+/// identity. On conflicts, conflicted files get markers in the working tree, everything that
+/// merged cleanly is staged, and `MERGE_HEAD`/`MERGE_MSG` are written so `rgit commit`
+/// records the merge once the conflicts are resolved and added.
 pub fn merge(branch: String) -> anyhow::Result<()> {
+    if crate::repo::path(".git/MERGE_HEAD").exists() {
+        anyhow::bail!("fatal: You have not concluded your merge (MERGE_HEAD exists).
+Please, commit your changes before you merge.");
+    }
     let head_state = refs::resolve_head()?;
     let current_branch = match head_state {
         refs::HeadState::Branch(b) => b,
@@ -49,132 +61,69 @@ pub fn merge(branch: String) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let base_commit = find_merge_base(&our_commit, &their_commit)?.ok_or_else(|| {
-        anyhow::anyhow!("fatal: refusing to merge unrelated histories")
-    })?;
-
-    let base_tree = resolve_tree_from_source(&base_commit)?;
+    let (base_tree, _bases) = merge_base_tree(&our_commit, &their_commit, false)?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
     let their_tree = resolve_tree_from_source(&their_commit)?;
+    let result = merge_trees_in_memory(&base_tree, &our_tree, &their_tree, "HEAD", &branch, 7)?;
 
-    let mut all_paths = std::collections::BTreeSet::new();
-    for p in base_tree.keys() { all_paths.insert(p.clone()); }
-    for p in our_tree.keys() { all_paths.insert(p.clone()); }
-    for p in their_tree.keys() { all_paths.insert(p.clone()); }
+    let index_entries = read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
+    check_switch_safety(&result.tree, &our_tree, &index_map).map_err(|e| {
+        anyhow::anyhow!("{}", e.to_string().replace("by switch", "by merge").replace("before you switch branches", "before you merge"))
+    })?;
 
-    let mut merged_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
-    let mut conflicts: Vec<MergeConflict> = Vec::new();
-
-    for path in all_paths {
-        let base_entry = base_tree.get(&path);
-        let our_entry = our_tree.get(&path);
-        let their_entry = their_tree.get(&path);
-
-        if our_entry == their_entry {
-            if let Some(entry) = our_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else if our_entry == base_entry {
-            if let Some(entry) = their_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else if their_entry == base_entry {
-            if let Some(entry) = our_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else {
-            let our_bytes = if let Some(our) = our_entry {
-                read_object(&hex::encode(our.0))?.1
-            } else {
-                Vec::new()
-            };
-            let their_bytes = if let Some(their) = their_entry {
-                read_object(&hex::encode(their.0))?.1
-            } else {
-                Vec::new()
-            };
-            let base_bytes = if let Some(base) = base_entry {
-                read_object(&hex::encode(base.0))?.1
-            } else {
-                Vec::new()
-            };
-
-            conflicts.push(MergeConflict {
-                path,
-                base: base_bytes,
-                ours: our_bytes,
-                theirs: their_bytes,
-            });
-        }
+    fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", our_commit))?;
+    sync_working_tree(&result.tree, &our_tree, &index_map)?;
+    for message in &result.messages {
+        println!("{}", message.text);
     }
+    let merge_msg = merge_message(&branch);
 
-    if !conflicts.is_empty() {
-        for conflict in &conflicts {
-            let conflict_content = generate_conflict_markers(&conflict.ours, &conflict.theirs, &branch);
-            if let Some(parent) = Path::new(&conflict.path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(&conflict.path, &conflict_content)?;
-            println!("CONFLICT (content): Merge conflict in {}", conflict.path);
+    if !result.conflicted.is_empty() {
+        // The index has no conflict stages: conflicted paths keep our version there (their
+        // markers live only in the working tree), and everything that merged cleanly is staged.
+        let mut index_tree = result.tree.clone();
+        for path in result.conflicted.keys() {
+            match our_tree.get(path) {
+                Some(entry) => index_tree.insert(path.clone(), *entry),
+                None => index_tree.remove(path),
+            };
         }
+        update_index_from_tree(&index_tree, &our_tree)?;
 
-        for (path, (hash, _mode)) in &merged_tree {
-            let (_, content) = read_object(&hex::encode(hash))?;
-            if let Some(parent) = Path::new(path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(path, &content)?;
+        let mut msg = format!("{}\n\n# Conflicts:\n", merge_msg);
+        for path in result.conflicted.keys() {
+            msg.push_str(&format!("#\t{}\n", path));
         }
-
         fs::write(crate::repo::path(".git/MERGE_HEAD"), format!("{}\n", their_commit))?;
-        fs::write(crate::repo::path(".git/MERGE_MSG"), format!("Merge branch '{}'\n", branch))?;
-
+        fs::write(crate::repo::path(".git/MERGE_MSG"), msg)?;
         println!("Automatic merge failed; fix conflicts and then commit the result.");
-        return Ok(());
+        std::process::exit(1);
     }
 
-    for path in our_tree.keys() {
-        if !merged_tree.contains_key(path) {
-            let path_obj = Path::new(path);
-            if path_obj.exists() {
-                let _ = fs::remove_file(path_obj);
-            }
-        }
-    }
-
-    let mut new_index_entries = Vec::new();
-    for (path, (hash, _mode)) in &merged_tree {
-        let (_, content) = read_object(&hex::encode(hash))?;
-        if let Some(parent) = Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-        fs::write(path, &content)?;
-
-        let metadata = fs::metadata(path)?;
-        let entry = build_entry(path, *hash, &metadata);
-        new_index_entries.push(entry);
-    }
-
-    write_index(&mut new_index_entries)?;
-
-    let tree_hash = write_tree_from_index_prefix(&new_index_entries, "")?;
-    let merge_msg = format!("Merge branch '{}'", branch);
+    update_index_from_tree(&result.tree, &our_tree)?;
+    let tree_hash = build_tree_from_map(&result.tree)?;
     let commit_hash = build_merge_commit(tree_hash, &our_commit, &their_commit, &merge_msg)?;
-    let short_hash = &commit_hash[..7];
-
-    let branch_ref = format!("refs/heads/{}", current_branch);
-    refs::write_ref(&branch_ref, &commit_hash)?;
+    refs::write_ref(&format!("refs/heads/{}", current_branch), &commit_hash)?;
 
     println!("Merge made by the 'ort' strategy.");
-    println!("[{} {}] {}", current_branch, short_hash, merge_msg);
-
+    println!("[{} {}] {}", current_branch, &commit_hash[..7], merge_msg);
     Ok(())
+}
+
+/// git's default merge message: `Merge branch 'x'`, `Merge remote-tracking branch 'origin/x'`,
+/// `Merge tag 'v1'`, or `Merge commit '<rev>'` for anything that isn't a branch or tag.
+fn merge_message(name: &str) -> String {
+    let exists = |r: String| refs::read_ref(&r).ok().flatten().is_some();
+    if exists(format!("refs/heads/{}", name)) {
+        format!("Merge branch '{}'", name)
+    } else if exists(format!("refs/remotes/{}", name)) {
+        format!("Merge remote-tracking branch '{}'", name)
+    } else if exists(format!("refs/tags/{}", name)) {
+        format!("Merge tag '{}'", name)
+    } else {
+        format!("Merge commit '{}'", name)
+    }
 }
 
 pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<String>) -> anyhow::Result<()> {

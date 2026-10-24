@@ -98,7 +98,7 @@ A lightweight, fully functional Git implementation written in Rust.
 
 ### Merging, Replaying & Rebasing
 
-- **`merge <branch>`**: Performs fast-forward or 3-way tree merges with conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+- **`merge <branch>`**: Fast-forwards when possible, otherwise runs the same line-level three-way merge as `merge-tree` (non-overlapping edits to one file merge cleanly; criss-cross histories use a virtual base) and commits the result with the configured identity. Refuses to start while a merge is in progress or when local changes would be overwritten. On conflicts it prints git's messages, writes conflict markers into the working tree, stages everything that merged cleanly, records `MERGE_HEAD`/`MERGE_MSG` (and `ORIG_HEAD`), and exits 1; `rgit commit` concludes the merge once conflicts are resolved and added.
 - **`merge-base`** (`<commit> <commit>...`, `-a|--all`, `--is-ancestor`): Finds the best common ancestor(s) of commits, or checks ancestry via exit code.
 - **`rebase`** (`<upstream>`, `-i`, `--continue`, `--abort`, `--skip`, `--edit-todo`): Full interactive rebase with `pick`, `reword`, `edit`, `squash`, `fixup`, and `drop` instructions.
 - **`cherry-pick <commit>`** (`--no-commit`, `--continue`, `--abort`): Replays a single commit onto current HEAD with state recording.

@@ -493,10 +493,12 @@ pub fn unified_hunks(old: &[String], new: &[String]) -> (String, usize, usize) {
     unified_hunks_with(old, new, true)
 }
 
-/// Same as `unified_hunks`, but the indent heuristic can be turned off: without it, xdiff
-/// leaves each sliding group at its lowest position (as git does when computing patch IDs).
-// Used by `unified_hunks` and `cherry` patch IDs.
-pub fn unified_hunks_with(old: &[String], new: &[String], indent_heuristic: bool) -> (String, usize, usize) {
+/// Diffs two line lists like xdiff: Myers diff, then change compaction (sliding each changed
+/// group as far down as it goes, aligning with the other side, and with `indent_heuristic`
+/// picking the most readable position). Returns the changed runs as
+/// `(old_start, old_count, new_start, new_count)` plus the per-line change flags of each side.
+// Used by `unified_hunks_with` and `merge-tree`'s line merge.
+pub fn compacted_changes(old: &[String], new: &[String], indent_heuristic: bool) -> (Vec<(usize, usize, usize, usize)>, Vec<bool>, Vec<bool>) {
     let old_refs: Vec<&str> = old.iter().map(String::as_str).collect();
     let new_refs: Vec<&str> = new.iter().map(String::as_str).collect();
     let ops = myers_diff(&old_refs, &new_refs);
@@ -540,6 +542,14 @@ pub fn unified_hunks_with(old: &[String], new: &[String], indent_heuristic: bool
             j += 1;
         }
     }
+    (changes, rchg_old, rchg_new)
+}
+
+/// Same as `unified_hunks`, but the indent heuristic can be turned off: without it, xdiff
+/// leaves each sliding group at its lowest position (as git does when computing patch IDs).
+// Used by `unified_hunks` and `cherry` patch IDs.
+pub fn unified_hunks_with(old: &[String], new: &[String], indent_heuristic: bool) -> (String, usize, usize) {
+    let (changes, rchg_old, rchg_new) = compacted_changes(old, new, indent_heuristic);
 
     let added = rchg_new.iter().filter(|&&c| c).count();
     let deleted = rchg_old.iter().filter(|&&c| c).count();

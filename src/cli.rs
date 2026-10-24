@@ -476,6 +476,26 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    MergeTree {
+        #[arg(long = "write-tree")]
+        write_tree: bool,
+        #[arg(long = "name-only")]
+        name_only: bool,
+        #[arg(long = "messages", overrides_with = "no_messages")]
+        messages: bool,
+        #[arg(long = "no-messages", overrides_with = "messages")]
+        no_messages: bool,
+        #[arg(short = 'z')]
+        nul: bool,
+        #[arg(long = "merge-base", value_name = "TREE-ISH")]
+        merge_base: Option<String>,
+        #[arg(long = "allow-unrelated-histories")]
+        allow_unrelated_histories: bool,
+        #[arg(long = "explain")]
+        explain: bool,
+        branch1: String,
+        branch2: String,
+    },
     Cherry {
         #[arg(short = 'v', long = "verbose")]
         verbose: bool,
@@ -864,6 +884,30 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RevList { args } => {
             crate::commands::rev_list(args)?;
+        }
+        Commands::MergeTree {
+            write_tree: _,
+            name_only,
+            messages,
+            no_messages,
+            nul,
+            merge_base,
+            allow_unrelated_histories,
+            explain,
+            branch1,
+            branch2,
+        } => {
+            let opts = crate::objects::MergeTreeOptions {
+                name_only,
+                messages: if messages { Some(true) } else if no_messages { Some(false) } else { None },
+                nul,
+                merge_base,
+                allow_unrelated_histories,
+                explain,
+                branch1,
+                branch2,
+            };
+            crate::commands::merge_tree(opts)?;
         }
         Commands::Cherry {
             verbose,

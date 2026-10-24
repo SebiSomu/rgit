@@ -7,7 +7,7 @@ use crate::helpers::commit::{
 };
 use crate::helpers::format_patch::{diff_commit_against_parent, format_diffstat, parse_commit_object, resolve_commit_rev, split_commit_message};
 use crate::helpers::reflog::set_reflog_action;
-use crate::helpers::{build_commit, flatten_tree, read_object, write_tree_from_index_prefix};
+use crate::helpers::{build_commit, flatten_tree, write_tree_from_index_prefix};
 use crate::index::read_index;
 use crate::objects::{CommitOptions, DiffStatEntry};
 use crate::refs;
@@ -235,75 +235,4 @@ fn editor_status(head_state: &refs::HeadState, tree: &str, base_tree: Option<&st
     }
     text.push_str("#\n");
     Ok(text)
-}
-
-pub fn log(oneline: bool) -> anyhow::Result<()> {
-    let head_state = refs::resolve_head()?;
-
-    let (label, mut current_hash) = match &head_state {
-        refs::HeadState::Branch(b) => {
-            let ref_path = format!("refs/heads/{}", b);
-            (b.clone(), refs::read_ref(&ref_path)?)
-        }
-        refs::HeadState::Detached(h) => ("HEAD".to_string(), Some(h.clone())),
-    };
-
-    if current_hash.is_none() {
-        anyhow::bail!(
-            "fatal: your current branch '{}' does not have any commits yet",
-            label
-        );
-    }
-
-    let mut first = true;
-
-    while let Some(hash) = current_hash {
-        let (object_type, content) = read_object(&hash)?;
-        if object_type != "commit" {
-            anyhow::bail!("{} is not a commit object", hash);
-        }
-
-        let text = String::from_utf8_lossy(&content);
-        let mut parent: Option<String> = None;
-        let mut author_line: Option<String> = None;
-        let mut message_lines: Vec<String> = Vec::new();
-        let mut in_message = false;
-
-        for line in text.lines() {
-            if in_message {
-                message_lines.push(line.to_string());
-            } else if line.is_empty() {
-                in_message = true;
-            } else if let Some(p) = line.strip_prefix("parent ") {
-                parent = Some(p.to_string());
-            } else if let Some(a) = line.strip_prefix("author ") {
-                author_line = Some(a.to_string());
-            }
-        }
-
-        if oneline {
-            let first_line = message_lines.first().map(|s| s.as_str()).unwrap_or("");
-            println!("{} {}", &hash[..7], first_line);
-        } else {
-            if !first {
-                println!();
-            }
-
-            println!("commit {}", hash);
-
-            if let Some(author) = &author_line {
-                println!("Author: {}", author);
-            }
-
-            println!();
-            for line in &message_lines {
-                println!("    {}", line);
-            }
-        }
-
-        first = false;
-        current_hash = parent;
-    }
-
-    Ok(())
 }

@@ -1,12 +1,9 @@
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
-use crate::helpers::rev_list::{
-    abbreviate_hash, build_commit_filter, expand_rev_list_format, parse_rev_list_args, resolve_rev_list_tips, rewrite_rev_list_parents,
-    run_rev_list_walk, sort_rev_list_topologically,
-};
+use crate::helpers::rev_list::{abbreviate_hash, expand_rev_list_format, parse_rev_list_args, rewrite_rev_list_parents, select_rev_list_commits};
 use crate::helpers::format_patch::split_commit_message;
-use crate::objects::{ParsedCommit, RevListFormat, RevListOptions, WalkedCommit};
+use crate::objects::{RevListFormat, RevListOptions, WalkedCommit};
 
 /// `rgit rev-list [<options>] <commit>... [--] [<path>...]`
 ///
@@ -35,27 +32,8 @@ pub fn rev_list(args: Vec<String>) -> Result<()> {
 }
 
 fn run_rev_list(opts: &RevListOptions) -> Result<()> {
-    let matches = build_commit_filter(opts)?;
-    let shown = |c: &ParsedCommit, parent_count: usize| -> bool {
-        opts.min_parents.is_none_or(|min| parent_count >= min)
-            && opts.max_parents.is_none_or(|max| parent_count <= max)
-            && opts.until.is_none_or(|until| c.committer.timestamp < until)
-            && matches(c)
-    };
-
-    let roots = resolve_rev_list_tips(opts)?;
-    let (mut walked, state) = run_rev_list_walk(opts, &roots, &shown)?;
-    if opts.topo_order || opts.date_order {
-        walked = sort_rev_list_topologically(walked, opts.date_order);
-    }
-
-    let shown: Vec<&WalkedCommit> = walked
-        .iter()
-        .filter(|w| !w.hidden && !state.uninteresting.contains(&w.commit.hash))
-        .filter(|w| shown(&w.commit, w.parents.len()))
-        .skip(opts.skip)
-        .take(opts.max_count.unwrap_or(usize::MAX))
-        .collect();
+    let (selected, state) = select_rev_list_commits(opts)?;
+    let shown: Vec<&WalkedCommit> = selected.iter().collect();
 
     let stdout = io::stdout();
     let mut out = BufWriter::new(stdout.lock());

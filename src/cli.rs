@@ -72,8 +72,8 @@ pub enum Commands {
         quiet: bool,
     },
     Log {
-        #[arg(short = 'o', long = "oneline")]
-        oneline: bool
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
     },
     Status,
     Branch {
@@ -198,18 +198,45 @@ pub enum Commands {
         action: BisectAction
     },
     Show {
-        commit: Option<String>
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
     },
     Tag {
-        name: Option<String>,
-        commit: Option<String>,
+        #[arg(short = 'l', long = "list")]
+        list: bool,
         #[arg(short = 'd', long = "delete")]
         delete: bool,
-        #[arg(short = 'l', long = "list")]
-        list: bool
+        #[arg(short = 'a', long = "annotate")]
+        annotate: bool,
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+        #[arg(short = 'm', long = "message", value_name = "MSG")]
+        messages: Vec<String>,
+        #[arg(short = 'F', long = "file", value_name = "FILE")]
+        file: Option<String>,
+        #[arg(short = 'e', long = "edit")]
+        edit: bool,
+        /// -n[<num>]: lines of each tag message to print (attached number, like git)
+        #[arg(short = 'n', num_args = 0..=1, default_missing_value = "1", value_name = "NUM")]
+        lines: Option<String>,
+        #[arg(long = "contains", value_name = "COMMIT")]
+        contains: Option<String>,
+        #[arg(long = "points-at", value_name = "OBJECT")]
+        points_at: Option<String>,
+        args: Vec<String>,
     },
     Describe {
-        commit: Option<String>
+        #[arg(long = "tags")]
+        tags: bool,
+        #[arg(long = "always")]
+        always: bool,
+        #[arg(long = "long")]
+        long: bool,
+        #[arg(long = "abbrev", value_name = "N", require_equals = true)]
+        abbrev: Option<usize>,
+        #[arg(long = "exact-match")]
+        exact_match: bool,
+        commits: Vec<String>,
     },
     Mv {
         source: PathBuf,
@@ -556,6 +583,16 @@ pub enum Commands {
     },
 }
 
+/// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
+/// `show` and `rev-list` need it to tell paths from revisions.
+fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.iter().position(|a| a == subcommand) {
+        Some(pos) => args[pos + 1..].to_vec(),
+        None => parsed,
+    }
+}
+
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
 
@@ -617,8 +654,8 @@ pub fn handle_commands() -> Result<()> {
             };
             crate::commands::commit(opts)?;
         }
-        Commands::Log { oneline } => {
-            crate::commands::log(oneline)?;
+        Commands::Log { args } => {
+            crate::commands::log(raw_args_after("log", args))?;
         }
         Commands::Status => {
             crate::commands::status()?;
@@ -674,14 +711,24 @@ pub fn handle_commands() -> Result<()> {
         Commands::Bisect { action } => {
             crate::commands::bisect(action)?;
         }
-        Commands::Show { commit } => {
-            crate::commands::show(commit)?;
+        Commands::Show { args } => {
+            crate::commands::show(raw_args_after("show", args))?;
         }
-        Commands::Tag { name, commit, delete, list } => {
-            crate::commands::tag(name, commit, delete, list)?;
+        Commands::Tag { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, mut args } => {
+            // git's `-n` only takes an attached number (`-n2`); a separate word after it is a pattern.
+            let lines = lines.map(|value| match value.parse::<usize>() {
+                Ok(n) => n,
+                Err(_) => {
+                    args.insert(0, value);
+                    1
+                }
+            });
+            let opts = crate::objects::TagOptions { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, args };
+            crate::commands::tag(opts)?;
         }
-        Commands::Describe { commit } => {
-            crate::commands::describe(commit)?;
+        Commands::Describe { tags, always, long, abbrev, exact_match, commits } => {
+            let opts = crate::objects::DescribeOptions { tags, always, long, abbrev, exact_match, commits };
+            crate::commands::describe(opts)?;
         }
         Commands::Mv { source, destination, force} => {
             crate::commands::mv(source, destination, force)?;
@@ -964,7 +1011,7 @@ pub fn handle_commands() -> Result<()> {
             crate::commands::am(opts)?;
         }
         Commands::RevList { args } => {
-            crate::commands::rev_list(args)?;
+            crate::commands::rev_list(raw_args_after("rev-list", args))?;
         }
         Commands::MergeTree {
             write_tree: _,

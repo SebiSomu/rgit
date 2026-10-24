@@ -19,6 +19,17 @@ const USAGE: &str = "usage: rgit rev-list [<options>] <commit>... [--] [<path>..
 /// start the path list. Errors starting with `usage:` mean exit 129, others 128.
 // Used by `rev-list`.
 pub fn parse_rev_list_args(args: &[String]) -> anyhow::Result<RevListOptions> {
+    let opts = parse_revision_args(args)?;
+    if opts.revs.is_empty() && !(opts.all || opts.branches || opts.tags || opts.remotes) {
+        anyhow::bail!("{}", USAGE);
+    }
+    Ok(opts)
+}
+
+/// Like `parse_rev_list_args`, but an empty revision list is allowed (the caller picks a
+/// default, as `log` does with `HEAD`).
+// Used by `parse_rev_list_args` and `log`.
+pub fn parse_revision_args(args: &[String]) -> anyhow::Result<RevListOptions> {
     let mut opts = RevListOptions::default();
     let mut negate = false;
     let mut i = 0;
@@ -151,11 +162,35 @@ pub fn parse_rev_list_args(args: &[String]) -> anyhow::Result<RevListOptions> {
         }
         i += 1;
     }
-
-    if opts.revs.is_empty() && !(opts.all || opts.branches || opts.tags || opts.remotes) {
-        anyhow::bail!("{}", USAGE);
-    }
     Ok(opts)
+}
+
+/// Runs a whole revision selection: the commit filters, the walk, the optional topological
+/// sort, the parent-count/date/grep filters, `--skip`, and `--max-count`. Returns the selected
+/// commits newest first (before `--reverse`) together with the walk state.
+// Used by `rev-list` and `log`.
+pub fn select_rev_list_commits(opts: &RevListOptions) -> anyhow::Result<(Vec<WalkedCommit>, RevWalkState)> {
+    let matches = build_commit_filter(opts)?;
+    let shown = |c: &ParsedCommit, parent_count: usize| -> bool {
+        opts.min_parents.is_none_or(|min| parent_count >= min)
+            && opts.max_parents.is_none_or(|max| parent_count <= max)
+            && opts.until.is_none_or(|until| c.committer.timestamp < until)
+            && matches(c)
+    };
+
+    let roots = resolve_rev_list_tips(opts)?;
+    let (mut walked, state) = run_rev_list_walk(opts, &roots, &shown)?;
+    if opts.topo_order || opts.date_order {
+        walked = sort_rev_list_topologically(walked, opts.date_order);
+    }
+    let selected = walked
+        .into_iter()
+        .filter(|w| !w.hidden && !state.uninteresting.contains(&w.commit.hash))
+        .filter(|w| shown(&w.commit, w.parents.len()))
+        .skip(opts.skip)
+        .take(opts.max_count.unwrap_or(usize::MAX))
+        .collect();
+    Ok((selected, state))
 }
 
 fn is_revision_arg(arg: &str) -> bool {
@@ -250,8 +285,9 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
 }
 
 /// Lists every ref under `.git/refs` and in `packed-refs` (loose refs win) with the object
-/// it points at, in name order.
-// Used by `collect_ref_tips` and `bundle create --all`.
+/// it points at, in name order. Symbolic refs (`refs/remotes/origin/HEAD` holding
+/// `ref: refs/remotes/origin/main`) are listed with their target's object.
+// Used by `collect_ref_tips`, `bundle create --all`, `log` decorations, and `tag`.
 pub fn list_all_refs() -> BTreeMap<String, String> {
     let mut refs: BTreeMap<String, String> = BTreeMap::new();
     if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
@@ -263,21 +299,29 @@ pub fn list_all_refs() -> BTreeMap<String, String> {
             }
         }
     }
-    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs);
+    let mut symbolic = Vec::new();
+    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs, &mut symbolic);
+    for (name, target) in symbolic {
+        if let Some(hash) = refs.get(&target).cloned() {
+            refs.insert(name, hash);
+        }
+    }
     refs
 }
 
-fn collect_loose_refs(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>) {
+fn collect_loose_refs(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>, symbolic: &mut Vec<(String, String)>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let name = format!("{}/{}", prefix, entry.file_name().to_string_lossy());
         let path = entry.path();
         if path.is_dir() {
-            collect_loose_refs(&path, &name, out);
+            collect_loose_refs(&path, &name, out, symbolic);
         } else if let Ok(content) = fs::read_to_string(&path) {
             let hash = content.trim();
             if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 out.insert(name, hash.to_string());
+            } else if let Some(target) = hash.strip_prefix("ref: ") {
+                symbolic.push((name, target.trim().to_string()));
             }
         }
     }

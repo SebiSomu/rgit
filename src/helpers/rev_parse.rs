@@ -137,6 +137,21 @@ pub fn resolve_tilde_ancestor(mut hash: String, n: usize) -> Result<String> {
     Ok(hash)
 }
 
+/// Finds the object hash of the entry called `name` in a raw tree object.
+fn tree_entry_hash(tree: &[u8], name: &str) -> Option<String> {
+    let mut pos = 0;
+    while pos < tree.len() {
+        let space = tree[pos..].iter().position(|&b| b == b' ')? + pos;
+        let nul = tree[space..].iter().position(|&b| b == 0)? + space;
+        let hash = tree.get(nul + 1..nul + 21)?;
+        if &tree[space + 1..nul] == name.as_bytes() {
+            return Some(hex::encode(hash));
+        }
+        pos = nul + 21;
+    }
+    None
+}
+
 /// Full revision resolution engine.
 ///
 /// Handles:
@@ -148,8 +163,18 @@ pub fn resolve_tilde_ancestor(mut hash: String, n: usize) -> Result<String> {
 /// - Suffix `^` — shorthand for `^1`
 /// - Suffix `^{type}` — peel to object of given type (`commit`, `tree`, `blob`, `tag`)
 /// - Suffix `^{}` — peel tag to the underlying non-tag object
+/// - `<rev>:<path>` — the blob or tree at `<path>` in `<rev>`'s tree (`<rev>:` is the tree itself)
 // Used by the `rev_parse` command.
 pub fn resolve_rev(rev: &str) -> Result<String> {
+    if let Some((base, path)) = rev.split_once(':').filter(|(base, _)| !base.is_empty()) {
+        let mut hash = peel_to_type(resolve_rev(base)?, "tree")?;
+        for component in path.split('/').filter(|c| !c.is_empty()) {
+            let (_, content) = read_object(&hash)?;
+            hash = tree_entry_hash(&content, component)
+                .ok_or_else(|| anyhow::anyhow!("fatal: path '{}' does not exist in '{}'", path, base))?;
+        }
+        return Ok(hash);
+    }
     let mut remaining = rev.to_string();
     let mut suffixes: Vec<String> = Vec::new();
 

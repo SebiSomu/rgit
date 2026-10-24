@@ -40,6 +40,7 @@ pub mod cherry;
 pub mod merge_tree;
 pub mod bundle;
 pub mod prune;
+pub mod log;
 pub mod worktree;
 
 pub use plumbing::*;
@@ -84,6 +85,7 @@ pub use cherry::*;
 pub use merge_tree::*;
 pub use bundle::*;
 pub use prune::*;
+pub use log::*;
 pub use worktree::*;
 
 

@@ -35,7 +35,8 @@ src/
 ├── commands.rs               # Root module declaring and re-exporting subcommands
 ├── commands/                 # High-level CLI command entry points
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
-│   ├── commit.rs             # commit, commit-tree, log
+│   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
+│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status), show (commits, tags, trees, blobs)
 │   ├── staging.rs            # add, status, rm, mv
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
@@ -47,7 +48,7 @@ src/
 │   ├── revert.rs             # revert (--continue, --abort)
 │   ├── stash.rs              # stash (push, pop, apply, list, drop, show, clear)
 │   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
-│   ├── tag.rs                # tag, show, describe
+│   ├── tag.rs                # tag (list/filters/-n, lightweight + annotated, -f, -d), describe (--tags/--always/--long/--abbrev/--exact-match)
 │   ├── config.rs             # config (get, set, unset, list)
 │   ├── rebase.rs             # rebase (-i, --continue, --abort, --skip, --edit-todo)
 │   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
@@ -111,7 +112,9 @@ src/
 │   ├── apply.rs              # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
 │   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
 │   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
-│   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters
+│   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
+│   ├── log.rs                # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
+│   ├── tag.rs                # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
 │   ├── bundle.rs             # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
 │   ├── merge_tree.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases

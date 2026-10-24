@@ -40,8 +40,36 @@ pub enum Commands {
         message: String
     },
     Commit {
-        #[arg(short = 'm', long = "message")]
-        message: String
+        #[arg(short = 'm', long = "message", value_name = "MSG")]
+        messages: Vec<String>,
+        #[arg(short = 'F', long = "file", value_name = "FILE", conflicts_with = "messages")]
+        file: Option<String>,
+        #[arg(short = 'C', long = "reuse-message", value_name = "COMMIT", conflicts_with_all = ["messages", "file", "reedit_message"])]
+        reuse_message: Option<String>,
+        #[arg(short = 'c', long = "reedit-message", value_name = "COMMIT", conflicts_with_all = ["messages", "file"])]
+        reedit_message: Option<String>,
+        #[arg(short = 'a', long = "all")]
+        all: bool,
+        #[arg(long = "amend")]
+        amend: bool,
+        #[arg(short = 'e', long = "edit", conflicts_with = "no_edit")]
+        edit: bool,
+        #[arg(long = "no-edit")]
+        no_edit: bool,
+        #[arg(long = "author", value_name = "AUTHOR")]
+        author: Option<String>,
+        #[arg(long = "date", value_name = "DATE")]
+        date: Option<String>,
+        #[arg(long = "reset-author")]
+        reset_author: bool,
+        #[arg(long = "allow-empty")]
+        allow_empty: bool,
+        #[arg(long = "allow-empty-message")]
+        allow_empty_message: bool,
+        #[arg(short = 's', long = "signoff")]
+        signoff: bool,
+        #[arg(short = 'q', long = "quiet")]
+        quiet: bool,
     },
     Log {
         #[arg(short = 'o', long = "oneline")]
@@ -553,8 +581,41 @@ pub fn handle_commands() -> Result<()> {
         Commands::CommitTree { tree_hash, parent_hash, message } => {
             crate::commands::commit_tree(tree_hash, parent_hash, message)?;
         }
-        Commands::Commit { message } => {
-            crate::commands::commit(message)?;
+        Commands::Commit {
+            messages,
+            file,
+            reuse_message,
+            reedit_message,
+            all,
+            amend,
+            edit,
+            no_edit,
+            author,
+            date,
+            reset_author,
+            allow_empty,
+            allow_empty_message,
+            signoff,
+            quiet,
+        } => {
+            let opts = crate::objects::CommitOptions {
+                messages,
+                file,
+                reedit: reedit_message.is_some(),
+                reuse_message: reuse_message.or(reedit_message),
+                all,
+                amend,
+                edit,
+                no_edit,
+                author,
+                date,
+                reset_author,
+                allow_empty,
+                allow_empty_message,
+                signoff,
+                quiet,
+            };
+            crate::commands::commit(opts)?;
         }
         Commands::Log { oneline } => {
             crate::commands::log(oneline)?;

@@ -72,7 +72,7 @@ A lightweight, fully functional Git implementation written in Rust.
 
 ### History, Inspection & Diffs
 
-- **`commit`** (`-m <message>`): Writes tree and commit objects from the current index.
+- **`commit`** (`-m <msg>`..., `-F <file>`, `-C|-c <commit>`, `-a`, `--amend`, `-e|--no-edit`, `--author=<who>`, `--date=<when>`, `--reset-author`, `--allow-empty`, `--allow-empty-message`, `-s`, `-q`): Records the index as a commit. The message comes from `-m` (several become paragraphs), a file, another commit, or the editor (`core.editor`/`$EDITOR`, `#` lines stripped), which opens when none is given and to conclude a merge; `-a` stages tracked changes first, `--amend` replaces the tip keeping its parents and author, and `-s` adds a `Signed-off-by:` trailer. Refuses empty commits and messages unless allowed, and refuses to conclude a merge while conflict markers remain. Output, reflog entries (`commit:`, `commit (initial|amend|merge):`) and stored commits match git's, including the diffstat and create/delete-mode summary. Timestamps are recorded in UTC.
 - **`log`** (`--oneline`): Walks commit parent graphs and displays chronological commit logs.
 - **`shortlog`** (`-s|--summary`, `-n|--numbered`, `-e|--email`, `--all`, `[<rev>]`): Summarizes history grouped by author, with commit counts and subject lines.
 - **`grep`** (`-i`, `-v`, `-n`, `-c`, `-l|-L`, `-F`, `--cached`, `-e <pattern>`, `<pattern> [<rev>...] [-- <path>...]`): Searches tracked files, the index, or historical revisions using regex or fixed-string patterns.

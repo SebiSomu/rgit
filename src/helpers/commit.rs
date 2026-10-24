@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::config::author_identity;
-use crate::helpers::objects::{flatten_tree, read_object, tree_hash_of_commit, write_object};
+use crate::helpers::objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object};
+use crate::index::{build_entry, read_index, write_index};
+use crate::objects::CommitSignature;
 use crate::refs;
 
 /// Resolves a commit's parent hashes from its raw object content, in order.
@@ -181,4 +184,204 @@ pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &st
     content.push_str(&format!("\n{}\n", message));
 
     write_object("commit", content.as_bytes())
-}
+}
+
+/// Splits the configured `Name <email>` identity into a signature stamped with the current
+/// time (in UTC, like every rgit timestamp).
+// Used by `commit` for the committer and the default author.
+pub fn current_signature() -> anyhow::Result<CommitSignature> {
+    let identity = author_identity()?;
+    let (name, email) = identity.split_once(" <").map(|(n, e)| (n.to_string(), e.trim_end_matches('>').to_string())).unwrap_or((identity, String::new()));
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
+    Ok(CommitSignature { name, email, timestamp, tz: "+0000".to_string() })
+}
+
+/// Parses `commit --author="Name <email>"` into its name and email.
+// Used by `commit --author`.
+pub fn parse_author_option(value: &str) -> anyhow::Result<(String, String)> {
+    let parsed = value.trim().strip_suffix('>').and_then(|rest| rest.rsplit_once('<')).map(|(name, email)| (name.trim().to_string(), email.trim().to_string()));
+    match parsed {
+        Some((name, email)) if !name.is_empty() && !name.contains(['<', '>', '\n']) && !email.contains(['<', '>', '\n']) => Ok((name, email)),
+        _ => anyhow::bail!("fatal: --author '{}' is not 'Name <email>' and matches no existing author", value),
+    }
+}
+
+/// Parses `commit --date=<date>` into a timestamp and timezone: git's raw `<unix> <+HHMM>`
+/// form, or anything `rev-list --since` accepts (ISO dates, `2.days.ago`, `@<unix>`), whose
+/// explicit `+HHMM` zone is kept (UTC otherwise).
+// Used by `commit --date`.
+pub fn parse_commit_date(value: &str) -> anyhow::Result<(i64, String)> {
+    let value = value.trim();
+    if let Some((ts, tz)) = value.split_once(' ') {
+        if let Ok(ts) = ts.parse::<i64>() {
+            if tz.len() == 5 && (tz.starts_with('+') || tz.starts_with('-')) && tz[1..].chars().all(|c| c.is_ascii_digit()) {
+                return Ok((ts, tz.to_string()));
+            }
+        }
+    }
+    let ts = crate::helpers::rev_list::parse_approx_date(value).ok_or_else(|| anyhow::anyhow!("fatal: invalid date format: {}", value))?;
+    let tz = value
+        .rsplit(|c: char| c == ' ' || c == 'T')
+        .next()
+        .filter(|z| z.len() == 5 && (z.starts_with('+') || z.starts_with('-')) && z[1..].chars().all(|c| c.is_ascii_digit()))
+        .unwrap_or("+0000");
+    Ok((ts, tz.to_string()))
+}
+
+/// Cleans up a commit message like git's default cleanup: trailing whitespace is removed from
+/// every line, runs of blank lines are collapsed, and leading/trailing blank lines are dropped;
+/// with `strip_comments` (messages that went through the editor) lines starting with `#` go
+/// too. The result ends with a single newline, or is empty.
+// Used by `commit`.
+pub fn cleanup_commit_message(text: &str, strip_comments: bool) -> String {
+    let mut out: Vec<&str> = Vec::new();
+    for line in text.lines() {
+        if strip_comments && line.starts_with('#') {
+            continue;
+        }
+        let line = line.trim_end();
+        if line.is_empty() && out.last().is_none_or(|l| l.is_empty()) {
+            continue;
+        }
+        out.push(line);
+    }
+    while out.last().is_some_and(|l| l.is_empty()) {
+        out.pop();
+    }
+    if out.is_empty() { String::new() } else { format!("{}\n", out.join("\n")) }
+}
+
+/// Appends a `Signed-off-by: Name <email>` trailer, separated by a blank line unless the
+/// message already ends in a trailer block, and not repeated if it is already the last line.
+// Used by `commit -s`.
+pub fn add_signoff(message: &str, signer: &CommitSignature) -> String {
+    let trailer = format!("Signed-off-by: {} <{}>", signer.name, signer.email);
+    let body = message.trim_end_matches('\n');
+    if body.lines().last() == Some(trailer.as_str()) {
+        return format!("{}\n", body);
+    }
+    let last_paragraph = body.rsplit("\n\n").next().unwrap_or("");
+    let is_trailer = |l: &str| l.split_once(": ").is_some_and(|(k, _)| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    let ends_in_trailers = body.contains("\n\n") && last_paragraph.lines().all(is_trailer);
+    if body.is_empty() {
+        format!("\n{}\n", trailer)
+    } else if ends_in_trailers {
+        format!("{}\n{}\n", body, trailer)
+    } else {
+        format!("{}\n\n{}\n", body, trailer)
+    }
+}
+
+/// Writes a commit object with any number of parents and explicit author and committer.
+// Used by `commit`.
+pub fn write_commit_object(tree: &str, parents: &[String], author: &CommitSignature, committer: &CommitSignature, message: &str) -> anyhow::Result<String> {
+    let mut content = format!("tree {}\n", tree);
+    for parent in parents {
+        content.push_str(&format!("parent {}\n", parent));
+    }
+    content.push_str(&format!("author {} <{}> {} {}\n", author.name, author.email, author.timestamp, author.tz));
+    content.push_str(&format!("committer {} <{}> {} {}\n", committer.name, committer.email, committer.timestamp, committer.tz));
+    content.push('\n');
+    content.push_str(message);
+    write_object("commit", content.as_bytes())
+}
+
+/// Lists tracked files whose working-tree copy differs from the index: `('M', path)` for a
+/// modified file and `('D', path)` for a deleted one, in path order.
+// Used by `commit -a` and `commit`'s "no changes added to commit" report.
+pub fn tracked_worktree_changes() -> anyhow::Result<Vec<(char, String)>> {
+    let mut changes = Vec::new();
+    for entry in read_index().unwrap_or_default() {
+        match fs::read(&entry.path) {
+            Ok(content) => {
+                if hash_content("blob", &content) != entry.hash {
+                    changes.push(('M', entry.path));
+                }
+            }
+            Err(_) => changes.push(('D', entry.path)),
+        }
+    }
+    changes.sort_by(|a, b| a.1.cmp(&b.1));
+    Ok(changes)
+}
+
+/// Stages every tracked file's working-tree state (modified files re-hashed, deleted files
+/// removed from the index); untracked files are left alone.
+// Used by `commit -a`.
+pub fn stage_tracked_changes() -> anyhow::Result<()> {
+    let changes = tracked_worktree_changes()?;
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let mut entries = read_index().unwrap_or_default();
+    for (kind, path) in changes {
+        entries.retain(|e| e.path != path);
+        if kind == 'M' {
+            let content = fs::read(&path)?;
+            let hash = hash_content("blob", &content);
+            write_object("blob", &content)?;
+            entries.push(build_entry(&path, hash, &fs::metadata(&path)?));
+        }
+    }
+    write_index(&mut entries)
+}
+
+/// Lists the paths of an in-progress merge that are still unresolved: those recorded under
+/// `# Conflicts:` in `MERGE_MSG` whose working-tree file or staged copy still contains
+/// conflict markers.
+// Used by `commit` to refuse concluding a merge with unresolved conflicts.
+pub fn unresolved_merge_paths() -> anyhow::Result<Vec<String>> {
+    let Ok(msg) = fs::read_to_string(crate::repo::path(".git/MERGE_MSG")) else {
+        return Ok(Vec::new());
+    };
+    let has_markers = |bytes: &[u8]| {
+        let text = String::from_utf8_lossy(bytes);
+        text.lines().any(|l| l.starts_with("<<<<<<< ")) && text.lines().any(|l| l.starts_with(">>>>>>> "))
+    };
+    let staged: BTreeMap<String, [u8; 20]> = read_index().unwrap_or_default().into_iter().map(|e| (e.path, e.hash)).collect();
+    let mut unresolved = Vec::new();
+    for path in msg.lines().filter_map(|l| l.strip_prefix("#\t")) {
+        let in_worktree = fs::read(path).map(|b| has_markers(&b)).unwrap_or(false);
+        let in_index = staged.get(path).and_then(|h| read_object(&hex::encode(h)).ok()).is_some_and(|(_, b)| has_markers(&b));
+        if in_worktree || in_index {
+            unresolved.push(path.to_string());
+        }
+    }
+    Ok(unresolved)
+}
+
+/// Formats a commit date the way `git commit` prints it (`Sat Oct 24 12:19:34 2026 +0300`).
+// Used by `commit`'s ` Date:` line.
+pub fn format_commit_date(timestamp: i64, tz: &str) -> String {
+    const DAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let local = timestamp + crate::helpers::format_patch::tz_offset_seconds(tz);
+    let days = local.div_euclid(86_400);
+    let secs = local.rem_euclid(86_400);
+    let (year, month, day) = crate::helpers::format_patch::civil_from_days(days);
+    format!(
+        "{} {} {} {:02}:{:02}:{:02} {} {}",
+        DAYS[days.rem_euclid(7) as usize],
+        MONTHS[(month - 1) as usize],
+        day,
+        secs / 3600,
+        secs % 3600 / 60,
+        secs % 60,
+        year,
+        tz
+    )
+}
+
+/// Opens the configured editor on `.git/COMMIT_EDITMSG`, prefilled with `initial` and a
+/// commented help block, and returns what was saved (uncleaned).
+// Used by `commit` when no message is given, or with `-e` / `--amend` / a merge in progress.
+pub fn edit_commit_message(initial: &str, comments: &str) -> anyhow::Result<String> {
+    let path = crate::repo::path(".git/COMMIT_EDITMSG");
+    let initial = initial.trim_end_matches('\n');
+    let mut text = if initial.is_empty() { String::new() } else { format!("{}\n", initial) };
+    text.push_str("\n# Please enter the commit message for your changes. Lines starting\n# with '#' will be ignored, and an empty message aborts the commit.\n#\n");
+    text.push_str(comments);
+    fs::write(&path, text)?;
+    crate::helpers::rebase::run_editor(&path, false)?;
+    Ok(fs::read_to_string(&path)?)
+}

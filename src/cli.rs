@@ -509,6 +509,10 @@ pub enum Commands {
         #[command(subcommand)]
         action: WorktreeAction,
     },
+    Bundle {
+        #[command(subcommand)]
+        action: crate::objects::BundleAction,
+    },
 }
 
 pub fn handle_commands() -> Result<()> {
@@ -927,6 +931,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Worktree { action } => {
             crate::commands::worktree(action)?;
+        }
+        Commands::Bundle { action } => {
+            crate::commands::bundle(action)?;
         }
     }
 

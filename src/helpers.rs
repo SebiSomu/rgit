@@ -35,6 +35,7 @@ pub mod am;
 pub mod rev_list;
 pub mod cherry;
 pub mod merge_tree;
+pub mod bundle;
 pub mod worktree;
 
 pub use objects::*;
@@ -72,4 +73,5 @@ pub use am::*;
 pub use rev_list::*;
 pub use cherry::*;
 pub use merge_tree::*;
+pub use bundle::*;
 

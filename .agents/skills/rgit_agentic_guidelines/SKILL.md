@@ -73,6 +73,7 @@ src/
 │   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
 │   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
 │   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
+│   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
 │   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
 │   └── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
@@ -110,6 +111,7 @@ src/
 │   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
 │   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
+│   ├── bundle.rs             # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
 │   ├── merge_tree.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases
 │   └── worktree.rs           # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
 │

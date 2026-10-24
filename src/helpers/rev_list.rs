@@ -226,17 +226,7 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 /// refs to other objects skipped), then `HEAD` for `--all`.
 // Used by `rev-list`.
 pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) -> anyhow::Result<Vec<String>> {
-    let mut refs: BTreeMap<String, String> = BTreeMap::new();
-    if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
-        for line in packed.lines() {
-            if let Some((hash, name)) = line.split_once(' ') {
-                if hash.len() == 40 && !line.starts_with('#') {
-                    refs.insert(name.to_string(), hash.to_string());
-                }
-            }
-        }
-    }
-    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs);
+    let refs = list_all_refs();
 
     let mut tips = Vec::new();
     for (name, hash) in refs {
@@ -257,6 +247,24 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
         }
     }
     Ok(tips)
+}
+
+/// Lists every ref under `.git/refs` and in `packed-refs` (loose refs win) with the object
+/// it points at, in name order.
+// Used by `collect_ref_tips` and `bundle create --all`.
+pub fn list_all_refs() -> BTreeMap<String, String> {
+    let mut refs: BTreeMap<String, String> = BTreeMap::new();
+    if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
+        for line in packed.lines() {
+            if let Some((hash, name)) = line.split_once(' ') {
+                if hash.len() == 40 && !line.starts_with('#') {
+                    refs.insert(name.to_string(), hash.to_string());
+                }
+            }
+        }
+    }
+    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs);
+    refs
 }
 
 fn collect_loose_refs(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>) {

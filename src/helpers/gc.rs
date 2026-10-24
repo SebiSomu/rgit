@@ -295,13 +295,15 @@ pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
 /// roots is kept (the strict roots must be intact, the reflog roots needn't be); of the rest,
 /// anything modified at or after `prune_cutoff` is kept as too new to judge, and so is
 /// everything such a recent object refers to, so a kept commit never loses its tree. A `None`
-/// cutoff (`--prune=never`) prunes nothing.
-// Used by the `gc` command.
-pub fn plan_gc(prune_cutoff: Option<u64>, reflog_cutoff: Option<u64>) -> Result<GcReport> {
+/// cutoff (`--prune=never`) prunes nothing. `extra_roots` are kept like refs (`prune <head>...`).
+// Used by the `gc` and `prune` commands.
+pub fn plan_gc(prune_cutoff: Option<u64>, reflog_cutoff: Option<u64>, extra_roots: &[String]) -> Result<GcReport> {
     check_no_pack_files()?;
 
     let mut keep: HashSet<String> = HashSet::new();
-    mark_reachable(&collect_strict_gc_roots()?, &mut keep, true)?;
+    let mut strict_roots = collect_strict_gc_roots()?;
+    strict_roots.extend(extra_roots.iter().cloned());
+    mark_reachable(&strict_roots, &mut keep, true)?;
     mark_reachable(&collect_lenient_gc_roots(reflog_cutoff)?, &mut keep, false)?;
 
     let loose = list_loose_objects()?;

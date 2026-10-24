@@ -33,6 +33,7 @@ A lightweight, fully functional Git implementation written in Rust.
   - `banana_split.rs`: Path grouping for per-file / per-directory commit splitting.
   - `reflog.rs`: Reflog append, parsing, `<ref>@{n}` resolution, entry deletion, and expiry.
   - `gc.rs`: Reachability roots, unreachable loose object detection, and pruning.
+  - `prune.rs`: `--expire` date parsing, stale temporary / stray file discovery in `.git/objects`, and empty fan-out directory cleanup.
   - `fsck.rs`: Object integrity checks, connectivity walks, and dangling object reports.
   - `grep.rs`: Regex/fixed-string matcher construction, pathspec filtering, and content search.
   - `count_objects.rs`: Loose/packed object statistics and human-readable size formatting.
@@ -128,6 +129,7 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`bisect`** (`start`, `bad`, `good`, `skip`, `reset`, `log`, `run`): Automated binary search to locate the regression-introducing commit.
 - **`banana-split <commit>`** (`--by-dir`, `-n|--dry-run`): Custom tool that splits a commit into atomic per-path or per-directory commits.
 - **`gc`** (`--prune <days|now|never>`, `--reflog-expire <days|now|never>`, `-n|--dry-run`): Expires old reflog entries and deletes unreachable loose objects past the prune window, keeping anything reachable from refs, the index, the stash, in-progress operations, or live reflogs.
+- **`prune`** (`-n`, `-v`, `--expire <time>`, `[--] <head>...`): Deletes every unreachable loose object (git's default; `--expire` keeps newer ones and whatever they refer to), using the same roots as `gc` (refs, HEAD, index, stash, operations in progress, all reflog entries, every worktree) plus any `<head>` given. Also removes stale `tmp_*` files and reports stray files in `.git/objects`. Silent by default; `-n`/`-v` print `<hash> <type>` per object exactly like git. Refuses to touch a damaged repository or one with packfiles.
 - **`fsck`** (`--connectivity-only`, `--no-dangling`, `--unreachable`, `--no-reflogs`): Verifies object integrity and connectivity, validates refs and the index, and reports dangling or unreachable objects.
 - **`count-objects`** (`-v|--verbose`, `-H|--human-readable`): Reports loose object count and disk usage; verbose mode adds pack, prune-packable, and garbage statistics.
 

@@ -60,6 +60,7 @@ src/
 │   ├── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
 │   ├── reflog.rs             # reflog (show, exists, delete, expire)
 │   ├── gc.rs                 # gc (reflog expiry + unreachable loose object pruning, --dry-run)
+│   ├── prune.rs              # prune (-n, -v, --expire, <head>...)
 │   ├── fsck.rs               # fsck (object integrity, connectivity, dangling/unreachable reports)
 │   ├── grep.rs               # grep (worktree, --cached, and revision search with regex/fixed strings)
 │   ├── count_objects.rs      # count-objects (-v, -H)
@@ -98,6 +99,7 @@ src/
 │   ├── archive.rs            # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
 │   ├── reflog.rs             # Reflog append/parse, <ref>@{n} resolution, entry deletion and expiry
 │   ├── gc.rs                 # Reachability roots, unreachable loose object detection, pruning
+│   ├── prune.rs              # --expire parsing, stale temp/stray file discovery in .git/objects, empty fan-out cleanup
 │   ├── fsck.rs               # Object integrity checks, connectivity walks, dangling object reports
 │   ├── grep.rs               # Matcher construction, pathspec filtering, content search
 │   ├── count_objects.rs      # Loose/packed object statistics, human-readable sizes

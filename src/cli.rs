@@ -274,6 +274,19 @@ pub enum Commands {
         #[arg(short = 'n', long = "dry-run")]
         dry_run: bool,
     },
+    Prune {
+        #[arg(short = 'n', long = "dry-run")]
+        dry_run: bool,
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        /// Accepted for compatibility; prune shows no progress
+        #[arg(long = "progress")]
+        progress: bool,
+        #[arg(long = "expire", value_name = "TIME")]
+        expire: Option<String>,
+        #[arg(value_name = "HEAD")]
+        heads: Vec<String>,
+    },
     Fsck {
         #[arg(long = "connectivity-only")]
         connectivity_only: bool,
@@ -644,6 +657,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Gc { prune, reflog_expire, dry_run } => {
             crate::commands::gc(prune, reflog_expire, dry_run)?;
+        }
+        Commands::Prune { dry_run, verbose, progress: _, expire, heads } => {
+            crate::commands::prune(dry_run, verbose, expire, heads)?;
         }
         Commands::Fsck { connectivity_only, no_dangling, unreachable, no_reflogs } => {
             crate::commands::fsck(connectivity_only, no_dangling, unreachable, no_reflogs)?;

@@ -20,7 +20,7 @@ pub fn gc(prune: String, reflog_expire: String, dry_run: bool) -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let prune_cutoff = expiry_cutoff(&prune, now)?;
     let reflog_cutoff = expiry_cutoff(&reflog_expire, now)?;
-    let mut report = plan_gc(prune_cutoff, reflog_cutoff)?;
+    let mut report = plan_gc(prune_cutoff, reflog_cutoff, &[])?;
     report.reflog_entries_expired = expire_all_reflogs(reflog_cutoff, dry_run)?;
 
     if !dry_run {

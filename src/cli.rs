@@ -476,6 +476,15 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    Cherry {
+        #[arg(short = 'v', long = "verbose")]
+        verbose: bool,
+        #[arg(long = "abbrev", value_name = "N", num_args = 0..=1, require_equals = true, default_missing_value = "7")]
+        abbrev: Option<usize>,
+        upstream: Option<String>,
+        head: Option<String>,
+        limit: Option<String>,
+    },
     Worktree {
         #[command(subcommand)]
         action: WorktreeAction,
@@ -855,6 +864,22 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RevList { args } => {
             crate::commands::rev_list(args)?;
+        }
+        Commands::Cherry {
+            verbose,
+            abbrev,
+            upstream,
+            head,
+            limit,
+        } => {
+            let opts = crate::objects::CherryOptions {
+                verbose,
+                abbrev,
+                upstream,
+                head,
+                limit,
+            };
+            crate::commands::cherry(opts)?;
         }
         Commands::Worktree { action } => {
             crate::commands::worktree(action)?;

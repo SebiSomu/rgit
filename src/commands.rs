@@ -36,6 +36,7 @@ pub mod apply;
 pub mod format_patch;
 pub mod am;
 pub mod rev_list;
+pub mod cherry;
 pub mod worktree;
 
 pub use plumbing::*;
@@ -76,6 +77,7 @@ pub use apply::*;
 pub use format_patch::*;
 pub use am::*;
 pub use rev_list::*;
+pub use cherry::*;
 pub use worktree::*;
 
 

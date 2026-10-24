@@ -459,7 +459,10 @@ pub fn diff_tree_file(path: &str, old: Option<([u8; 20], u32)>, new: Option<([u8
     Ok(FileDiff { text, stat, summary })
 }
 
-fn split_diff_lines(bytes: &[u8]) -> Vec<String> {
+/// Splits blob bytes into diff lines, marking a missing final newline the way the hunk
+/// formatter expects.
+// Used by `format-patch` via `diff_tree_file`, and `cherry` patch IDs.
+pub fn split_diff_lines(bytes: &[u8]) -> Vec<String> {
     let text = String::from_utf8_lossy(bytes);
     if text.is_empty() {
         return Vec::new();
@@ -487,6 +490,13 @@ fn display_line(line: &str) -> String {
 /// and the added/deleted line counts.
 // Used by `format-patch` via `diff_tree_file`.
 pub fn unified_hunks(old: &[String], new: &[String]) -> (String, usize, usize) {
+    unified_hunks_with(old, new, true)
+}
+
+/// Same as `unified_hunks`, but the indent heuristic can be turned off: without it, xdiff
+/// leaves each sliding group at its lowest position (as git does when computing patch IDs).
+// Used by `unified_hunks` and `cherry` patch IDs.
+pub fn unified_hunks_with(old: &[String], new: &[String], indent_heuristic: bool) -> (String, usize, usize) {
     let old_refs: Vec<&str> = old.iter().map(String::as_str).collect();
     let new_refs: Vec<&str> = new.iter().map(String::as_str).collect();
     let ops = myers_diff(&old_refs, &new_refs);
@@ -510,8 +520,8 @@ pub fn unified_hunks(old: &[String], new: &[String]) -> (String, usize, usize) {
             }
         }
     }
-    change_compact(&mut rchg_old, old, &mut rchg_new);
-    change_compact(&mut rchg_new, new, &mut rchg_old);
+    change_compact(&mut rchg_old, old, &mut rchg_new, indent_heuristic);
+    change_compact(&mut rchg_new, new, &mut rchg_old, indent_heuristic);
 
     let mut changes: Vec<(usize, usize, usize, usize)> = Vec::new();
     let (mut i, mut j) = (0, 0);
@@ -762,7 +772,7 @@ fn group_slide_up(rchg: &mut [bool], lines: &[String], g: &mut Group) -> bool {
     false
 }
 
-fn change_compact(rchg: &mut [bool], lines: &[String], rchgo: &mut [bool]) {
+fn change_compact(rchg: &mut [bool], lines: &[String], rchgo: &mut [bool], indent_heuristic: bool) {
     let mut g = group_init(rchg);
     let mut go = group_init(rchgo);
 
@@ -798,7 +808,7 @@ fn change_compact(rchg: &mut [bool], lines: &[String], rchgo: &mut [bool]) {
                     group_slide_up(rchg, lines, &mut g);
                     group_previous(rchgo, &mut go);
                 }
-            } else {
+            } else if indent_heuristic {
                 let mut shift = earliest_end as i64;
                 if g.end as i64 - groupsize as i64 - 1 > shift {
                     shift = g.end as i64 - groupsize as i64 - 1;

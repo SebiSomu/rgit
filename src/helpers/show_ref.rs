@@ -4,7 +4,8 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use crate::helpers::check_ref_format::check_refname_format;
 use crate::helpers::read_object;
-use crate::helpers::rev_list::{abbreviate_hash_to, list_all_refs};
+use crate::helpers::cherry::abbreviate_hash_min;
+use crate::helpers::rev_list::list_all_refs;
 use crate::helpers::rev_parse::peel_to_type;
 use crate::objects::ShowRefOptions;
 
@@ -158,7 +159,7 @@ pub fn show_ref_line(out: &mut impl Write, refname: &str, hash: &str, opts: &Sho
     if opts.quiet {
         return Ok(());
     }
-    let show = |h: &str| opts.abbrev.map(|n| abbreviate_hash_to(h, n)).unwrap_or_else(|| h.to_string());
+    let show = |h: &str| opts.abbrev.map(|n| abbreviate_hash_min(h, n)).unwrap_or_else(|| h.to_string());
 
     if opts.hash_only {
         writeln!(out, "{}", show(hash))?;

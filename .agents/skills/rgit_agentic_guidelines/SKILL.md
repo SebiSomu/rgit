@@ -75,6 +75,7 @@ src/
 │   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
 │   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
 │   ├── show_ref.rs           # show-ref (patterns, --head, --heads/--tags, -d, -s/--hash, --abbrev, --verify, --exists, --exclude-existing)
+│   ├── for_each_ref.rs       # for-each-ref (formats/atoms, --sort, --count, filters, quoting, --color, --stdin)
 │   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
 │   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
 │   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
@@ -115,6 +116,8 @@ src/
 │   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
 │   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
 │   ├── show_ref.rs           # show-ref option parsing, pattern matching, ref resolution/existence, output, --exclude-existing
+│   ├── for_each_ref.rs       # for-each-ref: ref-filter port (option/atom parsing, ref collection, filters, values, if/align stack, quoting, versioncmp)
+│   ├── wildmatch.rs          # git wildmatch() port (WM_PATHNAME, WM_CASEFOLD)
 │   ├── log.rs                # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
 │   ├── tag.rs                # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation

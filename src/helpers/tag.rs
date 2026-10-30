@@ -90,8 +90,18 @@ pub fn delete_tag_ref(name: &str) -> anyhow::Result<()> {
 /// Returns `(tag name, depth)`, or `None` when no candidate is an ancestor.
 // Used by `describe`.
 pub fn describe_commit(target: &str, all_tags: bool) -> anyhow::Result<Option<(String, usize)>> {
+    describe_commit_matching(target, all_tags, &|_| true)
+}
+
+/// Same as [`describe_commit`], but only tags whose name (without `refs/tags/`) `accept`s are
+/// candidates, like `describe --match` / `--exclude`.
+// Used by `describe` (via `describe_commit`) and `for-each-ref` (`%(describe:match=...)`).
+pub fn describe_commit_matching(target: &str, all_tags: bool, accept: &dyn Fn(&str) -> bool) -> anyhow::Result<Option<(String, usize)>> {
     let mut by_commit: HashMap<String, (String, bool, i64)> = HashMap::new();
     for (name, object) in list_tag_refs() {
+        if !accept(&name) {
+            continue;
+        }
         let Ok((kind, content)) = read_object(&object) else { continue };
         let annotated = kind == "tag";
         if !annotated && !all_tags {

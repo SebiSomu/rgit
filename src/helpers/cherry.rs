@@ -126,7 +126,8 @@ fn strip_whitespace(text: &str) -> String {
 
 /// Shortens a hash to at least `min_len` characters (clamped to 4..=40), lengthening it until
 /// no other loose object shares the prefix.
-// Used by `cherry --abbrev`.
+// Used by `cherry --abbrev`, `tag`/`describe --abbrev`, `rev-list --abbrev-commit`, `show-ref --hash=<n>` / `--abbrev`,
+// and `for-each-ref` (`%(objectname:short)`).
 pub fn abbreviate_hash_min(hash: &str, min_len: usize) -> String {
     let others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
         .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())

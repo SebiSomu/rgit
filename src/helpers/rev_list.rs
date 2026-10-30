@@ -796,21 +796,7 @@ pub fn build_commit_filter(opts: &RevListOptions) -> anyhow::Result<impl Fn(&Par
 /// Shortens a hash to the shortest unique prefix of at least 7 characters among loose objects.
 // Used by `rev-list --abbrev-commit` / `--oneline`.
 pub fn abbreviate_hash(hash: &str) -> String {
-    abbreviate_hash_to(hash, 7)
-}
-
-/// Shortens a hash to the shortest prefix of at least `min_len` characters (clamped to 4..=40,
-/// like git) that no other loose object shares.
-// Used by `abbreviate_hash` and `show-ref --hash=<n>` / `--abbrev=<n>`.
-pub fn abbreviate_hash_to(hash: &str, min_len: usize) -> String {
-    let others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
-        .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
-        .unwrap_or_default();
-    let mut len = min_len.clamp(4, hash.len());
-    while len < hash.len() && others.iter().any(|o| o.starts_with(&hash[..len])) {
-        len += 1;
-    }
-    hash[..len].to_string()
+    crate::helpers::cherry::abbreviate_hash_min(hash, 7)
 }
 
 /// Expands a `--format` template for one commit. Supports `%H %h %T %t %P %p`, author

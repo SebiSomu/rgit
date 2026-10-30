@@ -73,19 +73,30 @@ pub fn set_head_detached(hash: &str) -> Result<()> {
     Ok(())
 }
 
-/// Reads the commit hash associated with a specific reference file.
+/// Reads the commit hash associated with a specific reference file, falling back to its
+/// `packed-refs` entry when there is no loose file.
 /// Returns `None` if the reference does not exist.
 // Used widely by branch management, switching, checkout, commits, and logs.
 pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
     let path = repo::path(format!(".git/{}", ref_name));
 
     if !Path::new(&path).exists() {
-        return Ok(None);
+        return Ok(read_packed_ref(ref_name));
     }
 
     let content = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read ref: {}", ref_name))?;
     Ok(Some(content.trim().to_string()))
+}
+
+/// Looks a ref up in `.git/packed-refs` (ignoring the header and `^` peeled lines).
+// Used by `read_ref`.
+fn read_packed_ref(ref_name: &str) -> Option<String> {
+    let packed = fs::read_to_string(repo::path(".git/packed-refs")).ok()?;
+    packed.lines().find_map(|line| match line.split_once(' ') {
+        Some((hash, name)) if name == ref_name && hash.len() == 40 && !line.starts_with('#') && !line.starts_with('^') => Some(hash.to_string()),
+        _ => None,
+    })
 }
 
 /// Writes a commit hash to the specified reference file under `.git/`.

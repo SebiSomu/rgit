@@ -544,6 +544,11 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    ShowRef {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
     MergeTree {
         #[arg(long = "write-tree")]
         write_tree: bool,
@@ -584,7 +589,8 @@ pub enum Commands {
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
-/// `show` and `rev-list` need it to tell paths from revisions.
+/// `show` and `rev-list` need it to tell paths from revisions, and `show-ref` to tell patterns
+/// from options.
 fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().position(|a| a == subcommand) {
@@ -1012,6 +1018,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RevList { args } => {
             crate::commands::rev_list(raw_args_after("rev-list", args))?;
+        }
+        Commands::ShowRef { args } => {
+            crate::commands::show_ref(raw_args_after("show-ref", args))?;
         }
         Commands::MergeTree {
             write_tree: _,

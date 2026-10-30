@@ -74,6 +74,7 @@ src/
 │   ├── format_patch.rs       # format-patch (-<n>, --root, --stdout, -o, -n/-N, --start-number, --subject-prefix, -k, --signature)
 │   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
 │   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
+│   ├── show_ref.rs           # show-ref (patterns, --head, --heads/--tags, -d, -s/--hash, --abbrev, --verify, --exists, --exclude-existing)
 │   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
 │   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
 │   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
@@ -113,6 +114,7 @@ src/
 │   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
 │   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
 │   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
+│   ├── show_ref.rs           # show-ref option parsing, pattern matching, ref resolution/existence, output, --exclude-existing
 │   ├── log.rs                # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
 │   ├── tag.rs                # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation

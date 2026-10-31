@@ -136,6 +136,18 @@ pub fn record_symref_update(ref_name: &str, old_hash: Option<&str>, new_hash: &s
     let _ = append_reflog_entry_with_message(ref_name, old_hash, Some(new_hash), clean_reflog_message(message));
 }
 
+/// Records a ref change made by `update-ref` with its `-m` message (empty when none was
+/// given). Refs outside the default logged set get an entry only when they already have a
+/// reflog or `force_create` (`--create-reflog`) is set; `new_hash: None` logs a deletion
+/// (used for HEAD when the branch it is on is deleted). Best effort, like `record_ref_update`.
+// Used by `update-ref`.
+pub fn record_ref_change(ref_name: &str, old_hash: Option<&str>, new_hash: Option<&str>, message: &str, force_create: bool) {
+    if !force_create && !is_logged_ref(ref_name) && !Path::new(&reflog_file(ref_name)).is_file() {
+        return;
+    }
+    let _ = append_reflog_entry_with_message(ref_name, old_hash, new_hash, clean_reflog_message(message));
+}
+
 /// Reads a ref's reflog, newest entry first (so index `n` is `<ref>@{n}`). A missing log is
 /// an empty one; lines that don't parse are skipped.
 // Used by the `reflog` command and `resolve_reflog_revision`.

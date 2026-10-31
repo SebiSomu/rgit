@@ -454,3 +454,52 @@ pub fn list_remote_tracking_branches(remote_name: &str) -> Result<Vec<String>> {
     branches.sort();
     Ok(branches)
 }
+
+/// Removes a ref's entry (and the `^` peeled line that follows it) from `.git/packed-refs`,
+/// leaving the file untouched when the ref isn't packed. Returns whether anything was removed.
+// Used by `update-ref` (deletions).
+pub fn remove_packed_ref(ref_name: &str) -> Result<bool> {
+    let path = repo::path(".git/packed-refs");
+    let Ok(packed) = fs::read_to_string(&path) else { return Ok(false) };
+
+    let mut out = String::with_capacity(packed.len());
+    let mut removed = false;
+    let mut skipping_peeled = false;
+    for line in packed.split_inclusive('\n') {
+        if skipping_peeled && line.starts_with('^') {
+            continue;
+        }
+        skipping_peeled = false;
+        let is_entry = !line.starts_with('#') && !line.starts_with('^');
+        if is_entry && line.trim_end().split_once(' ').is_some_and(|(_, name)| name == ref_name) {
+            removed = true;
+            skipping_peeled = true;
+            continue;
+        }
+        out.push_str(line);
+    }
+
+    if removed {
+        let lock = repo::path(".git/packed-refs.lock");
+        fs::write(&lock, out).context("Failed to write .git/packed-refs.lock")?;
+        fs::rename(&lock, &path).context("Failed to update .git/packed-refs")?;
+    }
+    Ok(removed)
+}
+
+/// Removes the directories above a deleted ref file that became empty, stopping at
+/// `.git/refs` (and never touching anything outside it).
+// Used by `symbolic-ref --delete` and `update-ref` (deletions).
+pub fn prune_empty_ref_dirs(ref_file: &Path) {
+    let refs_root = repo::path(".git/refs");
+    let mut parent = ref_file.parent();
+    while let Some(dir) = parent {
+        if dir == refs_root || !dir.starts_with(&refs_root) {
+            break;
+        }
+        if fs::read_dir(dir).map(|mut d| d.next().is_some()).unwrap_or(true) || fs::remove_dir(dir).is_err() {
+            break;
+        }
+        parent = dir.parent();
+    }
+}

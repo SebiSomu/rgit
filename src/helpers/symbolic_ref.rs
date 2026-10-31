@@ -154,7 +154,7 @@ pub fn resolve_ref_unsafe(name: &str, recurse: bool, reading: bool) -> Option<Re
 }
 
 /// Lists the names in `.git/packed-refs` (skipping the header and `^` peeled lines).
-// Used by `check_symref_conflicts`.
+// Used by `check_ref_creation_conflicts`.
 fn packed_ref_names() -> Vec<String> {
     let Ok(packed) = fs::read_to_string(repo::path(".git/packed-refs")) else { return Vec::new() };
     packed
@@ -165,7 +165,7 @@ fn packed_ref_names() -> Vec<String> {
 }
 
 /// Says whether a directory tree contains any file at all.
-// Used by `check_symref_conflicts`.
+// Used by `check_ref_creation_conflicts`.
 fn dir_has_files(dir: &Path) -> bool {
     let Ok(entries) = fs::read_dir(dir) else { return false };
     entries.flatten().any(|e| {
@@ -177,8 +177,8 @@ fn dir_has_files(dir: &Path) -> bool {
 /// Checks that a ref file can be created at `name`, with git's "cannot lock ref" errors: no
 /// existing ref (loose or packed) may be a path prefix of it or have it as a prefix, and a
 /// directory in its place is only allowed (and removed) when it holds no files.
-// Used by `write_symbolic_ref`.
-fn check_symref_conflicts(name: &str) -> anyhow::Result<()> {
+// Used by `write_symbolic_ref` and `update-ref` (creating refs).
+pub fn check_ref_creation_conflicts(name: &str) -> anyhow::Result<()> {
     let lock_error = |reason: String| anyhow::anyhow!("error: cannot lock ref '{}': {}", name, reason);
     let packed = packed_ref_names();
 
@@ -220,7 +220,7 @@ pub fn write_symbolic_ref(name: &str, target: &str, message: Option<&str>) -> an
         anyhow::bail!("error: refusing to update ref with bad name '{}'", name);
     }
     if name.starts_with("refs/") {
-        check_symref_conflicts(name)?;
+        check_ref_creation_conflicts(name)?;
     }
 
     let old_hash = resolve_ref_unsafe(name, true, false).and_then(|r| r.hash);
@@ -245,18 +245,6 @@ pub fn delete_symbolic_ref(name: &str) -> anyhow::Result<()> {
     let path = repo::path(format!(".git/{}", name));
     fs::remove_file(&path).with_context(|| format!("error: unable to delete ref '{}'", name))?;
     delete_reflog(name);
-
-    let refs_root = repo::path(".git/refs");
-    let git_root = repo::path(".git");
-    let mut parent = path.parent();
-    while let Some(dir) = parent {
-        if dir == refs_root || dir == git_root || !dir.starts_with(&refs_root) {
-            break;
-        }
-        if fs::read_dir(dir).map(|mut d| d.next().is_some()).unwrap_or(true) || fs::remove_dir(dir).is_err() {
-            break;
-        }
-        parent = dir.parent();
-    }
+    crate::refs::prune_empty_ref_dirs(&path);
     Ok(())
 }

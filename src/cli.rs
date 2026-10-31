@@ -560,6 +560,11 @@ pub enum Commands {
         args: Vec<String>,
     },
     #[command(disable_help_flag = true)]
+    PackRefs {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
     ForEachRef {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
@@ -1042,6 +1047,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::UpdateRef { args } => {
             crate::commands::update_ref(raw_args_after("update-ref", args))?;
+        }
+        Commands::PackRefs { args } => {
+            crate::commands::pack_refs(raw_args_after("pack-refs", args))?;
         }
         Commands::ForEachRef { args } => {
             crate::commands::for_each_ref(raw_args_after("for-each-ref", args))?;

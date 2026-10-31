@@ -127,19 +127,34 @@ pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
     Ok(())
 }
 
-/// Returns a sorted list of all branch names located in `.git/refs/heads/`.
+/// Returns a sorted list of all branch names, loose (`.git/refs/heads/`) and packed.
 // Used by the `branch` command (list mode).
 pub fn list_branches() -> Result<Vec<String>> {
     let heads_dir = repo::path(".git/refs/heads");
 
-    if !heads_dir.exists() {
-        return Ok(Vec::new());
-    }
-
     let mut branches = Vec::new();
-    collect_branches(&heads_dir, "", &mut branches)?;
+    if heads_dir.exists() {
+        collect_branches(&heads_dir, "", &mut branches)?;
+    }
+    branches.extend(packed_ref_names_under("refs/heads/"));
     branches.sort();
+    branches.dedup();
     Ok(branches)
+}
+
+/// Lists the names in `.git/packed-refs` under `prefix`, with the prefix stripped
+/// (`refs/heads/` → `main`, `feature/x`).
+// Used by `list_branches`, `list_tags` and `list_remote_tracking_branches`.
+fn packed_ref_names_under(prefix: &str) -> Vec<String> {
+    let Ok(packed) = fs::read_to_string(repo::path(".git/packed-refs")) else { return Vec::new() };
+    packed
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.starts_with('^'))
+        .filter_map(|line| line.split_once(' '))
+        .filter(|(hash, _)| hash.len() == 40)
+        .filter_map(|(_, name)| name.strip_prefix(prefix))
+        .map(|name| name.to_string())
+        .collect()
 }
 
 /// Recursively walks `.git/refs/heads/` to collect all branch names (supporting nested hierarchies).
@@ -174,7 +189,7 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
     let ref_name = format!("refs/heads/{}", name);
     let path = repo::path(format!(".git/{}", ref_name));
 
-    if Path::new(&path).exists() {
+    if Path::new(&path).exists() || read_packed_ref(&ref_name).is_some() {
         anyhow::bail!("fatal: a branch named '{}' already exists", name);
     }
 
@@ -220,18 +235,23 @@ pub fn set_head(branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Deletes the reference file for a branch and cleans up empty parent folders.
+/// Deletes a branch, loose file and `packed-refs` entry alike, and cleans up empty parent
+/// folders.
 // Used by `branch -d` and `branch -D` commands.
 pub fn delete_branch(name: &str) -> Result<()> {
     let ref_path = format!("refs/heads/{}", name);
     let fs_path = repo::path(format!(".git/{}", ref_path));
 
-    if !Path::new(&fs_path).exists() {
+    let loose = Path::new(&fs_path).is_file();
+    if !loose && read_packed_ref(&ref_path).is_none() {
         anyhow::bail!("error: branch '{}' not found.", name);
     }
 
-    fs::remove_file(&fs_path)
-        .with_context(|| format!("Failed to delete branch '{}'", name))?;
+    if loose {
+        fs::remove_file(&fs_path)
+            .with_context(|| format!("Failed to delete branch '{}'", name))?;
+    }
+    remove_packed_ref(&ref_path)?;
     crate::helpers::reflog::delete_reflog(&ref_path);
 
     let mut parent = Path::new(&fs_path).parent();
@@ -266,10 +286,11 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
     let old_path = repo::path(format!(".git/{}", old_ref));
     let new_path = repo::path(format!(".git/{}", new_ref));
 
-    if !Path::new(&old_path).exists() {
+    let old_loose = Path::new(&old_path).is_file();
+    let Some(old_hash) = read_ref(&old_ref)? else {
         anyhow::bail!("error: branch '{}' not found.", old);
-    }
-    if Path::new(&new_path).exists() {
+    };
+    if Path::new(&new_path).exists() || read_packed_ref(&new_ref).is_some() {
         anyhow::bail!("fatal: a branch named '{}' already exists.", new);
     }
 
@@ -277,7 +298,13 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
         fs::create_dir_all(parent)?;
     }
 
-    fs::rename(&old_path, &new_path).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
+    // A packed branch has no file to move: it gets a loose file under its new name instead.
+    if old_loose {
+        fs::rename(&old_path, &new_path).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
+    } else {
+        fs::write(&new_path, format!("{}\n", old_hash)).with_context(|| format!("Failed to rename branch '{}' to '{}'", old, new))?;
+    }
+    remove_packed_ref(&old_ref)?;
     crate::helpers::reflog::rename_reflog(&old_ref, &new_ref);
 
     let head_content = fs::read_to_string(repo::path(".git/HEAD")).unwrap_or_default();
@@ -349,20 +376,20 @@ pub fn is_valid_branch_name(name: &str) -> bool {
     true
 }
 
-/// Returns a sorted list of all tag names located in `.git/refs/tags/`.
+/// Returns a sorted list of all tag names, loose (`.git/refs/tags/`) and packed.
 /// Reuses `collect_branches` (a generic ref-directory walker despite its
 /// name) rather than duplicating the recursive-directory logic.
 // Used by the `tag` command (list mode).
 pub fn list_tags() -> Result<Vec<String>> {
     let tags_dir = repo::path(".git/refs/tags");
 
-    if !tags_dir.exists() {
-        return Ok(Vec::new());
-    }
-
     let mut tags = Vec::new();
-    collect_branches(&tags_dir, "", &mut tags)?;
+    if tags_dir.exists() {
+        collect_branches(&tags_dir, "", &mut tags)?;
+    }
+    tags.extend(packed_ref_names_under("refs/tags/"));
     tags.sort();
+    tags.dedup();
     Ok(tags)
 }
 
@@ -378,7 +405,7 @@ pub fn create_tag(name: &str, commit_hash: &str) -> Result<()> {
     let ref_name = format!("refs/tags/{}", name);
     let path = repo::path(format!(".git/{}", ref_name));
 
-    if Path::new(&path).exists() {
+    if Path::new(&path).exists() || read_packed_ref(&ref_name).is_some() {
         anyhow::bail!("fatal: tag '{}' already exists", name);
     }
 
@@ -407,18 +434,22 @@ pub fn create_tag(name: &str, commit_hash: &str) -> Result<()> {
     Ok(())
 }
 
-/// Deletes the reference file for a tag and cleans up empty parent folders.
+/// Deletes a tag, loose file and `packed-refs` entry alike, and cleans up empty parent folders.
 // Used by `tag -d`.
 pub fn delete_tag(name: &str) -> Result<()> {
     let ref_path = format!("refs/tags/{}", name);
     let fs_path = repo::path(format!(".git/{}", ref_path));
 
-    if !Path::new(&fs_path).exists() {
+    let loose = Path::new(&fs_path).is_file();
+    if !loose && read_packed_ref(&ref_path).is_none() {
         anyhow::bail!("error: tag '{}' not found.", name);
     }
 
-    fs::remove_file(&fs_path)
-        .with_context(|| format!("Failed to delete tag '{}'", name))?;
+    if loose {
+        fs::remove_file(&fs_path)
+            .with_context(|| format!("Failed to delete tag '{}'", name))?;
+    }
+    remove_packed_ref(&ref_path)?;
 
     let mut parent = Path::new(&fs_path).parent();
     while let Some(p) = parent {
@@ -444,14 +475,15 @@ pub fn delete_tag(name: &str) -> Result<()> {
 // Used by `clone`.
 pub fn list_remote_tracking_branches(remote_name: &str) -> Result<Vec<String>> {
     let dir = repo::path(format!(".git/refs/remotes/{}", remote_name));
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
- 
+
     let mut branches = Vec::new();
-    collect_branches(&dir, "", &mut branches)?;
+    if dir.exists() {
+        collect_branches(&dir, "", &mut branches)?;
+    }
+    branches.extend(packed_ref_names_under(&format!("refs/remotes/{}/", remote_name)));
     branches.retain(|b| b != "HEAD");
     branches.sort();
+    branches.dedup();
     Ok(branches)
 }
 
@@ -487,14 +519,16 @@ pub fn remove_packed_ref(ref_name: &str) -> Result<bool> {
     Ok(removed)
 }
 
-/// Removes the directories above a deleted ref file that became empty, stopping at
-/// `.git/refs` (and never touching anything outside it).
-// Used by `symbolic-ref --delete` and `update-ref` (deletions).
+/// Removes the directories above a deleted ref file that became empty, like git's
+/// `try_remove_empty_parents`: the first two levels (`refs/heads`, `refs/tags`,
+/// `refs/custom`, ...) always stay, and nothing outside `.git/refs` is touched.
+// Used by `symbolic-ref --delete`, `update-ref` (deletions) and `pack-refs` (pruning).
 pub fn prune_empty_ref_dirs(ref_file: &Path) {
     let refs_root = repo::path(".git/refs");
     let mut parent = ref_file.parent();
     while let Some(dir) = parent {
-        if dir == refs_root || !dir.starts_with(&refs_root) {
+        let depth = dir.strip_prefix(&refs_root).map(|rel| rel.components().count()).unwrap_or(0);
+        if depth < 2 {
             break;
         }
         if fs::read_dir(dir).map(|mut d| d.next().is_some()).unwrap_or(true) || fs::remove_dir(dir).is_err() {

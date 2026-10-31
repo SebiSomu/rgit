@@ -90,8 +90,8 @@ pub fn read_ref(ref_name: &str) -> Result<Option<String>> {
 }
 
 /// Looks a ref up in `.git/packed-refs` (ignoring the header and `^` peeled lines).
-// Used by `read_ref`.
-fn read_packed_ref(ref_name: &str) -> Option<String> {
+// Used by `read_ref` and `symbolic-ref` (raw ref reads).
+pub fn read_packed_ref(ref_name: &str) -> Option<String> {
     let packed = fs::read_to_string(repo::path(".git/packed-refs")).ok()?;
     packed.lines().find_map(|line| match line.split_once(' ') {
         Some((hash, name)) if name == ref_name && hash.len() == 40 && !line.starts_with('#') && !line.starts_with('^') => Some(hash.to_string()),

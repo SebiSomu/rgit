@@ -28,15 +28,21 @@ static REFLOG_ACTION: Mutex<String> = Mutex::new(String::new());
 /// the text is cut to `MAX_MESSAGE_LEN`, so an entry always stays on one line.
 // Used by `handle_commands` and the `commit` command.
 pub fn set_reflog_action(message: &str) {
+    let cleaned = clean_reflog_message(message);
+    if let Ok(mut action) = REFLOG_ACTION.lock() {
+        *action = cleaned;
+    }
+}
+
+/// Makes a message safe for a reflog line: control characters become spaces, surrounding
+/// whitespace is trimmed and the text is cut to `MAX_MESSAGE_LEN`.
+// Used by `set_reflog_action` and `record_symref_update`.
+fn clean_reflog_message(message: &str) -> String {
     let cleaned: String = message
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
         .collect();
-    let cleaned: String = cleaned.trim().chars().take(MAX_MESSAGE_LEN).collect();
-
-    if let Ok(mut action) = REFLOG_ACTION.lock() {
-        *action = cleaned;
-    }
+    cleaned.trim().chars().take(MAX_MESSAGE_LEN).collect()
 }
 
 /// Returns the message to record for the current command.
@@ -65,6 +71,12 @@ fn is_logged_ref(ref_name: &str) -> bool {
 /// time.
 // Used by `record_ref_update` and `record_head_move`.
 fn append_reflog_entry(ref_name: &str, old_hash: Option<&str>, new_hash: Option<&str>) -> Result<()> {
+    append_reflog_entry_with_message(ref_name, old_hash, new_hash, current_reflog_action())
+}
+
+/// Appends one entry with an explicit message (possibly empty) to a ref's reflog.
+// Used by `append_reflog_entry` and `record_symref_update`.
+fn append_reflog_entry_with_message(ref_name: &str, old_hash: Option<&str>, new_hash: Option<&str>, message: String) -> Result<()> {
     let identity = author_identity().unwrap_or_else(|_| "rgit <rgit@example.com>".to_string());
     let entry = ReflogEntry {
         old_hash: old_hash.unwrap_or(NULL_HASH).to_string(),
@@ -72,7 +84,7 @@ fn append_reflog_entry(ref_name: &str, old_hash: Option<&str>, new_hash: Option<
         identity,
         timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         tz: "+0000".to_string(),
-        message: current_reflog_action(),
+        message,
     };
 
     let path = reflog_file(ref_name);
@@ -108,6 +120,20 @@ pub fn record_head_move(old_hash: Option<&str>, new_hash: Option<&str>) {
         return;
     }
     let _ = append_reflog_entry("HEAD", old_hash, new_hash);
+}
+
+/// Records a symbolic-ref update in the reflog of `ref_name` with the given message (empty
+/// when `symbolic-ref` got no `-m`, which git writes as a line without a message). Unlike
+/// `record_ref_update`, an entry is written even when the commit stays the same (pointing
+/// HEAD at another branch at the same commit is still a move), and refs outside the default
+/// logged set are logged when they already have a reflog, as git does. Best effort, like
+/// `record_ref_update`.
+// Used by `symbolic-ref`.
+pub fn record_symref_update(ref_name: &str, old_hash: Option<&str>, new_hash: &str, message: &str) {
+    if !is_logged_ref(ref_name) && !Path::new(&reflog_file(ref_name)).is_file() {
+        return;
+    }
+    let _ = append_reflog_entry_with_message(ref_name, old_hash, Some(new_hash), clean_reflog_message(message));
 }
 
 /// Reads a ref's reflog, newest entry first (so index `n` is `<ref>@{n}`). A missing log is

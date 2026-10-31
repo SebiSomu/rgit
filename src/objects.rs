@@ -484,12 +484,11 @@ pub struct ReflogEntry {
 }
 
 impl ReflogEntry {
-    /// Renders the entry as one line of a reflog file (without the trailing newline).
+    /// Renders the entry as one line of a reflog file (without the trailing newline). An
+    /// empty message is written without the tab, as git does.
     pub fn to_line(&self) -> String {
-        format!(
-            "{} {} {} {} {}\t{}",
-            self.old_hash, self.new_hash, self.identity, self.timestamp, self.tz, self.message
-        )
+        let head = format!("{} {} {} {} {}", self.old_hash, self.new_hash, self.identity, self.timestamp, self.tz);
+        if self.message.is_empty() { head } else { format!("{}\t{}", head, self.message) }
     }
 
     /// Parses one line of a reflog file; `None` if it is malformed.
@@ -2046,3 +2045,53 @@ pub enum RefDateKind {
 // Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
 // Used by command/helper: `prepare_ref_format` and `format_ref_item`
 pub type RefFormatPiece = (Option<String>, Option<usize>);
+
+/// Parsed arguments for the `symbolic-ref` command. Parsed by hand like git's option parser
+/// (bundled switches such as `-qd`, `-m<reason>` or `-m <reason>`, options after the names,
+/// `--` ending option parsing), so usage errors can exit 129 as git does.
+// Used by: src/helpers/symbolic_ref.rs, src/commands/symbolic_ref.rs
+// Used by command/helper: `parse_symbolic_ref_args` and the `symbolic_ref` command
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SymbolicRefOptions {
+    /// `-q` / `--quiet`: exit 1 silently instead of failing when the ref is not symbolic.
+    pub quiet: bool,
+    /// `-d` / `--delete`: delete the symbolic ref itself (never what it points at).
+    pub delete: bool,
+    /// `--short`: print the target shortened (`refs/heads/main` → `main`).
+    pub short: bool,
+    /// `--[no-]recurse`: follow chains of symbolic refs to the last one (default on).
+    pub recurse: bool,
+    /// `-m <reason>`: reflog message for an update; without it no reflog entry is written.
+    pub message: Option<String>,
+    /// `<name>` and, when setting, `<ref>`.
+    pub args: Vec<String>,
+}
+
+impl Default for SymbolicRefOptions {
+    fn default() -> Self {
+        Self { quiet: false, delete: false, short: false, recurse: true, message: None, args: Vec::new() }
+    }
+}
+
+/// What a single ref file (or `packed-refs` entry) holds, read without following symbolic
+/// refs: nothing, an object hash, a `ref: <target>` pointer, or contents that are neither.
+// Used by: src/helpers/symbolic_ref.rs
+// Used by command/helper: `read_raw_ref_value` and `resolve_ref_unsafe` (for the `symbolic-ref` command)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RawRefValue {
+    Missing,
+    Hash(String),
+    Symbolic(String),
+    Broken,
+}
+
+/// The result of resolving a ref name the way git's `resolve_ref_unsafe` does: the ref name
+/// the walk ended on, its hash when that ref exists, and whether any symbolic ref was followed.
+// Used by: src/helpers/symbolic_ref.rs, src/commands/symbolic_ref.rs
+// Used by command/helper: `resolve_ref_unsafe` and the `symbolic_ref` command
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRef {
+    pub name: String,
+    pub hash: Option<String>,
+    pub is_symref: bool,
+}

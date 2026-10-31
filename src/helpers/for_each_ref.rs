@@ -1412,6 +1412,14 @@ fn rstrip_ref(refname: &str, n: i64) -> String {
 // Used by `for-each-ref` (`:short`).
 pub fn shorten_unambiguous_ref(refname: &str) -> String {
     let strict = get_config_value("core.warnambiguousrefs").ok().flatten().and_then(|v| parse_maybe_bool(&v)).unwrap_or(true);
+    shorten_unambiguous_ref_with(refname, strict)
+}
+
+/// Shortens a full ref name like `shorten_unambiguous_ref`, with the strictness given by the
+/// caller: strict mode needs every other rule to miss, non-strict only the rules before the
+/// matching one (what `symbolic-ref --short` uses).
+// Used by `shorten_unambiguous_ref` and `symbolic-ref --short`.
+pub fn shorten_unambiguous_ref_with(refname: &str, strict: bool) -> String {
     for i in (1..SHORTEN_RULES.len()).rev() {
         let (prefix, suffix) = SHORTEN_RULES[i];
         let Some(short) = refname.strip_prefix(prefix).and_then(|r| r.strip_suffix(suffix)) else { continue };

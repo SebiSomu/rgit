@@ -550,6 +550,11 @@ pub enum Commands {
         args: Vec<String>,
     },
     #[command(disable_help_flag = true)]
+    SymbolicRef {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
     ForEachRef {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
@@ -1026,6 +1031,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::ShowRef { args } => {
             crate::commands::show_ref(raw_args_after("show-ref", args))?;
+        }
+        Commands::SymbolicRef { args } => {
+            crate::commands::symbolic_ref(raw_args_after("symbolic-ref", args))?;
         }
         Commands::ForEachRef { args } => {
             crate::commands::for_each_ref(raw_args_after("for-each-ref", args))?;

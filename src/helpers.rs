@@ -59,6 +59,10 @@ pub mod show_branch;
 pub mod last_modified;
 pub mod repo_info;
 pub mod range_diff;
+pub mod hook;
+pub mod maintenance;
+pub mod replay;
+pub mod rerere;
 
 pub use objects::*;
 pub use diff::*;

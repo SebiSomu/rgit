@@ -681,6 +681,31 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    Hook {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Maintenance {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    ForEachRepo {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Replay {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Rerere {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -1227,6 +1252,21 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RangeDiff { args } => {
             crate::commands::range_diff(raw_args_after("range-diff", args))?;
+        }
+        Commands::Hook { args } => {
+            crate::commands::hook(raw_args_after("hook", args))?;
+        }
+        Commands::Maintenance { args } => {
+            crate::commands::maintenance(raw_args_after("maintenance", args))?;
+        }
+        Commands::ForEachRepo { args } => {
+            crate::commands::for_each_repo(raw_args_after("for-each-repo", args))?;
+        }
+        Commands::Replay { args } => {
+            crate::commands::replay(raw_args_after("replay", args))?;
+        }
+        Commands::Rerere { args } => {
+            crate::commands::rerere(raw_args_after("rerere", args))?;
         }
     }
 

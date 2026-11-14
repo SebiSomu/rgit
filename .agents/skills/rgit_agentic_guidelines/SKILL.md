@@ -92,7 +92,11 @@ src/
 │   ├── show_branch.rs        # show-branch (-a, -r, --current, --more, --list, --independent, --merge-base, --topics, --sparse, ...)
 │   ├── range_diff.rs         # range-diff (--creation-factor, --left-only, --right-only, -s; two ranges, A...B, base tip1 tip2)
 │   ├── last_modified.rs      # last-modified (-r, -t, -z, <revision-range>, paths)
-│   └── repo_info.rs          # repo (info, structure)
+│   ├── repo_info.rs          # repo (info, structure)
+│   ├── hook.rs               # hook run (--ignore-missing, --to-stdin)
+│   ├── maintenance.rs        # maintenance (run, register, unregister), for-each-repo (--config, --keep-going)
+│   ├── replay.rs             # replay (--onto | --advance, --contained, ranges)
+│   └── rerere.rs             # rerere (record/replay, clear, forget, diff, status, remaining, gc)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
@@ -149,7 +153,11 @@ src/
 │   ├── show_branch.rs        # git show-branch.c port: tip collection, join_revs walk, topo sort, commit naming, column display
 │   ├── range_diff.rs         # git range-diff.c port: normalized patches, exact matches, linear assignment, pair output
 │   ├── last_modified.rs      # Per-path last-change lookup over a range (recursion, trees, boundary commits)
-│   └── repo_info.rs          # repo info keys, repo structure counts, table/key-value output
+│   ├── repo_info.rs          # repo info keys, repo structure counts, table/key-value output
+│   ├── hook.rs               # Hook lookup (core.hooksPath, executable check) and execution
+│   ├── maintenance.rs        # Config path lists, running rgit in other repos, maintenance tasks, maintenance.repo registration
+│   ├── replay.rs             # In-memory commit replay onto a new base, update-ref command output
+│   └── rerere.rs             # Conflict normalization and IDs, rr-cache store, MERGE_RR, resolution replay
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

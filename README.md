@@ -68,6 +68,10 @@ A lightweight, fully functional Git implementation written in Rust.
   - `range_diff.rs`: A port of git's `range-diff.c`: normalized per-commit patches, exact matching, the Jonker-Volgenant linear assignment over diff-of-diffs costs, and the pair listing with patch comparisons.
   - `last_modified.rs`: Per-path last-change lookup over a revision range, with recursion, tree entries, path arguments and boundary commits.
   - `repo_info.rs`: `repo info` keys and `repo structure` ref / reachable-object counts with table and key-value output.
+  - `hook.rs`: Hook lookup (`core.hooksPath`, executable check) and execution with arguments and standard input.
+  - `maintenance.rs`: Multi-valued path config lists, running rgit in other repositories, maintenance task selection and execution, and `maintenance.repo` registration.
+  - `replay.rs`: In-memory replay of commit ranges onto a new base (three-way tree merges, preserved authorship) and `update-ref` command output.
+  - `rerere.rs`: git's conflict normalization and conflict IDs, the `rr-cache` preimage/postimage store, `MERGE_RR`, resolution replay by three-way merge, and `forget` / `clear` / `gc` / `diff`.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -128,6 +132,8 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`rebase`** (`<upstream>`, `-i`, `--continue`, `--abort`, `--skip`, `--edit-todo`): Full interactive rebase with `pick`, `reword`, `edit`, `squash`, `fixup`, and `drop` instructions.
 - **`cherry-pick <commit>`** (`--no-commit`, `--continue`, `--abort`): Replays a single commit onto current HEAD with state recording.
 - **`revert <commit>`** (`--no-commit`, `--continue`, `--abort`): Inverts and applies target commit changes.
+- **`replay`** (`--onto <newbase>` | `--advance <branch>`, `--contained`, `<revision-range>...`): Re-creates commits on a new base in the object store only, without touching the working tree, index or refs, and prints `update <ref> <new> <old>` lines for `update-ref --stdin` (git 2.44's command). Exits 1 without output when a commit conflicts.
+- **`rerere`** (`clear`, `forget <path>...`, `diff`, `status`, `remaining`, `gc`): Records how conflicts were resolved in `.git/rr-cache` (git's format) and applies the recorded resolution when the same conflict shows up again. Run it by hand after a conflict and again after resolving: rgit's `merge`, `rebase` and `commit` don't call it, and conflicts are detected by their markers.
 
 ### State & Recovery
 
@@ -161,6 +167,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`fsck`** (`--connectivity-only`, `--no-dangling`, `--unreachable`, `--no-reflogs`): Verifies object integrity and connectivity, validates refs and the index, and reports dangling or unreachable objects.
 - **`count-objects`** (`-v|--verbose`, `-H|--human-readable`): Reports loose object count and disk usage; verbose mode adds pack, prune-packable, and garbage statistics.
 - **`repo`** (`info [--format=keyvalue|nul] [--all | <key>...]`, `structure [--format=table|keyvalue|nul]`): Prints repository facts (`layout.bare`, `layout.shallow`, `object.format`, `references.format`) and counts of refs and reachable objects (git 2.52's command).
+- **`hook run`** (`--ignore-missing`, `--to-stdin=<path>`, `<hook-name> [-- <hook-args>]`): Runs a hook script from `.git/hooks` or `core.hooksPath` and exits with its status. rgit's own commands do not fire hooks yet.
+- **`for-each-repo`** (`--config=<key>`, `--keep-going`, `<arguments>`): Runs `rgit <arguments>` in every repository listed under a multi-valued config key.
+- **`maintenance`** (`run [--auto] [--quiet] [--task=<task>]`, `register`, `unregister [--force]`): Runs upkeep tasks (`gc`, `pack-refs`; the packfile and commit-graph tasks are accepted but skipped) and manages the global `maintenance.repo` list. No `start` / `stop` scheduler.
 
 ### Plumbing Commands
 

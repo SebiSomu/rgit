@@ -60,6 +60,10 @@ pub mod show_branch;
 pub mod last_modified;
 pub mod repo_info;
 pub mod range_diff;
+pub mod hook;
+pub mod maintenance;
+pub mod replay;
+pub mod rerere;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -123,3 +127,7 @@ pub use show_branch::*;
 pub use last_modified::*;
 pub use repo_info::*;
 pub use range_diff::*;
+pub use hook::*;
+pub use maintenance::*;
+pub use replay::*;
+pub use rerere::*;

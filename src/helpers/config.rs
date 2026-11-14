@@ -253,6 +253,19 @@ pub fn get_config_value(key: &str) -> Result<Option<String>> {
     }
 }
 
+/// Returns every configuration entry as `(key, value)` in the order git reads them: the
+/// global file first, then the repository's, so later entries override earlier ones and
+/// multi-valued keys keep all their values.
+// Used by `interpret-trailers` (`trailer.*`) and `fmt-merge-msg` (`merge.suppressDest`).
+pub fn read_all_config_entries() -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    if let Some(global) = global_config_path() {
+        entries.extend(read_entries_from(&global).unwrap_or_default());
+    }
+    entries.extend(read_entries_from(&crate::repo::path(LOCAL_CONFIG_PATH)).unwrap_or_default());
+    entries
+}
+
 fn sanitize_ident(s: &str) -> String {
     s.chars()
         .filter(|c| !matches!(c, '<' | '>' | '\n' | '\r' | '\0'))

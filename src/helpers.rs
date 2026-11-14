@@ -46,6 +46,13 @@ pub mod prune;
 pub mod log;
 pub mod tag;
 pub mod worktree;
+pub mod patch_id;
+pub mod mailsplit;
+pub mod mailinfo;
+pub mod interpret_trailers;
+pub mod mailmap;
+pub mod fmt_merge_msg;
+pub mod request_pull;
 
 pub use objects::*;
 pub use diff::*;

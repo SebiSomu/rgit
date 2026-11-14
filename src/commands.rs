@@ -47,6 +47,13 @@ pub mod bundle;
 pub mod prune;
 pub mod log;
 pub mod worktree;
+pub mod patch_id;
+pub mod mailsplit;
+pub mod mailinfo;
+pub mod interpret_trailers;
+pub mod check_mailmap;
+pub mod fmt_merge_msg;
+pub mod request_pull;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -97,5 +104,10 @@ pub use bundle::*;
 pub use prune::*;
 pub use log::*;
 pub use worktree::*;
-
-
+pub use patch_id::*;
+pub use mailsplit::*;
+pub use mailinfo::*;
+pub use interpret_trailers::*;
+pub use check_mailmap::*;
+pub use fmt_merge_msg::*;
+pub use request_pull::*;

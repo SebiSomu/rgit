@@ -2197,3 +2197,390 @@ pub struct PackedRefEntry {
     pub hash: String,
     pub peeled: Option<String>,
 }
+
+/// Parsed arguments for the `patch-id` command: which of git's patch-ID algorithms to use.
+// Used by: src/helpers/patch_id.rs, src/commands/patch_id.rs
+// Used by command/helper: `parse_patch_id_args`, `compute_patch_ids`, and the `patch_id` command
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PatchIdOptions {
+    /// `--stable` (or `patchid.stable`): hash each file's diff separately and sum the hashes,
+    /// so the ID doesn't depend on file order. Off means git's default "unstable" ID.
+    pub stable: bool,
+    /// `--verbatim` (or `patchid.verbatim`): don't strip whitespace before hashing; implies `stable`.
+    pub verbatim: bool,
+}
+
+/// Parsed arguments for the `mailsplit` command, which cuts mbox files (or Maildirs) into
+/// one numbered file per message.
+// Used by: src/helpers/mailsplit.rs, src/commands/mailsplit.rs
+// Used by command/helper: `parse_mailsplit_args`, `split_mbox_messages`, `first_maildir_message`, and the `mailsplit` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MailsplitOptions {
+    /// `-o<directory>`: where the numbered message files are written.
+    pub directory: String,
+    /// `-d<prec>`: digits in the file names (default 4, allowed 3 to 9).
+    pub precision: usize,
+    /// `-f<n>`: number of messages already split; numbering starts at `n + 1`.
+    pub skip: usize,
+    /// `-b`: accept a mailbox with a single message that lacks the `From ` separator line.
+    pub allow_bare: bool,
+    /// `--keep-cr`: keep `\r\n` line endings instead of turning them into `\n`.
+    pub keep_cr: bool,
+    /// `--mboxrd`: remove one `>` from lines quoted as `>From `.
+    pub mboxrd: bool,
+    /// The mbox files / Maildir directories to split; `-` is standard input.
+    pub inputs: Vec<String>,
+}
+
+/// What `mailinfo` does when a base64 / quoted-printable part decodes to lines ending in CRLF.
+// Used by: src/helpers/mailinfo.rs
+// Used by command/helper: `parse_mailinfo_args` and `extract_mail_info` (for `mailinfo --quoted-cr`)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum QuotedCrAction {
+    /// `nowarn`: keep the CRs silently.
+    NoWarn,
+    /// `warn` (default): keep the CRs and print `warning: quoted CRLF detected`.
+    #[default]
+    Warn,
+    /// `strip`: turn CRLF into LF.
+    Strip,
+}
+
+/// The `Content-Transfer-Encoding` of the mail part `mailinfo` is currently reading.
+// Used by: src/helpers/mailinfo.rs
+// Used by command/helper: `extract_mail_info` and its body decoding helpers
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MailTransferEncoding {
+    /// 7bit, 8bit, binary or unknown: lines are used as they are.
+    #[default]
+    DontCare,
+    /// `quoted-printable`: `=XX` escapes and soft line breaks.
+    QuotedPrintable,
+    /// `base64`.
+    Base64,
+}
+
+/// Parsed arguments for the `mailinfo` command, which separates one email into commit
+/// message, patch, and author/subject/date summary.
+// Used by: src/helpers/mailinfo.rs, src/commands/mailinfo.rs
+// Used by command/helper: `parse_mailinfo_args`, `extract_mail_info`, and the `mailinfo` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MailinfoOptions {
+    /// `-k`: keep the subject as it is (no `Re:` / `[PATCH]` stripping, no whitespace cleanup).
+    pub keep_subject: bool,
+    /// `-b`: when cleaning the subject, only remove brackets that contain `PATCH`.
+    pub keep_non_patch_brackets: bool,
+    /// `-m` / `--message-id`: append the mail's `Message-ID:` to the commit message.
+    pub add_message_id: bool,
+    /// Encoding that names, subject and message are re-coded to (`-u` / `--encoding`); `None` with `-n`.
+    pub metainfo_charset: Option<String>,
+    /// `--scissors`: drop everything before a scissors line (`-- >8 --`) in the body.
+    pub use_scissors: bool,
+    /// Off with `--no-inbody-headers`: don't let `From:`/`Subject:`/`Date:` lines in the body override the mail headers.
+    pub use_inbody_headers: bool,
+    /// `--quoted-cr=<action>`: what to do with CRLF found in decoded parts.
+    pub quoted_cr: QuotedCrAction,
+    /// `<msg>`: file that receives the commit message.
+    pub msg_file: String,
+    /// `<patch>`: file that receives the patch.
+    pub patch_file: String,
+}
+
+/// The working state of one `mailinfo` run, mirroring git's `struct mailinfo`: the input
+/// and read position, the collected mail and in-body headers, the MIME decoding state of
+/// the current part, and the message and patch built so far.
+// Used by: src/helpers/mailinfo.rs
+// Used by command/helper: `extract_mail_info` and its header/body parsing helpers
+#[derive(Debug, Clone, Default)]
+pub struct MailinfoState {
+    /// The whole email, the offset of the next unread byte, and whether a read has already
+    /// run into the end of the input (stdio's `feof`, which decides what a failed read leaves behind).
+    pub input: Vec<u8>,
+    pub pos: usize,
+    pub eof: bool,
+    /// `From`, `Subject` and `Date` from the mail headers (`p_hdr`) and from the body (`s_hdr`).
+    pub p_hdr: [Option<Vec<u8>>; 3],
+    pub s_hdr: [Option<Vec<u8>>; 3],
+    /// Stack of MIME multipart boundary markers (each with its leading `--`), innermost last.
+    pub boundaries: Vec<Vec<u8>>,
+    /// Charset and transfer encoding of the part being read, and its `format=flowed` / `delsp=yes` flags.
+    pub charset: Vec<u8>,
+    pub transfer_encoding: MailTransferEncoding,
+    pub format_flowed: bool,
+    pub delsp: bool,
+    /// A decoded line of the current part ended in CRLF.
+    pub have_quoted_cr: bool,
+    /// False while lines belong to the commit message, true once the patch has started.
+    pub in_patch: bool,
+    /// Still at the top of the body, where blank lines are skipped and in-body headers may appear.
+    pub header_stage: bool,
+    /// An in-body header being collected (it may continue on the next line).
+    pub inbody_header_accum: Vec<u8>,
+    /// Outputs: the commit message, the patch and its line count, and the `Message-ID` (with `-m`).
+    pub log_message: Vec<u8>,
+    pub patch: Vec<u8>,
+    pub patch_lines: usize,
+    pub message_id: Option<Vec<u8>>,
+    /// Author name and email taken from the `From` header.
+    pub name: Vec<u8>,
+    pub email: Vec<u8>,
+    /// Something could not be decoded; `mailinfo` exits 1.
+    pub input_error: bool,
+}
+
+/// What `mailinfo` produces from one email: the commit message, the patch, the summary
+/// printed on standard output, and whether the mail was empty or could not be decoded.
+// Used by: src/helpers/mailinfo.rs, src/commands/mailinfo.rs
+// Used by command/helper: `extract_mail_info` and the `mailinfo` command
+#[derive(Debug, Clone, Default)]
+pub struct MailinfoOutput {
+    pub message: Vec<u8>,
+    pub patch: Vec<u8>,
+    pub info: Vec<u8>,
+    pub failed: bool,
+}
+
+/// Where `interpret-trailers` puts a new trailer relative to the existing ones
+/// (`--where` / `trailer.where` / `trailer.<token>.where`).
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TrailerWhere {
+    /// Not given on the command line: use the configured placement.
+    #[default]
+    Default,
+    /// After all existing trailers (git's default).
+    End,
+    /// Right after the last trailer with the same token.
+    After,
+    /// Right before the first trailer with the same token.
+    Before,
+    /// Before all existing trailers.
+    Start,
+}
+
+/// What `interpret-trailers` does with a new trailer whose token already exists in the
+/// message (`--if-exists` / `trailer.ifexists` / `trailer.<token>.ifexists`).
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TrailerIfExists {
+    /// Not given on the command line: use the configured action.
+    #[default]
+    Default,
+    /// Add unless the neighbouring trailer has the same token and value (git's default).
+    AddIfDifferentNeighbor,
+    /// Add unless some trailer has the same token and value.
+    AddIfDifferent,
+    /// Always add.
+    Add,
+    /// Replace the existing trailer with the new one.
+    Replace,
+    /// Leave the message alone.
+    DoNothing,
+}
+
+/// What `interpret-trailers` does with a new trailer whose token isn't in the message yet
+/// (`--if-missing` / `trailer.ifmissing` / `trailer.<token>.ifmissing`).
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TrailerIfMissing {
+    /// Not given on the command line: use the configured action.
+    #[default]
+    Default,
+    /// Leave the message alone.
+    DoNothing,
+    /// Add the trailer (git's default).
+    Add,
+}
+
+/// The settings of one configured trailer (`trailer.<name>.*`), or the defaults when `name`
+/// is empty: its canonical `key`, an optional `command` / `cmd` that computes its value, and
+/// where and when it is added.
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `read_trailer_config` and `process_trailers`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrailerConf {
+    pub name: String,
+    pub key: Option<String>,
+    pub command: Option<String>,
+    pub cmd: Option<String>,
+    pub place: TrailerWhere,
+    pub if_exists: TrailerIfExists,
+    pub if_missing: TrailerIfMissing,
+}
+
+/// The whole `trailer.*` configuration: the separator characters (`trailer.separators`,
+/// `:` by default), the default settings, and the configured trailers in config order.
+// Used by: src/helpers/interpret_trailers.rs, src/commands/interpret_trailers.rs
+// Used by command/helper: `read_trailer_config`, `process_trailers`, and the `interpret_trailers` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrailerConfig {
+    pub separators: String,
+    pub default: TrailerConf,
+    pub items: Vec<TrailerConf>,
+}
+
+/// One line of a message's trailer block: a trailer (`token` and `value`), or, when `token`
+/// is `None`, a non-trailer line kept as it is in `value`.
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `process_trailers` and its list-editing helpers
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrailerItem {
+    pub token: Option<Vec<u8>>,
+    pub value: Vec<u8>,
+}
+
+/// A trailer about to be added to a message (from `--trailer` or from a configured
+/// `command`), with the settings that decide where and whether it goes in.
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `process_trailers` and its list-editing helpers
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrailerArg {
+    pub token: Vec<u8>,
+    pub value: Vec<u8>,
+    pub conf: TrailerConf,
+}
+
+/// One `--trailer <token>[(=|:)<value>]` argument together with the `--where`,
+/// `--if-exists` and `--if-missing` options that were in effect when it was given.
+// Used by: src/helpers/interpret_trailers.rs
+// Used by command/helper: `parse_interpret_trailers_args` and `process_trailers`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NewTrailer {
+    pub text: String,
+    pub place: TrailerWhere,
+    pub if_exists: TrailerIfExists,
+    pub if_missing: TrailerIfMissing,
+}
+
+/// Parsed arguments for the `interpret-trailers` command, which adds or parses the
+/// `Token: value` lines at the end of commit messages.
+// Used by: src/helpers/interpret_trailers.rs, src/commands/interpret_trailers.rs
+// Used by command/helper: `parse_interpret_trailers_args`, `process_trailers`, and the `interpret_trailers` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InterpretTrailersOptions {
+    /// `--in-place`: rewrite the input files instead of printing the result.
+    pub in_place: bool,
+    /// `--trim-empty`: drop trailers whose value is empty.
+    pub trim_empty: bool,
+    /// `--only-trailers`: print only the trailers, not the rest of the message.
+    pub only_trailers: bool,
+    /// `--only-input`: don't add trailers from `--trailer` or configured commands.
+    pub only_input: bool,
+    /// `--unfold`: join multi-line trailer values into one line.
+    pub unfold: bool,
+    /// `--no-divider`: don't treat a `---` line as the end of the message.
+    pub no_divider: bool,
+    /// The `--trailer` arguments, in order.
+    pub trailers: Vec<NewTrailer>,
+    /// Message files to process; standard input when empty.
+    pub files: Vec<String>,
+}
+
+/// The corrected name and/or email a mailmap line gives for a commit identity; a `None`
+/// part is left as it was.
+// Used by: src/helpers/mailmap.rs
+// Used by command/helper: `add_mailmap_line` and `map_user`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MailmapInfo {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+/// Everything the mailmap says about one commit email: the mapping that applies whatever
+/// the commit name is (`simple`), and the mappings that only apply to a specific commit
+/// name (`by_name`, keyed by that name).
+// Used by: src/helpers/mailmap.rs
+// Used by command/helper: `add_mailmap_line` and `map_user`
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MailmapEntry {
+    pub old_email: String,
+    pub simple: MailmapInfo,
+    pub by_name: Vec<(String, MailmapInfo)>,
+}
+
+/// A parsed mailmap (`.mailmap`, `mailmap.file`, `mailmap.blob`): one entry per commit
+/// email, compared ignoring case.
+// Used by: src/helpers/mailmap.rs, src/helpers/request_pull.rs, src/commands/check_mailmap.rs
+// Used by command/helper: `read_mailmap`, `map_user`, and the `check_mailmap` / `request_pull` commands
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Mailmap {
+    pub entries: Vec<MailmapEntry>,
+}
+
+/// Parsed arguments for the `check-mailmap` command, which shows the canonical name and
+/// email of contacts.
+// Used by: src/helpers/mailmap.rs, src/commands/check_mailmap.rs
+// Used by command/helper: `parse_check_mailmap_args` and the `check_mailmap` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckMailmapOptions {
+    /// `--stdin`: also read contacts from standard input, one per line.
+    pub stdin: bool,
+    /// `--mailmap-file <file>`: extra mailmap file, read last.
+    pub mailmap_file: Option<String>,
+    /// `--mailmap-blob <blob>`: extra mailmap blob (e.g. `HEAD:.mailmap`).
+    pub mailmap_blob: Option<String>,
+    /// The contacts to look up: `Name <email>` or `<email>`.
+    pub contacts: Vec<String>,
+}
+
+/// Parsed arguments for the `fmt-merge-msg` command, which writes the default message of a
+/// merge commit.
+// Used by: src/helpers/fmt_merge_msg.rs, src/commands/fmt_merge_msg.rs
+// Used by command/helper: `parse_fmt_merge_msg_args`, `format_merge_message`, and the `fmt_merge_msg` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FmtMergeMsgOptions {
+    /// `--log[=<n>]` / `merge.log`: list up to this many commit subjects per merged tip; 0 turns the shortlog off.
+    pub shortlog_len: usize,
+    /// `-m <text>`: use this text instead of the generated `Merge ...` title.
+    pub message: Option<String>,
+    /// `--into-name <name>`: pretend the merge goes into this branch.
+    pub into_name: Option<String>,
+    /// `-F <file>`: read the `FETCH_HEAD`-style lines from this file instead of standard input.
+    pub file: Option<String>,
+}
+
+/// What a merge takes from one repository (the text after ` of ` on `FETCH_HEAD` lines,
+/// `.` for the local one), grouped by kind for the title. `head_status` has bit 1 when the
+/// repository's HEAD is merged and bit 2 when named refs are.
+// Used by: src/helpers/fmt_merge_msg.rs
+// Used by command/helper: `format_merge_message` and its title helpers
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MergeSource {
+    pub name: String,
+    pub branches: Vec<String>,
+    pub tags: Vec<String>,
+    pub remote_branches: Vec<String>,
+    pub generic: Vec<String>,
+    pub head_status: u8,
+}
+
+/// One tip being merged: its display name for the shortlog (`topic`, or `'topic' of
+/// <repo>`), the object named on its `FETCH_HEAD` line, and whether it is a branch of the
+/// local repository (only those can have a branch description).
+// Used by: src/helpers/fmt_merge_msg.rs
+// Used by command/helper: `format_merge_message` and its tag-message / shortlog helpers
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MergeOrigin {
+    pub name: String,
+    pub hash: String,
+    pub is_local_branch: bool,
+}
+
+/// Parsed arguments for the `request-pull` command, which writes a summary of pending
+/// changes for someone to pull.
+// Used by: src/helpers/request_pull.rs, src/commands/request_pull.rs
+// Used by command/helper: `parse_request_pull_args` and the `request_pull` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RequestPullOptions {
+    /// `-p`: include the full patch after the diffstat.
+    pub patch: bool,
+    /// `<start>`: the commit the upstream already has.
+    pub start: String,
+    /// `<url>`: the repository to be pulled from (a path, a URL, or a remote name).
+    pub url: String,
+    /// `<end>`: the commit to pull, optionally `<local>:<remote>`; empty means `HEAD`.
+    pub end: String,
+}

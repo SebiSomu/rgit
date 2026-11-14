@@ -79,7 +79,14 @@ src/
 │   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
 │   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
 │   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
-│   └── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
+│   ├── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
+│   ├── patch_id.rs           # patch-id (--stable, --unstable, --verbatim)
+│   ├── mailsplit.rs          # mailsplit (-o<dir>, -d<prec>, -f<n>, -b, --keep-cr, --mboxrd, mbox/Maildir/stdin)
+│   ├── mailinfo.rs           # mailinfo (-k, -b, -m, -u/-n/--encoding, --[no-]scissors, --no-inbody-headers, --quoted-cr)
+│   ├── interpret_trailers.rs # interpret-trailers (--trailer, --where, --if-exists, --if-missing, --parse, --in-place, ...)
+│   ├── check_mailmap.rs      # check-mailmap (--stdin, --mailmap-file, --mailmap-blob, <contact>...)
+│   ├── fmt_merge_msg.rs      # fmt-merge-msg (-m, --into-name, --log[=<n>], --no-log, -F)
+│   └── request_pull.rs       # request-pull ([-p] <start> <url> [<end>])
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, and tree writing
@@ -123,7 +130,14 @@ src/
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
 │   ├── bundle.rs             # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
 │   ├── merge_tree.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases
-│   └── worktree.rs           # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
+│   ├── worktree.rs           # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
+│   ├── patch_id.rs           # git patch-id port: patch stream splitting, hunk scanning, unstable/stable/verbatim hashing
+│   ├── mailsplit.rs          # mbox From-line detection, message splitting, Maildir listing, numbered file output
+│   ├── mailinfo.rs           # git mailinfo.c port: headers, RFC 2047, in-body headers, scissors, MIME/base64/QP/flowed, charsets
+│   ├── interpret_trailers.rs # git trailer.c port: trailer block detection, trailer.* config, placement rules, commands, in-place
+│   ├── mailmap.rs            # .mailmap / mailmap.file / mailmap.blob parsing, map_user, contact splitting
+│   ├── fmt_merge_msg.rs      # git fmt-merge-msg.c port: FETCH_HEAD lines, title, tag messages, shortlog credits, branch descriptions
+│   └── request_pull.rs       # ls-remote style ref listing (local/GitHub), matching-ref lookup, range shortlog, tree diffs
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

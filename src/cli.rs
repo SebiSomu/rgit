@@ -606,6 +606,41 @@ pub enum Commands {
         #[command(subcommand)]
         action: crate::objects::BundleAction,
     },
+    #[command(disable_help_flag = true)]
+    PatchId {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Mailsplit {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Mailinfo {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    InterpretTrailers {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    CheckMailmap {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    FmtMergeMsg {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    RequestPull {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -1099,6 +1134,27 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Bundle { action } => {
             crate::commands::bundle(action)?;
+        }
+        Commands::PatchId { args } => {
+            crate::commands::patch_id(raw_args_after("patch-id", args))?;
+        }
+        Commands::Mailsplit { args } => {
+            crate::commands::mailsplit(raw_args_after("mailsplit", args))?;
+        }
+        Commands::Mailinfo { args } => {
+            crate::commands::mailinfo(raw_args_after("mailinfo", args))?;
+        }
+        Commands::InterpretTrailers { args } => {
+            crate::commands::interpret_trailers(raw_args_after("interpret-trailers", args))?;
+        }
+        Commands::CheckMailmap { args } => {
+            crate::commands::check_mailmap(raw_args_after("check-mailmap", args))?;
+        }
+        Commands::FmtMergeMsg { args } => {
+            crate::commands::fmt_merge_msg(raw_args_after("fmt-merge-msg", args))?;
+        }
+        Commands::RequestPull { args } => {
+            crate::commands::request_pull(raw_args_after("request-pull", args))?;
         }
     }
 

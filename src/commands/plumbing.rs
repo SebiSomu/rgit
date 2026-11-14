@@ -31,6 +31,8 @@ pub fn hash_object(write: bool, file: PathBuf) -> anyhow::Result<()> {
 }
 
 pub fn cat_file(pretty_print: bool, object_hash: String) -> anyhow::Result<()> {
+    // An object with a `refs/replace/` entry shows its replacement, as in git.
+    let object_hash = crate::helpers::objects::replacement_object(&object_hash).unwrap_or(object_hash);
     let dir = &object_hash[0..2];
     let file_name = &object_hash[2..];
     let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));

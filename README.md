@@ -62,6 +62,12 @@ A lightweight, fully functional Git implementation written in Rust.
   - `mailmap.rs`: `.mailmap` / `mailmap.file` / `mailmap.blob` parsing (all four line forms), case-insensitive name and email mapping, and contact splitting.
   - `fmt_merge_msg.rs`: A port of git's `fmt-merge-msg.c`: `FETCH_HEAD` line parsing, redundant tip removal, title joining by repository, `merge.suppressDest`, tag messages, and the per-tip shortlog with `By` / `Via` credits.
   - `request_pull.rs`: `ls-remote`-style ref listing for local and GitHub repositories, matching-ref lookup, range shortlog with mailmap, and commit-to-commit tree diffs.
+  - `replace.rs`: `refs/replace/` listing, deletion and creation with git's type and existence checks, graft commits with rewritten parents, and editing objects (trees as `ls-tree` lines). Object reads honour replacements through `objects.rs`.
+  - `notes.rs`: Notes refs and trees (any fan-out when reading, git's fan-out rule when writing), notes commits, `stripspace`, the editor template, automatic notes merges (`ours`, `theirs`, `union`, `cat_sort_uniq`), and note lookup for `log` / `show`.
+  - `show_branch.rs`: A port of git's `show-branch.c`: tip collection (globs, `--all`, `--remotes`, `--current`), the flag-propagating `join_revs` walk, topological sorting, tip-relative commit naming, and the column display.
+  - `range_diff.rs`: A port of git's `range-diff.c`: normalized per-commit patches, exact matching, the Jonker-Volgenant linear assignment over diff-of-diffs costs, and the pair listing with patch comparisons.
+  - `last_modified.rs`: Per-path last-change lookup over a revision range, with recursion, tree entries, path arguments and boundary commits.
+  - `repo_info.rs`: `repo info` keys and `repo structure` ref / reachable-object counts with table and key-value output.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -99,6 +105,13 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`describe`** (`[--tags] [--always] [--long] [--abbrev=<n>] [--exact-match] [<commit>...]`): Names commits after the nearest tag as `<tag>-<n>-g<hash>` (`<n>` = commits since the tag); annotated tags only unless `--tags`, preferring annotated and newer tags on the same commit, with git's error messages (including the "try --tags" hint).
 - **`blame`** (`[-L <start>,<end>] [<rev>] [--] <file>`): Shows line-by-line commit attribution, author info, timestamps, and detects uncommitted lines.
 - **`archive`** (`[-f|--format <fmt>]`, `[-l|--list]`, `[--prefix <prefix>]`, `[-o|--output <file>]`, `<tree-ish> [<paths...>]`): Exports files from a tree, commit, tag, or ref into a `tar`, `tar.gz`/`tgz`, or `zip` archive with directory hierarchy and commit timestamps preserved.
+- **`annotate`** (`-L <start>,<end>`, `[<rev>] <file>`): `blame` in git's tab-separated `annotate` format.
+- **`whatchanged`** (`log`'s options): `log` with the raw change list (`:<old mode> <new mode> <old hash> <new hash> <status>\t<path>`) after each commit, skipping merges and commits that change nothing. `log` and `show` also accept `--raw` now.
+- **`show-branch`** (`-a`, `-r`, `--current`, `--more=<n>`, `--list`, `--independent`, `--merge-base`, `--topo-order`, `--date-order`, `--sha1-name`, `--no-name`, `--topics`, `--sparse`, `<rev>|<glob>...`): Shows branch tips and, column by column, which of them contain each commit down to their common ancestor.
+- **`range-diff`** (`--creation-factor=<n>`, `--left-only`, `--right-only`, `-s`; `<range1> <range2>`, `<rev1>...<rev2>`, `<base> <rev1> <rev2>`): Compares two versions of a commit range, pairing up commits (`=`, `!`, `<`, `>`) and showing how the changed patches differ.
+- **`last-modified`** (`-r`, `-t`, `-z`, `[<revision-range>] [-- <path>...]`): For each path, the commit that last changed it (git 2.52's command; output ordered by path).
+- **`notes`** (`--ref <ref>`; `list`, `add`, `append`, `edit`, `copy`, `show`, `remove`, `prune`, `merge -s <strategy>`, `get-ref`): Attaches notes to commits under `refs/notes/commits`, in git's tree layout. `log` and `show` print them in a `Notes:` block and as `%N` (`--notes` / `--no-notes`). Notes merge conflicts can only be resolved with a strategy, not by hand.
+- **`replace`** (`[-f] <object> <replacement>`, `--graft <commit> [<parent>...]`, `--edit <object>` (`--raw`), `-d <object>...`, `-l [<pattern>]` (`--format=short|medium|long`)): Manages `refs/replace/` so that reads of an object return its replacement; `fsck`, `gc`, `prune`, `count-objects`, `bundle`, `push`, `fetch`, `clone` and `pull` ignore replacements, as does everything when `GIT_NO_REPLACE_OBJECTS` is set.
 
 ### Branching & Navigation
 
@@ -147,6 +160,7 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`prune`** (`-n`, `-v`, `--expire <time>`, `[--] <head>...`): Deletes every unreachable loose object (git's default; `--expire` keeps newer ones and whatever they refer to), using the same roots as `gc` (refs, HEAD, index, stash, operations in progress, all reflog entries, every worktree) plus any `<head>` given. Also removes stale `tmp_*` files and reports stray files in `.git/objects`. Silent by default; `-n`/`-v` print `<hash> <type>` per object exactly like git. Refuses to touch a damaged repository or one with packfiles.
 - **`fsck`** (`--connectivity-only`, `--no-dangling`, `--unreachable`, `--no-reflogs`): Verifies object integrity and connectivity, validates refs and the index, and reports dangling or unreachable objects.
 - **`count-objects`** (`-v|--verbose`, `-H|--human-readable`): Reports loose object count and disk usage; verbose mode adds pack, prune-packable, and garbage statistics.
+- **`repo`** (`info [--format=keyvalue|nul] [--all | <key>...]`, `structure [--format=table|keyvalue|nul]`): Prints repository facts (`layout.bare`, `layout.shallow`, `object.format`, `references.format`) and counts of refs and reachable objects (git 2.52's command).
 
 ### Plumbing Commands
 

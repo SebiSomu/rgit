@@ -45,6 +45,46 @@ pub fn log(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+/// `rgit whatchanged [<options>] [<revision-range>] [[--] <path>...]`
+///
+/// `log` in the form git had before `log` learned to show diffs: every commit is followed
+/// by the raw list of what it changed, one `:<old mode> <new mode> <old hash> <new hash>
+/// <status>\t<path>` line per path (`A` added, `D` deleted, `M` modified, `T` type changed).
+/// Commits that change nothing, and merges, are left out. It takes all of `log`'s options;
+/// asking for another diff format (`-p`, `--stat`, `--name-only`, `--name-status`) replaces
+/// the raw list.
+pub fn whatchanged(args: Vec<String>) -> Result<()> {
+    let mut opts = parse_log_args(&args, false).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    if !(opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status) {
+        opts.raw = true;
+    }
+    // `-n` and `--skip` count the commits that are shown, not the ones walked.
+    let (limit, skip) = (opts.revs.max_count.take().unwrap_or(usize::MAX), std::mem::take(&mut opts.revs.skip));
+    let (selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let decorations = collect_decorations(effective_decorate(&opts))?;
+
+    let mut shown = Vec::new();
+    for walked in &selected {
+        let diff = commit_diff_output(&walked.commit, &opts)?;
+        if !diff.is_empty() {
+            shown.push((&walked.commit, diff));
+        }
+    }
+    let mut shown: Vec<_> = shown.into_iter().skip(skip).take(limit).collect();
+    if opts.revs.reverse {
+        shown.reverse();
+    }
+
+    let mut out = BufWriter::new(io::stdout().lock());
+    for (i, (commit, diff)) in shown.iter().enumerate() {
+        let entry = format_log_entry(commit, &opts, &decorations);
+        let separator = if i > 0 { entry_separator(&opts) } else { "" };
+        write_or_quit(&mut out, &format!("{}{}", separator, join_entry_and_diff(&entry, diff, &opts)));
+    }
+    let _ = out.flush();
+    Ok(())
+}
+
 /// `rgit show [<options>] [<object>...]`
 ///
 /// Shows each object (default `HEAD`): a commit as `log -p` shows it (merges without a diff),

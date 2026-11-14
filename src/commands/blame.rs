@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::path::Path;
-use crate::helpers::blame::{blame_file, format_blame_output};
+use crate::helpers::blame::{blame_file, format_annotate_output, format_blame_output};
 use crate::helpers::{normalize_path, resolve_commit_from_source};
 
 /// `rgit blame [-L <start>,<end>] [<rev>] [--] <file>`
@@ -22,6 +22,28 @@ pub fn blame(args: Vec<String>, line_range: Option<String>) -> Result<()> {
     let commit_hash = resolve_commit_from_source(rev.unwrap_or("HEAD"))?;
     let lines = blame_file(&path, &commit_hash, rev.is_none(), line_range.as_deref())?;
     print!("{}", format_blame_output(&lines));
+
+    Ok(())
+}
+
+/// `rgit annotate [-L <start>,<end>] [<rev>] [--] <file>` (also `annotate <file> <rev>`)
+///
+/// `blame` in git's older `annotate` output format: every line shows the abbreviated commit,
+/// then `(author<TAB>date<TAB>line number)` and the line, separated by tabs instead of
+/// aligned columns. It takes the same arguments as `blame` and exists for scripts written
+/// against `git annotate`; like git's, it also accepts the file before the revision.
+pub fn annotate(args: Vec<String>, line_range: Option<String>) -> Result<()> {
+    let (rev, file) = match args.as_slice() {
+        [file] => (None, file.as_str()),
+        [file, rev] if resolve_commit_from_source(rev).is_ok() && resolve_commit_from_source(file).is_err() => (Some(rev.as_str()), file.as_str()),
+        [rev, file] => (Some(rev.as_str()), file.as_str()),
+        _ => anyhow::bail!("usage: rgit annotate [-L <start>,<end>] [<rev>] [--] <file>"),
+    };
+
+    let path = normalize_path(Path::new(file));
+    let commit_hash = resolve_commit_from_source(rev.unwrap_or("HEAD"))?;
+    let lines = blame_file(&path, &commit_hash, rev.is_none(), line_range.as_deref())?;
+    print!("{}", format_annotate_output(&lines));
 
     Ok(())
 }

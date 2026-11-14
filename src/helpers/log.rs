@@ -24,6 +24,8 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
     let mut rev_args: Vec<String> = Vec::new();
     let mut abbrev_commit = false;
     let mut explicit_patch = false;
+    let mut notes: Option<bool> = None;
+    let mut pretty_given = false;
     let mut i = 0;
 
     let value = |arg: &str, args: &[String], i: &mut usize, name: &str| -> anyhow::Result<String> {
@@ -51,12 +53,17 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
                 opts.shortstat = false;
                 opts.name_only = false;
                 opts.name_status = false;
+                opts.raw = false;
             }
+            "--raw" => opts.raw = true,
+            "--notes" | "--show-notes" => notes = Some(true),
+            "--no-notes" => notes = Some(false),
             "--stat" => opts.stat = true,
             "--shortstat" => opts.shortstat = true,
             "--name-only" => opts.name_only = true,
             "--name-status" => opts.name_status = true,
             "--oneline" => {
+                pretty_given = true;
                 opts.format = LogFormat::Oneline;
                 abbrev_commit = true;
             }
@@ -75,11 +82,13 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
                 opts.date = parse_date_mode(&value(arg, args, &mut i, "--date")?)?;
             }
             _ if arg == "--pretty" || arg.starts_with("--pretty=") => {
+                pretty_given = true;
                 let v = if arg == "--pretty" { "medium".to_string() } else { value(arg, args, &mut i, "--pretty")? };
                 opts.format = parse_pretty(&v, false)?;
                 abbrev_commit = abbrev_commit || opts.format == LogFormat::Oneline;
             }
             _ if arg == "--format" || arg.starts_with("--format=") => {
+                pretty_given = true;
                 opts.format = parse_pretty(&value(arg, args, &mut i, "--format")?, true)?;
             }
             _ if show_mode && !arg.starts_with('-') => opts.objects.push(arg.to_string()),
@@ -88,6 +97,7 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
         i += 1;
     }
 
+    opts.show_notes = notes.unwrap_or(!pretty_given);
     opts.revs = parse_revision_args(&rev_args)?;
     opts.revs.abbrev_commit = opts.revs.abbrev_commit || abbrev_commit;
     if !show_mode && opts.revs.revs.is_empty() && !(opts.revs.all || opts.revs.branches || opts.revs.tags || opts.revs.remotes) {
@@ -97,7 +107,7 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
         opts.objects.push("HEAD".to_string());
     }
     // As in git, asking `show` for another diff format replaces its default patch.
-    if show_mode && !explicit_patch && (opts.stat || opts.shortstat || opts.name_only || opts.name_status) {
+    if show_mode && !explicit_patch && (opts.stat || opts.shortstat || opts.name_only || opts.name_status || opts.raw) {
         opts.patch = false;
     }
     opts.decorate = match decorate {
@@ -340,7 +350,7 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
         String::new()
     };
 
-    match &opts.format {
+    let entry = match &opts.format {
         LogFormat::Oneline => format!("{}{} {}\n", hash, decor, split_commit_message(&commit.message).0),
         LogFormat::Short => format!("commit {}{}\n{}Author: {}\n\n    {}\n", hash, decor, merge_line, signature_line(&commit.author), split_commit_message(&commit.message).0),
         LogFormat::Medium => format!(
@@ -385,6 +395,16 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             let text = expand_rev_list_format(&substitute_decorations(template, &labels), commit, &commit.parents);
             if *terminator { format!("{}\n", text) } else { text }
         }
+    };
+
+    // git appends the commit's note to every multi-line format.
+    let note = if opts.show_notes && !matches!(opts.format, LogFormat::Oneline | LogFormat::Template { .. }) { crate::helpers::notes::display_note(&commit.hash) } else { None };
+    match note {
+        Some(note) => {
+            let lines: String = note.lines().map(|line| format!("    {}\n", line)).collect();
+            format!("{}\nNotes:\n{}", entry, lines)
+        }
+        None => entry,
     }
 }
 
@@ -395,14 +415,14 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
 /// blank line and the patch.
 // Used by `log` and `show`.
 pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::Result<String> {
-    let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status;
+    let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status || opts.raw;
     if !wants_diff || commit.parents.len() > 1 {
         return Ok(String::new());
     }
     let specs = normalize_pathspecs(&opts.revs.paths);
     let in_scope = |path: &str| specs.is_empty() || matches_ls_files_pathspec(path, &specs);
 
-    if opts.name_only || opts.name_status {
+    if opts.name_only || opts.name_status || opts.raw {
         let (mut old, mut new) = (BTreeMap::new(), BTreeMap::new());
         if let Some(parent) = commit.parents.first() {
             flatten_tree(&parse_commit_object(parent)?.tree, "", &mut old)?;
@@ -420,6 +440,10 @@ pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::R
             };
             if opts.name_only {
                 out.push_str(&format!("{}\n", path));
+            } else if opts.raw {
+                let side = |entry: Option<&([u8; 20], u32)>| entry.map(|(hash, mode)| (*mode, hex::encode(hash)[..7].to_string())).unwrap_or((0, "0000000".to_string()));
+                let ((old_mode, old_hash), (new_mode, new_hash)) = (side(old.get(path)), side(new.get(path)));
+                out.push_str(&format!(":{:06o} {:06o} {} {} {}\t{}\n", old_mode, new_mode, old_hash, new_hash, status, path));
             } else {
                 out.push_str(&format!("{}\t{}\n", status, path));
             }

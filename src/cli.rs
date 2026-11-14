@@ -303,6 +303,16 @@ pub enum Commands {
         #[arg(required = true, num_args = 1..=2)]
         args: Vec<String>,
     },
+    Annotate {
+        #[arg(short = 'L', value_name = "START,END")]
+        line_range: Option<String>,
+        #[arg(required = true, num_args = 1..=2)]
+        args: Vec<String>,
+    },
+    Whatchanged {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
     Archive {
         #[arg(short = 'f', long = "format")]
         format: Option<String>,
@@ -641,6 +651,36 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    Replace {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Notes {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    ShowBranch {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    LastModified {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Repo {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    RangeDiff {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -656,6 +696,14 @@ fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
+
+    // These commands copy, verify or delete objects by hash, so they must not see replacements.
+    if matches!(
+        *cli.command,
+        Commands::Fsck { .. } | Commands::Gc { .. } | Commands::Prune { .. } | Commands::CountObjects { .. } | Commands::Bundle { .. } | Commands::Push { .. } | Commands::Fetch { .. } | Commands::Clone { .. } | Commands::Pull { .. } | Commands::Replace { .. }
+    ) {
+        crate::helpers::objects::disable_replace_objects();
+    }
 
     match *cli.command {
         Commands::Init => {
@@ -817,6 +865,12 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Blame { line_range, args } => {
             crate::commands::blame(args, line_range)?;
+        }
+        Commands::Annotate { line_range, args } => {
+            crate::commands::annotate(args, line_range)?;
+        }
+        Commands::Whatchanged { args } => {
+            crate::commands::whatchanged(raw_args_after("whatchanged", args))?;
         }
         Commands::Archive { format, list, prefix, output, tree_ish, paths } => {
             crate::commands::archive(format, list, prefix, output, tree_ish, paths)?;
@@ -1155,6 +1209,24 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::RequestPull { args } => {
             crate::commands::request_pull(raw_args_after("request-pull", args))?;
+        }
+        Commands::Replace { args } => {
+            crate::commands::replace(raw_args_after("replace", args))?;
+        }
+        Commands::Notes { args } => {
+            crate::commands::notes(raw_args_after("notes", args))?;
+        }
+        Commands::ShowBranch { args } => {
+            crate::commands::show_branch(raw_args_after("show-branch", args))?;
+        }
+        Commands::LastModified { args } => {
+            crate::commands::last_modified(raw_args_after("last-modified", args))?;
+        }
+        Commands::Repo { args } => {
+            crate::commands::repo(raw_args_after("repo", args))?;
+        }
+        Commands::RangeDiff { args } => {
+            crate::commands::range_diff(raw_args_after("range-diff", args))?;
         }
     }
 

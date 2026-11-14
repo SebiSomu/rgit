@@ -36,7 +36,7 @@ src/
 ├── commands/                 # High-level CLI command entry points
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
 │   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
-│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status), show (commits, tags, trees, blobs)
+│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes), show (commits, tags, trees, blobs), whatchanged
 │   ├── staging.rs            # add, status, rm, mv
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
@@ -57,7 +57,7 @@ src/
 │   ├── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
 │   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
 │   ├── remote.rs             # remote (list, verbose, add, remove/rm, rename, get-url, set-url, show)
-│   ├── blame.rs              # blame (line-by-line commit attribution, -L ranges, uncommitted changes)
+│   ├── blame.rs              # blame (line-by-line commit attribution, -L ranges, uncommitted changes), annotate
 │   ├── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
 │   ├── reflog.rs             # reflog (show, exists, delete, expire)
 │   ├── gc.rs                 # gc (reflog expiry + unreachable loose object pruning, --dry-run)
@@ -86,10 +86,16 @@ src/
 │   ├── interpret_trailers.rs # interpret-trailers (--trailer, --where, --if-exists, --if-missing, --parse, --in-place, ...)
 │   ├── check_mailmap.rs      # check-mailmap (--stdin, --mailmap-file, --mailmap-blob, <contact>...)
 │   ├── fmt_merge_msg.rs      # fmt-merge-msg (-m, --into-name, --log[=<n>], --no-log, -F)
-│   └── request_pull.rs       # request-pull ([-p] <start> <url> [<end>])
+│   ├── request_pull.rs       # request-pull ([-p] <start> <url> [<end>])
+│   ├── replace.rs            # replace (<object> <replacement>, --graft, --edit, -d, -l, --format)
+│   ├── notes.rs              # notes (list, add, append, edit, copy, show, remove, prune, merge, get-ref; --ref)
+│   ├── show_branch.rs        # show-branch (-a, -r, --current, --more, --list, --independent, --merge-base, --topics, --sparse, ...)
+│   ├── range_diff.rs         # range-diff (--creation-factor, --left-only, --right-only, -s; two ranges, A...B, base tip1 tip2)
+│   ├── last_modified.rs      # last-modified (-r, -t, -z, <revision-range>, paths)
+│   └── repo_info.rs          # repo (info, structure)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
-│   ├── objects.rs            # Object compression, hashing, and tree writing
+│   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
 │   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
@@ -137,7 +143,13 @@ src/
 │   ├── interpret_trailers.rs # git trailer.c port: trailer block detection, trailer.* config, placement rules, commands, in-place
 │   ├── mailmap.rs            # .mailmap / mailmap.file / mailmap.blob parsing, map_user, contact splitting
 │   ├── fmt_merge_msg.rs      # git fmt-merge-msg.c port: FETCH_HEAD lines, title, tag messages, shortlog credits, branch descriptions
-│   └── request_pull.rs       # ls-remote style ref listing (local/GitHub), matching-ref lookup, range shortlog, tree diffs
+│   ├── request_pull.rs       # ls-remote style ref listing (local/GitHub), matching-ref lookup, range shortlog, tree diffs
+│   ├── replace.rs            # refs/replace listing/creation/deletion, graft commits, object editing
+│   ├── notes.rs              # Notes refs/trees (git fan-out), notes commits, stripspace, notes merge, note lookup for log/show
+│   ├── show_branch.rs        # git show-branch.c port: tip collection, join_revs walk, topo sort, commit naming, column display
+│   ├── range_diff.rs         # git range-diff.c port: normalized patches, exact matches, linear assignment, pair output
+│   ├── last_modified.rs      # Per-path last-change lookup over a range (recursion, trees, boundary commits)
+│   └── repo_info.rs          # repo info keys, repo structure counts, table/key-value output
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

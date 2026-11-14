@@ -378,6 +378,18 @@ fn format_author_time(timestamp: u64, tz: &str) -> String {
     format!("{} {} {}", &iso[..10], &iso[11..19], tz)
 }
 
+/// Renders blame results in git's `annotate` layout (`blame -c`): abbreviated hash, a tab,
+/// `(author`, a tab, the author time, a tab, the line number and `)`, then the line itself.
+/// The author is right-aligned in at least ten columns.
+// Used by `annotate`.
+pub fn format_annotate_output(lines: &[BlameLine]) -> String {
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(&format!("{}\t({:>10}\t{}\t{}){}\n", line.commit.chars().take(8).collect::<String>(), line.author, format_author_time(line.timestamp, &line.tz), line.line_no, line.content));
+    }
+    out
+}
+
 /// Renders blame results as one line per source line: abbreviated hash, author, author time,
 /// line number and the line itself, with the author and line-number columns padded to align.
 // Used by `blame`.

@@ -53,6 +53,12 @@ pub mod interpret_trailers;
 pub mod mailmap;
 pub mod fmt_merge_msg;
 pub mod request_pull;
+pub mod replace;
+pub mod notes;
+pub mod show_branch;
+pub mod last_modified;
+pub mod repo_info;
+pub mod range_diff;
 
 pub use objects::*;
 pub use diff::*;

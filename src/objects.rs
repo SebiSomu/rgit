@@ -1689,6 +1689,11 @@ pub struct LogOptions {
     pub shortstat: bool,
     pub name_only: bool,
     pub name_status: bool,
+    /// Show each commit's note in a `Notes:` block: on by default, off once `--pretty`,
+    /// `--format` or `--oneline` is given (`--notes` / `--no-notes` decide explicitly).
+    pub show_notes: bool,
+    /// `--raw`: one `:<old mode> <new mode> <old hash> <new hash> <status>\t<path>` line per changed path (what `whatchanged` shows).
+    pub raw: bool,
     /// Revisions named on the command line, in order (`show` displays each one).
     pub objects: Vec<String>,
 }
@@ -2583,4 +2588,148 @@ pub struct RequestPullOptions {
     pub url: String,
     /// `<end>`: the commit to pull, optionally `<local>:<remote>`; empty means `HEAD`.
     pub end: String,
+}
+
+/// What the `replace` command was asked to do.
+// Used by: src/helpers/replace.rs, src/commands/replace.rs
+// Used by command/helper: `parse_replace_args` and the `replace` command
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ReplaceMode {
+    /// `-l [<pattern>]`, or no arguments: list replace refs.
+    #[default]
+    List,
+    /// `-d <object>...`: delete replace refs.
+    Delete,
+    /// `<object> <replacement>`: replace one object with another.
+    Replace,
+    /// `-e <object>`: edit a copy of the object and replace it with that.
+    Edit,
+    /// `-g <commit> [<parent>...]`: replace a commit with a copy that has other parents.
+    Graft,
+}
+
+/// Parsed arguments for the `replace` command, which manages `refs/replace/` object substitutions.
+// Used by: src/helpers/replace.rs, src/commands/replace.rs
+// Used by command/helper: `parse_replace_args` and the `replace` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReplaceOptions {
+    pub mode: ReplaceMode,
+    /// `-f`: overwrite an existing replace ref and allow objects of different types.
+    pub force: bool,
+    /// `--raw`: with `--edit`, edit a tree's raw content instead of its `ls-tree` listing.
+    pub raw: bool,
+    /// `--format=short|medium|long` for listing.
+    pub format: Option<String>,
+    /// The mode's arguments: objects, a pattern, or a commit and its new parents.
+    pub args: Vec<String>,
+}
+
+/// A loaded notes ref: its name, the notes commit it points at (if any), the notes as
+/// `annotated object -> note blob`, and whatever else its tree contains.
+// Used by: src/helpers/notes.rs, src/commands/notes.rs
+// Used by command/helper: `load_notes_tree`, `commit_notes_tree`, `merge_notes`, and the `notes` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NotesTree {
+    pub notes_ref: String,
+    pub commit: Option<String>,
+    pub notes: std::collections::BTreeMap<String, String>,
+    pub other: std::collections::BTreeMap<String, ([u8; 20], u32)>,
+}
+
+/// How `notes merge` settles a note that both sides changed differently (`-s <strategy>`).
+// Used by: src/helpers/notes.rs, src/commands/notes.rs
+// Used by command/helper: `merge_notes` and the `notes` command
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum NotesMergeStrategy {
+    /// Stop and report the conflict (git's default; rgit cannot continue from there).
+    #[default]
+    Manual,
+    /// Keep the local note.
+    Ours,
+    /// Take the remote note.
+    Theirs,
+    /// Both notes, separated by a blank line.
+    Union,
+    /// The unique lines of both notes, sorted.
+    CatSortUniq,
+}
+
+/// Parsed arguments for the `show-branch` command, which shows branches and the commits
+/// that set them apart.
+// Used by: src/helpers/show_branch.rs, src/commands/show_branch.rs
+// Used by command/helper: `parse_show_branch_args`, `collect_show_branch_names`, `show_branch_output`, and the `show_branch` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShowBranchOptions {
+    /// `-a`: all branches and remote-tracking branches; `-r`: remote-tracking branches.
+    pub all_heads: bool,
+    pub all_remotes: bool,
+    /// `--more=<n>`: commits to show beyond the common ancestor; -1 (`--list`) shows only the headers.
+    pub extra: i64,
+    /// `--no-name` / `--sha1-name`: omit the `[name]` column, or show abbreviated hashes in it.
+    pub no_name: bool,
+    pub sha1_name: bool,
+    /// `--current`: add the current branch to the tips.
+    pub current: bool,
+    /// `--merge-base` / `--independent`: print merge bases, or the tips no other tip contains.
+    pub merge_base: bool,
+    pub independent: bool,
+    /// `--date-order` instead of the default topological order.
+    pub date_order: bool,
+    /// `--topics`: only commits that are not on the first tip.
+    pub topics: bool,
+    /// `--sparse`: don't hide merges reachable from a single tip.
+    pub sparse: bool,
+    /// Revisions and ref globs named on the command line.
+    pub revs: Vec<String>,
+}
+
+/// Parsed arguments for the `last-modified` command, which shows the commit that last
+/// changed each path.
+// Used by: src/helpers/last_modified.rs, src/commands/last_modified.rs
+// Used by command/helper: `parse_last_modified_args`, `last_modified_paths`, and the `last_modified` command
+#[derive(Debug, Clone, Default)]
+pub struct LastModifiedOptions {
+    /// `-r`: list every file instead of only the top-level entries.
+    pub recursive: bool,
+    /// `-t`: also list directories when recursing.
+    pub show_trees: bool,
+    /// `-z`: end entries with NUL instead of a newline.
+    pub nul: bool,
+    /// The revision range to search and the paths to report.
+    pub revs: RevListOptions,
+}
+
+/// Parsed arguments for the `range-diff` command, which compares two versions of a commit range.
+// Used by: src/helpers/range_diff.rs, src/commands/range_diff.rs
+// Used by command/helper: `parse_range_diff_args`, `format_range_diff`, and the `range_diff` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RangeDiffOptions {
+    /// The old and the new range (`<base>..<tip>`).
+    pub range1: String,
+    pub range2: String,
+    /// `--creation-factor=<n>`: how readily two commits are treated as unrelated, in percent (default 60).
+    pub creation_factor: i64,
+    /// `--left-only` / `--right-only`: leave out commits that exist only in the other range.
+    pub left_only: bool,
+    pub right_only: bool,
+    /// Off with `-s` / `--no-patch`: don't show the patch comparison of changed pairs.
+    pub patch: bool,
+}
+
+/// One commit of a range as `range-diff` sees it: its position, hash and subject, its
+/// normalized patch text (metadata, message, then the diff starting at `diff_offset`), the
+/// diff's size in lines, the commit of the other range it is paired with, and whether it
+/// has been printed.
+// Used by: src/helpers/range_diff.rs, src/commands/range_diff.rs
+// Used by command/helper: `read_range_patches`, `match_range_patches`, `format_range_diff`, and the `range_diff` command
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RangePatch {
+    pub index: usize,
+    pub hash: String,
+    pub subject: String,
+    pub patch: String,
+    pub diff_offset: usize,
+    pub diffsize: usize,
+    pub matching: Option<usize>,
+    pub shown: bool,
 }

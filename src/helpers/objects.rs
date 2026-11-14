@@ -40,13 +40,73 @@ pub fn write_object(object_type: &str, content: &[u8]) -> anyhow::Result<String>
     Ok(hash_hex)
 }
 
+/// Set once a command must see objects exactly as stored, ignoring `refs/replace/`.
+static REPLACE_OBJECTS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Turns off object replacement for the rest of the process, like git's
+/// `read_replace_refs = 0`. Commands that copy, verify or delete objects by hash must read
+/// the real ones.
+// Used by the CLI dispatcher for `fsck`, `gc`, `prune`, `count-objects`, `bundle`, `push`, `fetch`, `clone`, `pull` and `replace`.
+pub fn disable_replace_objects() {
+    REPLACE_OBJECTS_DISABLED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Returns the object that stands in for `hash` according to `refs/replace/<hash>` (loose
+/// or packed), following chains of replacements up to five deep like git; `None` when the
+/// object is not replaced, replacement is disabled, or `GIT_NO_REPLACE_OBJECTS` is set.
+/// The replace refs are read once per process.
+// Used by `read_object`, and by `replace` to show what is in effect.
+pub fn replacement_object(hash: &str) -> Option<String> {
+    static REPLACE_MAP: std::sync::OnceLock<std::collections::HashMap<String, String>> = std::sync::OnceLock::new();
+    if REPLACE_OBJECTS_DISABLED.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("GIT_NO_REPLACE_OBJECTS").is_some() {
+        return None;
+    }
+    let map = REPLACE_MAP.get_or_init(|| {
+        let mut map = std::collections::HashMap::new();
+        if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
+            for line in packed.lines() {
+                if let Some((target, name)) = line.split_once(' ') {
+                    if let Some(original) = name.strip_prefix("refs/replace/").filter(|_| target.len() == 40) {
+                        map.insert(original.to_string(), target.to_string());
+                    }
+                }
+            }
+        }
+        if let Ok(entries) = fs::read_dir(crate::repo::path(".git/refs/replace")) {
+            for entry in entries.flatten() {
+                if let Ok(target) = fs::read_to_string(entry.path()) {
+                    let target = target.trim();
+                    if target.len() == 40 {
+                        map.insert(entry.file_name().to_string_lossy().into_owned(), target.to_string());
+                    }
+                }
+            }
+        }
+        map
+    });
+    if map.is_empty() {
+        return None;
+    }
+    let mut current = map.get(hash)?;
+    for _ in 0..5 {
+        match map.get(current) {
+            Some(next) => current = next,
+            None => break,
+        }
+    }
+    Some(current.clone())
+}
+
 /// Reads a zlib-compressed object from `.git/objects/` and returns its
-/// object type and decompressed content.
+/// object type and decompressed content. An object with a `refs/replace/` entry is
+/// transparently read as its replacement (see `replacement_object`).
 // Used by commands that read objects (like `cat-file`, `log`, `status`, `switch`, `checkout`, `restore`, and merge checks).
 pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
     if hash.len() < 3 {
         anyhow::bail!("Invalid object hash: {}", hash);
     }
+    let replaced = replacement_object(hash);
+    let hash = replaced.as_deref().unwrap_or(hash);
 
     let dir = &hash[0..2];
     let file_name = &hash[2..];
@@ -212,4 +272,4 @@ pub fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> any
     }
 
     write_object("tree", &tree_content)
-}
+}

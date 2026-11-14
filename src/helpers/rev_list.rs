@@ -825,6 +825,7 @@ pub fn expand_rev_list_format(template: &str, commit: &ParsedCommit, parents: &[
             's' => (subject.clone(), 1),
             'b' => (if body.is_empty() { String::new() } else { format!("{}\n", body) }, 1),
             'B' => (commit.message.clone(), 1),
+            'N' => (crate::helpers::notes::display_note(&commit.hash).unwrap_or_default(), 1),
             'n' => ("\n".to_string(), 1),
             '%' => ("%".to_string(), 1),
             'x' if two.len() == 2 => match u8::from_str_radix(&chars[i + 2..(i + 4).min(chars.len())].iter().collect::<String>(), 16) {

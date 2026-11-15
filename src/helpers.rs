@@ -69,6 +69,12 @@ pub mod var;
 pub mod help;
 pub mod name_rev;
 pub mod refs_verify;
+pub mod merge_file;
+pub mod mktree;
+pub mod mktag;
+pub mod index_plumbing;
+pub mod read_tree;
+pub mod diff_plumbing;
 
 pub use objects::*;
 pub use diff::*;

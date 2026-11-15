@@ -78,6 +78,12 @@ A lightweight, fully functional Git implementation written in Rust.
   - `refs_verify.rs`: Consistency checks for loose ref names and contents and for `packed-refs`.
   - `var.rs`: The logical variables behind `var` (identity, editors, pager, default branch, shell, global config).
   - `help.rs`: Command list and per-command help lookup on top of clap.
+  - `index_plumbing.rs`: Index entry vs working-tree comparison (stat data, then content), path normalization, `add_index_entry` rules (`--add`, `--replace`, file/directory clashes), refresh, temporary files, and writing an entry to disk.
+  - `read_tree.rs`: git's `unpack-trees` merge rules for `read-tree`: plain read, `--prefix`, one-way, two-way and trivial three-way merges with their working-tree checks.
+  - `diff_plumbing.rs`: Raw diff engine: tree-to-tree walk in git's entry order (`-r`, `-t`), tree-to-index and index-to-working-tree comparison, pathspec selection, and raw / name / stat / numstat / summary / patch output with `-z`, `--abbrev` and `-R`.
+  - `merge_file.rs`: Argument parsing for `merge-file` (the merge itself lives in `merge_tree.rs`, which gained diff3 / zdiff3 styles and `--ours` / `--theirs` / `--union`).
+  - `mktree.rs`: `ls-tree` line parsing with git's type checks and tree serialization in git's entry order.
+  - `mktag.rs`: git's standalone tag fsck (`fsck_tag_standalone`, `fsck_ident`) with its message ids.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -205,6 +211,13 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`refs`** (`list ...`, `exists <ref>`, `verify [--strict] [--verbose]`, `optimize ...`): git 2.46+ umbrella command: `list` = `for-each-ref`, `exists` = `show-ref --exists`, `optimize` = `pack-refs`, and `verify` checks loose ref names/contents and `packed-refs` for consistency.
 - **`stripspace`** (`-s|--strip-comments`, `-c|--comment-lines`): git's message cleanup filter for standard input: trims trailing whitespace, collapses and trims empty lines; `-s` drops comment lines, `-c` turns every line into a comment (`core.commentChar`).
 - **`column`** (`--mode[=<style>]`, `--raw-mode=<n>`, `--width=<n>`, `--padding=<n>`, `--indent=<string>`, `--nl=<string>`, `--command=<name>`): Lays lines from standard input out in columns (`column`/`row`/`plain`, `dense`), honouring `column.ui` and `column.<name>`.
+- **`read-tree`** (`<tree-ish>...`, `--empty`, `--prefix=<dir>/`, `-m`, `--reset`, `-u`, `-i`, `-n`, `--trivial`, `--aggressive`): Reads trees into the index: plain replace, bind under a prefix, one-way merge, two-way merge (branch switch, carrying local index changes) and trivial three-way merge, optionally updating the working tree. Paths that would need conflict stages are refused (rgit's index has none).
+- **`update-index`** (`--add`, `--remove`, `--force-remove`, `--replace`, `--cacheinfo <mode>,<object>,<path>`, `--chmod=(+|-)x`, `--refresh`, `-q`, `--ignore-missing`, `--info-only`, `--index-info`, `--stdin`, `-z`, `-g|--again`, `--verbose`, `<file>...`): Low-level index editing with git's in-order option handling. `--assume-unchanged`, `--skip-worktree` and stage numbers are refused (no entry flags or stages in rgit's index).
+- **`checkout-index`** (`-a`, `-f`, `-q`, `-n`, `-u`, `--prefix=<string>`, `--temp`, `--stage=<n>|all`, `--stdin`, `-z`, `<file>...`): Copies index entries to the working tree, a prefix directory, or temporary files.
+- **`diff-tree`** (`<tree-ish> [<tree-ish>]`, `-r`, `-t`, `--root`, `-m`, `--stdin`, `-s`, `-v`, `--pretty[=<format>]`, `--no-commit-id`, `[<path>...]`), **`diff-index`** (`[--cached] [-m] <tree-ish> [<path>...]`) and **`diff-files`** (`[<path>...]`): The raw plumbing diffs between two trees, a tree and the index or working tree, and the index and the working tree. Output: raw (`:<modes> <hashes> <status> TAB <path>`), `-p`, `--name-only`, `--name-status`, `--stat`, `--shortstat`, `--numstat`, `--summary`, `-z`, `--abbrev[=<n>]`, `-R`, `--quiet`, `--exit-code`. No rename detection or combined diffs.
+- **`merge-file`** (`-p`, `-q`, `--diff3`, `--zdiff3`, `--ours`, `--theirs`, `--union`, `--marker-size=<n>`, `--object-id`, `-L <label>`, `<current> <base> <other>`): Three-way merge of files (or blobs), identical to git's xdiff merge output; exit status is the number of conflicts.
+- **`mktree`** (`-z`, `--missing`, `--batch`): Builds tree objects from `ls-tree` formatted input. **`mktag`** (`--no-strict`): Validates tag object text from standard input with git's fsck checks and stores it.
+- **`unpack-file <blob>`**: Writes a blob to a `.merge_file_XXXXXX` temporary file and prints its name. **`get-tar-commit-id`**: Prints the commit id recorded in a tar archive made by `archive` (which now writes git's pax global header for commits).
 - **Synonyms**: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`.
 
 ---

@@ -404,8 +404,13 @@ pub fn diff_tree_file(path: &str, old: Option<([u8; 20], u32)>, new: Option<([u8
             None => Ok(Vec::new()),
         }
     };
-    let old_bytes = load(old)?;
-    let new_bytes = load(new)?;
+    diff_file_contents(path, old, new, load(old)?, load(new)?)
+}
+
+/// `diff_tree_file` for contents that are already in memory, so a side can also be a file
+/// from the working tree (its hash being the blob hash of that content).
+// Used by `diff_tree_file` and the `diff-files` / `diff-index` / `diff-tree` commands.
+pub fn diff_file_contents(path: &str, old: Option<([u8; 20], u32)>, new: Option<([u8; 20], u32)>, old_bytes: Vec<u8>, new_bytes: Vec<u8>) -> anyhow::Result<FileDiff> {
     let old_hex = old.map(|(h, _)| hex::encode(h)).unwrap_or_else(|| "0".repeat(40));
     let new_hex = new.map(|(h, _)| hex::encode(h)).unwrap_or_else(|| "0".repeat(40));
 

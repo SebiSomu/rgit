@@ -103,7 +103,18 @@ src/
 │   ├── stripspace.rs         # stripspace (-s, -c)
 │   ├── column.rs             # column (--mode, --width, --padding, --indent, --nl)
 │   ├── version.rs            # version (--build-options)
-│   └── help.rs               # help (-a, <command>)
+│   ├── help.rs               # help (-a, <command>)
+│   ├── read_tree.rs          # read-tree (--empty, --prefix, -m 1/2/3 trees, --reset, -u, -i, -n)
+│   ├── update_index.rs       # update-index (--add, --remove, --cacheinfo, --chmod, --refresh, --index-info, --stdin)
+│   ├── checkout_index.rs     # checkout-index (-a, -f, -n, -u, --prefix, --temp, --stdin)
+│   ├── diff_tree.rs          # diff-tree (-r, -t, --root, -m, --stdin, -v/--pretty, common diff options)
+│   ├── diff_index.rs         # diff-index (--cached, -m, common diff options)
+│   ├── diff_files.rs         # diff-files (common diff options)
+│   ├── merge_file.rs         # merge-file (-p, --diff3, --zdiff3, --ours/--theirs/--union, --object-id, -L)
+│   ├── mktree.rs             # mktree (-z, --missing, --batch)
+│   ├── mktag.rs              # mktag (--no-strict)
+│   ├── unpack_file.rs        # unpack-file <blob>
+│   └── get_tar_commit_id.rs  # get-tar-commit-id
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
@@ -170,7 +181,13 @@ src/
 │   ├── var.rs                # Logical variables (identity, editors, pager, default branch, shell, global config)
 │   ├── stripspace.rs         # Whitespace cleanup on raw bytes, comment-line prefixing
 │   ├── column.rs             # git column.c port: mode parsing, display width, column/row/dense layout
-│   └── help.rs               # Command list and per-command help lookup (clap)
+│   ├── help.rs               # Command list and per-command help lookup (clap)
+│   ├── index_plumbing.rs     # Entry vs worktree state, path normalization, add_index_entry rules, refresh, temp files
+│   ├── read_tree.rs          # unpack-trees rules: plain read, --prefix, one/two/three-way merges, worktree checks
+│   ├── diff_plumbing.rs      # Raw diffs: tree walk, tree/index/worktree comparison, raw/name/stat/patch rendering
+│   ├── merge_file.rs         # merge-file argument parsing
+│   ├── mktree.rs             # ls-tree line parsing and checks, tree serialization
+│   └── mktag.rs              # Standalone tag fsck (headers, ident) with git's message ids
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

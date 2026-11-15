@@ -118,16 +118,16 @@ pub fn collect_directory_paths(
 
 /// Writes tree entries as a tar or compressed tar.gz archive to the destination writer.
 // Used by `create_archive`.
-pub fn write_tar_archive<W: Write>(tree_entries: &BTreeMap<String, ([u8; 20], u32)>,timestamp: u64,prefix: Option<&str>,gzip: bool,writer: W) -> anyhow::Result<()> {
+pub fn write_tar_archive<W: Write>(tree_entries: &BTreeMap<String, ([u8; 20], u32)>,timestamp: u64,prefix: Option<&str>,gzip: bool,commit: Option<&str>,writer: W) -> anyhow::Result<()> {
     if gzip {
         let gz = GzEncoder::new(writer, Compression::default());
         let mut builder = Builder::new(gz);
-        write_tar_entries(&mut builder, tree_entries, timestamp, prefix)?;
+        write_tar_entries(&mut builder, tree_entries, timestamp, prefix, commit)?;
         let gz = builder.into_inner()?;
         gz.finish()?;
     } else {
         let mut builder = Builder::new(writer);
-        write_tar_entries(&mut builder, tree_entries, timestamp, prefix)?;
+        write_tar_entries(&mut builder, tree_entries, timestamp, prefix, commit)?;
         builder.finish()?;
     }
 
@@ -136,7 +136,19 @@ pub fn write_tar_archive<W: Write>(tree_entries: &BTreeMap<String, ([u8; 20], u3
 
 /// Appends directory headers and file blobs into an active tar builder.
 // Used by `write_tar_archive`.
-fn write_tar_entries<W: Write>(builder: &mut Builder<W>,tree_entries: &BTreeMap<String, ([u8; 20], u32)>,timestamp: u64,prefix: Option<&str>,) -> anyhow::Result<()> {
+fn write_tar_entries<W: Write>(builder: &mut Builder<W>,tree_entries: &BTreeMap<String, ([u8; 20], u32)>,timestamp: u64,prefix: Option<&str>,commit: Option<&str>,) -> anyhow::Result<()> {
+    // Like git, an archive of a commit starts with a pax global header whose comment is the
+    // commit id (what `get-tar-commit-id` reads back).
+    if let Some(commit) = commit {
+        let comment = format!("52 comment={}\n", commit);
+        let mut header = Header::new_ustar();
+        header.set_entry_type(EntryType::XGlobalHeader);
+        header.set_size(comment.len() as u64);
+        header.set_mode(0o666);
+        header.set_mtime(timestamp);
+        header.set_cksum();
+        builder.append_data(&mut header, "pax_global_header", comment.as_bytes())?;
+    }
     let dirs = collect_directory_paths(tree_entries.keys(), prefix);
     for dir_path in dirs {
         let mut header = Header::new_gnu();
@@ -233,8 +245,9 @@ pub fn write_zip_archive<W: Write>(tree_entries: &BTreeMap<String, ([u8; 20], u3
 }
 
 /// Creates an archive in the specified format from tree entries and writes it to `writer`.
+/// `commit` is the commit the tree came from, recorded in tar archives (not in zip).
 // Used by the `archive` command.
-pub fn create_archive<W: Write>(tree_hash: &str,timestamp: u64,format: ArchiveFormat,prefix: Option<&str>,paths: &[String],writer: W,) -> anyhow::Result<()> {
+pub fn create_archive<W: Write>(tree_hash: &str,timestamp: u64,format: ArchiveFormat,prefix: Option<&str>,paths: &[String],commit: Option<&str>,writer: W,) -> anyhow::Result<()> {
     let mut all_entries = BTreeMap::new();
     flatten_tree(tree_hash, "", &mut all_entries)?;
 
@@ -244,8 +257,16 @@ pub fn create_archive<W: Write>(tree_hash: &str,timestamp: u64,format: ArchiveFo
         .collect();
 
     match format {
-        ArchiveFormat::Tar => write_tar_archive(&filtered_entries, timestamp, prefix, false, writer),
-        ArchiveFormat::TarGz => write_tar_archive(&filtered_entries, timestamp, prefix, true, writer),
+        ArchiveFormat::Tar => write_tar_archive(&filtered_entries, timestamp, prefix, false, commit, writer),
+        ArchiveFormat::TarGz => write_tar_archive(&filtered_entries, timestamp, prefix, true, commit, writer),
         ArchiveFormat::Zip => write_zip_archive(&filtered_entries, timestamp, prefix, writer),
     }
+}
+
+/// The commit a tree-ish names (directly or through annotated tags), or `None` for a tree.
+// Used by the `archive` command to record the commit id in tar archives.
+pub fn archive_commit_id(tree_ish: &str) -> Option<String> {
+    let hash = crate::helpers::rev_parse::resolve_rev(tree_ish).ok()?;
+    let commit = crate::helpers::rev_parse::peel_to_type(hash, "commit").ok()?;
+    matches!(read_object(&commit), Ok((ref object_type, _)) if object_type == "commit").then_some(commit)
 }

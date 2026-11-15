@@ -744,6 +744,61 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    MergeFile {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Mktree {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Mktag {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    UnpackFile {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    GetTarCommitId {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    UpdateIndex {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    CheckoutIndex {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    ReadTree {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    DiffTree {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    DiffIndex {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    DiffFiles {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -1326,6 +1381,39 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Refs { args } => {
             crate::commands::refs(raw_args_after("refs", args))?;
+        }
+        Commands::MergeFile { args } => {
+            crate::commands::merge_file(raw_args_after("merge-file", args))?;
+        }
+        Commands::Mktree { args } => {
+            crate::commands::mktree(raw_args_after("mktree", args))?;
+        }
+        Commands::Mktag { args } => {
+            crate::commands::mktag(raw_args_after("mktag", args))?;
+        }
+        Commands::UnpackFile { args } => {
+            crate::commands::unpack_file(raw_args_after("unpack-file", args))?;
+        }
+        Commands::GetTarCommitId { args } => {
+            crate::commands::get_tar_commit_id(raw_args_after("get-tar-commit-id", args))?;
+        }
+        Commands::UpdateIndex { args } => {
+            crate::commands::update_index(raw_args_after("update-index", args))?;
+        }
+        Commands::CheckoutIndex { args } => {
+            crate::commands::checkout_index(raw_args_after("checkout-index", args))?;
+        }
+        Commands::ReadTree { args } => {
+            crate::commands::read_tree(raw_args_after("read-tree", args))?;
+        }
+        Commands::DiffTree { args } => {
+            crate::commands::diff_tree(raw_args_after("diff-tree", args))?;
+        }
+        Commands::DiffIndex { args } => {
+            crate::commands::diff_index(raw_args_after("diff-index", args))?;
+        }
+        Commands::DiffFiles { args } => {
+            crate::commands::diff_files(raw_args_after("diff-files", args))?;
         }
     }
 

@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use anyhow::Context;
 
-use crate::helpers::archive::{create_archive, list_archive_formats, resolve_tree_ish};
+use crate::helpers::archive::{archive_commit_id, create_archive, list_archive_formats, resolve_tree_ish};
 use crate::objects::ArchiveFormat;
 
 /// Entry point for `rgit archive`.
@@ -31,6 +31,7 @@ pub fn archive(format: Option<String>, list: bool, prefix: Option<String>, outpu
 
     let (tree_hash, timestamp) = resolve_tree_ish(&tree_ish_str)?;
     let prefix_ref = prefix.as_deref();
+    let commit = archive_commit_id(&tree_ish_str);
 
     if let Some(out_path) = output {
         if let Some(parent) = out_path.parent() {
@@ -41,12 +42,12 @@ pub fn archive(format: Option<String>, list: bool, prefix: Option<String>, outpu
         let file = std::fs::File::create(&out_path)
             .with_context(|| format!("fatal: could not create output archive '{}'", out_path.display()))?;
         let mut buf_writer = std::io::BufWriter::new(file);
-        create_archive(&tree_hash, timestamp, archive_format, prefix_ref, &paths, &mut buf_writer)?;
+        create_archive(&tree_hash, timestamp, archive_format, prefix_ref, &paths, commit.as_deref(), &mut buf_writer)?;
         buf_writer.flush()?;
     } else {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
-        create_archive(&tree_hash, timestamp, archive_format, prefix_ref, &paths, &mut handle)?;
+        create_archive(&tree_hash, timestamp, archive_format, prefix_ref, &paths, commit.as_deref(), &mut handle)?;
         handle.flush()?;
     }
 

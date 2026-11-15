@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use crate::helpers::format_patch::compacted_changes;
 use crate::helpers::{find_all_merge_bases, read_object, resolve_tree_from_source, write_object};
-use crate::objects::{ConflictRegion, FileMergeResult, MergeMessage, MergePathOutcome, MergePathReport, SideChange, TreeMergeResult};
+use crate::objects::{ConflictRegion, FileMergeResult, MergeConflictStyle, MergeFavor, MergeFileOptions, MergeMessage, MergePathOutcome, MergePathReport, SideChange, TreeMergeResult};
 
 type Entry = ([u8; 20], u32);
 
@@ -75,6 +75,19 @@ fn eol_crlf(lines: &[&str], i: usize) -> i32 {
 /// marker characters, using CRLF when the surrounding lines do.
 // Used by `merge-tree` via `merge_trees_in_memory`.
 pub fn merge_file_lines(base: &str, ours: &str, theirs: &str, ours_label: &str, theirs_label: &str, marker_size: usize) -> FileMergeResult {
+    let opts = MergeFileOptions { ours_label: ours_label.to_string(), theirs_label: theirs_label.to_string(), marker_size, ..Default::default() };
+    merge_file_lines_with(base, ours, theirs, &opts)
+}
+
+/// `merge_file_lines` with every knob of git's xdiff merge: the conflict style (`merge`,
+/// `diff3` — conflicts are left whole and show the base between `|||||||` and `=======` —
+/// or `zdiff3`, which also moves lines common to the start or end of both sides out of the
+/// conflict), a favoured side for conflicts (`ours`, `theirs`, or `union` = both, without
+/// markers), and `join_non_alnum` (`merge-file`'s level: conflicts are also joined when the
+/// lines between them hold no letters or digits).
+// Used by `merge_file_lines` and `merge-file`.
+pub fn merge_file_lines_with(base: &str, ours: &str, theirs: &str, opts: &MergeFileOptions) -> FileMergeResult {
+    let (ours_label, theirs_label, marker_size) = (opts.ours_label.as_str(), opts.theirs_label.as_str(), opts.marker_size);
     let base_lines: Vec<&str> = base.split_inclusive('\n').collect();
     let our_lines: Vec<&str> = ours.split_inclusive('\n').collect();
     let their_lines: Vec<&str> = theirs.split_inclusive('\n').collect();
@@ -140,6 +153,25 @@ pub fn merge_file_lines(base: &str, ours: &str, theirs: &str, ours_label: &str, 
             continue;
         }
 
+        if opts.style == MergeConflictStyle::Diff3 {
+            chunks.push(Chunk { kind: ChunkKind::Conflict, ours: ours_part, theirs: theirs_part, base: (start, end) });
+            continue;
+        }
+        if opts.style == MergeConflictStyle::Zdiff3 {
+            let limit = ours_part.len().min(theirs_part.len());
+            let head = (0..limit).take_while(|i| ours_part[*i] == theirs_part[*i]).count();
+            let tail = (0..limit - head).take_while(|i| ours_part[ours_part.len() - 1 - i] == theirs_part[theirs_part.len() - 1 - i]).count();
+            let common = |lines: &[String]| Chunk { kind: ChunkKind::Stable, ours: lines.to_vec(), theirs: lines.to_vec(), base: (start, start) };
+            if head > 0 {
+                chunks.push(common(&ours_part[..head]));
+            }
+            chunks.push(Chunk { kind: ChunkKind::Conflict, ours: ours_part[head..ours_part.len() - tail].to_vec(), theirs: theirs_part[head..theirs_part.len() - tail].to_vec(), base: (start, end) });
+            if tail > 0 {
+                chunks.push(common(&ours_part[ours_part.len() - tail..]));
+            }
+            continue;
+        }
+
         let (refined, _, _) = compacted_changes(&ours_part, &theirs_part, false);
         let mut i = 0;
         for (oi, on, tj, tn) in refined {
@@ -163,9 +195,11 @@ pub fn merge_file_lines(base: &str, ours: &str, theirs: &str, ours_label: &str, 
     for chunk in chunks {
         let n = joined.len();
         let after_conflict = |i: usize| joined[i].kind == ChunkKind::Conflict;
-        let joinable = chunk.kind == ChunkKind::Conflict
+        let small_gap = |gap: &Chunk| gap.ours.len() <= 3 || (opts.join_non_alnum && !gap.ours.iter().any(|l| l.bytes().any(|b| b.is_ascii_alphanumeric())));
+        let joinable = opts.style == MergeConflictStyle::Merge
+            && chunk.kind == ChunkKind::Conflict
             && n >= 1
-            && (after_conflict(n - 1) || (n >= 2 && joined[n - 1].kind == ChunkKind::Stable && joined[n - 1].ours.len() <= 3 && after_conflict(n - 2)));
+            && (after_conflict(n - 1) || (n >= 2 && joined[n - 1].kind == ChunkKind::Stable && small_gap(&joined[n - 1]) && after_conflict(n - 2)));
         if !joinable {
             joined.push(chunk);
             continue;
@@ -200,8 +234,26 @@ pub fn merge_file_lines(base: &str, ours: &str, theirs: &str, ours_label: &str, 
                         out.push_str(eol);
                     }
                 };
+                match opts.favor {
+                    MergeFavor::Ours => chunk.ours.iter().for_each(|l| out.push_str(l)),
+                    MergeFavor::Theirs => chunk.theirs.iter().for_each(|l| out.push_str(l)),
+                    MergeFavor::Union => {
+                        push_side(&mut out, &chunk.ours);
+                        chunk.theirs.iter().for_each(|l| out.push_str(l));
+                    }
+                    MergeFavor::None => {}
+                }
+                if opts.favor != MergeFavor::None {
+                    ours_pos += chunk.ours.len();
+                    theirs_pos += chunk.theirs.len();
+                    continue;
+                }
                 out.push_str(&format!("{} {}{}", "<".repeat(marker_size), ours_label, eol));
                 push_side(&mut out, &chunk.ours);
+                if opts.style != MergeConflictStyle::Merge {
+                    out.push_str(&format!("{} {}{}", "|".repeat(marker_size), opts.base_label, eol));
+                    push_side(&mut out, &to_strings(&base_lines[chunk.base.0..chunk.base.1]));
+                }
                 out.push_str(&format!("{}{}", "=".repeat(marker_size), eol));
                 push_side(&mut out, &chunk.theirs);
                 out.push_str(&format!("{} {}{}", ">".repeat(marker_size), theirs_label, eol));

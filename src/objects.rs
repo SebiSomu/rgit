@@ -2880,3 +2880,241 @@ pub enum CommandHelp {
     Raw(String),
     Clap(String),
 }
+
+/// Settings of a line-level three-way file merge (git's `xmparam_t`).
+// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs, src/commands/merge_file.rs
+// Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
+#[derive(Debug, Clone)]
+pub struct MergeFileOptions {
+    /// Label after `<<<<<<<`.
+    pub ours_label: String,
+    /// Label after `|||||||` (diff3 styles only).
+    pub base_label: String,
+    /// Label after `>>>>>>>`.
+    pub theirs_label: String,
+    /// Length of the conflict markers (git's default is 7).
+    pub marker_size: usize,
+    /// `merge`, `diff3` or `zdiff3`.
+    pub style: MergeConflictStyle,
+    /// Which side wins a conflict, if any.
+    pub favor: MergeFavor,
+    /// Also join conflicts separated only by lines without letters or digits (`merge-file`).
+    pub join_non_alnum: bool,
+}
+
+impl Default for MergeFileOptions {
+    fn default() -> Self {
+        MergeFileOptions { ours_label: String::new(), base_label: String::new(), theirs_label: String::new(), marker_size: 7, style: MergeConflictStyle::Merge, favor: MergeFavor::None, join_non_alnum: false }
+    }
+}
+
+/// How conflicts are written by a file merge.
+// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs
+// Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeConflictStyle {
+    /// Ours and theirs only, conflicts narrowed down as far as possible.
+    Merge,
+    /// Whole conflicts with the base version in the middle.
+    Diff3,
+    /// Like `Diff3`, but lines both sides share at the edges are moved out of the conflict.
+    Zdiff3,
+}
+
+/// The side a file merge takes for conflicting regions instead of writing markers.
+// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs
+// Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeFavor {
+    None,
+    Ours,
+    Theirs,
+    Union,
+}
+
+/// Parsed arguments of the `merge-file` command.
+// Used by: src/helpers/merge_file.rs, src/commands/merge_file.rs
+// Used by command/helper: `parse_merge_file_args` and the `merge_file` command
+#[derive(Debug, Clone)]
+pub struct MergeFileArgs {
+    /// `-p` / `--stdout`: print the result instead of overwriting the first file.
+    pub stdout: bool,
+    /// `--object-id`: the three arguments are blobs, and the result is written as a blob.
+    pub object_id: bool,
+    /// `-q` / `--quiet`: no warnings about conflicts.
+    pub quiet: bool,
+    /// `--diff3` / `--zdiff3`, else `merge.conflictStyle`.
+    pub style: MergeConflictStyle,
+    /// `--ours` / `--theirs` / `--union`.
+    pub favor: MergeFavor,
+    /// `--marker-size=<n>`.
+    pub marker_size: usize,
+    /// Up to three `-L <label>` values: current, base, other.
+    pub labels: Vec<String>,
+    /// `<current> <base> <other>`.
+    pub files: Vec<String>,
+}
+
+/// What the working tree holds for an index entry.
+// Used by: src/helpers/index_plumbing.rs, src/helpers/diff_plumbing.rs, src/commands/update_index.rs, src/commands/checkout_index.rs, src/commands/read_tree.rs
+// Used by command/helper: `worktree_state`, `refresh_index`, `diff_index_changes`, and the `update_index` / `checkout_index` / `read_tree` / `diff_files` / `diff_index` commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexFileState {
+    /// No file at the entry's path.
+    Missing,
+    /// The file has the entry's content and mode.
+    Clean,
+    /// The file differs; the value is the mode it would be staged with.
+    Modified(u32),
+}
+
+/// The switches of `update-index` that apply to the paths and actions after them.
+// Used by: src/helpers/index_plumbing.rs, src/commands/update_index.rs
+// Used by command/helper: `update_index_path`, `add_cache_entry`, and the `update_index` command
+#[derive(Debug, Clone, Default)]
+pub struct UpdateIndexFlags {
+    /// `--add`: paths not yet in the index may be added.
+    pub add: bool,
+    /// `--replace`: a file may replace a directory of entries and the other way round.
+    pub replace: bool,
+    /// `--remove`: a path missing from the working tree is removed from the index.
+    pub remove: bool,
+    /// `--force-remove`: remove the paths from the index even when the files exist.
+    pub force_remove: bool,
+    /// `--info-only`: record the hash without writing the blob to the object store.
+    pub info_only: bool,
+    /// `--verbose`: report `add '<path>'` / `remove '<path>'` / `chmod ±x '<path>'`.
+    pub verbose: bool,
+    /// `--chmod=+x` (`Some(true)`) or `--chmod=-x` (`Some(false)`).
+    pub chmod: Option<bool>,
+    /// `-q`: `--refresh` does not report or fail on entries that need an update.
+    pub quiet: bool,
+    /// `--ignore-missing`: `--refresh` skips entries whose file is missing.
+    pub ignore_missing: bool,
+}
+
+/// Parsed arguments of the `read-tree` command.
+// Used by: src/helpers/read_tree.rs, src/commands/read_tree.rs
+// Used by command/helper: `parse_read_tree_args`, `plan_read_tree`, and the `read_tree` command
+#[derive(Debug, Clone, Default)]
+pub struct ReadTreeOptions {
+    /// `-m`: merge the trees into the index instead of replacing it.
+    pub merge: bool,
+    /// `--reset`: like `-m`, but local changes never stop the operation.
+    pub reset: bool,
+    /// `--prefix=<dir>/`: add the tree under this directory, keeping the rest of the index.
+    pub prefix: Option<String>,
+    /// `-u`: also update the working tree.
+    pub update: bool,
+    /// `-i`: do not look at the working tree at all.
+    pub index_only: bool,
+    /// `-n` / `--dry-run`: check whether the operation would succeed, change nothing.
+    pub dry_run: bool,
+    /// `--trivial`: fail if a three-way merge needs more than the trivial cases.
+    pub trivial: bool,
+    /// `--aggressive`: also resolve deletions and identical additions in a three-way merge.
+    pub aggressive: bool,
+    /// `--empty`: empty the index.
+    pub empty: bool,
+    /// The tree-ish arguments.
+    pub trees: Vec<String>,
+}
+
+/// What `read-tree` decided to do: the new index, and for `-u` the files to write and remove.
+// Used by: src/helpers/read_tree.rs, src/commands/read_tree.rs
+// Used by command/helper: `plan_read_tree` and the `read_tree` command
+#[derive(Debug, Clone, Default)]
+pub struct ReadTreePlan {
+    /// The index entries after the operation.
+    pub entries: Vec<crate::index::IndexEntry>,
+    /// Paths whose file must be (re)written from the new entry.
+    pub write: Vec<String>,
+    /// Paths whose file must be removed.
+    pub remove: Vec<String>,
+    /// Problems that stop the operation, as git words them.
+    pub errors: Vec<String>,
+    /// Paths a three-way merge could not settle trivially.
+    pub unmerged: Vec<String>,
+}
+
+/// One side of a raw diff entry: the mode and object of a path in a tree, the index or the
+/// working tree.
+// Used by: src/helpers/diff_plumbing.rs
+// Used by command/helper: `diff_trees`, `diff_index_changes`, `diff_files_changes`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffSide {
+    /// File mode (`100644`, `100755`, `120000`, `160000`, or `040000` for a tree).
+    pub mode: u32,
+    /// Object hash; all zeros when the content is only in the working tree.
+    pub hash: [u8; 20],
+    /// True when the content has to be read from the working tree file.
+    pub worktree: bool,
+}
+
+/// One changed path of a raw diff.
+// Used by: src/helpers/diff_plumbing.rs
+// Used by command/helper: `diff_trees`, `diff_index_changes`, `diff_files_changes`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
+#[derive(Debug, Clone)]
+pub struct DiffChange {
+    pub path: String,
+    /// The path before; `None` for an addition.
+    pub old: Option<DiffSide>,
+    /// The path after; `None` for a deletion.
+    pub new: Option<DiffSide>,
+}
+
+/// Options shared by `diff-tree`, `diff-index` and `diff-files`.
+// Used by: src/helpers/diff_plumbing.rs, src/commands/diff_tree.rs, src/commands/diff_index.rs, src/commands/diff_files.rs
+// Used by command/helper: `parse_diff_plumbing_args`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
+#[derive(Debug, Clone, Default)]
+pub struct DiffPlumbingOptions {
+    /// `--raw` (the default when no other format is asked for).
+    pub raw: bool,
+    /// `-p` / `-u` / `--patch`.
+    pub patch: bool,
+    /// `--name-only`.
+    pub name_only: bool,
+    /// `--name-status`.
+    pub name_status: bool,
+    /// `--stat`.
+    pub stat: bool,
+    /// `--shortstat`.
+    pub shortstat: bool,
+    /// `--numstat`.
+    pub numstat: bool,
+    /// `--summary`.
+    pub summary: bool,
+    /// `-s` / `--no-patch`: no diff output at all.
+    pub no_output: bool,
+    /// `-z`: NUL-terminated records, paths never quoted.
+    pub nul: bool,
+    /// `--abbrev[=<n>]`: shorten hashes in raw output.
+    pub abbrev: Option<usize>,
+    /// `-r`: recurse into subtrees (`diff-tree`).
+    pub recursive: bool,
+    /// `-t`: also show the tree entries themselves (`diff-tree`; implies `-r`).
+    pub show_trees: bool,
+    /// `--root`: show a root commit as a diff against nothing (`diff-tree`).
+    pub root: bool,
+    /// `-m`: show merges against each parent (`diff-tree`); treat files missing from the
+    /// working tree as unchanged (`diff-index`).
+    pub merges: bool,
+    /// `--cached`: compare the tree with the index only (`diff-index`).
+    pub cached: bool,
+    /// `--stdin`: read commits or tree pairs from standard input (`diff-tree`).
+    pub stdin: bool,
+    /// `--no-commit-id`: do not print the commit id line (`diff-tree`).
+    pub no_commit_id: bool,
+    /// `-v` / `--pretty[=<format>]` / `--format=<format>`: show the commit header (`diff-tree`).
+    pub pretty: Option<String>,
+    /// `-R`: swap the two sides.
+    pub reverse: bool,
+    /// `--exit-code`: exit 1 when there are differences.
+    pub exit_code: bool,
+    /// `--quiet`: no output, implies `--exit-code`.
+    pub quiet: bool,
+    /// Positional arguments before `--`.
+    pub args: Vec<String>,
+    /// Arguments after `--`: always paths.
+    pub paths: Vec<String>,
+}

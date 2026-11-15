@@ -178,41 +178,25 @@ pub fn resolve_rev(rev: &str) -> Result<String> {
     let mut remaining = rev.to_string();
     let mut suffixes: Vec<String> = Vec::new();
 
+    // Strip suffixes from the right, always taking whichever one actually ends the string, so
+    // mixed chains such as `topic~2^0` or `v1^{commit}~1^2` come apart correctly.
     loop {
-        if let Some(pos) = remaining.rfind("^{") {
-            if remaining.ends_with('}') {
-                let suffix = remaining[pos..].to_string();
-                remaining = remaining[..pos].to_string();
-                suffixes.push(suffix);
+        if remaining.ends_with('}') {
+            if let Some(pos) = remaining.rfind("^{") {
+                suffixes.push(remaining[pos..].to_string());
+                remaining.truncate(pos);
                 continue;
             }
         }
-        if let Some(pos) = remaining.rfind('~') {
-            let after = &remaining[pos + 1..];
-            let n: usize = if after.is_empty() {
-                1
-            } else if let Ok(n) = after.parse() {
-                n
-            } else {
-                break;
-            };
-            remaining = remaining[..pos].to_string();
-            suffixes.push(format!("~{}", n));
+        let digits = remaining.chars().rev().take_while(|c| c.is_ascii_digit()).count();
+        let marker_end = remaining.len() - digits;
+        let marker = remaining[..marker_end].chars().last();
+        if matches!(marker, Some('^') | Some('~')) && marker_end > 1 {
+            let default = 1;
+            let n: usize = if digits == 0 { default } else { remaining[marker_end..].parse().unwrap_or(default) };
+            suffixes.push(format!("{}{}", marker.unwrap_or('^'), n));
+            remaining.truncate(marker_end - 1);
             continue;
-        }
-        if remaining.ends_with('^') {
-            remaining.pop();
-            suffixes.push("^1".to_string());
-            continue;
-        }
-        if let Some(pos) = remaining.rfind('^') {
-            let after = &remaining[pos + 1..];
-            if !after.is_empty() && after.chars().all(|c| c.is_ascii_digit()) {
-                let n: usize = after.parse().unwrap_or(1);
-                remaining = remaining[..pos].to_string();
-                suffixes.push(format!("^{}", n));
-                continue;
-            }
         }
         break;
     }
@@ -224,14 +208,48 @@ pub fn resolve_rev(rev: &str) -> Result<String> {
             hash = peel_to_type(hash, inner)?;
         } else if let Some(rest) = suffix.strip_prefix('~') {
             let n: usize = rest.parse().unwrap_or(1);
-            hash = resolve_tilde_ancestor(hash, n)?;
+            hash = resolve_tilde_ancestor(peel_to_type(hash, "commit")?, n)?;
         } else if let Some(rest) = suffix.strip_prefix('^') {
+            // `^0` is the commit itself, which also peels an annotated tag.
             let n: usize = rest.parse().unwrap_or(1);
-            hash = resolve_nth_parent(&hash, n)?;
+            hash = resolve_nth_parent(&peel_to_type(hash, "commit")?, n)?;
         }
     }
 
     Ok(hash)
+}
+
+/// Prints git's `warning: refname '<name>' is ambiguous.` on stderr, once per name for the
+/// whole run (commands often resolve the same argument several times).
+// Used by `resolve_base_name`.
+fn warn_ambiguous_refname(name: &str) {
+    static WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    let mut warned = WARNED.lock().unwrap_or_else(|e| e.into_inner());
+    if !warned.iter().any(|n| n == name) {
+        eprintln!("warning: refname '{}' is ambiguous.", name);
+        warned.push(name.to_string());
+    }
+}
+
+/// Reads a ref, following symbolic refs (`ref: refs/...`, e.g. `refs/remotes/origin/HEAD`) to
+/// the hash they end at. Returns `None` when the ref, or the ref it points to, does not exist.
+// Used by `resolve_base_name`.
+fn read_ref_following_symref(ref_name: &str) -> Result<Option<String>> {
+    let mut current = ref_name.to_string();
+    for _ in 0..5 {
+        // A name such as `feat` can be a directory of refs (`refs/heads/feat/a`), not a ref.
+        if crate::repo::path(format!(".git/{}", current)).is_dir() {
+            return Ok(None);
+        }
+        match read_ref(&current)? {
+            Some(value) => match value.strip_prefix("ref: ") {
+                Some(target) => current = target.trim().to_string(),
+                None => return Ok(Some(value)),
+            },
+            None => return Ok(None),
+        }
+    }
+    Ok(None)
 }
 
 /// Resolves a bare name (no suffixes) into a commit/object hash.
@@ -243,31 +261,43 @@ fn resolve_base_name(name: &str) -> Result<String> {
     }
 
     // HEAD
-    if name.eq_ignore_ascii_case("head") {
+    if name.eq_ignore_ascii_case("head") || name == "@" {
         let hash = resolve_head_commit()?.ok_or_else(|| {
             anyhow::anyhow!("fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree")
         })?;
         return Ok(hash);
     }
 
-    // Full ref path (refs/…)
-    if name.starts_with("refs/") {
-        if let Some(hash) = read_ref(name)? {
-            return Ok(hash);
-        }
-        anyhow::bail!("fatal: ambiguous argument '{}': unknown revision or path not in the working tree", name);
+    // A full object name always wins over a ref that happens to be called the same.
+    if name.len() == 40 && name.chars().all(|c| c.is_ascii_hexdigit()) && read_object(name).is_ok() {
+        return Ok(name.to_string());
     }
 
-    // Local branch
-    if let Some(hash) = read_ref(&format!("refs/heads/{}", name))? {
-        return Ok(hash);
+    // Ref lookup in git's order: the name itself (`refs/...` or a pseudo-ref like `ORIG_HEAD`),
+    // `refs/<name>` (so `heads/x`, `tags/x`, `remotes/x` work), then tag, branch, remote-tracking
+    // branch and a remote's default branch. The first match wins; more than one match is ambiguous.
+    let pseudo_ref = !name.is_empty() && name.chars().all(|c| c.is_ascii_uppercase() || c == '_');
+    let mut candidates: Vec<String> = Vec::new();
+    if name.starts_with("refs/") || pseudo_ref {
+        candidates.push(name.to_string());
     }
-    // Tag
-    if let Some(hash) = read_ref(&format!("refs/tags/{}", name))? {
-        return Ok(hash);
+    for prefix in ["refs/", "refs/tags/", "refs/heads/", "refs/remotes/"] {
+        candidates.push(format!("{}{}", prefix, name));
     }
-    // Remote-tracking branch (e.g. `origin/main`)
-    if let Some(hash) = read_ref(&format!("refs/remotes/{}", name))? {
+    candidates.push(format!("refs/remotes/{}/HEAD", name));
+
+    let mut found: Option<String> = None;
+    let mut matches = 0;
+    for candidate in &candidates {
+        if let Some(hash) = read_ref_following_symref(candidate)? {
+            matches += 1;
+            found.get_or_insert(hash);
+        }
+    }
+    if let Some(hash) = found {
+        if matches > 1 {
+            warn_ambiguous_refname(name);
+        }
         return Ok(hash);
     }
 

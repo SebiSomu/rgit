@@ -33,58 +33,24 @@ pub fn extract_commit_message(commit_text: &str) -> String {
     lines.join("\n")
 }
 
-/// Resolves a source branch, HEAD, commit hash, or parent expression (like `~N`)
-/// into its commit hash.
+/// Resolves any revision expression `rev-parse` understands (branch, tag, `heads/<name>`,
+/// hash or prefix, `~N` / `^N` chains, ...) into the hash of the commit it names, peeling
+/// annotated tags.
 // Used by `merge`, `diff`, `restore`, and tree resolution helpers.
 pub fn resolve_commit_from_source(source: &str) -> anyhow::Result<String> {
-    let (base_name, steps) = if let Some(idx) = source.find('~') {
-        let base = &source[..idx];
-        let num_str = &source[idx + 1..];
-        let num: usize = num_str.parse().unwrap_or(1);
-        (base, num)
-    } else {
-        (source, 0)
+    let hash = match crate::helpers::rev_parse::resolve_rev(source) {
+        Ok(hash) => hash,
+        // Keep precise failures ("commit ... has no parent"); an unknown name is an invalid reference.
+        Err(e) if e.to_string().starts_with("error:") => return Err(e),
+        Err(_) => anyhow::bail!("error: invalid reference: '{}'", source),
     };
-
-    let mut commit_hash = if base_name.eq_ignore_ascii_case("head") {
-        refs::resolve_head_commit()?.ok_or_else(|| {
-            anyhow::anyhow!("error: could not resolve HEAD: HEAD has no commits yet")
-        })?
-    } else if let Some(hash) = refs::read_ref(&format!("refs/heads/{}", base_name))? {
-        hash
-    } else if base_name.starts_with("refs/") && refs::read_ref(base_name)?.is_some() {
-        refs::read_ref(base_name)?.unwrap()
-    } else if let Some(hash) = refs::read_ref(&format!("refs/remotes/{}", base_name))? {
-        hash
-    } else if let Some(hash) = refs::read_ref(&format!("refs/tags/{}", base_name))? {
-        hash
-    } else {
-        match read_object(base_name) {
-            Ok((ref obj_type, _)) if obj_type == "commit" => base_name.to_string(),
-            Ok((obj_type, _)) => {
-                anyhow::bail!("error: '{}' is not a commit (it is a {})", base_name, obj_type);
-            }
-            Err(_) => {
-                anyhow::bail!("error: invalid reference: '{}'", base_name);
-            }
-        }
-    };
-
-    for _ in 0..steps {
-        let (obj_type, content) = read_object(&commit_hash)?;
-        if obj_type != "commit" {
-            anyhow::bail!("error: object {} is not a commit", commit_hash);
-        }
-        let text = String::from_utf8_lossy(&content);
-        let parent = text.lines().find_map(|line| line.strip_prefix("parent ")).map(|s| s.to_string());
-        if let Some(p) = parent {
-            commit_hash = p;
-        } else {
-            anyhow::bail!("error: commit {} has no parent", commit_hash);
+    match crate::helpers::rev_parse::peel_to_type(hash.clone(), "commit") {
+        Ok(commit) => Ok(commit),
+        Err(_) => {
+            let (obj_type, _) = read_object(&hash)?;
+            anyhow::bail!("error: '{}' is not a commit (it is a {})", source, obj_type);
         }
     }
-
-    Ok(commit_hash)
 }
 
 /// Resolves a source branch/commit name/hash into its tree structure, returning

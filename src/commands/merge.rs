@@ -115,15 +115,24 @@ Please, commit your changes before you merge.");
 /// `Merge tag 'v1'`, or `Merge commit '<rev>'` for anything that isn't a branch or tag.
 fn merge_message(name: &str) -> String {
     let exists = |r: String| refs::read_ref(&r).ok().flatten().is_some();
-    if exists(format!("refs/heads/{}", name)) {
-        format!("Merge branch '{}'", name)
-    } else if exists(format!("refs/remotes/{}", name)) {
-        format!("Merge remote-tracking branch '{}'", name)
+    // Same lookup order as revision parsing: `heads/x` / `tags/x` / `remotes/x` first, then a
+    // tag wins over a branch of the same name.
+    let kind = if name.starts_with("heads/") && exists(format!("refs/{}", name)) {
+        "branch"
+    } else if name.starts_with("tags/") && exists(format!("refs/{}", name)) {
+        "tag"
+    } else if name.starts_with("remotes/") && exists(format!("refs/{}", name)) {
+        "remote-tracking branch"
     } else if exists(format!("refs/tags/{}", name)) {
-        format!("Merge tag '{}'", name)
+        "tag"
+    } else if exists(format!("refs/heads/{}", name)) {
+        "branch"
+    } else if exists(format!("refs/remotes/{}", name)) {
+        "remote-tracking branch"
     } else {
-        format!("Merge commit '{}'", name)
-    }
+        "commit"
+    };
+    format!("Merge {} '{}'", kind, name)
 }
 
 pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<String>) -> anyhow::Result<()> {

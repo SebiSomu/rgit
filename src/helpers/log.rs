@@ -294,9 +294,16 @@ fn signature_line(sig: &CommitSignature) -> String {
     format!("{} <{}>", sig.name, sig.email)
 }
 
-fn indented_message(message: &str) -> String {
-    let mut out = String::new();
-    for line in message.trim_start_matches('\n').trim_end().lines() {
+/// Renders the message part of a multi-line log entry: a blank line and the message indented by
+/// four spaces, or nothing at all for a commit without a message (git prints only the header).
+// Used by `format_log_entry`.
+fn message_block(message: &str) -> String {
+    let body = message.trim_start_matches('\n').trim_end();
+    if body.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("\n");
+    for line in body.lines() {
         out.push_str("    ");
         out.push_str(line);
         out.push('\n');
@@ -352,27 +359,27 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
 
     let entry = match &opts.format {
         LogFormat::Oneline => format!("{}{} {}\n", hash, decor, split_commit_message(&commit.message).0),
-        LogFormat::Short => format!("commit {}{}\n{}Author: {}\n\n    {}\n", hash, decor, merge_line, signature_line(&commit.author), split_commit_message(&commit.message).0),
+        LogFormat::Short => format!("commit {}{}\n{}Author: {}\n{}", hash, decor, merge_line, signature_line(&commit.author), message_block(&split_commit_message(&commit.message).0)),
         LogFormat::Medium => format!(
-            "commit {}{}\n{}Author: {}\nDate:   {}\n\n{}",
+            "commit {}{}\n{}Author: {}\nDate:   {}\n{}",
             hash,
             decor,
             merge_line,
             signature_line(&commit.author),
             date(&commit.author),
-            indented_message(&commit.message)
+            message_block(&commit.message)
         ),
         LogFormat::Full => format!(
-            "commit {}{}\n{}Author: {}\nCommit: {}\n\n{}",
+            "commit {}{}\n{}Author: {}\nCommit: {}\n{}",
             hash,
             decor,
             merge_line,
             signature_line(&commit.author),
             signature_line(&commit.committer),
-            indented_message(&commit.message)
+            message_block(&commit.message)
         ),
         LogFormat::Fuller => format!(
-            "commit {}{}\n{}Author:     {}\nAuthorDate: {}\nCommit:     {}\nCommitDate: {}\n\n{}",
+            "commit {}{}\n{}Author:     {}\nAuthorDate: {}\nCommit:     {}\nCommitDate: {}\n{}",
             hash,
             decor,
             merge_line,
@@ -380,7 +387,7 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             date(&commit.author),
             signature_line(&commit.committer),
             date(&commit.committer),
-            indented_message(&commit.message)
+            message_block(&commit.message)
         ),
         LogFormat::Raw => {
             let mut out = format!("commit {}{}\ntree {}\n", commit.hash, decor, commit.tree);
@@ -388,7 +395,7 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
                 out.push_str(&format!("parent {}\n", parent));
             }
             let raw = |sig: &CommitSignature| format!("{} {} {}", signature_line(sig), sig.timestamp, sig.tz);
-            out.push_str(&format!("author {}\ncommitter {}\n\n{}", raw(&commit.author), raw(&commit.committer), indented_message(&commit.message)));
+            out.push_str(&format!("author {}\ncommitter {}\n{}", raw(&commit.author), raw(&commit.committer), message_block(&commit.message)));
             out
         }
         LogFormat::Template { template, terminator } => {

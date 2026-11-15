@@ -72,6 +72,12 @@ A lightweight, fully functional Git implementation written in Rust.
   - `maintenance.rs`: Multi-valued path config lists, running rgit in other repositories, maintenance task selection and execution, and `maintenance.repo` registration.
   - `replay.rs`: In-memory replay of commit ranges onto a new base (three-way tree merges, preserved authorship) and `update-ref` command output.
   - `rerere.rs`: git's conflict normalization and conflict IDs, the `rr-cache` preimage/postimage store, `MERGE_RR`, resolution replay by three-way merge, and `forget` / `clear` / `gc` / `diff`.
+  - `name_rev.rs`: A port of git's `name-rev.c`: ref tips ranked tags-first and oldest-first, names spread to ancestors (`~N`, `^N`) with git's distance rules, `--refs` / `--exclude` sub-path matching, unambiguous ref shortening, and stdin annotation.
+  - `column.rs`: A port of git's `column.c`: mode parsing (`always`/`never`/`auto`, `column`/`row`/`plain`, `dense`), display width, and the column/row/dense table layout.
+  - `stripspace.rs`: git's whitespace cleanup on raw bytes and the comment-line prefixer.
+  - `refs_verify.rs`: Consistency checks for loose ref names and contents and for `packed-refs`.
+  - `var.rs`: The logical variables behind `var` (identity, editors, pager, default branch, shell, global config).
+  - `help.rs`: Command list and per-command help lookup on top of clap.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -170,6 +176,9 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`hook run`** (`--ignore-missing`, `--to-stdin=<path>`, `<hook-name> [-- <hook-args>]`): Runs a hook script from `.git/hooks` or `core.hooksPath` and exits with its status. rgit's own commands do not fire hooks yet.
 - **`for-each-repo`** (`--config=<key>`, `--keep-going`, `<arguments>`): Runs `rgit <arguments>` in every repository listed under a multi-valued config key.
 - **`maintenance`** (`run [--auto] [--quiet] [--task=<task>]`, `register`, `unregister [--force]`): Runs upkeep tasks (`gc`, `pack-refs`; the packfile and commit-graph tasks are accepted but skipped) and manages the global `maintenance.repo` list. No `start` / `stop` scheduler.
+- **`var`** (`-l`, `<variable>`): Prints rgit's logical variables under git's names: `GIT_AUTHOR_IDENT`, `GIT_COMMITTER_IDENT`, `GIT_EDITOR`, `GIT_SEQUENCE_EDITOR`, `GIT_PAGER`, `GIT_DEFAULT_BRANCH`, `GIT_SHELL_PATH`, `GIT_CONFIG_GLOBAL`; `-l` lists the configuration followed by all of them.
+- **`version`** (`--build-options`): Prints `rgit version <version>`, optionally with CPU, OS, pointer size and build profile.
+- **`help`** (`-a|--all`, `<command>`): Lists every command in columns, or shows one command's usage and options (the command's own `-h` text where it has one, clap's help otherwise).
 
 ### Plumbing Commands
 
@@ -192,6 +201,11 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`mailsplit`** (`-o<directory>`, `-d<prec>`, `-f<n>`, `-b`, `--keep-cr`, `--mboxrd`, `[<mbox>|<Maildir>...]`): Splits mbox files, Maildirs or standard input into one numbered file per message (`0001`, `0002`, ...) and prints the count.
 - **`mailinfo`** (`-k`, `-b`, `-m|--message-id`, `-u`, `-n`, `--encoding=<encoding>`, `--[no-]scissors`, `--no-inbody-headers`, `--quoted-cr=<action>`, `<msg> <patch>`): Reads one email on standard input, writes its commit message and patch to the two files, and prints `Author:` / `Email:` / `Subject:` / `Date:`. Decodes RFC 2047 headers, MIME multipart, base64, quoted-printable and `format=flowed`. Charset conversion covers UTF-8, US-ASCII, ISO-8859-1/15 and Windows-1252; `--encoding` re-codes to the named charset as documented (git 2.43 itself turns re-coding off there).
 - **`interpret-trailers`** (`--in-place`, `--trim-empty`, `--trailer <token>[(=|:)<value>]`, `--where <placement>`, `--if-exists <action>`, `--if-missing <action>`, `--only-trailers`, `--only-input`, `--unfold`, `--parse`, `--no-divider`, `[<file>...]`): Adds or parses the `Token: value` trailers at the end of commit messages, honouring `trailer.separators`, `trailer.where`, `trailer.ifexists`, `trailer.ifmissing` and `trailer.<token>.key|command|cmd|where|ifexists|ifmissing`.
+- **`name-rev`** (`--name-only`, `--tags`, `--refs=<pattern>`, `--exclude=<pattern>`, `--all`, `--annotate-stdin`, `--no-undefined`, `--always`, `<commit>...`): Names revisions relative to the nearest ref (`main~3`, `tags/v1^0`, `main~3^2~1`) with git's rules (tags first, older tags first, first-parent paths preferred); can list every reachable commit or annotate hashes in text read from standard input.
+- **`refs`** (`list ...`, `exists <ref>`, `verify [--strict] [--verbose]`, `optimize ...`): git 2.46+ umbrella command: `list` = `for-each-ref`, `exists` = `show-ref --exists`, `optimize` = `pack-refs`, and `verify` checks loose ref names/contents and `packed-refs` for consistency.
+- **`stripspace`** (`-s|--strip-comments`, `-c|--comment-lines`): git's message cleanup filter for standard input: trims trailing whitespace, collapses and trims empty lines; `-s` drops comment lines, `-c` turns every line into a comment (`core.commentChar`).
+- **`column`** (`--mode[=<style>]`, `--raw-mode=<n>`, `--width=<n>`, `--padding=<n>`, `--indent=<string>`, `--nl=<string>`, `--command=<name>`): Lays lines from standard input out in columns (`column`/`row`/`plain`, `dense`), honouring `column.ui` and `column.<name>`.
+- **Synonyms**: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`.
 
 ---
 

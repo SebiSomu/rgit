@@ -2749,3 +2749,134 @@ pub struct ReplayOptions {
     /// The revision ranges whose commits are replayed.
     pub ranges: Vec<String>,
 }
+
+/// Layout settings of the `column` command, mirroring git's `colopts` bits and
+/// `struct column_options`: whether columns are on (`always`/`never`/`auto`), how items are
+/// filled in (down the columns, across the rows, or one per line), whether columns shrink to
+/// their own widest item (`dense`), and the width / padding / indent / line ending to use.
+// Used by: src/helpers/column.rs, src/commands/column.rs, src/commands/help.rs
+// Used by command/helper: `parse_column_args`, `apply_column_mode`, `render_columns`, and the `column` / `help` commands
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnOptions {
+    /// `always` / `never` / `auto` (`auto` = only when standard output is a terminal).
+    pub enable: ColumnEnable,
+    /// `column`, `row` or `plain`.
+    pub layout: ColumnLayout,
+    /// `dense` / `nodense`: unequal column widths, to fit more columns.
+    pub dense: bool,
+    /// `--width=<n>`: total width; 0 means the terminal width minus one.
+    pub width: usize,
+    /// `--padding=<n>`: spaces between columns (default 1).
+    pub padding: usize,
+    /// `--indent=<string>`: printed at the start of every line.
+    pub indent: String,
+    /// `--nl=<string>`: printed at the end of every line (default a newline).
+    pub nl: String,
+}
+
+/// Whether `column` lays its input out in columns at all.
+// Used by: src/helpers/column.rs, src/commands/help.rs
+// Used by command/helper: `apply_column_mode`, `render_columns`, and the `column` / `help` commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnEnable {
+    Never,
+    Always,
+    Auto,
+}
+
+/// How `column` fills its table.
+// Used by: src/helpers/column.rs, src/commands/help.rs
+// Used by command/helper: `apply_column_mode`, `render_columns`, and the `column` / `help` commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnLayout {
+    /// Fill the first column top to bottom, then the next one.
+    Column,
+    /// Fill the first row left to right, then the next one.
+    Row,
+    /// One item per line.
+    Plain,
+}
+
+/// Parsed arguments of the `name-rev` command.
+// Used by: src/helpers/name_rev.rs, src/commands/name_rev.rs
+// Used by command/helper: `parse_name_rev_args`, `build_rev_names`, and the `name_rev` command
+#[derive(Debug, Clone, Default)]
+pub struct NameRevOptions {
+    /// `--name-only`: print only the name, not the argument it belongs to.
+    pub name_only: bool,
+    /// `--tags`: only use tags to name commits.
+    pub tags: bool,
+    /// `--refs=<pattern>` (repeatable): only use refs matching one of the patterns.
+    pub refs: Vec<String>,
+    /// `--exclude=<pattern>` (repeatable): never use refs matching one of the patterns.
+    pub exclude: Vec<String>,
+    /// `--all`: list every commit reachable from the refs with its name.
+    pub all: bool,
+    /// `--annotate-stdin` (or the older `--stdin`): copy standard input, adding names after hashes.
+    pub annotate_stdin: bool,
+    /// `--no-undefined`: fail instead of printing `undefined` for a revision without a name.
+    pub no_undefined: bool,
+    /// `--always`: fall back to the abbreviated hash for a revision without a name.
+    pub always: bool,
+    /// The revisions to name.
+    pub revs: Vec<String>,
+}
+
+/// The best name `name-rev` has found for a commit so far: the ref it is reached from and
+/// how — `generation` first-parent steps after the last merge hop recorded in `tip_name`.
+/// `distance` (first-parent steps count 1, other parents 65535) decides between names.
+// Used by: src/helpers/name_rev.rs
+// Used by command/helper: `build_rev_names`, `rev_name_text`, and the `name_rev` command
+#[derive(Debug, Clone)]
+pub struct RevName {
+    /// Ref-relative prefix such as `main`, `tags/v1^0` or `main~3^2`.
+    pub tip_name: String,
+    /// Tagger date of the tag the name starts at (commit date for other refs); older wins ties.
+    pub taggerdate: i64,
+    /// First-parent steps from `tip_name` to this commit (printed as `~N`).
+    pub generation: u32,
+    /// Total weighted distance from the ref.
+    pub distance: u32,
+    /// Whether the name starts at a ref under `refs/tags/` (preferred over other refs).
+    pub from_tag: bool,
+}
+
+/// Everything `name-rev` worked out from the refs: the best name of every commit it reached,
+/// and the name of each object a ref points at directly (for tags, trees and blobs).
+// Used by: src/helpers/name_rev.rs, src/commands/name_rev.rs
+// Used by command/helper: `build_rev_names`, `object_name`, `annotate_line`, and the `name_rev` command
+#[derive(Debug, Clone, Default)]
+pub struct RevNames {
+    /// Commit hash → best name.
+    pub commits: std::collections::HashMap<String, RevName>,
+    /// Object a ref points at → that ref's short name.
+    pub tips: std::collections::HashMap<String, String>,
+}
+
+/// A ref `name-rev` may name commits after: its short name, the commit it leads to (if any),
+/// the date used to rank it, and whether it is a tag / an annotated tag that was peeled.
+// Used by: src/helpers/name_rev.rs
+// Used by command/helper: `build_rev_names` and the `name_rev` command
+#[derive(Debug, Clone)]
+pub struct NameRevTip {
+    /// Short ref name, e.g. `main` or `tags/v1`.
+    pub name: String,
+    /// The commit the ref points at, directly or through annotated tags.
+    pub commit: Option<String>,
+    /// Tagger date of an annotated tag, else the commit's date.
+    pub taggerdate: i64,
+    /// Whether the ref is under `refs/tags/` and leads to a commit.
+    pub from_tag: bool,
+    /// Whether an annotated tag was peeled to reach the commit (names it `<tag>^0`).
+    pub deref: bool,
+}
+
+/// How `help <command>` shows a command: `Raw` commands parse their own arguments and print
+/// their own usage for `-h` (the value is the command name); `Clap` holds rendered clap help.
+// Used by: src/helpers/help.rs, src/commands/help.rs
+// Used by command/helper: `command_help` and the `help` command
+#[derive(Debug, Clone)]
+pub enum CommandHelp {
+    Raw(String),
+    Clap(String),
+}

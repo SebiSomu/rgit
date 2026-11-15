@@ -96,7 +96,14 @@ src/
 │   ├── hook.rs               # hook run (--ignore-missing, --to-stdin)
 │   ├── maintenance.rs        # maintenance (run, register, unregister), for-each-repo (--config, --keep-going)
 │   ├── replay.rs             # replay (--onto | --advance, --contained, ranges)
-│   └── rerere.rs             # rerere (record/replay, clear, forget, diff, status, remaining, gc)
+│   ├── rerere.rs             # rerere (record/replay, clear, forget, diff, status, remaining, gc)
+│   ├── name_rev.rs           # name-rev (--name-only, --tags, --refs, --exclude, --all, --annotate-stdin)
+│   ├── refs_cmd.rs           # refs (list, exists, verify, optimize)
+│   ├── var.rs                # var (-l, <variable>)
+│   ├── stripspace.rs         # stripspace (-s, -c)
+│   ├── column.rs             # column (--mode, --width, --padding, --indent, --nl)
+│   ├── version.rs            # version (--build-options)
+│   └── help.rs               # help (-a, <command>)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
@@ -157,7 +164,13 @@ src/
 │   ├── hook.rs               # Hook lookup (core.hooksPath, executable check) and execution
 │   ├── maintenance.rs        # Config path lists, running rgit in other repos, maintenance tasks, maintenance.repo registration
 │   ├── replay.rs             # In-memory commit replay onto a new base, update-ref command output
-│   └── rerere.rs             # Conflict normalization and IDs, rr-cache store, MERGE_RR, resolution replay
+│   ├── rerere.rs             # Conflict normalization and IDs, rr-cache store, MERGE_RR, resolution replay
+│   ├── name_rev.rs           # git name-rev.c port: tip ranking, name propagation, ref filters/shortening, stdin annotation
+│   ├── refs_verify.rs        # Loose ref name/content checks and packed-refs checks for refs verify
+│   ├── var.rs                # Logical variables (identity, editors, pager, default branch, shell, global config)
+│   ├── stripspace.rs         # Whitespace cleanup on raw bytes, comment-line prefixing
+│   ├── column.rs             # git column.c port: mode parsing, display width, column/row/dense layout
+│   └── help.rs               # Command list and per-command help lookup (clap)
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

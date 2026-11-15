@@ -63,6 +63,12 @@ pub mod hook;
 pub mod maintenance;
 pub mod replay;
 pub mod rerere;
+pub mod stripspace;
+pub mod column;
+pub mod var;
+pub mod help;
+pub mod name_rev;
+pub mod refs_verify;
 
 pub use objects::*;
 pub use diff::*;

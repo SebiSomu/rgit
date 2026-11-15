@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashAction, WorktreeAction};
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, disable_help_subcommand = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Box<Commands>,
@@ -12,6 +12,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    #[command(visible_alias = "init-db")]
     Init,
     HashObject {
         #[arg(short = 'w')]
@@ -24,6 +25,7 @@ pub enum Commands {
         object_hash: String
     },
     WriteTree,
+    #[command(visible_alias = "stage")]
     Add {
         paths: Vec<PathBuf>
     },
@@ -352,6 +354,7 @@ pub enum Commands {
         #[arg(value_name = "HEAD")]
         heads: Vec<String>,
     },
+    #[command(visible_alias = "fsck-objects")]
     Fsck {
         #[arg(long = "connectivity-only")]
         connectivity_only: bool,
@@ -703,6 +706,41 @@ pub enum Commands {
     },
     #[command(disable_help_flag = true)]
     Rerere {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Stripspace {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Column {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Var {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Version {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Help {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    NameRev {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Refs {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
@@ -1267,6 +1305,27 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Rerere { args } => {
             crate::commands::rerere(raw_args_after("rerere", args))?;
+        }
+        Commands::Stripspace { args } => {
+            crate::commands::stripspace(raw_args_after("stripspace", args))?;
+        }
+        Commands::Column { args } => {
+            crate::commands::column(raw_args_after("column", args))?;
+        }
+        Commands::Var { args } => {
+            crate::commands::var(raw_args_after("var", args))?;
+        }
+        Commands::Version { args } => {
+            crate::commands::version(raw_args_after("version", args))?;
+        }
+        Commands::Help { args } => {
+            crate::commands::help(raw_args_after("help", args))?;
+        }
+        Commands::NameRev { args } => {
+            crate::commands::name_rev(raw_args_after("name-rev", args))?;
+        }
+        Commands::Refs { args } => {
+            crate::commands::refs(raw_args_after("refs", args))?;
         }
     }
 

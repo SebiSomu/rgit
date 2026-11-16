@@ -799,6 +799,61 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    ShowIndex {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    VerifyPack {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    IndexPack {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    UnpackObjects {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    PrunePacked {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    PackObjects {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Repack {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    CommitGraph {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    MultiPackIndex {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    FastExport {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    FastImport {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -1414,6 +1469,39 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::DiffFiles { args } => {
             crate::commands::diff_files(raw_args_after("diff-files", args))?;
+        }
+        Commands::ShowIndex { args } => {
+            crate::commands::show_index(raw_args_after("show-index", args))?;
+        }
+        Commands::VerifyPack { args } => {
+            crate::commands::verify_pack(raw_args_after("verify-pack", args))?;
+        }
+        Commands::IndexPack { args } => {
+            crate::commands::index_pack(raw_args_after("index-pack", args))?;
+        }
+        Commands::UnpackObjects { args } => {
+            crate::commands::unpack_objects(raw_args_after("unpack-objects", args))?;
+        }
+        Commands::PrunePacked { args } => {
+            crate::commands::prune_packed(raw_args_after("prune-packed", args))?;
+        }
+        Commands::PackObjects { args } => {
+            crate::commands::pack_objects(raw_args_after("pack-objects", args))?;
+        }
+        Commands::Repack { args } => {
+            crate::commands::repack(raw_args_after("repack", args))?;
+        }
+        Commands::CommitGraph { args } => {
+            crate::commands::commit_graph(raw_args_after("commit-graph", args))?;
+        }
+        Commands::MultiPackIndex { args } => {
+            crate::commands::multi_pack_index(raw_args_after("multi-pack-index", args))?;
+        }
+        Commands::FastExport { args } => {
+            crate::commands::fast_export(raw_args_after("fast-export", args))?;
+        }
+        Commands::FastImport { args } => {
+            crate::commands::fast_import(raw_args_after("fast-import", args))?;
         }
     }
 

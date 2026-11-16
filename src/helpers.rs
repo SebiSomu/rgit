@@ -75,6 +75,12 @@ pub mod mktag;
 pub mod index_plumbing;
 pub mod read_tree;
 pub mod diff_plumbing;
+pub mod pack;
+pub mod commit_graph;
+pub mod chunk_file;
+pub mod midx;
+pub mod fast_export;
+pub mod fast_import;
 
 pub use objects::*;
 pub use diff::*;

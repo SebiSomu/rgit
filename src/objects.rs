@@ -3118,3 +3118,174 @@ pub struct DiffPlumbingOptions {
     /// Arguments after `--`: always paths.
     pub paths: Vec<String>,
 }
+
+/// A parsed pack index (`.idx`, version 1 or 2): the object names it lists in sorted order
+/// with each object's offset in the pack and, for version 2, the CRC-32 of its packed bytes.
+// Used by: src/helpers/pack.rs, src/helpers/midx.rs, src/commands/show_index.rs, src/commands/verify_pack.rs
+// Used by command/helper: `parse_pack_index`, `repo_packs`, `read_packed_object`, and the `show_index` / `verify_pack` / `index_pack` / `multi_pack_index` commands
+#[derive(Debug, Clone, Default)]
+pub struct PackIndexData {
+    /// Index format version (1 or 2).
+    pub version: u32,
+    /// Object names, sorted.
+    pub hashes: Vec<[u8; 20]>,
+    /// CRC-32 of each object's entry in the pack (empty for version 1).
+    pub crcs: Vec<u32>,
+    /// Offset of each object's entry in the pack.
+    pub offsets: Vec<u64>,
+    /// The pack's trailing checksum, as recorded in the index.
+    pub pack_checksum: [u8; 20],
+}
+
+/// One pack of the repository: its files, its index and (once needed) its bytes.
+// Used by: src/helpers/pack.rs, src/helpers/midx.rs, src/helpers/commit_graph.rs
+// Used by command/helper: `repo_packs`, `read_packed_object`, `packed_object_names`, and the `repack` / `prune_packed` / `multi_pack_index` / `commit_graph` commands
+#[derive(Debug)]
+pub struct RepoPack {
+    /// File stem, e.g. `pack-1234...`.
+    pub name: String,
+    /// Path of the `.pack` file.
+    pub pack_path: PathBuf,
+    /// The parsed `.idx`.
+    pub index: PackIndexData,
+    /// The pack file's bytes, read on first use.
+    pub data: std::sync::OnceLock<Vec<u8>>,
+}
+
+/// One entry of a pack as it is stored: where it is, what its header says, what it is a
+/// delta against (if anything), and its inflated data (object content, or delta instructions).
+// Used by: src/helpers/pack.rs
+// Used by command/helper: `scan_pack`, `resolve_pack_entries`, and the `index_pack` / `verify_pack` / `unpack_objects` commands
+#[derive(Debug, Clone)]
+pub struct PackEntry {
+    /// Offset of the entry in the pack.
+    pub offset: u64,
+    /// Offset just past the entry.
+    pub end: u64,
+    /// Type code from the header: 1 commit, 2 tree, 3 blob, 4 tag, 6 offset delta, 7 ref delta.
+    pub type_code: u8,
+    /// Size from the header: the object's size, or for a delta the size of the delta data.
+    pub size: u64,
+    /// For an offset delta, the offset of its base entry.
+    pub base_offset: Option<u64>,
+    /// For a ref delta, the name of its base object.
+    pub base_hash: Option<String>,
+    /// The inflated data.
+    pub data: Vec<u8>,
+}
+
+/// A pack entry after delta resolution: the object it stands for.
+// Used by: src/helpers/pack.rs
+// Used by command/helper: `resolve_pack_entries`, `write_pack_index`, and the `index_pack` / `verify_pack` / `unpack_objects` commands
+#[derive(Debug, Clone)]
+pub struct PackedObject {
+    /// Object name (hex).
+    pub hash: String,
+    /// `commit`, `tree`, `blob` or `tag`.
+    pub kind: String,
+    /// The object's content.
+    pub content: Vec<u8>,
+    /// Offset of its entry in the pack.
+    pub offset: u64,
+    /// Offset just past its entry.
+    pub end: u64,
+    /// Size from the entry header (delta size for deltas).
+    pub header_size: u64,
+    /// CRC-32 of the entry's bytes in the pack.
+    pub crc: u32,
+    /// Number of deltas between this object and a whole one (0 = stored whole).
+    pub depth: u32,
+    /// For a delta, the name of the object it is based on.
+    pub base: Option<String>,
+}
+
+/// Settings for building a pack.
+// Used by: src/helpers/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by command/helper: `build_pack`, and the `pack_objects` / `repack` commands
+#[derive(Debug, Clone)]
+pub struct PackBuildOptions {
+    /// How many earlier objects each object is tried against as a delta base (0 = no deltas).
+    pub window: usize,
+    /// Longest allowed delta chain.
+    pub depth: u32,
+}
+
+/// A pack that was just built: its bytes and, per object, name, offset and CRC-32.
+// Used by: src/helpers/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by command/helper: `build_pack`, `store_pack`, and the `pack_objects` / `repack` commands
+#[derive(Debug, Clone, Default)]
+pub struct BuiltPack {
+    /// The complete pack, trailer included.
+    pub bytes: Vec<u8>,
+    /// `(object name, offset, crc32)` for every object, in pack order.
+    pub entries: Vec<([u8; 20], u64, u32)>,
+    /// How many objects were stored as deltas.
+    pub deltas: usize,
+}
+
+/// Parsed arguments of the `fast-export` command.
+// Used by: src/helpers/fast_export.rs, src/commands/fast_export.rs
+// Used by command/helper: `parse_fast_export_args`, `run_fast_export`, and the `fast_export` command
+#[derive(Debug, Clone, Default)]
+pub struct FastExportOptions {
+    /// `--signed-tags=<mode>`: `abort` (default), `verbatim`, `warn`, `warn-strip` or `strip`.
+    pub signed_tags: String,
+    /// `--tag-of-filtered-object=<mode>`: `abort` (default) or `drop`.
+    pub tag_of_filtered: String,
+    /// `--export-marks=<file>`.
+    pub export_marks: Option<String>,
+    /// `--import-marks=<file>` (the flag is true for `--import-marks-if-exists`).
+    pub import_marks: Option<(String, bool)>,
+    /// `--no-data`: refer to blobs by name instead of exporting them.
+    pub no_data: bool,
+    /// `--full-tree`: every commit lists all its files after a `deleteall`.
+    pub full_tree: bool,
+    /// `--use-done-feature`: frame the stream with `feature done` / `done`.
+    pub use_done: bool,
+    /// `--mark-tags`: give tag objects marks too.
+    pub mark_tags: bool,
+    /// `--reference-excluded-parents`: name excluded parents by hash instead of dropping them.
+    pub reference_excluded: bool,
+    /// `--show-original-ids`: add `original-oid` lines.
+    pub show_original_ids: bool,
+    /// The revision arguments.
+    pub revs: Vec<String>,
+}
+
+/// Everything `fast-import` keeps while reading a stream.
+// Used by: src/helpers/fast_import.rs, src/commands/fast_import.rs
+// Used by command/helper: `run_fast_import`, `finish_fast_import`, and the `fast_import` command
+#[derive(Debug, Clone, Default)]
+pub struct FastImportState {
+    /// Mark number → object name.
+    pub marks: std::collections::BTreeMap<u64, String>,
+    /// Ref name → its current tip in the stream (`None` after a `reset` without `from`).
+    pub refs: std::collections::BTreeMap<String, Option<String>>,
+    /// Ref name → the flattened tree of its tip: path → (hash, mode).
+    pub trees: std::collections::HashMap<String, std::collections::BTreeMap<String, ([u8; 20], u32)>>,
+    /// Refs to delete at the end (`reset <ref>` from the all-zero hash).
+    pub deleted: Vec<String>,
+    /// How dates are given: `raw` (default), `raw-permissive` or `now`.
+    pub date_format: String,
+    /// `--force` / `feature force`: update refs even when history would be lost.
+    pub force: bool,
+    /// `--done` / `feature done`: the stream must end with a `done` command.
+    pub require_done: bool,
+    /// Whether a `done` command was read.
+    pub saw_done: bool,
+    /// `--export-marks=<file>` / `feature export-marks=<file>`.
+    pub export_marks: Option<String>,
+    /// Counts of objects created, for `--stats`: blobs, trees, commits, tags.
+    pub counts: [usize; 4],
+}
+
+/// A cursor over the bytes of a `fast-import` stream.
+// Used by: src/helpers/fast_import.rs
+// Used by command/helper: `run_fast_import`, `import_commit`, and the `fast_import` command
+#[derive(Debug)]
+pub struct FastImportInput<'a> {
+    /// The whole stream.
+    pub data: &'a [u8],
+    /// Position of the next unread byte.
+    pub pos: usize,
+}

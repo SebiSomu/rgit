@@ -1,8 +1,6 @@
 use std::fs;
-use std::io::Read;
 use std::path::PathBuf;
 use anyhow::Context;
-use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use crate::helpers::{read_object, write_object, write_tree_from_index_prefix};
 use crate::index::read_index;
@@ -33,20 +31,10 @@ pub fn hash_object(write: bool, file: PathBuf) -> anyhow::Result<()> {
 pub fn cat_file(pretty_print: bool, object_hash: String) -> anyhow::Result<()> {
     // An object with a `refs/replace/` entry shows its replacement, as in git.
     let object_hash = crate::helpers::objects::replacement_object(&object_hash).unwrap_or(object_hash);
-    let dir = &object_hash[0..2];
-    let file_name = &object_hash[2..];
-    let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));
-
-    let compressed_data = fs::read(&path).context("Failed to read object file")?;
-    let mut decoder = ZlibDecoder::new(&compressed_data[..]);
-    let mut decompressed_data = Vec::new();
-    decoder.read_to_end(&mut decompressed_data)?;
-
-    let null_pos = decompressed_data.iter().position(|&b| b == 0).context("Invalid Git object")?;
+    let (_, content) = crate::helpers::objects::read_object(&object_hash).context("Failed to read object file")?;
 
     if pretty_print {
-        let content = &decompressed_data[null_pos + 1..];
-        let text = String::from_utf8_lossy(content);
+        let text = String::from_utf8_lossy(&content);
         println!("{}", text);
     }
     Ok(())

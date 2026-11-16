@@ -114,7 +114,18 @@ src/
 │   ├── mktree.rs             # mktree (-z, --missing, --batch)
 │   ├── mktag.rs              # mktag (--no-strict)
 │   ├── unpack_file.rs        # unpack-file <blob>
-│   └── get_tar_commit_id.rs  # get-tar-commit-id
+│   ├── get_tar_commit_id.rs  # get-tar-commit-id
+│   ├── repack.rs             # repack (-a, -A, -d, --window, --depth)
+│   ├── pack_objects.rs       # pack-objects (--revs, --all, --unpacked, --stdout | <base-name>)
+│   ├── unpack_objects.rs     # unpack-objects (-n, -r)
+│   ├── index_pack.rs         # index-pack (<pack>, -o, --stdin, --fix-thin, --keep, --verify)
+│   ├── verify_pack.rs        # verify-pack (-v, -s)
+│   ├── show_index.rs         # show-index
+│   ├── prune_packed.rs       # prune-packed (-n)
+│   ├── commit_graph.rs       # commit-graph (write, verify)
+│   ├── multi_pack_index.rs   # multi-pack-index (write, verify, expire)
+│   ├── fast_export.rs        # fast-export (revs, marks, --no-data, --full-tree, --signed-tags)
+│   └── fast_import.rs        # fast-import (--force, --stats, --done, marks)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
@@ -187,7 +198,13 @@ src/
 │   ├── diff_plumbing.rs      # Raw diffs: tree walk, tree/index/worktree comparison, raw/name/stat/patch rendering
 │   ├── merge_file.rs         # merge-file argument parsing
 │   ├── mktree.rs             # ls-tree line parsing and checks, tree serialization
-│   └── mktag.rs              # Standalone tag fsck (headers, ident) with git's message ids
+│   ├── mktag.rs              # Standalone tag fsck (headers, ident) with git's message ids
+│   ├── pack.rs               # Packfile engine: idx parse/write, packed object lookup (read_object fallback), deltas, pack writer
+│   ├── chunk_file.rs         # Chunk file format shared by commit-graph and multi-pack-index
+│   ├── commit_graph.rs       # Commit-graph writer and verifier
+│   ├── midx.rs               # Multi-pack-index writer, parser and verifier
+│   ├── fast_export.rs        # fast-import stream writer (ref naming, commit order, marks)
+│   └── fast_import.rs        # fast-import stream reader (marks, branch trees, commits, tags, refs)
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

@@ -44,11 +44,9 @@ pub fn remote_has_object(remote_git_dir: &Path, hash: &str) -> bool {
     if hash.len() < 3 {
         return false;
     }
-    remote_git_dir
-        .join("objects")
-        .join(&hash[..2])
-        .join(&hash[2..])
-        .exists()
+    // Loose there, or in one of the remote's packs.
+    remote_git_dir.join("objects").join(&hash[..2]).join(&hash[2..]).exists()
+        || crate::helpers::pack::read_object_in_objects_dir(&remote_git_dir.join("objects"), hash).is_some()
 }
 
 /// Recursively inspects a tree object and collects all reachable tree and blob hashes
@@ -161,8 +159,14 @@ pub fn copy_object_to_remote(hash: &str, remote_git_dir: &Path) -> Result<()> {
 
     fs::create_dir_all(&remote_dir)?;
     if !remote_path.exists() {
-        fs::copy(&local_path, &remote_path)
-            .with_context(|| format!("Failed to copy object {} to remote", hash))?;
+        if local_path.exists() {
+            fs::copy(&local_path, &remote_path)
+                .with_context(|| format!("Failed to copy object {} to remote", hash))?;
+        } else {
+            // Packed here: read it and store it loose in the remote.
+            let (kind, content) = crate::helpers::objects::read_object(hash).with_context(|| format!("Failed to copy object {} to remote", hash))?;
+            crate::helpers::pack::write_loose_object_in(&remote_git_dir.join("objects"), &kind, &content)?;
+        }
     }
     Ok(())
 }
@@ -172,7 +176,8 @@ pub fn copy_object_to_remote(hash: &str, remote_git_dir: &Path) -> Result<()> {
 pub fn read_remote_ref(remote_git_dir: &Path, branch_name: &str) -> Result<Option<String>> {
     let path = remote_git_dir.join("refs").join("heads").join(branch_name);
     if !path.exists() {
-        return Ok(None);
+        // The remote may keep the branch in `packed-refs`.
+        return Ok(crate::helpers::fetch::remote_packed_heads(remote_git_dir).into_iter().find(|(name, _)| name == branch_name).map(|(_, sha)| sha));
     }
     let content = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read remote ref: {}", branch_name))?;

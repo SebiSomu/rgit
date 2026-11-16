@@ -84,6 +84,12 @@ A lightweight, fully functional Git implementation written in Rust.
   - `merge_file.rs`: Argument parsing for `merge-file` (the merge itself lives in `merge_tree.rs`, which gained diff3 / zdiff3 styles and `--ours` / `--theirs` / `--union`).
   - `mktree.rs`: `ls-tree` line parsing with git's type checks and tree serialization in git's entry order.
   - `mktag.rs`: git's standalone tag fsck (`fsck_tag_standalone`, `fsck_ident`) with its message ids.
+  - `pack.rs`: Packfile engine: `.idx` v1/v2 parsing, object lookup in the repository's packs (the fallback of `read_object`, with offset/ref delta resolution), pack scanning and delta resolution for indexing, the pack writer with a block-matching delta encoder, `.idx` v2 writing, thin-pack completion, reachable-object enumeration and `prune-packed`.
+  - `chunk_file.rs`: git's chunk file format (table of contents, fan-out, trailing checksum) shared by the commit-graph and the multi-pack-index.
+  - `commit_graph.rs`: Commit-graph writer (OIDF/OIDL/CDAT/GDA2/GDO2/EDGE, topological levels and corrected commit dates) and verifier.
+  - `midx.rs`: Multi-pack-index writer (PNAM/OIDF/OIDL/OOFF/LOFF), parser and verifier.
+  - `fast_export.rs`: `fast-import` stream writer: git's ref naming and commit order, blobs, file changes, extra refs, tags and marks.
+  - `fast_import.rs`: `fast-import` stream reader: data blocks, marks, in-memory branch trees, commits, tags, resets, and the final ref update.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -218,6 +224,13 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`merge-file`** (`-p`, `-q`, `--diff3`, `--zdiff3`, `--ours`, `--theirs`, `--union`, `--marker-size=<n>`, `--object-id`, `-L <label>`, `<current> <base> <other>`): Three-way merge of files (or blobs), identical to git's xdiff merge output; exit status is the number of conflicts.
 - **`mktree`** (`-z`, `--missing`, `--batch`): Builds tree objects from `ls-tree` formatted input. **`mktag`** (`--no-strict`): Validates tag object text from standard input with git's fsck checks and stores it.
 - **`unpack-file <blob>`**: Writes a blob to a `.merge_file_XXXXXX` temporary file and prints its name. **`get-tar-commit-id`**: Prints the commit id recorded in a tar archive made by `archive` (which now writes git's pax global header for commits).
+- **Packfiles**: objects are read from loose files or from packfiles in `.git/objects/pack` (index v1/v2, offset and ref deltas), so repositories packed by git work; `fsck`, short-hash lookup, `gc`/`prune`, and local `fetch`/`push`/`clone` (including the remote's `packed-refs`) handle packed objects.
+- **`repack`** (`-a`, `-A`, `-d`, `--window=<n>`, `--depth=<n>`): Packs loose objects (or with `-a` everything reachable) into a new packfile with delta compression; `-d` removes redundant loose objects and older packs.
+- **`pack-objects`** (`--revs`, `--all`, `--unpacked|--incremental`, `--non-empty`, `--window=<n>`, `--depth=<n>`, `--progress`, `--stdout | <base-name>`): Builds a pack from object names or revisions on standard input. **`unpack-objects`** (`-n`, `-r`): Explodes a pack from standard input into loose objects.
+- **`index-pack`** (`<pack-file>`, `-o <index>`, `--stdin`, `--fix-thin`, `--keep`, `--verify`): Builds the `.idx` for a pack (byte-identical to git's), or stores a pack read from standard input. **`verify-pack`** (`-v`, `-s`): Checks packs and lists their objects and delta chains. **`show-index`**: Lists a pack index read from standard input.
+- **`prune-packed`** (`-n`): Removes loose objects that are also in a pack.
+- **`commit-graph`** (`write [--reachable | --stdin-commits | --stdin-packs] [--append]`, `verify`): Writes and checks git's commit-graph file (identical to git's output; not used for rgit's own walks). **`multi-pack-index`** (`write [--preferred-pack=<pack>]`, `verify`, `expire`): Writes and checks git's multi-pack-index (identical to git's output).
+- **`fast-export`** (`--all | <rev>...`, `--signed-tags=<mode>`, `--no-data`, `--full-tree`, `--export-marks`, `--import-marks`, `--use-done-feature`, `--mark-tags`, `--reference-excluded-parents`, `--show-original-ids`): Writes history as a `fast-import` stream, matching git's output. **`fast-import`** (`--force`, `--stats`, `--done`, `--date-format`, `--export-marks`, `--import-marks`): Replays such a stream (`blob`, `commit` with `M`/`D`/`C`/`R`/`N`/`deleteall`, `tag`, `reset`, `alias`, ...), producing the same object ids as git.
 - **Synonyms**: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`.
 
 ---

@@ -308,21 +308,25 @@ fn resolve_base_name(name: &str) -> Result<String> {
                 return Ok(name.to_string());
             }
         } else {
-            let prefix_dir = crate::repo::path(format!(".git/objects/{}", &name[..2]));
+            // Candidates: loose objects in `objects/<xx>/` and the names in the pack indexes.
+            let prefix = name.to_ascii_lowercase();
+            let mut matches = crate::helpers::pack::packed_object_names(&prefix);
+            let prefix_dir = crate::repo::path(format!(".git/objects/{}", &prefix[..2]));
             if let Ok(entries) = std::fs::read_dir(prefix_dir) {
-                let rest = &name[2..];
-                let mut matches = Vec::new();
+                let rest = &prefix[2..];
                 for entry in entries.flatten() {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     if file_name.starts_with(rest) {
-                        matches.push(format!("{}{}", &name[..2], file_name));
+                        matches.push(format!("{}{}", &prefix[..2], file_name));
                     }
                 }
-                if matches.len() == 1 {
-                    return Ok(matches.remove(0));
-                } else if matches.len() > 1 {
-                    anyhow::bail!("short SHA1 {} is ambiguous", name);
-                }
+            }
+            matches.sort();
+            matches.dedup();
+            if matches.len() == 1 {
+                return Ok(matches.remove(0));
+            } else if matches.len() > 1 {
+                anyhow::bail!("short SHA1 {} is ambiguous", name);
             }
         }
     }

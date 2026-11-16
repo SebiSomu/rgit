@@ -125,13 +125,14 @@ fn strip_whitespace(text: &str) -> String {
 }
 
 /// Shortens a hash to at least `min_len` characters (clamped to 4..=40), lengthening it until
-/// no other loose object shares the prefix.
+/// no other object (loose or packed) shares the prefix.
 // Used by `cherry --abbrev`, `tag`/`describe --abbrev`, `rev-list --abbrev-commit`, `show-ref --hash=<n>` / `--abbrev`,
 // and `for-each-ref` (`%(objectname:short)`).
 pub fn abbreviate_hash_min(hash: &str, min_len: usize) -> String {
-    let others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
+    let mut others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
         .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
         .unwrap_or_default();
+    others.extend(crate::helpers::pack::packed_object_names(&hash[..min_len.clamp(4, hash.len())]).into_iter().filter(|h| h != hash));
     let mut len = min_len.clamp(4, hash.len());
     while len < hash.len() && others.iter().any(|o| o.starts_with(&hash[..len])) {
         len += 1;

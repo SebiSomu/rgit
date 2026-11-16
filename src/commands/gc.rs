@@ -15,7 +15,7 @@ use crate::helpers::gc::{
 /// refer to, are always kept. If a reachable object is missing or unreadable nothing is
 /// deleted at all. `-n` shows what would be done and changes nothing.
 ///
-/// There are no packfiles to repack, so this reclaims space but never compacts it.
+/// It does not repack: use `repack` to move loose objects into packfiles.
 pub fn gc(prune: String, reflog_expire: String, dry_run: bool) -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let prune_cutoff = expiry_cutoff(&prune, now)?;

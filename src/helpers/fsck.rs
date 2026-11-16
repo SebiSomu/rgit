@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use crate::helpers::gc::{
-    check_no_pack_files, hashes_in_file, list_loose_objects, GC_LENIENT_STATE_FILES,
+    hashes_in_file, list_loose_objects, GC_LENIENT_STATE_FILES,
     GC_STRICT_STATE_FILES,
 };
 use crate::helpers::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
@@ -458,7 +458,31 @@ pub fn mark_reachable_in_graph(roots: &[(String, String, bool)], graph: &HashMap
     reachable
 }
 
-/// Runs the whole check and returns the findings: verifies every loose object, builds the
+/// Reads one object out of the packfiles and checks it like a loose one: it must be
+/// readable (its delta chain intact), hash to its name when `check_hash`, and parse as its
+/// type. Returns its node for the connectivity graph.
+// Used by `run_fsck_checks`.
+pub fn verify_packed_object(hash: &str, check_hash: bool, issues: &mut Vec<FsckIssue>) -> FsckNode {
+    let Some((kind, body)) = crate::helpers::pack::read_packed_object(hash) else {
+        issues.push(FsckIssue::error(format!("object {}: cannot be read from its packfile", hash)));
+        return FsckNode { kind: "unknown".to_string(), links: Vec::new() };
+    };
+    if check_hash {
+        let actual = hex::encode(crate::helpers::objects::hash_content(&kind, &body));
+        if actual != hash {
+            issues.push(FsckIssue::error(format!("object {}: hash mismatch (its contents hash to {})", hash, actual)));
+        }
+    }
+    let links = match kind.as_str() {
+        "commit" => parse_commit_object(hash, &body, issues),
+        "tree" => parse_tree_object(hash, &body, issues),
+        "tag" => parse_tag_object(hash, &body, issues),
+        _ => Vec::new(),
+    };
+    FsckNode { kind, links }
+}
+
+/// Runs the whole check and returns the findings: verifies every loose and packed object, builds the
 /// object graph, validates refs, HEAD and the index, walks connectivity from every root, and
 /// classifies what nothing reaches. An unreachable object that no other unreachable object
 /// points at is `dangling`: the tip of an abandoned line of work, and what is worth recovering.
@@ -466,14 +490,31 @@ pub fn mark_reachable_in_graph(roots: &[(String, String, bool)], graph: &HashMap
 /// `include_reflogs` counts reflog entries as roots.
 // Used by the `fsck` command.
 pub fn run_fsck_checks(connectivity_only: bool, include_reflogs: bool) -> Result<FsckReport> {
-    check_no_pack_files()?;
-
     let loose = list_loose_objects()?;
     let mut issues: Vec<FsckIssue> = Vec::new();
     let mut graph: HashMap<String, FsckNode> = HashMap::with_capacity(loose.len());
     for object in &loose {
         let node = verify_loose_object(object, !connectivity_only, &mut issues);
         graph.insert(object.hash.clone(), node);
+    }
+    // Objects that only live in packfiles are part of the graph too.
+    let mut packed_checked = 0;
+    for pack in crate::helpers::pack::repo_packs().iter() {
+        if !connectivity_only {
+            let bytes = crate::helpers::pack::pack_bytes(pack);
+            if bytes.len() < 32 || Sha1::digest(&bytes[..bytes.len() - 20]).as_slice() != &bytes[bytes.len() - 20..] {
+                issues.push(FsckIssue::error(format!("pack {}: checksum mismatch (the packfile is corrupt)", pack.name)));
+            }
+        }
+        for hash in &pack.index.hashes {
+            let hash = hex::encode(hash);
+            if graph.contains_key(&hash) {
+                continue;
+            }
+            let node = verify_packed_object(&hash, !connectivity_only, &mut issues);
+            graph.insert(hash, node);
+            packed_checked += 1;
+        }
     }
 
     check_refs(&graph, &mut issues)?;
@@ -500,5 +541,5 @@ pub fn run_fsck_checks(connectivity_only: bool, include_reflogs: bool) -> Result
         .cloned()
         .collect();
 
-    Ok(FsckReport { objects_checked: loose.len(), issues, dangling, unreachable })
+    Ok(FsckReport { objects_checked: loose.len() + packed_checked, issues, dangling, unreachable })
 }

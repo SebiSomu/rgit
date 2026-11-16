@@ -55,26 +55,6 @@ pub fn expiry_cutoff(spec: &str, now: u64) -> Result<Option<u64>> {
     }
 }
 
-/// Refuses to run in a repository that has packfiles. `gc` only understands loose objects, and
-/// objects inside a pack would look unreachable and missing, so nothing is safe to prune.
-// Used by `plan_gc`.
-pub(crate) fn check_no_pack_files() -> Result<()> {
-    let pack_dir = &crate::repo::path(".git/objects/pack");
-    if !pack_dir.is_dir() {
-        return Ok(());
-    }
-    let has_pack = fs::read_dir(pack_dir)
-        .with_context(|| format!("Failed to read {}", pack_dir.display()))?
-        .flatten()
-        .any(|e| e.path().extension().is_some_and(|ext| ext == "pack"));
-    if has_pack {
-        anyhow::bail!(
-            "fatal: this repository has packfiles (.git/objects/pack/*.pack); rgit gc only handles loose objects and will not touch it"
-        );
-    }
-    Ok(())
-}
-
 /// Extracts every 40-hex-digit token from a piece of text (a ref file, a todo list, a
 /// `FETCH_HEAD`), whatever the surrounding format is.
 // Used by `hashes_in_file`.
@@ -298,7 +278,6 @@ pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
 /// cutoff (`--prune=never`) prunes nothing. `extra_roots` are kept like refs (`prune <head>...`).
 // Used by the `gc` and `prune` commands.
 pub fn plan_gc(prune_cutoff: Option<u64>, reflog_cutoff: Option<u64>, extra_roots: &[String]) -> Result<GcReport> {
-    check_no_pack_files()?;
 
     let mut keep: HashSet<String> = HashSet::new();
     let mut strict_roots = collect_strict_gc_roots()?;

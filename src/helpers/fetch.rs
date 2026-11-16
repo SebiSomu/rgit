@@ -3,17 +3,35 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Walks a remote repository's `refs/heads/` directory and returns all branch names
-/// paired with their commit SHA strings.
+/// Walks a remote repository's `refs/heads/` directory (and its `packed-refs`) and returns
+/// all branch names paired with their commit SHA strings.
 // Used by `fetch`.
 pub fn list_remote_refs(remote_git_dir: &Path) -> Result<Vec<(String, String)>> {
     let heads_dir = remote_git_dir.join("refs").join("heads");
-    if !heads_dir.exists() {
-        return Ok(Vec::new());
-    }
     let mut refs = Vec::new();
-    collect_refs_recursive(&heads_dir, &heads_dir, &mut refs)?;
+    if heads_dir.exists() {
+        collect_refs_recursive(&heads_dir, &heads_dir, &mut refs)?;
+    }
+    // Branches the remote keeps in `packed-refs` (a loose ref of the same name wins).
+    for (branch, sha) in remote_packed_heads(remote_git_dir) {
+        if !refs.iter().any(|(name, _)| *name == branch) {
+            refs.push((branch, sha));
+        }
+    }
     Ok(refs)
+}
+
+/// The branches listed in a remote repository's `packed-refs` file, as `(name, sha)`.
+// Used by `list_remote_refs` and `push` (`read_remote_ref`).
+pub fn remote_packed_heads(remote_git_dir: &Path) -> Vec<(String, String)> {
+    let Ok(packed) = fs::read_to_string(remote_git_dir.join("packed-refs")) else { return Vec::new() };
+    packed
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.starts_with('^'))
+        .filter_map(|line| line.split_once(' '))
+        .filter_map(|(sha, name)| name.strip_prefix("refs/heads/").map(|branch| (branch.to_string(), sha.to_string())))
+        .filter(|(_, sha)| sha.len() == 40)
+        .collect()
 }
 
 /// Recursive helper that walks subdirectories under `refs/heads/` to support nested branch names.
@@ -62,7 +80,7 @@ pub fn local_has_object(hash: &str) -> bool {
     if hash.len() < 3 {
         return false;
     }
-    crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..])).exists()
+    crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..])).exists() || crate::helpers::pack::packed_object_exists(hash)
 }
 
 /// BFS-walks a commit graph from `remote_commit` using the remote's object store and
@@ -179,6 +197,17 @@ pub fn read_object_from_path(path: &Path) -> Result<(String, Vec<u8>)> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
 
+    // Not a loose file: `<objects>/<xx>/<38 hex>` may still be an object in one of that
+    // repository's packs.
+    if !path.exists() {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let prefix = path.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        if let Some(objects_dir) = path.parent().and_then(|p| p.parent()) {
+            if let Some(object) = crate::helpers::pack::read_object_in_objects_dir(objects_dir, &format!("{}{}", prefix, name)) {
+                return Ok(object);
+            }
+        }
+    }
     let compressed = fs::read(path)
         .with_context(|| format!("Cannot read object at {}", path.display()))?;
 
@@ -217,8 +246,15 @@ pub fn fetch_object_from_remote(hash: &str, remote_git_dir: &Path) -> Result<()>
 
     fs::create_dir_all(&local_dir)?;
     if !local_path.exists() {
-        fs::copy(&remote_path, &local_path)
-            .with_context(|| format!("Failed to copy object {} from remote", hash))?;
+        if remote_path.exists() {
+            fs::copy(&remote_path, &local_path)
+                .with_context(|| format!("Failed to copy object {} from remote", hash))?;
+        } else {
+            // The remote keeps it in a pack: read it there and store it loose here.
+            let (kind, content) = crate::helpers::pack::read_object_in_objects_dir(&remote_git_dir.join("objects"), hash)
+                .with_context(|| format!("Failed to copy object {} from remote", hash))?;
+            crate::helpers::objects::write_object(&kind, &content)?;
+        }
     }
     Ok(())
 }

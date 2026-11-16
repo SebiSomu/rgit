@@ -97,8 +97,8 @@ pub fn replacement_object(hash: &str) -> Option<String> {
     Some(current.clone())
 }
 
-/// Reads a zlib-compressed object from `.git/objects/` and returns its
-/// object type and decompressed content. An object with a `refs/replace/` entry is
+/// Reads an object — a zlib-compressed loose file in `.git/objects/`, or else an entry of
+/// a packfile in `.git/objects/pack/` — and returns its object type and content. An object with a `refs/replace/` entry is
 /// transparently read as its replacement (see `replacement_object`).
 // Used by commands that read objects (like `cat-file`, `log`, `status`, `switch`, `checkout`, `restore`, and merge checks).
 pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
@@ -111,7 +111,18 @@ pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
     let dir = &hash[0..2];
     let file_name = &hash[2..];
     let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));
-    let compressed_data = fs::read(&path).context("Failed to read object file (does this hash exist?)")?;
+    let compressed_data = match fs::read(&path) {
+        Ok(data) => data,
+        // Not a loose object: it may live in a packfile.
+        Err(_) => {
+            if hash.len() == 40 {
+                if let Some(object) = crate::helpers::pack::read_packed_object(hash) {
+                    return Ok(object);
+                }
+            }
+            anyhow::bail!("Failed to read object file (does this hash exist?)");
+        }
+    };
     let mut decoder = ZlibDecoder::new(&compressed_data[..]);
     let mut decompressed_data = Vec::new();
     decoder.read_to_end(&mut decompressed_data)?;

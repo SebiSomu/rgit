@@ -72,6 +72,7 @@ fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
                             size: content.len() as u32,
                             hash,
                             path: m.clone(),
+                            skip_worktree: false,
                         });
                     }
                 }

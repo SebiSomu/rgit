@@ -37,8 +37,14 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
             }
         }
     }
+    // Files left out by a sparse checkout (skip-worktree) are absent on purpose.
+    let skipped = crate::helpers::sparse::skipped_worktree_paths(&read_index().unwrap_or_default());
     for path in index_map.keys() {
-        if !working_map.contains_key(path) {
+        // A submodule's directory holds another repository, not a file to compare.
+        if Path::new(path).is_dir() {
+            continue;
+        }
+        if !working_map.contains_key(path) && !skipped.contains(path) {
             local_changes.insert(path.clone());
         }
     }
@@ -106,6 +112,10 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
 
     for path in files_to_delete {
         let path_obj = Path::new(&path);
+        // A submodule's directory is left in place, as git does.
+        if path_obj.is_dir() {
+            continue;
+        }
         if path_obj.exists() {
             fs::remove_file(path_obj)?;
             let mut parent = path_obj.parent();
@@ -132,6 +142,11 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
         };
 
         if should_write {
+            // A submodule (gitlink) is a directory; `submodule update` fills it.
+            if *_mode == 0o160000 {
+                fs::create_dir_all(path)?;
+                continue;
+            }
             let (_, content) = read_object(&hex::encode(hash))?;
             if let Some(parent) = Path::new(&path).parent() {
                 fs::create_dir_all(parent)?;
@@ -164,7 +179,11 @@ pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, h
 
         if should_update {
             let metadata = fs::metadata(path)?;
-            let new_entry = build_entry(path, *hash, &metadata);
+            let mut new_entry = build_entry(path, *hash, &metadata);
+            if target_tree.get(path).is_some_and(|(_, mode)| *mode == 0o160000) {
+                new_entry.mode = 0o160000;
+                new_entry.size = 0;
+            }
             entries.retain(|e| &e.path != path);
             entries.push(new_entry);
         }
@@ -201,8 +220,13 @@ pub fn ensure_working_tree_clean(action: &str) -> anyhow::Result<()> {
         );
     }
 
+    let skipped = crate::helpers::sparse::skipped_worktree_paths(&index_entries);
     for (path, (head_hash, _mode)) in &head_tree {
         let path_obj = Path::new(path);
+        // Left out by a sparse checkout: absent on purpose. A submodule is a directory.
+        if skipped.contains(path) || path_obj.is_dir() {
+            continue;
+        }
         if !path_obj.exists() {
             anyhow::bail!(
                 "error: local file '{}' is missing; cannot safely {}.\nAborting",
@@ -241,6 +265,10 @@ pub fn hard_reset_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, 
         }
 
         let path_obj = Path::new(path);
+        // A submodule's directory is left in place, as git does.
+        if path_obj.is_dir() {
+            continue;
+        }
         if path_obj.exists() {
             fs::remove_file(path_obj)
                 .with_context(|| format!("failed to remove file '{}'", path))?;
@@ -263,6 +291,11 @@ pub fn hard_reset_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, 
     }
 
     for (path, (hash, _mode)) in target_tree {
+        // A submodule (gitlink) is a directory; `submodule update` fills it.
+        if *_mode == 0o160000 {
+            fs::create_dir_all(path)?;
+            continue;
+        }
         let (_, content) = read_object(&hex::encode(hash))?;
         if let Some(parent) = Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
@@ -292,6 +325,10 @@ pub fn build_index_entries_for_tree(target_tree: &BTreeMap<String, ([u8; 20], u3
     let mut entries = Vec::with_capacity(target_tree.len());
 
     for (path, (hash, mode)) in target_tree {
+        if *mode == 0o160000 {
+            entries.push(crate::helpers::index_plumbing::bare_index_entry(path, *hash, *mode));
+            continue;
+        }
         if read_disk_metadata {
             if let Ok(metadata) = fs::metadata(path) {
                 let mut entry = build_entry(path, *hash, &metadata);
@@ -315,6 +352,7 @@ pub fn build_index_entries_for_tree(target_tree: &BTreeMap<String, ([u8; 20], u3
             size: content.len() as u32,
             hash: *hash,
             path: path.clone(),
+            skip_worktree: false,
         });
     }
 

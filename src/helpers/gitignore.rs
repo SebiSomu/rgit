@@ -173,6 +173,11 @@ fn collect_files_internal(path: &Path, rules: &mut Vec<GitIgnoreRule>, out: &mut
         if name_str == ".git" {
             return Ok(());
         }
+        // A directory with its own `.git` is another repository (a submodule): its files
+        // belong to that repository, not to this one.
+        if !rel_path.is_empty() && rel_path != "." && path.join(".git").exists() {
+            return Ok(());
+        }
 
         if !rel_path.is_empty() && is_path_ignored(rules, &rel_path, true) {
             return Ok(());

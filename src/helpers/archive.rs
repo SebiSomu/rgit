@@ -253,7 +253,8 @@ pub fn create_archive<W: Write>(tree_hash: &str,timestamp: u64,format: ArchiveFo
 
     let filtered_entries: BTreeMap<String, ([u8; 20], u32)> = all_entries
         .into_iter()
-        .filter(|(p, _)| path_matches_filter(p, paths))
+        // Submodule links have no content in this repository; they are left out.
+        .filter(|(p, (_, mode))| *mode != 0o160000 && path_matches_filter(p, paths))
         .collect();
 
     match format {

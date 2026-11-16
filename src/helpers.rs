@@ -81,6 +81,8 @@ pub mod chunk_file;
 pub mod midx;
 pub mod fast_export;
 pub mod fast_import;
+pub mod sparse;
+pub mod submodule;
 
 pub use objects::*;
 pub use diff::*;

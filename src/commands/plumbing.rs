@@ -68,7 +68,7 @@ pub fn ls_tree(name_only: bool, tree_hash: String) -> anyhow::Result<()> {
         if name_only {
             println!("{}", name);
         } else {
-            let entry_type = if mode == "40000" { "tree" } else { "blob" };
+            let entry_type = if mode == "40000" { "tree" } else if mode == "160000" { "commit" } else { "blob" };
             println!("{:0>6} {} {}\t{}", mode, entry_type, sha_hex, name);
         }
         pos = hash_end;

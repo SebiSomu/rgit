@@ -400,6 +400,9 @@ pub fn diff_commit_against_parent(commit: &ParsedCommit) -> anyhow::Result<Vec<F
 pub fn diff_tree_file(path: &str, old: Option<([u8; 20], u32)>, new: Option<([u8; 20], u32)>) -> anyhow::Result<FileDiff> {
     let load = |entry: Option<([u8; 20], u32)>| -> anyhow::Result<Vec<u8>> {
         match entry {
+            // A submodule entry names a commit of another repository; like git, show it as
+            // a one-line pseudo file.
+            Some((hash, mode)) if mode == 0o160000 => Ok(format!("Subproject commit {}\n", hex::encode(hash)).into_bytes()),
             Some((hash, _)) => Ok(read_object(&hex::encode(hash))?.1),
             None => Ok(Vec::new()),
         }

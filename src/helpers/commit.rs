@@ -258,12 +258,18 @@ pub fn write_commit_object(tree: &str, parents: &[String], author: &CommitSignat
 pub fn tracked_worktree_changes() -> anyhow::Result<Vec<(char, String)>> {
     let mut changes = Vec::new();
     for entry in read_index().unwrap_or_default() {
+        // Submodules are staged with `add`, not picked up by `commit -a`.
+        if entry.mode == 0o160000 {
+            continue;
+        }
         match fs::read(&entry.path) {
             Ok(content) => {
                 if hash_content("blob", &content) != entry.hash {
                     changes.push(('M', entry.path));
                 }
             }
+            // Left out by a sparse checkout: absent on purpose, not deleted.
+            Err(_) if entry.skip_worktree => {}
             Err(_) => changes.push(('D', entry.path)),
         }
     }

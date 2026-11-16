@@ -2991,6 +2991,9 @@ pub struct UpdateIndexFlags {
     pub quiet: bool,
     /// `--ignore-missing`: `--refresh` skips entries whose file is missing.
     pub ignore_missing: bool,
+    /// `--skip-worktree` (`Some(true)`) / `--no-skip-worktree` (`Some(false)`): only set or
+    /// clear the skip-worktree bit of the following paths.
+    pub skip_worktree: Option<bool>,
 }
 
 /// Parsed arguments of the `read-tree` command.
@@ -3288,4 +3291,21 @@ pub struct FastImportInput<'a> {
     pub data: &'a [u8],
     /// Position of the next unread byte.
     pub pos: usize,
+}
+
+/// One submodule as described by `.gitmodules`.
+// Used by: src/helpers/submodule.rs, src/commands/submodule.rs
+// Used by command/helper: `read_gitmodules`, `selected_submodules`, and the `submodule` command
+#[derive(Debug, Clone, Default)]
+pub struct SubmoduleInfo {
+    /// The name in `[submodule "<name>"]`.
+    pub name: String,
+    /// Where it lives in the working tree.
+    pub path: String,
+    /// The URL to clone it from, as written in `.gitmodules`.
+    pub url: String,
+    /// `branch = <name>`, if set.
+    pub branch: Option<String>,
+    /// The commit recorded for it in the index (the gitlink), if it is tracked.
+    pub staged: Option<String>,
 }

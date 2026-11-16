@@ -125,7 +125,9 @@ src/
 │   ├── commit_graph.rs       # commit-graph (write, verify)
 │   ├── multi_pack_index.rs   # multi-pack-index (write, verify, expire)
 │   ├── fast_export.rs        # fast-export (revs, marks, --no-data, --full-tree, --signed-tags)
-│   └── fast_import.rs        # fast-import (--force, --stats, --done, marks)
+│   ├── fast_import.rs        # fast-import (--force, --stats, --done, marks)
+│   ├── sparse_checkout.rs    # sparse-checkout (init, set, add, list, reapply, disable, check-rules)
+│   └── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
 ├── helpers.rs                # Root module declaring and re-exporting helper utilities
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
@@ -204,7 +206,9 @@ src/
 │   ├── commit_graph.rs       # Commit-graph writer and verifier
 │   ├── midx.rs               # Multi-pack-index writer, parser and verifier
 │   ├── fast_export.rs        # fast-import stream writer (ref naming, commit order, marks)
-│   └── fast_import.rs        # fast-import stream reader (marks, branch trees, commits, tags, refs)
+│   ├── fast_import.rs        # fast-import stream reader (marks, branch trees, commits, tags, refs)
+│   ├── sparse.rs             # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
+│   └── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

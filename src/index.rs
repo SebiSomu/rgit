@@ -21,6 +21,9 @@ pub struct IndexEntry {
     pub size: u32,
     pub hash: [u8; 20],
     pub path: String,
+    /// The skip-worktree bit (index version 3 extended flag): the file is deliberately absent
+    /// from the working tree, as set by `sparse-checkout`, and counts as unchanged.
+    pub skip_worktree: bool,
 }
 
 pub fn read_index() -> Result<Vec<IndexEntry>> {
@@ -45,7 +48,8 @@ pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
     }
 
     let version = u32::from_be_bytes(data[4..8].try_into()?);
-    if version != VERSION {
+    // Version 3 is version 2 plus an extra 16-bit flag word on entries that need one.
+    if version != VERSION && version != 3 {
         anyhow::bail!("Unsupported index version: {}", version);
     }
 
@@ -84,7 +88,10 @@ pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
 
         let flags = u16::from_be_bytes(data[pos..pos + 2].try_into()?);
         pos += 2;
+        let mut skip_worktree = false;
         if flags & 0x4000 != 0 {
+            let extended = u16::from_be_bytes(data[pos..pos + 2].try_into()?);
+            skip_worktree = extended & 0x4000 != 0;
             pos += 2;
         }
 
@@ -109,6 +116,7 @@ pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
             size,
             hash,
             path,
+            skip_worktree,
         });
     }
 
@@ -120,7 +128,8 @@ pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
 
     let mut buf = Vec::new();
     buf.extend_from_slice(SIGNATURE);
-    buf.extend_from_slice(&VERSION.to_be_bytes());
+    let version: u32 = if entries.iter().any(|e| e.skip_worktree) { 3 } else { VERSION };
+    buf.extend_from_slice(&version.to_be_bytes());
     buf.extend_from_slice(&(entries.len() as u32).to_be_bytes());
 
     for entry in entries.iter() {
@@ -140,7 +149,13 @@ pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
 
         let name_bytes = entry.path.as_bytes();
         let name_len = name_bytes.len().min(0x0FFF) as u16;
-        buf.extend_from_slice(&name_len.to_be_bytes());
+        if entry.skip_worktree {
+            // Extended-flags bit, then the extended word with the skip-worktree bit.
+            buf.extend_from_slice(&(name_len | 0x4000).to_be_bytes());
+            buf.extend_from_slice(&0x4000u16.to_be_bytes());
+        } else {
+            buf.extend_from_slice(&name_len.to_be_bytes());
+        }
         buf.extend_from_slice(name_bytes);
 
         let entry_len = buf.len() - entry_start;
@@ -237,6 +252,7 @@ pub fn build_entry(rel_path: &str, hash: [u8; 20], metadata: &fs::Metadata) -> I
         size: metadata.len() as u32,
         hash,
         path: rel_path.to_string(),
+        skip_worktree: false,
     }
 }
 

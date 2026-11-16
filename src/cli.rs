@@ -854,6 +854,16 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
+    #[command(disable_help_flag = true)]
+    SparseCheckout {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    #[command(disable_help_flag = true)]
+    Submodule {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -1502,6 +1512,12 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::FastImport { args } => {
             crate::commands::fast_import(raw_args_after("fast-import", args))?;
+        }
+        Commands::SparseCheckout { args } => {
+            crate::commands::sparse_checkout(raw_args_after("sparse-checkout", args))?;
+        }
+        Commands::Submodule { args } => {
+            crate::commands::submodule(raw_args_after("submodule", args))?;
         }
     }
 

@@ -178,7 +178,9 @@ fn collect_tree_objects_to_fetch(tree_hash: &str, remote_git_dir: &Path, to_fetc
         }
         let sha_hex = hex::encode(&content[hash_start..hash_end]);
 
-        if mode == "40000" || mode == "040000" {
+        if mode == "160000" {
+            // A submodule link names a commit of another repository: nothing to fetch.
+        } else if mode == "40000" || mode == "040000" {
             collect_tree_objects_to_fetch(&sha_hex, remote_git_dir, to_fetch, visited_trees)?;
         } else if !local_has_object(&sha_hex) {
             to_fetch.insert(sha_hex);

@@ -88,7 +88,9 @@ pub fn collect_tree_objects(tree_hash: &str, remote_git_dir: &Path, to_copy: &mu
         }
         let sha_hex = hex::encode(&content[hash_start..hash_end]);
 
-        if mode == "40000" || mode == "040000" {
+        if mode == "160000" {
+            // A submodule link names a commit of another repository: nothing to copy.
+        } else if mode == "40000" || mode == "040000" {
             collect_tree_objects(&sha_hex, remote_git_dir, to_copy, visited_trees)?;
         } else if !remote_has_object(remote_git_dir, &sha_hex) {
             to_copy.insert(sha_hex);

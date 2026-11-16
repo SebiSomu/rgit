@@ -28,6 +28,14 @@ fn process_path(entries: &mut Vec<IndexEntry>, arg: &str, flags: &UpdateIndexFla
         }
         Err(message) => die(&message, 128),
     };
+    if let Some(skip) = flags.skip_worktree {
+        // Only the bit changes; the file is not looked at.
+        match entries.iter_mut().find(|e| e.path == path) {
+            Some(entry) => entry.skip_worktree = skip,
+            None => die(&format!("fatal: Unable to mark file {}", path), 128),
+        }
+        return;
+    }
     if flags.force_remove {
         entries.retain(|e| e.path != path);
         if flags.verbose {
@@ -124,8 +132,9 @@ fn read_index_info(entries: &mut Vec<IndexEntry>, input: &[u8], nul_terminated: 
 /// prints `<path>: needs update` for changed or missing files, exiting 1 (`-q`: silently
 /// and successfully; `--ignore-missing`: missing files are fine). `-g` / `--again` updates
 /// the entries that differ from `HEAD`. `--verbose` reports each action.
-/// Not supported, because rgit's index stores no per-entry flags or conflict stages:
-/// `--assume-unchanged`, `--skip-worktree`, `--unresolve`, stage numbers in `--index-info`,
+/// `--skip-worktree` / `--no-skip-worktree` set or clear the skip-worktree bit of the files
+/// after them (the bit `sparse-checkout` uses). Not supported, because rgit's index stores
+/// no other per-entry flags or conflict stages: `--assume-unchanged`, `--unresolve`, stage numbers in `--index-info`,
 /// and the split-index / untracked-cache / fsmonitor switches. Exit status: 0, 1 when
 /// `--refresh` found entries needing an update, 128 on errors, 129 for a usage error.
 pub fn update_index(args: Vec<String>) -> Result<()> {
@@ -237,7 +246,9 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
                     }
                 };
             }
-            "--assume-unchanged" | "--no-assume-unchanged" | "--skip-worktree" | "--no-skip-worktree" | "--fsmonitor-valid" | "--no-fsmonitor-valid" | "--unresolve" => {
+            "--skip-worktree" => flags.skip_worktree = Some(true),
+            "--no-skip-worktree" => flags.skip_worktree = Some(false),
+            "--assume-unchanged" | "--no-assume-unchanged" | "--fsmonitor-valid" | "--no-fsmonitor-valid" | "--unresolve" => {
                 die(&format!("fatal: {} is not supported: rgit's index stores no per-entry flags or conflict stages", arg), 128);
             }
             other if other.starts_with("--") => {

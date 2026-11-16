@@ -26,10 +26,12 @@ pub fn worktree_file_mode(metadata: &fs::Metadata, current: Option<u32>) -> u32 
 /// whose stat data is merely stale (or was never recorded) still counts as clean.
 // Used by `update-index --refresh`, `checkout-index`, `read-tree -u`, `diff-files` and `diff-index`.
 pub fn worktree_state(entry: &IndexEntry) -> IndexFileState {
-    let Ok(metadata) = fs::metadata(&entry.path) else { return IndexFileState::Missing };
-    if !metadata.is_file() {
-        return IndexFileState::Missing;
-    }
+    let metadata = match fs::metadata(&entry.path) {
+        Ok(metadata) if metadata.is_file() => metadata,
+        // A skip-worktree entry is meant to be absent (sparse checkout): that is not a change.
+        _ if entry.skip_worktree => return IndexFileState::Clean,
+        _ => return IndexFileState::Missing,
+    };
     let mode = if entry.mode & 0o170000 == 0o100000 { worktree_file_mode(&metadata, Some(entry.mode)) } else { entry.mode };
     if mode != entry.mode {
         return IndexFileState::Modified(mode);
@@ -108,7 +110,7 @@ pub fn add_cache_entry(entries: &mut Vec<IndexEntry>, entry: IndexEntry, flags: 
 /// An index entry without stat data, as `--cacheinfo` and tree-reading commands create them.
 // Used by `update-index --cacheinfo` / `--index-info` and `read-tree`.
 pub fn bare_index_entry(path: &str, hash: [u8; 20], mode: u32) -> IndexEntry {
-    IndexEntry { ctime_secs: 0, ctime_nsecs: 0, mtime_secs: 0, mtime_nsecs: 0, dev: 0, ino: 0, mode, uid: 0, gid: 0, size: 0, hash, path: path.to_string() }
+    IndexEntry { ctime_secs: 0, ctime_nsecs: 0, mtime_secs: 0, mtime_nsecs: 0, dev: 0, ino: 0, mode, uid: 0, gid: 0, size: 0, hash, path: path.to_string(), skip_worktree: false }
 }
 
 /// git's `create_ce_mode`: any mode becomes one an index entry can have — `120000` for

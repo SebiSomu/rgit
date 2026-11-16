@@ -9,10 +9,43 @@ use crate::refs;
 pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     let mut entries = read_index().unwrap_or_default();
     let mut files_to_add: Vec<PathBuf> = Vec::new();
+    // Submodules: a directory that is a repository of its own is staged as a gitlink (the
+    // commit it has checked out), and tracked submodules below the given paths are refreshed.
+    let mut gitlinks_changed = 0;
+    for path in &paths {
+        let given = normalize_path(path);
+        let mut candidates: Vec<String> = entries.iter().filter(|e| e.mode == 0o160000 && (given.is_empty() || given == "." || e.path == given || e.path.starts_with(&format!("{}/", given)))).map(|e| e.path.clone()).collect();
+        if !given.is_empty() && given != "." && path.join(".git").exists() && !candidates.contains(&given) {
+            candidates.push(given.clone());
+        }
+        for sub_path in candidates {
+            let Some(head) = crate::helpers::submodule::submodule_head(&sub_path) else { continue };
+            let mut hash = [0u8; 20];
+            hex::decode_to_slice(&head, &mut hash)?;
+            if entries.iter().any(|e| e.path == sub_path && e.hash == hash && e.mode == 0o160000) {
+                continue;
+            }
+            let below = format!("{}/", sub_path);
+            entries.retain(|e| e.path != sub_path && !e.path.starts_with(&below));
+            entries.push(crate::helpers::index_plumbing::bare_index_entry(&sub_path, hash, 0o160000));
+            gitlinks_changed += 1;
+        }
+    }
+    if gitlinks_changed > 0 {
+        write_index(&mut entries)?;
+    }
     for path in paths {
+        // The submodule itself was handled above; its files are not ours.
+        if path.is_dir() && path.join(".git").exists() && !normalize_path(&path).is_empty() && normalize_path(&path) != "." {
+            continue;
+        }
         collect_files(&path, &mut files_to_add)?;
     }
 
+    if files_to_add.is_empty() && gitlinks_changed > 0 {
+        println!("Staged files to index ({} submodule{}).", gitlinks_changed, if gitlinks_changed == 1 { "" } else { "s" });
+        return Ok(());
+    }
     if files_to_add.is_empty() {
         println!("nothing specified, nothing added.");
         return Ok(());
@@ -105,6 +138,11 @@ pub fn status() -> anyhow::Result<()> {
         .map(|e| (e.path.clone(), (e.hash, e.mode)))
         .collect();
 
+    if crate::helpers::sparse::sparse_checkout_enabled() && !index_entries.is_empty() {
+        let present = index_entries.iter().filter(|e| !e.skip_worktree).count();
+        println!("You are in a sparse checkout with {}% of tracked files present.", 100 - (index_entries.len() - present) * 100 / index_entries.len());
+    }
+
     let mut staged_new = Vec::new();
     let mut staged_modified = Vec::new();
     let mut staged_deleted = Vec::new();
@@ -154,8 +192,17 @@ pub fn status() -> anyhow::Result<()> {
             _ => {}
         }
     }
-    for path in index_map.keys() {
-        if !working_map.contains_key(path) {
+    // Files left out by a sparse checkout (skip-worktree) are absent on purpose.
+    let skipped = crate::helpers::sparse::skipped_worktree_paths(&index_entries);
+    for (path, (hash, mode)) in &index_map {
+        if *mode == 0o160000 {
+            // A submodule: changed when its checked-out commit differs from the staged one.
+            if crate::helpers::submodule::submodule_head(path).is_some_and(|head| head != hex::encode(hash)) {
+                unstaged_modified.push(format!("{} (new commits)", path));
+            }
+            continue;
+        }
+        if !working_map.contains_key(path) && !skipped.contains(path) {
             unstaged_deleted.push(path.clone());
         }
     }

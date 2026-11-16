@@ -58,10 +58,11 @@ pub fn ls_files(opts: LsFilesOptions) -> Result<()> {
         }
 
         if show_index {
-            write_entry(&mut out, entry, tag("H "), opts.stage, terminator)?;
+            // `S` marks skip-worktree entries (files left out by a sparse checkout).
+            write_entry(&mut out, entry, tag(if entry.skip_worktree { "S " } else { "H " }), opts.stage, terminator)?;
         }
 
-        if check_worktree {
+        if check_worktree && !(entry.skip_worktree && !std::path::Path::new(&entry.path).exists()) {
             let state = worktree_state(entry)?;
             if opts.deleted && state == WorktreeState::Deleted {
                 write_entry(&mut out, entry, tag("R "), opts.stage, terminator)?;

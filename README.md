@@ -90,6 +90,8 @@ A lightweight, fully functional Git implementation written in Rust.
   - `midx.rs`: Multi-pack-index writer (PNAM/OIDF/OIDL/OOFF/LOFF), parser and verifier.
   - `fast_export.rs`: `fast-import` stream writer: git's ref naming and commit order, blobs, file changes, extra refs, tags and marks.
   - `fast_import.rs`: `fast-import` stream reader: data blocks, marks, in-memory branch trees, commits, tags, resets, and the final ref update.
+  - `sparse.rs`: Sparse checkout: pattern file and config switches, `.gitignore`-style matching with git's walk-up rule (covers cone and non-cone patterns), cone pattern generation, applying the patterns to the working tree and the skip-worktree bits, and the re-apply hook run after working-tree commands.
+  - `submodule.rs`: Submodules: `.gitmodules` parsing, a nested repository's git directory and `HEAD`, URL resolution, running rgit inside a submodule, and the `Subproject commit` stand-in for diffs.
 - **[`src/index.rs`](file:///c:/rgit-main/src/index.rs)**: Binary staging index parser and serializer (`.git/index`).
 - **[`src/refs.rs`](file:///c:/rgit-main/src/refs.rs)**: Reference resolution (`HEAD`, branch heads, symbolic refs, detached HEAD).
 - **[`src/repo.rs`](file:///c:/rgit-main/src/repo.rs)**: Repository path resolution: maps `.git/...` paths to the shared `.git` or to a linked worktree's `.git/worktrees/<id>/`.
@@ -231,6 +233,8 @@ A lightweight, fully functional Git implementation written in Rust.
 - **`prune-packed`** (`-n`): Removes loose objects that are also in a pack.
 - **`commit-graph`** (`write [--reachable | --stdin-commits | --stdin-packs] [--append]`, `verify`): Writes and checks git's commit-graph file (identical to git's output; not used for rgit's own walks). **`multi-pack-index`** (`write [--preferred-pack=<pack>]`, `verify`, `expire`): Writes and checks git's multi-pack-index (identical to git's output).
 - **`fast-export`** (`--all | <rev>...`, `--signed-tags=<mode>`, `--no-data`, `--full-tree`, `--export-marks`, `--import-marks`, `--use-done-feature`, `--mark-tags`, `--reference-excluded-parents`, `--show-original-ids`): Writes history as a `fast-import` stream, matching git's output. **`fast-import`** (`--force`, `--stats`, `--done`, `--date-format`, `--export-marks`, `--import-marks`): Replays such a stream (`blob`, `commit` with `M`/`D`/`C`/`R`/`N`/`deleteall`, `tag`, `reset`, `alias`, ...), producing the same object ids as git.
+- **`sparse-checkout`** (`init [--cone|--no-cone]`, `set <dir>...`, `add <dir>...`, `list`, `reapply`, `disable`, `check-rules`): Limits the working tree to selected directories (cone mode) or `.gitignore`-style patterns. Uses git's files (`.git/info/sparse-checkout`, `core.sparseCheckout`, index version 3 skip-worktree bits); `status`, `diff`, `commit -a`, `stash`, `switch` and the plumbing diffs treat left-out files as unchanged, and the patterns are re-applied after commands that rewrite the working tree.
+- **`submodule`** (`add [-b <branch>] [--name <name>] <repository> [<path>]`, `status [--cached] [--recursive]`, `init`, `update [--init] [--recursive]`, `deinit [-f] (--all|<path>...)`, `foreach [--recursive] <command>`, `sync`, `set-url`, `set-branch`): Nested repositories recorded as gitlink entries (mode 160000) plus `.gitmodules`. `add <path>` stages a submodule's current commit, `status` reports `(new commits)`, checkouts create the directory, diffs show `Subproject commit <hash>`.
 - **Synonyms**: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`.
 
 ---

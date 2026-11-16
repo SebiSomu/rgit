@@ -115,6 +115,7 @@ pub fn restore(files: Vec<PathBuf>, staged: bool, worktree: bool, source: Option
                             size: content.len() as u32,
                             hash: blob_hash,
                             path: rel_path.clone(),
+                            skip_worktree: false,
                         });
                     }
                     index_dirty = true;

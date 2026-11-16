@@ -93,6 +93,8 @@ pub mod commit_graph;
 pub mod multi_pack_index;
 pub mod fast_export;
 pub mod fast_import;
+pub mod sparse_checkout;
+pub mod submodule;
 
 pub use plumbing::*;
 pub use commit::*;
@@ -189,3 +191,5 @@ pub use commit_graph::*;
 pub use multi_pack_index::*;
 pub use fast_export::*;
 pub use fast_import::*;
+pub use sparse_checkout::*;
+pub use submodule::*;

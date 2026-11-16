@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::helpers::{collect_files, flatten_tree, format_diff_output, normalize_path, read_object, resolve_tree_from_source, tree_hash_of_commit};
+use crate::helpers::{collect_files, flatten_tree, format_diff_output, normalize_path, resolve_tree_from_source, tree_hash_of_commit};
 use crate::index::read_index;
 use crate::refs;
 
@@ -28,13 +28,13 @@ pub fn diff(staged: bool, commit_a: Option<String>, commit_b: Option<String>, pa
             if !should_process(&path) { continue; }
 
             let old_bytes = if let Some((hash, _)) = tree_a.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
 
             let new_bytes = if let Some((hash, _)) = tree_b.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
@@ -53,17 +53,28 @@ pub fn diff(staged: bool, commit_a: Option<String>, commit_b: Option<String>, pa
         for p in tree_a.keys() { all_paths.insert(p.clone()); }
         for f in &working_files { all_paths.insert(normalize_path(f)); }
 
-        for path in all_paths {
+        // Files left out by a sparse checkout stand for their staged content.
+        let sparse_index = read_index().unwrap_or_default();
+        let skipped = crate::helpers::sparse::skipped_worktree_paths(&sparse_index);
+        for path in all_paths.into_iter().chain(skipped.iter().cloned()).collect::<std::collections::BTreeSet<String>>() {
             if !should_process(&path) { continue; }
 
             let old_bytes = if let Some((hash, _)) = tree_a.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
 
-            let new_bytes = if Path::new(&path).exists() && Path::new(&path).is_file() {
+            let new_bytes = if skipped.contains(&path) {
+                match sparse_index.iter().find(|e| e.path == path) {
+                    Some(entry) => crate::helpers::submodule::diff_object_bytes(&entry.hash),
+                    None => Vec::new(),
+                }
+            } else if Path::new(&path).exists() && Path::new(&path).is_file() {
                 fs::read(&path).unwrap_or_default()
+            } else if Path::new(&path).is_dir() {
+                // A submodule: its checked-out commit, or no change when it is not checked out.
+                crate::helpers::submodule::submodule_worktree_bytes(&path).unwrap_or_else(|| old_bytes.clone())
             } else {
                 Vec::new()
             };
@@ -93,13 +104,13 @@ pub fn diff(staged: bool, commit_a: Option<String>, commit_b: Option<String>, pa
             if !should_process(&path) { continue; }
 
             let old_bytes = if let Some((hash, _)) = head_tree.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
 
             let new_bytes = if let Some(hash) = index_map.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
@@ -124,17 +135,22 @@ pub fn diff(staged: bool, commit_a: Option<String>, commit_b: Option<String>, pa
             }
         }
 
+        // Files left out by a sparse checkout are absent on purpose: no difference.
+        let skipped = crate::helpers::sparse::skipped_worktree_paths(&index_entries);
         for path in all_paths {
-            if !should_process(&path) { continue; }
+            if !should_process(&path) || skipped.contains(&path) { continue; }
 
             let old_bytes = if let Some(hash) = index_map.get(&path) {
-                read_object(&hex::encode(hash))?.1
+                crate::helpers::submodule::diff_object_bytes(hash)
             } else {
                 Vec::new()
             };
 
             let new_bytes = if Path::new(&path).exists() && Path::new(&path).is_file() {
                 fs::read(&path).unwrap_or_default()
+            } else if Path::new(&path).is_dir() {
+                // A submodule: its checked-out commit, or no change when it is not checked out.
+                crate::helpers::submodule::submodule_worktree_bytes(&path).unwrap_or_else(|| old_bytes.clone())
             } else {
                 Vec::new()
             };

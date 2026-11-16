@@ -106,7 +106,10 @@ pub fn collect_strict_gc_roots() -> Result<Vec<String>> {
             roots.extend(hashes_in_file(&git_dir.join(name))?);
         }
         for entry in read_index_from(&git_dir.join("index")).unwrap_or_default() {
-            roots.push(hex::encode(entry.hash));
+            // A submodule link names a commit of another repository, not an object here.
+            if entry.mode != 0o160000 {
+                roots.push(hex::encode(entry.hash));
+            }
         }
     }
     hashes_in_refs_dir(&crate::repo::path(".git/refs"), &mut roots)?;

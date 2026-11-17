@@ -206,7 +206,8 @@ pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> 
 
     match action {
         None => stash_push(None),
-        Some(StashAction::Push { message }) => stash_push(message),
+        Some(StashAction::Push { message, patch: true, paths }) => crate::commands::stash_patch(message, paths),
+        Some(StashAction::Push { message, .. }) => stash_push(message),
         Some(StashAction::Pop { stash }) => stash_pop(stash),
         Some(StashAction::Apply { stash }) => stash_apply(stash),
         Some(StashAction::List) => stash_list(),

@@ -27,6 +27,8 @@ pub enum Commands {
     WriteTree,
     #[command(visible_alias = "stage")]
     Add {
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
         paths: Vec<PathBuf>
     },
     LsTree {
@@ -103,9 +105,16 @@ pub enum Commands {
         #[arg(long = "detach")]
         detach: bool,
         #[arg(short = 'f', long = "force")]
-        force: bool
+        force: bool,
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
+        /// Paths after `--` (with `-p`).
+        #[arg(last = true)]
+        paths: Vec<String>
     },
     Restore {
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
         files: Vec<PathBuf>,
         #[arg(short = 'S', long = "staged")]
         staged: bool,
@@ -151,6 +160,8 @@ pub enum Commands {
         mixed: bool,
         #[arg(long = "hard", conflicts_with_all = ["soft", "mixed"])]
         hard: bool,
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
         #[arg(last = true)]
         paths: Vec<PathBuf>
     },
@@ -192,6 +203,8 @@ pub enum Commands {
         abort: bool
     },
     Stash {
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
         #[command(subcommand)]
         action: Option<StashAction>
     },
@@ -901,7 +914,10 @@ pub fn handle_commands() -> Result<()> {
         Commands::WriteTree => {
             crate::commands::write_tree()?;
         }
-        Commands::Add { paths } => {
+        Commands::Add { patch: true, paths } => {
+            crate::commands::add_patch(paths.iter().map(|p| p.to_string_lossy().to_string()).collect())?;
+        }
+        Commands::Add { patch: false, paths } => {
             crate::commands::add(paths)?;
         }
         Commands::LsTree { name_only, tree_hash } => {
@@ -958,10 +974,16 @@ pub fn handle_commands() -> Result<()> {
         Commands::Switch { branch, create, detach, force } => {
             crate::commands::switch(branch, create, detach, force)?;
         }
-        Commands::Checkout { target, create_branch, detach, force } => {
+        Commands::Checkout { patch: true, .. } => {
+            crate::commands::checkout_patch(raw_args_after("checkout", Vec::new()))?;
+        }
+        Commands::Checkout { target, create_branch, detach, force, .. } => {
             crate::commands::checkout(target, create_branch, detach, force)?;
         }
-        Commands::Restore { files, staged, worktree, source } => {
+        Commands::Restore { patch: true, files, staged, worktree, source } => {
+            crate::commands::restore_patch(files.iter().map(|p| p.to_string_lossy().to_string()).collect(), staged, worktree, source)?;
+        }
+        Commands::Restore { patch: false, files, staged, worktree, source } => {
             crate::commands::restore(files, staged, worktree, source)?;
         }
         Commands::Diff { staged, commits, paths } => {
@@ -982,7 +1004,13 @@ pub fn handle_commands() -> Result<()> {
         Commands::Rm { files, force, cached, recursive } => {
             crate::commands::rm(files, force, cached, recursive)?;
         }
-        Commands::Reset { commit, soft, mixed, hard, paths } => {
+        Commands::Reset { patch: true, soft, hard, .. } => {
+            if soft || hard {
+                anyhow::bail!("fatal: options '--patch' and '--{}' cannot be used together", if soft { "soft" } else { "hard" });
+            }
+            crate::commands::reset_patch(raw_args_after("reset", Vec::new()))?;
+        }
+        Commands::Reset { commit, soft, mixed, hard, paths, .. } => {
             crate::commands::reset(commit, soft, mixed, hard, paths)?;
         }
         Commands::Clean { dry_run, force, dirs, ignored, only_ignored } => {
@@ -997,7 +1025,10 @@ pub fn handle_commands() -> Result<()> {
         Commands::Revert { commit, no_commit, cont, abort } => {
             crate::commands::revert(commit, no_commit, cont, abort)?;
         }
-        Commands::Stash { action } => {
+        Commands::Stash { patch: true, action: None } => {
+            crate::commands::stash_patch(None, Vec::new())?;
+        }
+        Commands::Stash { action, .. } => {
             crate::commands::stash(action)?;
         }
         Commands::Bisect { action } => {

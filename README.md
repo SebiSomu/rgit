@@ -107,6 +107,7 @@ A lightweight, fully functional Git implementation written in Rust.
 ### Repository & Staging
 
 - **`init`**: Initializes a new repository with standard `.git/` directory layout.
+- **Patch mode** (`add -p`, `reset -p [<tree-ish>]`, `checkout -p [<tree-ish>]`, `restore -p [-S] [-W] [--source=<tree>]`, `stash [push] -p [-m <msg>] [-- <paths>]`): A port of git's `add-patch.c`. Shows each file's diff hunk by hunk with git's prompts (`Stage this hunk`, `Unstage this hunk`, `Discard this hunk from worktree`, `Apply this hunk to index and worktree`, `Stash this hunk`, ... and the mode-change / deletion / addition variants) and commands `y n q a d j J k K g / s e ?`: split a hunk into its change groups, edit it in the editor (with git's instructions; re-edit when it does not apply), go to a hunk by number or regex. Each file's chosen hunks are applied as soon as it is done, with git's placement rules (split hunks merged back, start/end anchoring). `stash -p` stashes only the chosen hunks, takes them out of the working tree, and keeps the index (git's implied `--keep-index`). Answers are read line by line (git's default, `interactive.singleKey` off), so it can be scripted by piping answers in.
 - **`add <paths...>`**: Hashes file contents into blobs and updates the binary index (`.git/index`).
 - **`rm <files...>`** (`--cached`, `-r`, `-f`): Removes files from index and/or working tree.
 - **`mv <source> <destination>`** (`-f`): Moves/renames files, staging the change in the index.

@@ -85,6 +85,7 @@ pub mod sparse;
 pub mod submodule;
 pub mod graph;
 pub mod follow;
+pub mod add_patch;
 
 pub use objects::*;
 pub use diff::*;

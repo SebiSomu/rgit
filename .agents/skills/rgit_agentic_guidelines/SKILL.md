@@ -38,6 +38,7 @@ src/
 │   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
 │   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
 │   ├── staging.rs            # add, status, rm, mv
+│   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
 │   ├── diff.rs               # diff

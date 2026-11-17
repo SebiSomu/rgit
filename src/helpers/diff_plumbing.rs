@@ -16,6 +16,12 @@ pub const DIFF_COMMON_OPTIONS: &str = "common diff options:\n  -z            out
 // Used by `diff-tree`, `diff-index` and `diff-files`.
 pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> Result<DiffPlumbingOptions, (String, i32)> {
     let mut opts = DiffPlumbingOptions::default();
+    // The porcelain `diff` detects renames unless told otherwise (`diff.renames`).
+    if command == "diff" {
+        opts.renames = crate::helpers::rename::default_rename_options("diff.renames");
+        // Porcelain raw output abbreviates object names.
+        opts.abbrev = Some(7);
+    }
     let unsupported = |option: &str, why: &str| (format!("fatal: {} is not supported by rgit {} ({})\n", option, command, why), 128);
     let mut i = 0;
     while i < args.len() {
@@ -42,10 +48,11 @@ pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> 
             "-s" | "--no-patch" => opts.no_output = true,
             "-z" => opts.nul = true,
             "--abbrev" => opts.abbrev = Some(7),
-            "--no-abbrev" => opts.abbrev = None,
+            "--no-abbrev" | "--full-index" => opts.abbrev = None,
             "-R" => opts.reverse = true,
             "--exit-code" => opts.exit_code = true,
             "--quiet" => opts.quiet = true,
+            "--no-renames" => opts.renames.level = 0,
             "-r" if command == "diff-tree" => opts.recursive = true,
             "-t" if command == "diff-tree" => {
                 opts.show_trees = true;
@@ -56,7 +63,8 @@ pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> 
             "--no-commit-id" if command == "diff-tree" => opts.no_commit_id = true,
             "-v" | "--pretty" if command == "diff-tree" => opts.pretty = Some("medium".to_string()),
             "-m" if command != "diff-files" => opts.merges = true,
-            "--cached" if command == "diff-index" => opts.cached = true,
+            "--cached" if command == "diff-index" || command == "diff" => opts.cached = true,
+            "--staged" if command == "diff" => opts.cached = true,
             "-q" if command == "diff-files" => {}
             "-c" | "--cc" | "--combined-all-paths" => return Err(unsupported(arg, "no combined diffs")),
             other => {
@@ -65,8 +73,9 @@ pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> 
                     opts.abbrev = Some(n.clamp(4, 40));
                 } else if let Some(format) = other.strip_prefix("--pretty=").or_else(|| other.strip_prefix("--format=")).filter(|_| command == "diff-tree") {
                     opts.pretty = Some(if other.starts_with("--format=") { format!("format:{}", format) } else { format.to_string() });
-                } else if ["-M", "-C", "-B", "--find-renames", "--find-copies", "--break-rewrites"].iter().any(|p| other.starts_with(p)) {
-                    return Err(unsupported(other, "no rename or copy detection"));
+                } else if crate::helpers::rename::parse_rename_option(other, &mut opts.renames) {
+                } else if other.starts_with("-B") || other.starts_with("--break-rewrites") {
+                    return Err(unsupported(other, "no rewrite breaking"));
                 } else {
                     return Err((usage.to_string(), 129));
                 }
@@ -157,14 +166,14 @@ pub fn diff_trees(old: Option<&str>, new: Option<&str>, prefix: &str, opts: &Dif
         }
         if tree {
             if !opts.recursive || opts.show_trees {
-                out.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side) });
+                out.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None });
             }
             if opts.recursive {
                 let (old_sub, new_sub) = (a.map(|e| hex::encode(e.2)), b.map(|e| hex::encode(e.2)));
                 diff_trees(old_sub.as_deref(), new_sub.as_deref(), &format!("{}/", path), opts, specs, out)?;
             }
         } else {
-            out.push(DiffChange { path, old: a.map(side), new: b.map(side) });
+            out.push(DiffChange { path, old: a.map(side), new: b.map(side), renamed_from: None });
         }
     }
     Ok(())
@@ -205,7 +214,7 @@ pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[Ind
             }
         });
         if old != new {
-            changes.push(DiffChange { path: path.to_string(), old, new });
+            changes.push(DiffChange { path: path.to_string(), old, new, renamed_from: None });
         }
     }
     changes
@@ -222,7 +231,7 @@ pub fn diff_files_changes(index: &[IndexEntry], specs: &[String]) -> Vec<DiffCha
         let old = DiffSide { mode: entry.mode, hash: entry.hash, worktree: false };
         let new = worktree_side(entry);
         if new.as_ref() != Some(&old) {
-            changes.push(DiffChange { path: entry.path.clone(), old: Some(old), new });
+            changes.push(DiffChange { path: entry.path.clone(), old: Some(old), new, renamed_from: None });
         }
     }
     changes
@@ -231,11 +240,34 @@ pub fn diff_files_changes(index: &[IndexEntry], specs: &[String]) -> Vec<DiffCha
 /// The status letter of a change: `A`dded, `D`eleted, `T`ype changed, else `M`odified.
 // Used by `render_diff_changes`.
 fn status_letter(change: &DiffChange) -> char {
+    if let Some((_, status, _)) = &change.renamed_from {
+        return *status;
+    }
     match (&change.old, &change.new) {
         (None, _) => 'A',
         (_, None) => 'D',
         (Some(a), Some(b)) if a.mode & 0o170000 != b.mode & 0o170000 => 'T',
         _ => 'M',
+    }
+}
+
+/// The status as raw and `--name-status` output show it: the letter, with the similarity
+/// percentage for a rename or copy (`R086`).
+// Used by `render_diff_changes`.
+pub fn status_field(change: &DiffChange) -> String {
+    match &change.renamed_from {
+        Some((_, status, score)) => format!("{}{:03}", status, u64::from(*score) * 100 / crate::helpers::rename::MAX_SCORE),
+        None => status_letter(change).to_string(),
+    }
+}
+
+/// The paths a raw or `--name-status` line shows: the path, or source and destination of a
+/// rename or copy, separated by TAB (NUL with `-z`).
+fn shown_paths(change: &DiffChange, nul: bool) -> String {
+    let show = |p: &str| if nul { p.to_string() } else { quote_c_path(p) };
+    match &change.renamed_from {
+        Some((source, _, _)) => format!("{}{}{}", show(source), if nul { "\0" } else { "\t" }, show(&change.path)),
+        None => show(&change.path),
     }
 }
 
@@ -272,12 +304,16 @@ pub fn quote_c_path(path: &str) -> String {
 fn side_content(path: &str, side: &Option<DiffSide>) -> anyhow::Result<(Option<([u8; 20], u32)>, Vec<u8>)> {
     match side {
         None => Ok((None, Vec::new())),
+        Some(side) if side.worktree && side.mode & 0o170000 == 0o160000 => {
+            let bytes = crate::helpers::submodule::submodule_worktree_bytes(path).unwrap_or_default();
+            Ok((Some((side.hash, side.mode)), bytes))
+        }
         Some(side) if side.worktree => {
             let content = std::fs::read(path).unwrap_or_default();
             Ok((Some((hash_content("blob", &content), side.mode)), content))
         }
-        // A submodule link has no blob to show.
-        Some(side) if side.mode & 0o170000 == 0o160000 => Ok((Some((side.hash, side.mode)), Vec::new())),
+        // A submodule link shows as git's one-line pseudo file.
+        Some(side) if side.mode & 0o170000 == 0o160000 => Ok((Some((side.hash, side.mode)), format!("Subproject commit {}\n", hex::encode(side.hash)).into_bytes())),
         Some(side) => Ok((Some((side.hash, side.mode)), read_object(&hex::encode(side.hash))?.1)),
     }
 }
@@ -290,6 +326,11 @@ fn change_patch(change: &DiffChange) -> anyhow::Result<Vec<FileDiff>> {
     if is_tree(&change.old) || is_tree(&change.new) {
         return Ok(Vec::new());
     }
+    if let Some((source, status, score)) = &change.renamed_from {
+        let (old, old_bytes) = side_content(source, &change.old)?;
+        let (new, new_bytes) = side_content(&change.path, &change.new)?;
+        return Ok(vec![renamed_file_diff(source, &change.path, *status, *score, old, old_bytes, new, new_bytes)?]);
+    }
     let (old, old_bytes) = side_content(&change.path, &change.old)?;
     let (new, new_bytes) = side_content(&change.path, &change.new)?;
     if status_letter(change) == 'T' {
@@ -299,6 +340,45 @@ fn change_patch(change: &DiffChange) -> anyhow::Result<Vec<FileDiff>> {
         ]);
     }
     Ok(vec![diff_file_contents(&change.path, old, new, old_bytes, new_bytes)?])
+}
+
+/// The patch of a rename or copy as git writes it: `diff --git a/<old> b/<new>`, mode lines,
+/// `similarity index`, `rename from`/`rename to` (or `copy`), then the `index` line and hunks
+/// when the content changed; the stat names it `old => new` (git's `pprint_rename`) and the
+/// summary says ` rename <names> (N%)`, plus ` mode change` without a path.
+// Used by `render_diff_changes`, `log`/`show` and `log --follow`.
+#[allow(clippy::too_many_arguments)]
+pub fn renamed_file_diff(source: &str, path: &str, status: char, score: u32, old: Option<([u8; 20], u32)>, old_bytes: Vec<u8>, new: Option<([u8; 20], u32)>, new_bytes: Vec<u8>) -> anyhow::Result<FileDiff> {
+    // An unchanged binary file still counts as binary in --stat / --numstat.
+    let unchanged_binary = old_bytes == new_bytes && old_bytes[..old_bytes.len().min(8000)].contains(&0);
+    let mut diff = diff_file_contents(path, old, new, old_bytes, new_bytes)?;
+    if unchanged_binary {
+        diff.stat.binary_sizes = Some((0, 0));
+    }
+    let word = if status == 'R' { "rename" } else { "copy" };
+    let percent = u64::from(score) * 100 / crate::helpers::rename::MAX_SCORE;
+    let mut lines: Vec<String> = diff.text.split_inclusive('\n').map(str::to_string).collect();
+    lines[0] = format!("diff --git a/{} b/{}\n", source, path);
+    let after_modes = lines.iter().position(|l| !(l.starts_with("diff --git") || l.starts_with("old mode ") || l.starts_with("new mode "))).unwrap_or(lines.len());
+    let rename_lines = [format!("similarity index {}%\n", percent), format!("{} from {}\n", word, source), format!("{} to {}\n", word, path)];
+    lines.splice(after_modes..after_modes, rename_lines);
+    for line in lines.iter_mut() {
+        if *line == format!("--- a/{}\n", path) {
+            *line = format!("--- a/{}\n", source);
+            break;
+        }
+    }
+    diff.text = lines.concat();
+    let names = crate::helpers::rename::pprint_rename(source, path);
+    diff.stat.name = names.clone();
+    let mut summary = format!(" {} {} ({}%)\n", word, names, percent);
+    if let (Some((_, old_mode)), Some((_, new_mode))) = (old, new)
+        && old_mode != new_mode
+    {
+        summary.push_str(&format!(" mode change {:06o} => {:06o}\n", old_mode, new_mode));
+    }
+    diff.summary = Some(summary);
+    Ok(diff)
 }
 
 /// Formats changes the way the raw diff commands print them: raw lines
@@ -332,7 +412,7 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
     } else if opts.name_status {
         for change in changes {
             let separator = if opts.nul { "\0" } else { "\t" };
-            out.push_str(&format!("{}{}{}{}", status_letter(change), separator, shown_path(&change.path), end));
+            out.push_str(&format!("{}{}{}{}", status_field(change), separator, shown_paths(change, opts.nul), end));
         }
     } else if raw {
         for change in changes {
@@ -344,9 +424,9 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
                 mode(&change.new),
                 shown_hash(&change.old),
                 shown_hash(&change.new),
-                status_letter(change),
+                status_field(change),
                 separator,
-                shown_path(&change.path),
+                shown_paths(change, opts.nul),
                 end
             ));
         }
@@ -369,7 +449,7 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
     }
     if (opts.stat || opts.shortstat) && !diffs.is_empty() {
         let stats: Vec<DiffStatEntry> = diffs.iter().map(|d| d.stat.clone()).collect();
-        let block = format_diffstat(&stats, 80);
+        let block = format_diffstat(&stats, if opts.stat_width == 0 { 80 } else { opts.stat_width });
         if opts.stat {
             out.push_str(&block);
         } else if let Some(last) = block.lines().last() {
@@ -388,15 +468,30 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
         if !out.is_empty() {
             out.push('\n');
         }
-        for diff in &diffs {
+        for (diff, change) in diffs.iter().zip(changes.iter().flat_map(|c| std::iter::repeat_n(c, if status_letter(c) == 'T' && c.renamed_from.is_none() { 2 } else { 1 }))) {
+            // Like git without --binary: no binary patch, just "Binary files ... differ".
+            let source = change.renamed_from.as_ref().map(|r| r.0.as_str()).unwrap_or(&change.path);
+            let text = crate::helpers::log::binary_patch_as_notice(&diff.text, source, &change.path);
             if opts.reverse {
-                out.push_str(&swap_patch_prefixes(&diff.text));
+                out.push_str(&swap_patch_prefixes(&text));
             } else {
-                out.push_str(&diff.text);
+                out.push_str(&text);
             }
         }
     }
     Ok(out)
+}
+
+/// The files a change list leaves untouched, from the side the changes start from: the extra
+/// copy sources of `--find-copies-harder`.
+// Used by `diff-tree`, `diff-index`, `diff-files`, `diff`, `log` and `fast-export`.
+pub fn unmodified_files(old_side: &BTreeMap<String, ([u8; 20], u32)>, changes: &[DiffChange]) -> Vec<(String, DiffSide)> {
+    let changed: std::collections::HashSet<&str> = changes.iter().map(|c| c.path.as_str()).collect();
+    old_side
+        .iter()
+        .filter(|(p, _)| !changed.contains(p.as_str()))
+        .map(|(p, (hash, mode))| (p.clone(), DiffSide { mode: *mode, hash: *hash, worktree: false }))
+        .collect()
 }
 
 /// Applies `-R`: swaps the two sides of every change.

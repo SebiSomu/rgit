@@ -41,7 +41,7 @@ src/
 │   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
-│   ├── diff.rs               # diff
+│   ├── diff.rs               # diff (porcelain on the raw diff engine: worktree/index/commits, ranges, all formats, renames)
 │   ├── merge.rs              # merge, merge-base
 │   ├── reset.rs              # reset
 │   ├── clean.rs              # clean
@@ -211,6 +211,7 @@ src/
 │   ├── sparse.rs             # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
 │   ├── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
 │   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
+│   ├── rename.rs             # git diffcore-rename port: exact/basename/similarity rename+copy detection, -M/-C parsing, limit warnings
 │   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases

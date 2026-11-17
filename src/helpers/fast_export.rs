@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Write;
 
 use anyhow::{bail, Result};
@@ -7,7 +7,7 @@ use crate::helpers::diff_plumbing::quote_c_path;
 use crate::helpers::objects::{flatten_tree, read_object};
 use crate::helpers::rev_list::{list_all_refs, parse_rev_list_args, select_rev_list_commits};
 use crate::helpers::rev_parse::resolve_rev;
-use crate::objects::FastExportOptions;
+use crate::objects::{DiffChange, DiffSide, FastExportOptions};
 use crate::refs::read_ref;
 
 /// Usage text of `fast-export`.
@@ -62,7 +62,8 @@ pub fn parse_fast_export_args(args: &[String]) -> Result<FastExportOptions, (Str
                 value(&mut i)?;
             }
             "--fake-missing-tagger" | "--no-progress" => {}
-            "--anonymize" | "--anonymize-map" | "--refspec" | "--reencode" | "-M" | "-C" => {
+            _ if crate::helpers::rename::parse_rename_option(arg, &mut opts.renames) => {}
+            "--anonymize" | "--anonymize-map" | "--refspec" | "--reencode" => {
                 return Err((format!("fatal: {} is not supported by rgit fast-export\n", name), 128));
             }
             _ => opts.revs.push(arg.to_string()),
@@ -299,15 +300,19 @@ pub fn run_fast_export(opts: &FastExportOptions, out: &mut impl Write) -> Result
             flatten_tree(&parent_tree, "", &mut old_files)?;
         }
 
-        // Changed paths in tree order; blobs first.
-        let mut changes: Vec<(String, Option<([u8; 20], u32)>)> = Vec::new();
+        // Changed paths in tree order (with -M / -C, renames and copies found); blobs first.
+        let side = |e: &([u8; 20], u32)| DiffSide { mode: e.1, hash: e.0, worktree: false };
         let paths: std::collections::BTreeSet<&String> = old_files.keys().chain(new_files.keys()).collect();
+        let mut diff: Vec<DiffChange> = Vec::new();
         for path in paths {
             let (old, new) = (old_files.get(path), new_files.get(path));
             if old != new {
-                changes.push((path.clone(), new.copied()));
+                diff.push(DiffChange { path: path.clone(), old: old.map(side), new: new.map(side), renamed_from: None });
             }
         }
+        let unmodified = if opts.renames.find_copies_harder { crate::helpers::diff_plumbing::unmodified_files(&old_files, &diff) } else { Vec::new() };
+        diff = crate::helpers::rename::detect_renames(diff, &opts.renames, &unmodified);
+        let changes: Vec<(String, Option<([u8; 20], u32)>)> = diff.iter().map(|c| (c.path.clone(), c.new.as_ref().map(|s| (s.hash, s.mode)))).collect();
         if !opts.no_data {
             for (_, new) in &changes {
                 let Some((blob, mode)) = new else { continue };
@@ -359,24 +364,43 @@ pub fn run_fast_export(opts: &FastExportOptions, out: &mut impl Write) -> Result
         if opts.full_tree {
             writeln!(out, "deleteall")?;
         }
-        // git's order: a path sorts before its own prefix, so `d/e` comes before `d`.
-        changes.sort_by(|a, b| {
-            let (x, y) = (a.0.as_bytes(), b.0.as_bytes());
+        // git's order (depth_first): by the path the change starts from, a path before its own
+        // prefix (`d/e` before `d`), renames last among equals.
+        let key = |c: &DiffChange| c.renamed_from.as_ref().map(|r| r.0.clone()).unwrap_or_else(|| c.path.clone());
+        diff.sort_by(|a, b| {
+            let (ka, kb) = (key(a), key(b));
+            let (x, y) = (ka.as_bytes(), kb.as_bytes());
             let common = x.len().min(y.len());
-            x[..common].cmp(&y[..common]).then(y.len().cmp(&x.len()))
+            x[..common]
+                .cmp(&y[..common])
+                .then(y.len().cmp(&x.len()))
+                .then((a.renamed_from.as_ref().map(|r| r.1) == Some('R')).cmp(&(b.renamed_from.as_ref().map(|r| r.1) == Some('R'))))
         });
-        for (path, new) in &changes {
-            match new {
-                None => writeln!(out, "D {}", export_path(path))?,
-                Some((blob, mode)) => {
-                    let name = hex::encode(blob);
-                    let reference = match marks.get(&name) {
-                        Some(mark) if !opts.no_data && *mode != 0o160000 => format!(":{}", mark),
-                        _ => name,
-                    };
-                    writeln!(out, "M {:06o} {} {}", mode, reference, export_path(path))?;
+        // A rename or copy is only declared when its source was not changed earlier in this
+        // commit; otherwise (and when the content differs) the file is written out with `M`.
+        let mut changed: BTreeSet<String> = BTreeSet::new();
+        for change in &diff {
+            if let Some((source, status, _)) = &change.renamed_from
+                && !changed.contains(source)
+            {
+                writeln!(out, "{} {} {}", status, export_path(source), export_path(&change.path))?;
+                changed.insert(change.path.clone());
+                if change.old == change.new {
+                    continue;
                 }
             }
+            match &change.new {
+                None => writeln!(out, "D {}", export_path(&change.path))?,
+                Some(new) => {
+                    let name = hex::encode(new.hash);
+                    let reference = match marks.get(&name) {
+                        Some(mark) if !opts.no_data && new.mode != 0o160000 => format!(":{}", mark),
+                        _ => name,
+                    };
+                    writeln!(out, "M {:06o} {} {}", new.mode, reference, export_path(&change.path))?;
+                }
+            }
+            changed.insert(change.path.clone());
         }
         writeln!(out)?;
     }

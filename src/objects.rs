@@ -1684,6 +1684,10 @@ pub enum LogDecorate {
 #[derive(Debug, Clone, Default)]
 pub struct LogOptions {
     pub revs: RevListOptions,
+    /// Rename/copy detection for the diff output (`diff.renames`, `-M`, `-C`, `--no-renames`).
+    pub renames: RenameOptions,
+    /// `--summary`: creations, deletions, renames, copies and mode changes.
+    pub summary: bool,
     pub format: LogFormat,
     pub date: LogDateMode,
     pub decorate: LogDecorate,
@@ -3130,13 +3134,36 @@ pub struct DiffSide {
 /// One changed path of a raw diff.
 // Used by: src/helpers/diff_plumbing.rs
 // Used by command/helper: `diff_trees`, `diff_index_changes`, `diff_files_changes`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DiffChange {
+    /// The path (the new path of a rename or copy).
     pub path: String,
     /// The path before; `None` for an addition.
     pub old: Option<DiffSide>,
     /// The path after; `None` for a deletion.
     pub new: Option<DiffSide>,
+    /// For a detected rename or copy: the source path, `R` or `C`, and git's 0..60000 score.
+    pub renamed_from: Option<(String, char, u32)>,
+}
+
+/// Which renames/copies `diffcore_rename` looks for (git's `-M`, `-C`, `--find-copies-harder`,
+/// `-l`, `diff.renames`): the kind, whether unmodified files can be copy sources, the minimum
+/// similarity (out of 60000) and the rename limit.
+// Used by: src/helpers/rename.rs, src/helpers/diff_plumbing.rs, src/helpers/log.rs, src/commands/diff.rs, src/commands/staging.rs, src/helpers/fast_export.rs
+// Used by command/helper: `detect_renames`, `parse_rename_option`, and the diff/log/status/fast-export commands
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenameOptions {
+    /// 0 = off, 1 = renames, 2 = renames and copies.
+    pub level: u8,
+    pub find_copies_harder: bool,
+    pub min_score: u32,
+    pub limit: usize,
+}
+
+impl Default for RenameOptions {
+    fn default() -> Self {
+        RenameOptions { level: 0, find_copies_harder: false, min_score: 30000, limit: 1000 }
+    }
 }
 
 /// Options shared by `diff-tree`, `diff-index` and `diff-files`.
@@ -3166,6 +3193,10 @@ pub struct DiffPlumbingOptions {
     pub nul: bool,
     /// `--abbrev[=<n>]`: shorten hashes in raw output.
     pub abbrev: Option<usize>,
+    /// `-M` / `-C` / `--find-copies-harder` / `-l<n>` / `--no-renames`.
+    pub renames: RenameOptions,
+    /// Width of the `--stat` block (0: 80 columns).
+    pub stat_width: usize,
     /// `-r`: recurse into subtrees (`diff-tree`).
     pub recursive: bool,
     /// `-t`: also show the tree entries themselves (`diff-tree`; implies `-r`).
@@ -3325,6 +3356,8 @@ pub struct FastExportOptions {
     /// `--show-original-ids`: add `original-oid` lines.
     pub show_original_ids: bool,
     /// The revision arguments.
+    /// `-M` / `-C`: report renames and copies (`R` / `C` commands).
+    pub renames: RenameOptions,
     pub revs: Vec<String>,
 }
 

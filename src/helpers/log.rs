@@ -8,7 +8,7 @@ use crate::helpers::format_patch::{civil_from_days, diff_commit_against_parent, 
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::rev_list::{abbreviate_hash, expand_rev_list_format, list_all_refs, parse_revision_args};
 use crate::helpers::rev_parse::peel_to_type;
-use crate::objects::{CommitSignature, DiffStatEntry, LogDateMode, LogDecorate, LogFormat, LogOptions, ParsedCommit};
+use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, CommitSignature, DiffStatEntry, LogDateMode, LogDecorate, LogFormat, LogOptions, ParsedCommit};
 use crate::refs;
 
 /// Parses `log` / `show` arguments. Display options (`--pretty`, `--format`, `--oneline`,
@@ -19,7 +19,7 @@ use crate::refs;
 /// Decoration defaults to `log.decorate`, or to short names when output is a terminal.
 // Used by `log` and `show`.
 pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOptions> {
-    let mut opts = LogOptions { patch: show_mode, ..Default::default() };
+    let mut opts = LogOptions { patch: show_mode, renames: crate::helpers::rename::default_rename_options("diff.renames"), ..Default::default() };
     let mut decorate: Option<LogDecorate> = None;
     let mut rev_args: Vec<String> = Vec::new();
     let mut abbrev_commit = false;
@@ -60,6 +60,7 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
             "--no-notes" => notes = Some(false),
             "--stat" => opts.stat = true,
             "--shortstat" => opts.shortstat = true,
+            "--summary" => opts.summary = true,
             "--name-only" => opts.name_only = true,
             "--name-status" => opts.name_status = true,
             "--oneline" => {
@@ -74,6 +75,7 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
             "--color" | "--no-color" => {}
             "--graph" => opts.graph = true,
             "--follow" => opts.follow = true,
+            _ if crate::helpers::rename::parse_rename_option(arg, &mut opts.renames) => {}
             _ if arg.starts_with("--decorate=") => {
                 decorate = Some(parse_decorate(&arg["--decorate=".len()..])?);
             }
@@ -441,66 +443,54 @@ pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::R
 /// than 80 when `--graph` takes up the left of each line, as in git).
 // Used by `log --graph` and `commit_diff_output`.
 pub fn commit_diff_output_width(commit: &ParsedCommit, opts: &LogOptions, stat_width: usize) -> anyhow::Result<String> {
-    let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status || opts.raw;
+    let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.summary || opts.name_only || opts.name_status || opts.raw;
     if !wants_diff || commit.parents.len() > 1 {
         return Ok(String::new());
     }
     let specs = normalize_pathspecs(&opts.revs.paths);
     let in_scope = |path: &str| specs.is_empty() || matches_ls_files_pathspec(path, &specs);
 
-    if opts.name_only || opts.name_status || opts.raw {
-        let (mut old, mut new) = (BTreeMap::new(), BTreeMap::new());
-        if let Some(parent) = commit.parents.first() {
-            flatten_tree(&parse_commit_object(parent)?.tree, "", &mut old)?;
-        }
-        flatten_tree(&commit.tree, "", &mut new)?;
-        let paths: BTreeSet<&String> = old.keys().chain(new.keys()).collect();
-        let mut out = String::new();
-        for path in paths.into_iter().filter(|p| in_scope(p)) {
-            let status = match (old.get(path), new.get(path)) {
-                (None, Some(_)) => 'A',
-                (Some(_), None) => 'D',
-                (Some(a), Some(b)) if a.1 & 0o170000 != b.1 & 0o170000 => 'T',
-                (Some(a), Some(b)) if a != b => 'M',
-                _ => continue,
-            };
-            if opts.name_only {
-                out.push_str(&format!("{}\n", path));
-            } else if opts.raw {
-                let side = |entry: Option<&([u8; 20], u32)>| entry.map(|(hash, mode)| (*mode, hex::encode(hash)[..7].to_string())).unwrap_or((0, "0000000".to_string()));
-                let ((old_mode, old_hash), (new_mode, new_hash)) = (side(old.get(path)), side(new.get(path)));
-                out.push_str(&format!(":{:06o} {:06o} {} {} {}\t{}\n", old_mode, new_mode, old_hash, new_hash, status, path));
-            } else {
-                out.push_str(&format!("{}\t{}\n", status, path));
-            }
-        }
-        return Ok(out);
+    // The changes against the first parent (the empty tree for a root commit), in path order,
+    // limited to the paths, then rename/copy detection as configured.
+    let (mut old, mut new) = (BTreeMap::new(), BTreeMap::new());
+    if let Some(parent) = commit.parents.first() {
+        flatten_tree(&parse_commit_object(parent)?.tree, "", &mut old)?;
     }
-
-    let diffs: Vec<_> = diff_commit_against_parent(commit)?.into_iter().filter(|d| in_scope(&d.stat.name)).collect();
-    if diffs.is_empty() {
+    flatten_tree(&commit.tree, "", &mut new)?;
+    let side = |e: &([u8; 20], u32)| DiffSide { mode: e.1, hash: e.0, worktree: false };
+    let paths: BTreeSet<&String> = old.keys().chain(new.keys()).filter(|p| in_scope(p)).collect();
+    let mut changes = Vec::new();
+    for path in paths {
+        let (a, b) = (old.get(path), new.get(path));
+        if a != b {
+            changes.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None });
+        }
+    }
+    if opts.renames.level > 0 {
+        let mut start = if opts.renames.find_copies_harder { old.clone() } else { BTreeMap::new() };
+        start.retain(|p, _| in_scope(p));
+        let unmodified = crate::helpers::diff_plumbing::unmodified_files(&start, &changes);
+        changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &unmodified);
+    }
+    if changes.is_empty() {
         return Ok(String::new());
     }
-    let mut out = String::new();
-    if opts.stat || opts.shortstat {
-        let stats: Vec<DiffStatEntry> = diffs.iter().map(|d| d.stat.clone()).collect();
-        let block = format_diffstat(&stats, stat_width);
-        if opts.stat {
-            out.push_str(&block);
-        } else if let Some(summary) = block.lines().last() {
-            out.push_str(summary);
-            out.push('\n');
-        }
-        if opts.patch {
-            out.push('\n');
-        }
-    }
-    if opts.patch {
-        for diff in &diffs {
-            out.push_str(&binary_patch_as_notice(&diff.text, &diff.stat.name, &diff.stat.name));
-        }
-    }
-    Ok(out)
+
+    // `--name-only`, `--raw` and `--name-status` replace the stat and patch output.
+    let names = opts.name_only || opts.name_status || opts.raw;
+    let render = DiffPlumbingOptions {
+        patch: opts.patch && !names,
+        stat: opts.stat && !names,
+        shortstat: opts.shortstat && !names,
+        summary: opts.summary && !names,
+        name_only: opts.name_only,
+        name_status: opts.name_status && !opts.name_only && !opts.raw,
+        raw: opts.raw && !opts.name_only,
+        abbrev: Some(7),
+        stat_width,
+        ..Default::default()
+    };
+    crate::helpers::diff_plumbing::render_diff_changes(&changes, &render)
 }
 
 /// `log -p` does not print binary patches (only `format-patch` does): a `GIT binary patch`

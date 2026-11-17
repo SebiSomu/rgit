@@ -22,6 +22,18 @@ fn tree_diff_text(old: Option<&str>, new: Option<&str>, opts: &DiffPlumbingOptio
     if opts.reverse {
         reverse_changes(&mut changes);
     }
+    if opts.renames.level > 0 {
+        // --find-copies-harder: unchanged files of the starting side are copy sources too.
+        let mut start = std::collections::BTreeMap::new();
+        if opts.renames.find_copies_harder {
+            if let Some(tree) = if opts.reverse { new } else { old } {
+                crate::helpers::objects::flatten_tree(tree, "", &mut start)?;
+            }
+            start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, specs));
+        }
+        let unmodified = crate::helpers::diff_plumbing::unmodified_files(&start, &changes);
+        changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &unmodified);
+    }
     Ok((render_diff_changes(&changes, opts)?, !changes.is_empty()))
 }
 
@@ -66,7 +78,12 @@ fn show_commit(out: &mut impl Write, hash: &str, parents_override: Option<Vec<St
                 *printed += 1;
             }
             None => {
-                if diff.is_empty() && !((opts.no_output || opts.quiet) && changed) {
+                // git prints the id whenever something changed, even if the chosen format shows
+                // nothing for it (`--summary` of plain modifications).
+                if !changed && diff.is_empty() {
+                    continue;
+                }
+                if diff.is_empty() && opts.quiet {
                     continue;
                 }
                 if !opts.no_commit_id {
@@ -95,7 +112,8 @@ fn show_commit(out: &mut impl Write, hash: &str, parents_override: Option<Vec<St
 /// status 1 when there are differences. `--stdin` reads commits (optionally followed by
 /// the parents to compare with) or pairs of trees, one per line. `-v` / `--pretty` /
 /// `--format` print the commit header before the diff; `--no-commit-id` drops the id line.
-/// Paths limit the comparison. No rename detection (`-M`, `-C`) and no combined diffs
+/// Paths limit the comparison. `-M[<n>]` / `-C[<n>]` / `--find-copies-harder` / `-l<n>` detect
+/// renames and copies (shown as `R086` / `C100` with both paths). No combined diffs
 /// (`-c`, `--cc`). Exit status: 0 (1 with `--exit-code` and differences), 128 on errors,
 /// 129 for a usage error.
 pub fn diff_tree(args: Vec<String>) -> Result<()> {
@@ -218,6 +236,7 @@ pub fn diff_tree(args: Vec<String>) -> Result<()> {
         }
     }
     out.flush()?;
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && differs {
         std::process::exit(1);
     }

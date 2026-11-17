@@ -64,7 +64,14 @@ pub fn diff_index(args: Vec<String>) -> Result<()> {
     if opts.reverse {
         reverse_changes(&mut changes);
     }
+    if opts.renames.level > 0 {
+        let mut start = if opts.renames.find_copies_harder && !opts.reverse { tree_map.clone() } else { BTreeMap::new() };
+        start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, &specs));
+        let unmodified = crate::helpers::diff_plumbing::unmodified_files(&start, &changes);
+        changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &unmodified);
+    }
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && !changes.is_empty() {
         std::process::exit(1);
     }

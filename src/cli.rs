@@ -124,11 +124,8 @@ pub enum Commands {
         source: Option<String>
     },
     Diff {
-        #[arg(long = "staged", alias = "cached")]
-        staged: bool,
-        commits: Vec<String>,
-        #[arg(last = true)]
-        paths: Vec<PathBuf>
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
     },
     Merge {
         branch: String
@@ -986,14 +983,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Restore { patch: false, files, staged, worktree, source } => {
             crate::commands::restore(files, staged, worktree, source)?;
         }
-        Commands::Diff { staged, commits, paths } => {
-            let (commit_a, commit_b) = match commits.len() {
-                0 => (None, None),
-                1 => (Some(commits[0].clone()), None),
-                2 => (Some(commits[0].clone()), Some(commits[1].clone())),
-                _ => anyhow::bail!("usage: rgit diff [<commit> [<commit>]] [-- <path>...]"),
-            };
-            crate::commands::diff(staged, commit_a, commit_b, paths)?;
+        Commands::Diff { args } => {
+            crate::commands::diff(raw_args_after("diff", args))?;
         }
         Commands::Merge { branch } => {
             crate::commands::merge(branch)?;

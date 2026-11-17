@@ -159,6 +159,29 @@ pub fn status() -> anyhow::Result<()> {
             staged_deleted.push(path.clone());
         }
     }
+    // Staged renames and copies (`status.renames`, else `diff.renames`; on by default).
+    let mut staged_renamed: Vec<(char, String, String)> = Vec::new();
+    let rename_opts = crate::helpers::rename::default_rename_options("status.renames");
+    if rename_opts.level > 0 && !staged_new.is_empty() {
+        use crate::objects::{DiffChange, DiffSide};
+        let side = |e: &([u8; 20], u32)| DiffSide { mode: e.1, hash: e.0, worktree: false };
+        let paths: std::collections::BTreeSet<&String> = head_tree.keys().chain(index_map.keys()).collect();
+        let changes: Vec<DiffChange> = paths
+            .into_iter()
+            .filter(|p| head_tree.get(*p) != index_map.get(*p))
+            .map(|p| DiffChange { path: p.clone(), old: head_tree.get(p).map(side), new: index_map.get(p).map(side), renamed_from: None })
+            .collect();
+        let unmodified = if rename_opts.find_copies_harder { crate::helpers::diff_plumbing::unmodified_files(&head_tree, &changes) } else { Vec::new() };
+        for change in crate::helpers::rename::detect_renames(changes, &rename_opts, &unmodified) {
+            if let Some((source, status, _)) = change.renamed_from {
+                staged_new.retain(|p| *p != change.path);
+                if status == 'R' {
+                    staged_deleted.retain(|p| *p != source);
+                }
+                staged_renamed.push((status, source, change.path));
+            }
+        }
+    }
 
     let mut working_files = Vec::new();
     collect_files(Path::new("."), &mut working_files)?;
@@ -207,7 +230,7 @@ pub fn status() -> anyhow::Result<()> {
         }
     }
 
-    let has_staged = !staged_new.is_empty() || !staged_modified.is_empty() || !staged_deleted.is_empty();
+    let has_staged = !staged_new.is_empty() || !staged_modified.is_empty() || !staged_deleted.is_empty() || !staged_renamed.is_empty();
     let has_unstaged = !unstaged_modified.is_empty() || !unstaged_deleted.is_empty();
     let has_untracked = !untracked.is_empty();
     let mut need_leading_blank = no_commits_yet;
@@ -217,6 +240,9 @@ pub fn status() -> anyhow::Result<()> {
         println!("Changes to be committed:");
         for p in &staged_new { println!("\tnew file:   {}", p); }
         for p in &staged_modified { println!("\tmodified:   {}", p); }
+        for (status, from, to) in &staged_renamed {
+            println!("\t{}{} -> {}", if *status == 'R' { "renamed:    " } else { "copied:     " }, from, to);
+        }
         for p in &staged_deleted { println!("\tdeleted:    {}", p); }
         println!();
         need_leading_blank = false;

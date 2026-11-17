@@ -36,11 +36,22 @@ pub fn diff_files(args: Vec<String>) -> Result<()> {
     let mut paths = std::mem::take(&mut opts.args);
     paths.extend(std::mem::take(&mut opts.paths));
     let specs = normalize_pathspecs(&paths);
-    let mut changes = diff_files_changes(&read_index()?, &specs);
+    let index = read_index()?;
+    let mut changes = diff_files_changes(&index, &specs);
     if opts.reverse {
         reverse_changes(&mut changes);
     }
+    if opts.renames.level > 0 {
+        let mut start: std::collections::BTreeMap<String, ([u8; 20], u32)> = std::collections::BTreeMap::new();
+        if opts.renames.find_copies_harder && !opts.reverse {
+            start = index.iter().map(|e| (e.path.clone(), (e.hash, e.mode))).collect();
+            start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, &specs));
+        }
+        let unmodified = crate::helpers::diff_plumbing::unmodified_files(&start, &changes);
+        changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &unmodified);
+    }
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && !changes.is_empty() {
         std::process::exit(1);
     }

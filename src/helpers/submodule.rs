@@ -136,21 +136,9 @@ pub fn describe_submodule_commit(path: &str, hash: &str) -> String {
     hash[..7].to_string()
 }
 
-/// The content `diff` shows for an object of a tree or the index: the blob, or for a
-/// submodule entry (whose commit is not an object of this repository) git's one-line
-/// stand-in `Subproject commit <hash>`.
-// Used by `diff`.
-pub fn diff_object_bytes(hash: &[u8; 20]) -> Vec<u8> {
-    let name = hex::encode(hash);
-    match crate::helpers::objects::read_object(&name) {
-        Ok((kind, content)) if kind == "blob" => content,
-        _ => format!("Subproject commit {}\n", name).into_bytes(),
-    }
-}
-
 /// The working-tree side of a submodule in a diff: `Subproject commit <its HEAD>`, or
 /// `None` when no repository is checked out there.
-// Used by `diff`.
+// Used by `diff` and the raw diff commands.
 pub fn submodule_worktree_bytes(path: &str) -> Option<Vec<u8>> {
     submodule_head(path).map(|head| format!("Subproject commit {}\n", head).into_bytes())
 }

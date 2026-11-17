@@ -9,12 +9,11 @@ use crate::helpers::format_patch::{diff_file_contents, format_diffstat, parse_co
 use crate::helpers::log::binary_patch_as_notice;
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::objects::read_object;
+use crate::helpers::rename::{estimate_similarity, pprint_rename, span_hash, MAX_SCORE};
 use crate::objects::{DiffStatEntry, FollowPair, LogOptions, ParsedCommit};
 
-/// git's MAX_SCORE and default minimum rename score (50%).
-const MAX_SCORE: u64 = 60000;
+/// git's default minimum rename score (50%).
 const MIN_SCORE: u64 = 30000;
-const HASHBASE: u32 = 107927;
 
 type Tree = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -103,7 +102,12 @@ fn find_rename_source(old_tree: &Tree, new_tree: &Tree, path: &str) -> anyhow::R
     let sources: Vec<(&String, &([u8; 20], u32))> = old_tree.iter().collect();
     let mut slots: [Option<(u64, bool, usize)>; 4] = [None; 4];
     for (j, (src_path, src)) in sources.iter().enumerate() {
-        let score = if is_regular(src.1) { estimate_similarity(&read_object(&hex::encode(src.0))?.1, &dst_data, &dst_hash) } else { 0 };
+        let score = if is_regular(src.1) {
+            let src_data = read_object(&hex::encode(src.0))?.1;
+            estimate_similarity(&src_data, &span_hash(&src_data), &dst_data, &dst_hash, MIN_SCORE)
+        } else {
+            0
+        };
         let candidate = Some((score, basename(src_path) == dst_base, j));
         let mut worst = 0;
         for i in 1..slots.len() {
@@ -141,117 +145,6 @@ fn is_regular(mode: u32) -> bool {
     mode & 0o170000 == 0o100000
 }
 
-/// git's `hash_chars`: the content cut into lines (at most 64 bytes each), each chunk hashed,
-/// with the number of bytes per hash. CR before LF is skipped in text, and an unterminated
-/// last line is dropped (git never adds it).
-// Used by `find_rename_source` and `estimate_similarity`.
-fn span_hash(data: &[u8]) -> Vec<(u32, u64)> {
-    let is_text = !data[..data.len().min(8000)].contains(&0);
-    let mut counts: HashMap<u32, u64> = HashMap::new();
-    let (mut accum1, mut accum2, mut n) = (0u32, 0u32, 0u64);
-    let mut i = 0;
-    while i < data.len() {
-        let c = data[i] as u32;
-        i += 1;
-        if is_text && c == u32::from(b'\r') && i < data.len() && data[i] == b'\n' {
-            continue;
-        }
-        let old_1 = accum1;
-        accum1 = (accum1 << 7) ^ (accum2 >> 25);
-        accum2 = (accum2 << 7) ^ (old_1 >> 25);
-        accum1 = accum1.wrapping_add(c);
-        n += 1;
-        if n < 64 && c != u32::from(b'\n') {
-            continue;
-        }
-        let hashval = accum1.wrapping_add(accum2.wrapping_mul(0x61)) % HASHBASE;
-        *counts.entry(hashval).or_default() += n;
-        n = 0;
-        accum1 = 0;
-        accum2 = 0;
-    }
-    // Like git, a last chunk without a newline is not counted at all.
-    let mut list: Vec<(u32, u64)> = counts.into_iter().collect();
-    list.sort();
-    list
-}
-
-/// git's `estimate_similarity`: how much of the larger file is material copied from the source,
-/// out of 60000; 0 when the sizes differ too much to reach the minimum score.
-// Used by `find_rename_source`.
-fn estimate_similarity(src: &[u8], dst: &[u8], dst_hash: &[(u32, u64)]) -> u64 {
-    let (src_size, dst_size) = (src.len() as u64, dst.len() as u64);
-    let max_size = src_size.max(dst_size);
-    let base_size = src_size.min(dst_size);
-    let delta_size = max_size - base_size;
-    if max_size * (MAX_SCORE - MIN_SCORE) < delta_size * MAX_SCORE {
-        return 0;
-    }
-    if dst_size == 0 {
-        return 0;
-    }
-    // diffcore_count_changes: bytes of dst whose chunk hash also occurs in src.
-    let src_hash = span_hash(src);
-    let mut copied = 0u64;
-    let mut d = 0;
-    for &(hash, src_cnt) in &src_hash {
-        while d < dst_hash.len() && dst_hash[d].0 < hash {
-            d += 1;
-        }
-        let mut dst_cnt = 0;
-        if d < dst_hash.len() && dst_hash[d].0 == hash {
-            dst_cnt = dst_hash[d].1;
-            d += 1;
-        }
-        copied += src_cnt.min(dst_cnt);
-    }
-    copied * MAX_SCORE / max_size
-}
-
-/// git's `pprint_rename`: `old => new`, with a common leading and trailing directory part
-/// pulled out into `prefix{old => new}suffix`.
-// Used by `render_follow_diff`.
-fn pprint_rename(a: &str, b: &str) -> String {
-    let (ab, bb) = (a.as_bytes(), b.as_bytes());
-    let mut pfx = 0;
-    let mut k = 0;
-    while k < ab.len() && k < bb.len() && ab[k] == bb[k] {
-        if ab[k] == b'/' {
-            pfx = k + 1;
-        }
-        k += 1;
-    }
-    // Walk back from the terminating NUL; with a prefix, one byte into it (its slash).
-    let mut sfx = 0;
-    let adjust = usize::from(pfx > 0);
-    let (mut oa, mut ob) = (ab.len() as isize, bb.len() as isize);
-    let at = |s: &[u8], i: isize| if i as usize == s.len() { 0u8 } else { s[i as usize] };
-    while (pfx as isize - adjust as isize) <= oa && (pfx as isize - adjust as isize) <= ob && oa >= 0 && ob >= 0 && at(ab, oa) == at(bb, ob) {
-        if at(ab, oa) == b'/' {
-            sfx = ab.len() - oa as usize;
-        }
-        oa -= 1;
-        ob -= 1;
-    }
-    let a_mid = ab.len().saturating_sub(pfx + sfx);
-    let b_mid = bb.len().saturating_sub(pfx + sfx);
-    let mut out = String::new();
-    if pfx + sfx > 0 {
-        out.push_str(&a[..pfx]);
-        out.push('{');
-    }
-    out.push_str(&a[pfx..pfx + a_mid]);
-    out.push_str(" => ");
-    out.push_str(&b[pfx..pfx + b_mid]);
-    if pfx + sfx > 0 {
-        out.push('}');
-        out.push_str(&a[a.len() - sfx..]);
-    }
-    out
-}
-
-/// The `--name-status` / `--raw` status of a pair: `A`, `D`, `M`, or `R`/`C` with similarity.
-// Used by `render_follow_diff`.
 fn status_of(pair: &FollowPair) -> String {
     match (pair.rename, pair.old, pair.new) {
         (Some((status, score)), _, _) => format!("{}{:03}", status, score as u64 * 100 / MAX_SCORE),
@@ -302,28 +195,11 @@ pub fn render_follow_diff(pairs: &[FollowPair], opts: &LogOptions, stat_width: u
     let mut diffs = Vec::new();
     for pair in pairs {
         let (old_bytes, new_bytes) = (load(pair.old)?, load(pair.new)?);
-        // An unchanged binary file (an exact rename or copy) still counts as binary in --stat.
-        let unchanged_binary = old_bytes == new_bytes && old_bytes[..old_bytes.len().min(8000)].contains(&0);
-        let mut diff = diff_file_contents(&pair.new_path, pair.old, pair.new, old_bytes, new_bytes)?;
-        if unchanged_binary {
-            diff.stat.binary_sizes = Some((0, 0));
-        }
-        if let Some((status, score)) = pair.rename {
-            let word = if status == 'R' { "rename" } else { "copy" };
-            let header = format!(
-                "diff --git a/{} b/{}\nsimilarity index {}%\n{} from {}\n{} to {}\n",
-                pair.old_path,
-                pair.new_path,
-                score as u64 * 100 / MAX_SCORE,
-                word,
-                pair.old_path,
-                word,
-                pair.new_path
-            );
-            let first_line_end = diff.text.find('\n').map(|i| i + 1).unwrap_or(diff.text.len());
-            diff.text = format!("{}{}", header, &diff.text[first_line_end..]).replacen(&format!("\n--- a/{}\n", pair.new_path), &format!("\n--- a/{}\n", pair.old_path), 1);
-            diff.stat.name = pprint_rename(&pair.old_path, &pair.new_path);
-        }
+        let diff = match pair.rename {
+            // The same rename/copy rendering as every other diff output.
+            Some((status, score)) => crate::helpers::diff_plumbing::renamed_file_diff(&pair.old_path, &pair.new_path, status, score, pair.old, old_bytes, pair.new, new_bytes)?,
+            None => diff_file_contents(&pair.new_path, pair.old, pair.new, old_bytes, new_bytes)?,
+        };
         diffs.push(diff);
     }
     if opts.stat || opts.shortstat {
@@ -349,7 +225,7 @@ pub fn render_follow_diff(pairs: &[FollowPair], opts: &LogOptions, stat_width: u
 
 #[cfg(test)]
 mod tests {
-    use super::pprint_rename;
+    use crate::helpers::rename::pprint_rename;
 
     #[test]
     fn pprint_rename_matches_git() {

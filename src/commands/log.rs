@@ -54,6 +54,7 @@ pub fn log(args: Vec<String>) -> Result<()> {
         write_or_quit(&mut out, &format!("{}{}", separator, join_entry_and_diff(&entry, &diff, &opts)));
     }
     let _ = out.flush();
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     Ok(())
 }
 
@@ -151,6 +152,7 @@ fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
         write_or_quit(&mut out, &format!("{}{}", separator, text));
     }
     let _ = out.flush();
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     Ok(())
 }
 
@@ -192,6 +194,7 @@ pub fn whatchanged(args: Vec<String>) -> Result<()> {
         write_or_quit(&mut out, &format!("{}{}", separator, join_entry_and_diff(&entry, diff, &opts)));
     }
     let _ = out.flush();
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     Ok(())
 }
 
@@ -222,6 +225,7 @@ pub fn show(args: Vec<String>) -> Result<()> {
         write_or_quit(&mut out, &text);
     }
     let _ = out.flush();
+    crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     Ok(())
 }
 

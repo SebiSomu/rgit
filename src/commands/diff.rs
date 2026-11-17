@@ -1,178 +1,142 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-use crate::helpers::{collect_files, flatten_tree, format_diff_output, normalize_path, resolve_tree_from_source, tree_hash_of_commit};
+use std::io::Write;
+
+use crate::helpers::diff_plumbing::{
+    diff_files_changes, diff_index_changes, diff_trees, parse_diff_plumbing_args, render_diff_changes, reverse_changes, unmodified_files, DIFF_COMMON_OPTIONS,
+};
+use crate::helpers::ls_files::normalize_pathspecs;
+use crate::helpers::merge::find_merge_base;
+use crate::helpers::objects::flatten_tree;
+use crate::helpers::rename::{detect_renames, warn_rename_limit};
+use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
 use crate::index::read_index;
+use crate::objects::{DiffChange, DiffSide};
 use crate::refs;
 
-pub fn diff(staged: bool, commit_a: Option<String>, commit_b: Option<String>, paths: Vec<PathBuf>) -> anyhow::Result<()> {
-    let path_filters: Vec<String> = paths.iter().map(|p| normalize_path(p)).collect();
-    let should_process = |path: &str| -> bool {
-        if path_filters.is_empty() {
-            return true;
-        }
-        path_filters.iter().any(|f| path == f || path.starts_with(&format!("{}/", f)))
+type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
+
+/// `rgit diff [<options>] [--cached|--staged] [<commit> [<commit>]] [--] [<path>...]`
+///
+/// git's porcelain diff, built on the raw diff engine of `diff-files` / `diff-index` /
+/// `diff-tree`: the working tree against the index (no revision), the index against `HEAD` or
+/// a commit (`--cached` / `--staged`), the working tree against a commit (one revision), or two
+/// commits (`A B`, `A..B`, or `A...B` from their merge base). The patch is shown unless another
+/// format is asked for (`--stat`, `--shortstat`, `--numstat`, `--summary`, `--name-only`,
+/// `--name-status`, `--raw`, `-s`); `-z`, `-R`, `--abbrev`, `--exit-code` and `--quiet` work as
+/// for the raw commands. Renames are detected by default (`diff.renames`; `-M[<n>]`, `-C[<n>]`,
+/// `--find-copies-harder`, `-l<n>`, `--no-renames`). Files left out by a sparse checkout count
+/// as unchanged. Exit status: 0 (1 with `--exit-code` and differences), 128 on errors.
+pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
+    let usage = format!("usage: rgit diff [<options>] [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] --cached [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] <commit> [<commit>...] <commit> [--] [<path>...]\n\n{}", DIFF_COMMON_OPTIONS);
+    let die = |message: &str, code: i32| -> ! {
+        eprint!("{}", message);
+        std::process::exit(code);
     };
+    let mut opts = match parse_diff_plumbing_args(&args, "diff", &usage) {
+        Ok(opts) => opts,
+        Err((message, code)) => die(&message, code),
+    };
+    let explicit = opts.raw || opts.name_only || opts.name_status || opts.stat || opts.shortstat || opts.numstat || opts.summary || opts.no_output;
+    if !explicit {
+        opts.patch = true;
+    }
+    opts.recursive = true;
 
-    let mut diff_entries: BTreeMap<String, (Vec<u8>, Vec<u8>, String, String)> = BTreeMap::new();
-
-    if let (Some(ca), Some(cb)) = (&commit_a, &commit_b) {
-        let tree_a = resolve_tree_from_source(ca)?;
-        let tree_b = resolve_tree_from_source(cb)?;
-
-        let mut all_paths: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-        for p in tree_a.keys() { all_paths.insert(p.clone()); }
-        for p in tree_b.keys() { all_paths.insert(p.clone()); }
-
-        for path in all_paths {
-            if !should_process(&path) { continue; }
-
-            let old_bytes = if let Some((hash, _)) = tree_a.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let new_bytes = if let Some((hash, _)) = tree_b.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let old_label = format!("a/{}", path);
-            let new_label = format!("b/{}", path);
-            diff_entries.insert(path, (old_bytes, new_bytes, old_label, new_label));
-        }
-    } else if let Some(ca) = &commit_a {
-        let tree_a = resolve_tree_from_source(ca)?;
-
-        let mut working_files = Vec::new();
-        collect_files(Path::new("."), &mut working_files)?;
-
-        let mut all_paths: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-        for p in tree_a.keys() { all_paths.insert(p.clone()); }
-        for f in &working_files { all_paths.insert(normalize_path(f)); }
-
-        // Files left out by a sparse checkout stand for their staged content.
-        let sparse_index = read_index().unwrap_or_default();
-        let skipped = crate::helpers::sparse::skipped_worktree_paths(&sparse_index);
-        for path in all_paths.into_iter().chain(skipped.iter().cloned()).collect::<std::collections::BTreeSet<String>>() {
-            if !should_process(&path) { continue; }
-
-            let old_bytes = if let Some((hash, _)) = tree_a.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let new_bytes = if skipped.contains(&path) {
-                match sparse_index.iter().find(|e| e.path == path) {
-                    Some(entry) => crate::helpers::submodule::diff_object_bytes(&entry.hash),
-                    None => Vec::new(),
-                }
-            } else if Path::new(&path).exists() && Path::new(&path).is_file() {
-                fs::read(&path).unwrap_or_default()
-            } else if Path::new(&path).is_dir() {
-                // A submodule: its checked-out commit, or no change when it is not checked out.
-                crate::helpers::submodule::submodule_worktree_bytes(&path).unwrap_or_else(|| old_bytes.clone())
-            } else {
-                Vec::new()
-            };
-
-            let old_label = format!("a/{}", path);
-            let new_label = format!("b/{}", path);
-            diff_entries.insert(path, (old_bytes, new_bytes, old_label, new_label));
-        }
-    } else if staged {
-        let head_tree = if let Some(commit_hash) = refs::resolve_head_commit()? {
-            let tree_hash = tree_hash_of_commit(&commit_hash)?;
-            let mut map = BTreeMap::new();
-            flatten_tree(&tree_hash, "", &mut map)?;
-            map
+    // Revisions first, then paths; without `--`, an argument that is no revision must be a path.
+    let mut revs: Vec<String> = Vec::new();
+    let mut paths: Vec<String> = Vec::new();
+    for arg in std::mem::take(&mut opts.args) {
+        if paths.is_empty() && (resolve_rev(&arg).is_ok() || arg.contains("..")) {
+            revs.push(arg);
+        } else if std::path::Path::new(&arg).exists() {
+            paths.push(arg);
         } else {
-            BTreeMap::new()
-        };
-
-        let index_entries = read_index().unwrap_or_default();
-        let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
-
-        let mut all_paths: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-        for p in head_tree.keys() { all_paths.insert(p.clone()); }
-        for p in index_map.keys() { all_paths.insert(p.clone()); }
-
-        for path in all_paths {
-            if !should_process(&path) { continue; }
-
-            let old_bytes = if let Some((hash, _)) = head_tree.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let new_bytes = if let Some(hash) = index_map.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let old_label = format!("a/{}", path);
-            let new_label = format!("b/{}", path);
-            diff_entries.insert(path, (old_bytes, new_bytes, old_label, new_label));
+            die(&format!("fatal: ambiguous argument '{}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'\n", arg), 128);
         }
-    } else {
-        let index_entries = read_index().unwrap_or_default();
-        let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
+    }
+    paths.extend(std::mem::take(&mut opts.paths));
+    let specs = normalize_pathspecs(&paths);
 
-        let mut working_files = Vec::new();
-        collect_files(Path::new("."), &mut working_files)?;
-
-        let mut all_paths: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-        for p in index_map.keys() { all_paths.insert(p.clone()); }
-        for f in &working_files {
-            let rel = normalize_path(f);
-            if index_map.contains_key(&rel) {
-                all_paths.insert(rel);
+    let tree_of = |rev: &str| -> TreeMap {
+        let Ok(hash) = resolve_rev(rev) else { die(&format!("fatal: bad revision '{}'\n", rev), 128) };
+        let Ok(tree) = peel_to_type(hash, "tree") else { die(&format!("fatal: bad revision '{}'\n", rev), 128) };
+        let mut map = TreeMap::new();
+        let _ = flatten_tree(&tree, "", &mut map);
+        map
+    };
+    let tree_hash_of = |rev: &str| -> String {
+        let Ok(hash) = resolve_rev(rev) else { die(&format!("fatal: bad revision '{}'\n", rev), 128) };
+        peel_to_type(hash, "tree").unwrap_or_else(|_| die(&format!("fatal: bad revision '{}'\n", rev), 128))
+    };
+    // `A..B` and `A...B` (an empty side means HEAD).
+    if revs.len() == 1 && revs[0].contains("..") {
+        let range = revs.remove(0);
+        let (a, b, symmetric) = match range.split_once("...") {
+            Some((a, b)) => (a.to_string(), b.to_string(), true),
+            None => {
+                let (a, b) = range.split_once("..").unwrap_or((&range, ""));
+                (a.to_string(), b.to_string(), false)
             }
-        }
-
-        // Files left out by a sparse checkout are absent on purpose: no difference.
-        let skipped = crate::helpers::sparse::skipped_worktree_paths(&index_entries);
-        for path in all_paths {
-            if !should_process(&path) || skipped.contains(&path) { continue; }
-
-            let old_bytes = if let Some(hash) = index_map.get(&path) {
-                crate::helpers::submodule::diff_object_bytes(hash)
-            } else {
-                Vec::new()
-            };
-
-            let new_bytes = if Path::new(&path).exists() && Path::new(&path).is_file() {
-                fs::read(&path).unwrap_or_default()
-            } else if Path::new(&path).is_dir() {
-                // A submodule: its checked-out commit, or no change when it is not checked out.
-                crate::helpers::submodule::submodule_worktree_bytes(&path).unwrap_or_else(|| old_bytes.clone())
-            } else {
-                Vec::new()
-            };
-
-            let old_label = format!("a/{}", path);
-            let new_label = format!("b/{}", path);
-            diff_entries.insert(path, (old_bytes, new_bytes, old_label, new_label));
+        };
+        let (a, b) = (if a.is_empty() { "HEAD".to_string() } else { a }, if b.is_empty() { "HEAD".to_string() } else { b });
+        if symmetric {
+            let (Ok(ca), Ok(cb)) = (resolve_rev(&a), resolve_rev(&b)) else { die(&format!("fatal: bad revision '{}'\n", range), 128) };
+            match find_merge_base(&ca, &cb)? {
+                Some(base) => revs = vec![base, b],
+                None => die(&format!("fatal: {}...{}: no merge base\n", a, b), 128),
+            }
+        } else {
+            revs = vec![a, b];
         }
     }
 
-    for (path, (old_bytes, new_bytes, old_label, new_label)) in diff_entries {
-        if old_bytes == new_bytes {
-            continue;
+    let index = read_index().unwrap_or_default();
+    let skipped: std::collections::HashSet<String> = index.iter().filter(|e| e.skip_worktree).map(|e| e.path.clone()).collect();
+    let (mut changes, start): (Vec<DiffChange>, TreeMap) = match (opts.cached, revs.len()) {
+        (false, 0) => {
+            let tracked: Vec<_> = index.iter().filter(|e| !e.skip_worktree).cloned().collect();
+            let start = index.iter().map(|e| (e.path.clone(), (e.hash, e.mode))).collect();
+            (diff_files_changes(&tracked, &specs), start)
         }
-
-        let old_str = String::from_utf8_lossy(&old_bytes);
-        let new_str = String::from_utf8_lossy(&new_bytes);
-        let old_lines: Vec<&str> = if old_bytes.is_empty() { Vec::new() } else { old_str.lines().collect() };
-        let new_lines: Vec<&str> = if new_bytes.is_empty() { Vec::new() } else { new_str.lines().collect() };
-        let formatted = format_diff_output(&path, &old_lines, &new_lines, &old_label, &new_label);
-        print!("{}", formatted);
+        (true, 0) | (true, 1) => {
+            let tree = match revs.first() {
+                Some(rev) => tree_of(rev),
+                None if refs::resolve_head_commit()?.is_some() => tree_of("HEAD"),
+                None => TreeMap::new(),
+            };
+            (diff_index_changes(&tree, &index, true, false, &specs), tree)
+        }
+        (false, 1) => {
+            let tree = tree_of(&revs[0]);
+            let mut changes = diff_index_changes(&tree, &index, false, false, &specs);
+            // A file left out by a sparse checkout stands for its staged content.
+            for change in changes.iter_mut().filter(|c| skipped.contains(&c.path)) {
+                change.new = index.iter().find(|e| e.path == change.path).map(|e| DiffSide { mode: e.mode, hash: e.hash, worktree: false });
+            }
+            changes.retain(|c| c.old != c.new);
+            (changes, tree)
+        }
+        (false, 2) => {
+            let (a, b) = (tree_hash_of(&revs[0]), tree_hash_of(&revs[1]));
+            let mut changes = Vec::new();
+            diff_trees(Some(&a), Some(&b), "", &opts, &specs, &mut changes)?;
+            (changes, tree_of(&revs[0]))
+        }
+        _ => die(&usage, 129),
+    };
+    if opts.reverse {
+        reverse_changes(&mut changes);
     }
-
+    if opts.renames.level > 0 {
+        let mut start = if opts.renames.find_copies_harder && !opts.reverse { start } else { TreeMap::new() };
+        start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, &specs));
+        let unmodified = unmodified_files(&start, &changes);
+        changes = detect_renames(changes, &opts.renames, &unmodified);
+    }
+    std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
+    warn_rename_limit("diff.renameLimit");
+    if (opts.exit_code || opts.quiet) && !changes.is_empty() {
+        std::process::exit(1);
+    }
     Ok(())
 }

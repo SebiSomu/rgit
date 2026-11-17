@@ -1696,6 +1696,75 @@ pub struct LogOptions {
     pub raw: bool,
     /// Revisions named on the command line, in order (`show` displays each one).
     pub objects: Vec<String>,
+    /// `--graph`: draw the commit graph to the left of the output (implies `--topo-order`).
+    pub graph: bool,
+    /// `--follow`: follow one file's history across renames and copies.
+    pub follow: bool,
+}
+
+/// Which kind of line `log --graph` prints next for the current commit (git's `graph_state`):
+/// plain branch lines, a `...` marker for skipped output, the rows that make room before an
+/// octopus merge, the commit row itself, the row that fans a merge out to its parents, and the
+/// rows that move branch lines left until they sit in their columns.
+// Used by: src/helpers/graph.rs
+// Used by command/helper: `graph_update`, `graph_next_line`, and the `log` command through them
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GraphState {
+    #[default]
+    Padding,
+    Skip,
+    PreCommit,
+    Commit,
+    PostMerge,
+    Collapsing,
+}
+
+/// The state of a `log --graph` drawing (a port of git's `struct git_graph`): the commit being
+/// shown and its interesting parents, the branch lines (each the commit it leads to) before and
+/// after this commit, and the mapping from screen columns (two characters per branch line) to the
+/// line each one has to move to. Indices stay signed, with -1 for "none", as in git.
+// Used by: src/helpers/graph.rs, src/commands/log.rs
+// Used by command/helper: every `graph_*` helper and the `log` command
+#[derive(Debug, Clone, Default)]
+pub struct GitGraph {
+    /// The commit being shown, and the mark printed for it (`*`, or `<`/`>` with `--left-right`).
+    pub commit: Option<String>,
+    pub mark: String,
+    /// The commit's parents that are shown too (only the first with `--first-parent`).
+    pub parents: Vec<String>,
+    /// How many screen columns the lines for this commit need.
+    pub width: i32,
+    pub expansion_row: i32,
+    pub state: GraphState,
+    pub prev_state: GraphState,
+    pub commit_index: i32,
+    pub prev_commit_index: i32,
+    /// For a merge, where its first parent is: 0 to the left (skewed left), 1 otherwise.
+    pub merge_layout: i32,
+    pub edges_added: i32,
+    pub prev_edges_added: i32,
+    /// Branch lines before this commit, and after it (both as the commit each line leads to).
+    pub columns: Vec<String>,
+    pub new_columns: Vec<String>,
+    /// Target branch line for every screen column (-1: none), and the one from the row before.
+    pub mapping: Vec<i32>,
+    pub old_mapping: Vec<i32>,
+    pub mapping_size: usize,
+}
+
+/// One file pair in the diff `log --follow` shows for a commit: the old and new path with their
+/// tree entries, and the rename/copy status and similarity (`R`/`C`, git's 0..60000 score) when
+/// the pair was found by rename detection.
+// Used by: src/helpers/follow.rs, src/commands/log.rs
+// Used by command/helper: `follow_commit_pairs`, `render_follow_diff`, and the `log` command
+#[derive(Debug, Clone)]
+pub struct FollowPair {
+    pub old_path: String,
+    pub new_path: String,
+    pub old: Option<([u8; 20], u32)>,
+    pub new: Option<([u8; 20], u32)>,
+    /// `Some(('R' | 'C', score))` for a detected rename or copy.
+    pub rename: Option<(char, u32)>,
 }
 
 /// Options for the `tag` command: list (with patterns, `-n` annotation lines, `--contains`,

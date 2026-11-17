@@ -83,6 +83,8 @@ pub mod fast_export;
 pub mod fast_import;
 pub mod sparse;
 pub mod submodule;
+pub mod graph;
+pub mod follow;
 
 pub use objects::*;
 pub use diff::*;

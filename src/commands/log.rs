@@ -2,11 +2,15 @@ use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
 use crate::helpers::format_patch::parse_commit_object;
-use crate::helpers::log::{collect_decorations, commit_diff_output, effective_decorate, format_log_date, format_log_entry, join_entry_and_diff, parse_log_args};
+use std::collections::HashSet;
+
+use crate::helpers::follow::{follow_commit_pairs, render_follow_diff};
+use crate::helpers::graph::{graph_new, graph_padding_line, graph_prefix_lines, graph_show_commit, graph_show_commit_msg, graph_update};
+use crate::helpers::log::{collect_decorations, commit_diff_output, commit_diff_output_width, effective_decorate, format_log_date, format_log_entry, join_entry_and_diff, parse_log_args};
 use crate::helpers::read_object;
-use crate::helpers::rev_list::select_rev_list_commits;
+use crate::helpers::rev_list::{rewrite_rev_list_parents, select_rev_list_commits};
 use crate::helpers::rev_parse::resolve_rev;
-use crate::objects::{LogFormat, LogOptions};
+use crate::objects::{LogFormat, LogOptions, WalkedCommit};
 use crate::refs;
 
 /// `rgit log [<options>] [<revision-range>] [[--] <path>...]`
@@ -19,6 +23,11 @@ use crate::refs;
 /// `--format` template (with `%d`/`%D` decorations), with dates per `--date`, ref names per
 /// `--decorate` (on by default on a terminal), and optionally `-p`, `--stat`, `--shortstat`,
 /// `--name-only` or `--name-status` against the first parent.
+///
+/// `--graph` draws the commit graph to the left of every line (git's layout, including merges,
+/// octopus merges and collapsing branch lines) and implies `--topo-order`. `--follow <path>`
+/// walks the whole history and shows the commits that change that one path, switching to the
+/// old name at the commit that renamed or copied it (shown as `R`/`C` with its similarity).
 pub fn log(args: Vec<String>) -> Result<()> {
     let opts = parse_log_args(&args, false).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
     if opts.revs.revs == ["HEAD"] && refs::resolve_head_commit()?.is_none() {
@@ -27,6 +36,9 @@ pub fn log(args: Vec<String>) -> Result<()> {
             refs::HeadState::Detached(_) => "HEAD".to_string(),
         };
         exit_with(&format!("fatal: your current branch '{}' does not have any commits yet", name), 128);
+    }
+    if opts.graph || opts.follow {
+        return log_graph_or_follow(&opts);
     }
     let (mut selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
     if opts.revs.reverse {
@@ -45,6 +57,103 @@ pub fn log(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+/// `log --graph` and/or `log --follow`. The commits come from the full walk (with `--follow`,
+/// not limited by the path, since the path changes along the way); `--skip` drops walked
+/// commits before anything is looked at, and `-n` counts the commits actually shown, as in
+/// git. Every commit handed out is fed to the graph, even one `--follow` then does not show,
+/// so the graph marks such gaps with `...` exactly like git does.
+fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
+    let mut walk = opts.revs.clone();
+    let limit = walk.max_count.take().unwrap_or(usize::MAX);
+    let skip = std::mem::take(&mut walk.skip);
+    if opts.follow {
+        walk.paths.clear();
+    }
+    let (mut selected, state) = select_rev_list_commits(&walk).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let interesting: HashSet<String> = selected.iter().map(|w| w.commit.hash.clone()).collect();
+    let decorations = collect_decorations(effective_decorate(opts))?;
+
+    // --reverse (never with --graph) shows the same commits oldest first; with --follow the
+    // path is still followed newest first, so the names line up.
+    let mut follow_path = opts.revs.paths.first().cloned().filter(|_| opts.follow);
+    let mut chosen: Vec<(WalkedCommit, String)> = Vec::new();
+    let mut graph = opts.graph.then(graph_new);
+    let mut out = BufWriter::new(io::stdout().lock());
+    let mut shown = 0;
+    let mut prev_missing_newline = false;
+    for walked in selected.drain(..).skip(skip) {
+        if shown >= limit {
+            break;
+        }
+        let commit = &walked.commit;
+        if let Some(g) = graph.as_mut() {
+            let rewritten = if walk.paths.is_empty() { commit.parents.clone() } else { rewrite_rev_list_parents(&commit.parents, &state, walk.first_parent) };
+            let mut parents: Vec<String> = Vec::new();
+            for (n, parent) in rewritten.into_iter().enumerate() {
+                if walk.first_parent && n > 0 {
+                    break;
+                }
+                if interesting.contains(&parent) && !parents.contains(&parent) {
+                    parents.push(parent);
+                }
+            }
+            let mark = if walk.left_right { if walked.left { "<" } else { ">" } } else { "*" };
+            graph_update(g, &commit.hash, mark, parents);
+        }
+
+        let stat_width = graph.as_ref().map(|g| 80usize.saturating_sub(g.width.max(2 * g.new_columns.len() as i32) as usize)).unwrap_or(80);
+        let diff = match follow_path.as_mut() {
+            Some(path) => {
+                // Like git without --diff-merges, merges have no diff and so are not shown.
+                if commit.parents.len() > 1 {
+                    continue;
+                }
+                let (pairs, renamed_from) = follow_commit_pairs(commit, path)?;
+                if pairs.is_empty() {
+                    continue;
+                }
+                if let Some(old) = renamed_from {
+                    *path = old;
+                }
+                render_follow_diff(&pairs, opts, stat_width)?
+            }
+            None => commit_diff_output_width(commit, opts, stat_width)?,
+        };
+        shown += 1;
+
+        let entry = format_log_entry(commit, opts, &decorations);
+        let Some(g) = graph.as_mut() else {
+            chosen.push((walked, join_entry_and_diff(&entry, &diff, opts)));
+            continue;
+        };
+        let mut text = String::new();
+        if shown > 1 && !entry_separator(opts).is_empty() {
+            // A blank line between entries keeps the branch lines going (unless the previous
+            // entry did not end its last line, like `format:` templates).
+            if !prev_missing_newline {
+                text.push_str(&graph_padding_line(g));
+            }
+            text.push('\n');
+        }
+        text.push_str(&graph_show_commit(g));
+        let full = join_entry_and_diff(&entry, &diff, opts);
+        text.push_str(&graph_show_commit_msg(g, &entry));
+        text.push_str(&graph_prefix_lines(g, &full[entry.len()..]));
+        prev_missing_newline = !entry.ends_with('\n');
+        write_or_quit(&mut out, &text);
+    }
+
+    if opts.revs.reverse {
+        chosen.reverse();
+    }
+    for (i, (_, text)) in chosen.iter().enumerate() {
+        let separator = if i > 0 { entry_separator(opts) } else { "" };
+        write_or_quit(&mut out, &format!("{}{}", separator, text));
+    }
+    let _ = out.flush();
+    Ok(())
+}
+
 /// `rgit whatchanged [<options>] [<revision-range>] [[--] <path>...]`
 ///
 /// `log` in the form git had before `log` learned to show diffs: every commit is followed
@@ -55,6 +164,7 @@ pub fn log(args: Vec<String>) -> Result<()> {
 /// the raw list.
 pub fn whatchanged(args: Vec<String>) -> Result<()> {
     let mut opts = parse_log_args(&args, false).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    reject_log_only_options(&opts);
     if !(opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status) {
         opts.raw = true;
     }
@@ -94,6 +204,7 @@ pub fn whatchanged(args: Vec<String>) -> Result<()> {
 /// `--name-status`, `-s` to drop the diff) and `-- <path>...` to limit the diff.
 pub fn show(args: Vec<String>) -> Result<()> {
     let opts = parse_log_args(&args, true).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    reject_log_only_options(&opts);
     let decorations = collect_decorations(effective_decorate(&opts))?;
     let mut out = BufWriter::new(io::stdout().lock());
     let mut first = true;
@@ -187,6 +298,14 @@ fn entry_separator(opts: &LogOptions) -> &'static str {
     match &opts.format {
         LogFormat::Oneline | LogFormat::Template { terminator: true, .. } => "",
         _ => "\n",
+    }
+}
+
+/// `--graph` and `--follow` are implemented for `log` only.
+fn reject_log_only_options(opts: &LogOptions) {
+    if opts.graph || opts.follow {
+        let option = if opts.graph { "--graph" } else { "--follow" };
+        exit_with(&format!("fatal: {} is only supported by 'rgit log' for now", option), 128);
     }
 }
 

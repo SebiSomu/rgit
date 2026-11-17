@@ -72,8 +72,8 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
             "--decorate" => decorate = Some(LogDecorate::Short),
             "--no-decorate" => decorate = Some(LogDecorate::No),
             "--color" | "--no-color" => {}
-            "--graph" => anyhow::bail!("fatal: --graph is not supported by rgit yet"),
-            "--follow" => anyhow::bail!("fatal: --follow is not supported by rgit yet"),
+            "--graph" => opts.graph = true,
+            "--follow" => opts.follow = true,
             _ if arg.starts_with("--decorate=") => {
                 decorate = Some(parse_decorate(&arg["--decorate=".len()..])?);
             }
@@ -99,6 +99,18 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
 
     opts.show_notes = notes.unwrap_or(!pretty_given);
     opts.revs = parse_revision_args(&rev_args)?;
+    if opts.graph {
+        if opts.revs.reverse {
+            anyhow::bail!("fatal: options '--reverse' and '--graph' cannot be used together");
+        }
+        // As in git, --graph implies --topo-order unless --date-order was asked for.
+        if !opts.revs.date_order {
+            opts.revs.topo_order = true;
+        }
+    }
+    if opts.follow && opts.revs.paths.len() != 1 {
+        anyhow::bail!("fatal: --follow requires exactly one pathspec");
+    }
     opts.revs.abbrev_commit = opts.revs.abbrev_commit || abbrev_commit;
     if !show_mode && opts.revs.revs.is_empty() && !(opts.revs.all || opts.revs.branches || opts.revs.tags || opts.revs.remotes) {
         opts.revs.revs.push("HEAD".to_string());
@@ -422,6 +434,13 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
 /// blank line and the patch.
 // Used by `log` and `show`.
 pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::Result<String> {
+    commit_diff_output_width(commit, opts, 80)
+}
+
+/// `commit_diff_output` with the `--stat` block laid out for `stat_width` columns (narrower
+/// than 80 when `--graph` takes up the left of each line, as in git).
+// Used by `log --graph` and `commit_diff_output`.
+pub fn commit_diff_output_width(commit: &ParsedCommit, opts: &LogOptions, stat_width: usize) -> anyhow::Result<String> {
     let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status || opts.raw;
     if !wants_diff || commit.parents.len() > 1 {
         return Ok(String::new());
@@ -465,7 +484,7 @@ pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::R
     let mut out = String::new();
     if opts.stat || opts.shortstat {
         let stats: Vec<DiffStatEntry> = diffs.iter().map(|d| d.stat.clone()).collect();
-        let block = format_diffstat(&stats, 80);
+        let block = format_diffstat(&stats, stat_width);
         if opts.stat {
             out.push_str(&block);
         } else if let Some(summary) = block.lines().last() {
@@ -478,25 +497,41 @@ pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::R
     }
     if opts.patch {
         for diff in &diffs {
-            out.push_str(&diff.text);
+            out.push_str(&binary_patch_as_notice(&diff.text, &diff.stat.name, &diff.stat.name));
         }
     }
     Ok(out)
 }
 
+/// `log -p` does not print binary patches (only `format-patch` does): a `GIT binary patch`
+/// section becomes git's `Binary files a/<old> and b/<new> differ` line, with the `index` line
+/// abbreviated as for text diffs. Other diff text is returned unchanged.
+// Used by `log`, `show` and `log --follow`.
+pub fn binary_patch_as_notice(text: &str, old_path: &str, new_path: &str) -> String {
+    let Some(start) = text.find("\nGIT binary patch\n") else { return text.to_string() };
+    let head = &text[..start];
+    let index_at = head.rfind("\nindex ").map(|i| i + 1).unwrap_or(0);
+    let index_line = &head[index_at..];
+    let rest = index_line.trim_start_matches("index ");
+    let (range, suffix) = rest.split_once(' ').map(|(r, s)| (r, format!(" {}", s))).unwrap_or((rest, String::new()));
+    let (old_hash, new_hash) = range.split_once("..").unwrap_or((range, range));
+    let short = |h: &str| h.chars().take(7).collect::<String>();
+    let old_name = if head.contains("\nnew file mode ") { "/dev/null".to_string() } else { format!("a/{}", old_path) };
+    let new_name = if head.contains("\ndeleted file mode ") { "/dev/null".to_string() } else { format!("b/{}", new_path) };
+    format!("{}index {}..{}{}\nBinary files {} and {} differ\n", &head[..index_at], short(old_hash), short(new_hash), suffix, old_name, new_name)
+}
+
 /// Joins one entry's header and diff output the way git lays them out: one-line formats put
-/// the diff straight after the line; others separate it with a blank line, or with `---` when a
-/// stat precedes a patch.
+/// the diff straight after the line; every other format (templates included) ends the entry
+/// with a newline, written as `---` when a `--stat` precedes a patch.
 // Used by `log` and `show`.
 pub fn join_entry_and_diff(entry: &str, diff: &str, opts: &LogOptions) -> String {
     if diff.is_empty() {
         return entry.to_string();
     }
+    let dashes = opts.stat && opts.patch && !(opts.name_only || opts.name_status);
     match &opts.format {
         LogFormat::Oneline => format!("{}{}", entry, diff),
-        LogFormat::Template { .. } if !(opts.stat || opts.shortstat) || opts.patch => format!("{}\n{}", entry, diff),
-        LogFormat::Template { .. } => format!("{}{}", entry, diff),
-        _ if (opts.stat || opts.shortstat) && opts.patch && !(opts.name_only || opts.name_status) => format!("{}---\n{}", entry, diff),
-        _ => format!("{}\n{}", entry, diff),
+        _ => format!("{}{}\n{}", entry, if dashes { "---" } else { "" }, diff),
     }
 }

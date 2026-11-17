@@ -36,7 +36,7 @@ src/
 ├── commands/                 # High-level CLI command entry points
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
 │   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
-│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes), show (commits, tags, trees, blobs), whatchanged
+│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
 │   ├── staging.rs            # add, status, rm, mv
 │   ├── branch.rs             # branch, switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
@@ -208,7 +208,9 @@ src/
 │   ├── fast_export.rs        # fast-import stream writer (ref naming, commit order, marks)
 │   ├── fast_import.rs        # fast-import stream reader (marks, branch trees, commits, tags, refs)
 │   ├── sparse.rs             # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
-│   └── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
+│   ├── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
+│   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
+│   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions

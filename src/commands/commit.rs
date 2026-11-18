@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use crate::helpers::commit::{
-    add_signoff, cleanup_commit_message, current_signature, edit_commit_message, format_commit_date, parse_author_option, parse_commit_date,
+    add_signoff, cleanup_commit_message, current_author_signature, current_signature, edit_commit_message, parse_author_option, parse_commit_date,
     stage_tracked_changes, tracked_worktree_changes, write_commit_object,
 };
-use crate::helpers::format_patch::{diff_commit_against_parent, format_diffstat, parse_commit_object, resolve_commit_rev, split_commit_message};
+use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
 use crate::helpers::reflog::set_reflog_action;
 use crate::helpers::{build_commit, flatten_tree, write_tree_from_index_prefix};
 use crate::index::read_index;
-use crate::objects::{CommitOptions, DiffStatEntry};
+use crate::objects::CommitOptions;
 use crate::refs;
 
 pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: String) -> anyhow::Result<()> {
@@ -72,11 +72,20 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
         Some(rev) => Some(parse_commit_object(&resolve_commit_rev(rev)?)?),
         None => None,
     };
-    let mut author = match (&reused, &head_commit) {
-        (Some(c), _) if !opts.reset_author => c.author.clone(),
-        (None, Some(c)) if opts.amend && !opts.reset_author => c.author.clone(),
-        _ => committer.clone(),
+    // git takes the author from the commit being reused, amended or cherry-picked; its date
+    // is then "interesting" and shown in the summary.
+    let picked = if reused.is_none() && !opts.amend {
+        fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD")).ok().and_then(|h| parse_commit_object(h.trim()).ok())
+    } else {
+        None
     };
+    let mut author = match (&reused, &head_commit, &picked) {
+        (Some(c), _, _) if !opts.reset_author => c.author.clone(),
+        (None, Some(c), _) if opts.amend && !opts.reset_author => c.author.clone(),
+        (None, _, Some(c)) if !opts.reset_author => c.author.clone(),
+        _ => current_author_signature()?,
+    };
+    let show_date = opts.date.is_some() || (!opts.reset_author && (reused.is_some() || (opts.amend && head_commit.is_some()) || picked.is_some()));
     if let Some(who) = &opts.author {
         let (name, email) = parse_author_option(who).unwrap_or_else(|e| fail(128, &e.to_string()));
         author.name = name;
@@ -119,8 +128,8 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     let mut message = if use_editor {
         cleanup_commit_message(&edit_commit_message(&template, &editor_status(&head_state, &tree, base_tree.as_deref())?)?, true)
     } else {
-        // Without an editor git's cleanup is "whitespace": `#` lines stay.
-        cleanup_commit_message(&template, false)
+        // Without an editor git's cleanup is "whitespace": `#` lines stay (unless --cleanup=strip).
+        cleanup_commit_message(&template, opts.cleanup_strip)
     };
     if opts.signoff {
         message = add_signoff(&message, &committer);
@@ -144,31 +153,10 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     }
     crate::helpers::merge::clear_merge_state();
 
+    crate::helpers::sequencer::post_commit_cleanup();
+
     if !opts.quiet {
-        let label = match &head_state {
-            refs::HeadState::Branch(branch) => branch.clone(),
-            refs::HeadState::Detached(_) => "detached HEAD".to_string(),
-        };
-        let root = if parents.is_empty() { " (root-commit)" } else { "" };
-        println!("[{}{} {}] {}", label, root, &commit_hash[..7], subject);
-        if author.name != committer.name || author.email != committer.email {
-            println!(" Author: {} <{}>", author.name, author.email);
-        }
-        if author.timestamp != committer.timestamp {
-            println!(" Date: {}", format_commit_date(author.timestamp, &author.tz));
-        }
-        if parents.len() <= 1 {
-            let diffs = diff_commit_against_parent(&parse_commit_object(&commit_hash)?)?;
-            if !diffs.is_empty() {
-                let stats: Vec<DiffStatEntry> = diffs.iter().map(|d| d.stat.clone()).collect();
-                print!("{}", format_diffstat(&stats, 80).lines().last().map(|l| format!("{}\n", l)).unwrap_or_default());
-                for diff in &diffs {
-                    if let Some(summary) = &diff.summary {
-                        print!("{}", summary);
-                    }
-                }
-            }
-        }
+        crate::helpers::commit::print_commit_summary(&head_state, &commit_hash, &author, &committer, show_date)?;
     }
     Ok(())
 }

@@ -45,7 +45,7 @@ src/
 │   ├── merge.rs              # merge, merge-base
 │   ├── reset.rs              # reset
 │   ├── clean.rs              # clean
-│   ├── cherry_pick.rs        # cherry-pick (--continue, --abort)
+│   ├── cherry_pick.rs        # cherry-pick (commit lists/ranges, -x, -s, -n, -m, --ff, --continue, --skip, --abort, --quit)
 │   ├── revert.rs             # revert (--continue, --abort)
 │   ├── stash.rs              # stash (push, pop, apply, list, drop, show, clear)
 │   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
@@ -136,7 +136,8 @@ src/
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
-│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; merge --abort / state cleanup
+│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
+│   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates

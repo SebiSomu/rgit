@@ -365,10 +365,18 @@ pub fn merge_trees_favoring(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Stri
         } else {
             None
         };
-        if let (Some(hash), false) = (trivial_content, mode_conflict) {
+        if let Some(hash) = trivial_content {
             if regular(o.1) == regular(t.1) {
                 result.tree.insert(path.clone(), (hash, mode));
-                report(MergePathOutcome::AutoMerged, None, &mut result);
+                if mode_conflict {
+                    // ort: the 100644/100755 clash (only possible for add/add) makes the
+                    // content merge unclean, reported as a plain content conflict.
+                    result.messages.push(message(&[path], "CONFLICT (contents)", format!("CONFLICT ({}): Merge conflict in {}", kind, path)));
+                    result.conflicted.insert(path.clone(), [b.copied(), Some(*o), Some(*t)]);
+                    report(MergePathOutcome::Conflict(kind.into()), None, &mut result);
+                } else {
+                    report(MergePathOutcome::AutoMerged, None, &mut result);
+                }
                 continue;
             }
         }
@@ -380,9 +388,9 @@ pub fn merge_trees_favoring(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Stri
                 result.tree.insert(path.clone(), (picked, mode));
                 result.messages.push(message(&[path], "Auto-merging", format!("Auto-merging {}", path)));
                 if mode_conflict {
-                    result.messages.push(message(&[path], "CONFLICT (mode)", format!("CONFLICT (mode): {} had different modes in {} and {}; kept {}", path, ours_label, theirs_label, ours_label)));
+                    result.messages.push(message(&[path], "CONFLICT (contents)", format!("CONFLICT ({}): Merge conflict in {}", kind, path)));
                     result.conflicted.insert(path.clone(), [b.copied(), Some(*o), Some(*t)]);
-                    report(MergePathOutcome::Conflict("mode".into()), None, &mut result);
+                    report(MergePathOutcome::Conflict(kind.into()), None, &mut result);
                 } else {
                     report(MergePathOutcome::AutoMerged, None, &mut result);
                 }
@@ -411,12 +419,9 @@ pub fn merge_trees_favoring(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Stri
         result.tree.insert(path.clone(), (hash, mode));
         result.messages.push(message(&[path], "Auto-merging", format!("Auto-merging {}", path)));
 
-        let outcome = if !merged.conflicts.is_empty() {
+        let outcome = if !merged.conflicts.is_empty() || mode_conflict {
             result.messages.push(message(&[path], "CONFLICT (contents)", format!("CONFLICT ({}): Merge conflict in {}", kind, path)));
             MergePathOutcome::Conflict(kind.into())
-        } else if mode_conflict {
-            result.messages.push(message(&[path], "CONFLICT (mode)", format!("CONFLICT (mode): {} had different modes in {} and {}; kept {}", path, ours_label, theirs_label, ours_label)));
-            MergePathOutcome::Conflict("mode".into())
         } else {
             MergePathOutcome::AutoMerged
         };

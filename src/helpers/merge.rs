@@ -233,6 +233,20 @@ pub fn clear_merge_state() {
 /// alone. A path counts as touched when its index entry differs from `HEAD` or is unmerged.
 // Used by `merge --abort`.
 pub fn abort_merge_to_head() -> anyhow::Result<()> {
+    let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
+        Some(commit) => crate::helpers::resolve_tree_from_source(&commit)?,
+        None => TreeMap::new(),
+    };
+    reset_merge_to_tree(&head_tree)?;
+    clear_merge_state();
+    Ok(())
+}
+
+/// git's `reset --merge <tree>` on the index and working tree (refs are the caller's job):
+/// every path whose index entry is unmerged, differs from `HEAD`, or differs in `target`
+/// takes `target`'s version; files nobody touched keep their local changes.
+// Used by `merge --abort` and `cherry-pick --abort` / `--skip`.
+pub fn reset_merge_to_tree(target_tree: &TreeMap) -> anyhow::Result<()> {
     use crate::helpers::checkout::{sync_working_tree, update_index_from_tree};
     let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
         Some(commit) => crate::helpers::resolve_tree_from_source(&commit)?,
@@ -240,35 +254,32 @@ pub fn abort_merge_to_head() -> anyhow::Result<()> {
     };
     let entries = crate::index::read_index().unwrap_or_default();
     // Where the work tree is now (unmerged paths hold marker content: never equal to a blob)
-    // and where it should end up (HEAD's version of every touched path).
+    // and where it should end up.
     let mut current: TreeMap = TreeMap::new();
     let mut target: TreeMap = TreeMap::new();
     for entry in &entries {
         let in_head = head_tree.get(&entry.path).copied();
+        let in_target = target_tree.get(&entry.path).copied();
         if entry.stage != 0 {
             current.insert(entry.path.clone(), ([0u8; 20], 0));
-            if let Some(h) = in_head {
-                target.insert(entry.path.clone(), h);
-            }
-        } else if in_head != Some((entry.hash, entry.mode)) {
-            current.insert(entry.path.clone(), (entry.hash, entry.mode));
-            if let Some(h) = in_head {
-                target.insert(entry.path.clone(), h);
-            }
         } else {
             current.insert(entry.path.clone(), (entry.hash, entry.mode));
+        }
+        let keep = entry.stage == 0 && in_head == Some((entry.hash, entry.mode)) && in_target == in_head;
+        if keep {
             target.insert(entry.path.clone(), (entry.hash, entry.mode));
+        } else if let Some(t) = in_target {
+            target.insert(entry.path.clone(), t);
         }
     }
-    for (path, h) in &head_tree {
+    for (path, h) in target_tree {
         if !current.contains_key(path) {
-            // Deleted by the merge: comes back.
+            // Not in the index (deleted, or new in the target): comes back.
             target.insert(path.clone(), *h);
         }
     }
     let index_map: BTreeMap<String, [u8; 20]> = entries.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), e.hash)).collect();
     sync_working_tree(&target, &current, &index_map)?;
     update_index_from_tree(&target, &current)?;
-    clear_merge_state();
     Ok(())
 }

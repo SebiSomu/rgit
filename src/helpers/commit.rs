@@ -152,14 +152,78 @@ pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &st
     write_object("commit", content.as_bytes())
 }
 
-/// Splits the configured `Name <email>` identity into a signature stamped with the current
-/// time (in UTC, like every rgit timestamp).
-// Used by `commit` for the committer and the default author.
+/// The committer: the configured `Name <email>` identity stamped with the current time (in
+/// UTC), each part overridable like git with `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` and
+/// `GIT_COMMITTER_DATE`.
+// Used by `commit`, `merge`, `cherry-pick` and everything else that records commits.
 pub fn current_signature() -> anyhow::Result<CommitSignature> {
+    signature_from_env("COMMITTER")
+}
+
+/// The default author: like `current_signature`, from `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`
+/// and `GIT_AUTHOR_DATE` when set.
+// Used by `commit`.
+pub fn current_author_signature() -> anyhow::Result<CommitSignature> {
+    signature_from_env("AUTHOR")
+}
+
+fn signature_from_env(role: &str) -> anyhow::Result<CommitSignature> {
     let identity = author_identity()?;
-    let (name, email) = identity.split_once(" <").map(|(n, e)| (n.to_string(), e.trim_end_matches('>').to_string())).unwrap_or((identity, String::new()));
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
-    Ok(CommitSignature { name, email, timestamp, tz: "+0000".to_string() })
+    let (mut name, mut email) = identity.split_once(" <").map(|(n, e)| (n.to_string(), e.trim_end_matches('>').to_string())).unwrap_or((identity, String::new()));
+    let var = |part: &str| std::env::var(format!("GIT_{}_{}", role, part)).ok();
+    if let Some(value) = var("NAME") {
+        name = value;
+    }
+    if let Some(value) = var("EMAIL") {
+        email = value;
+    }
+    let (timestamp, tz) = match var("DATE").filter(|d| !d.trim().is_empty()) {
+        Some(date) => parse_commit_date(date.trim_start_matches('@')).map_err(|_| anyhow::anyhow!("fatal: invalid date format: {}", date))?,
+        None => (SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64, "+0000".to_string()),
+    };
+    Ok(CommitSignature { name, email, timestamp, tz })
+}
+
+/// Prints git's commit summary: `[<branch> <abbrev>] <subject>`, then ` Author:` when the
+/// author is not the committer, ` Date:` when `show_date` (an author taken from another commit,
+/// or `--date`), and for non-merges the diffstat line and create/delete-mode summary.
+// Used by `commit` and `cherry-pick`.
+pub fn print_commit_summary(head_state: &refs::HeadState, commit_hash: &str, author: &CommitSignature, committer: &CommitSignature, show_date: bool) -> anyhow::Result<()> {
+    use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
+    let commit = parse_commit_object(commit_hash)?;
+    let label = match head_state {
+        refs::HeadState::Branch(branch) => branch.clone(),
+        refs::HeadState::Detached(_) => "detached HEAD".to_string(),
+    };
+    let root = if commit.parents.is_empty() { " (root-commit)" } else { "" };
+    let subject = split_commit_message(&commit.message).0;
+    println!("[{}{} {}] {}", label, root, &commit_hash[..7], subject);
+    if author.name != committer.name || author.email != committer.email {
+        println!(" Author: {} <{}>", author.name, author.email);
+    }
+    if show_date {
+        println!(" Date: {}", format_commit_date(author.timestamp, &author.tz));
+    }
+    if commit.parents.len() <= 1 {
+        // git's summary: `--shortstat --summary` against the parent, renames detected.
+        use crate::helpers::diff_plumbing::{diff_trees, render_diff_changes};
+        let opts = crate::objects::DiffPlumbingOptions {
+            recursive: true,
+            shortstat: true,
+            summary: true,
+            renames: crate::helpers::rename::default_rename_options("diff.renames"),
+            ..Default::default()
+        };
+        let parent_tree = match commit.parents.first() {
+            Some(parent) => Some(parse_commit_object(parent)?.tree),
+            None => None,
+        };
+        let mut changes = Vec::new();
+        diff_trees(parent_tree.as_deref(), Some(&commit.tree), "", &opts, &[], &mut changes)?;
+        let changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &[]);
+        print!("{}", render_diff_changes(&changes, &opts)?);
+    }
+    Ok(())
 }
 
 /// Parses `commit --author="Name <email>"` into its name and email.

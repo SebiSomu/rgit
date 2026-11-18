@@ -121,6 +121,10 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
 
     let head_state = refs::resolve_head()?;
     let old_head_commit = refs::resolve_head_commit()?;
+    // Every reset without paths records where HEAD was.
+    if let Some(old) = &old_head_commit {
+        fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", old))?;
+    }
 
     match &head_state {
         refs::HeadState::Branch(branch_name) => {
@@ -133,7 +137,9 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     }
 
     crate::helpers::merge::clear_merge_state();
-    // Like git, a reset also ends an in-progress cherry-pick or revert.
+    // Like git, a reset also ends an in-progress cherry-pick or revert (and a cherry-pick
+    // sequence whose last pick that was).
+    crate::helpers::sequencer::post_commit_cleanup();
     for state in [".git/CHERRY_PICK_HEAD", ".git/CHERRY_PICK_MSG", ".git/REVERT_HEAD", ".git/REVERT_MSG"] {
         let _ = fs::remove_file(crate::repo::path(state));
     }

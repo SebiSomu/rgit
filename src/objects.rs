@@ -1622,7 +1622,34 @@ pub struct CommitOptions {
     pub allow_empty_message: bool,
     /// `-s`: add a `Signed-off-by:` trailer for the committer.
     pub signoff: bool,
+    /// `--cleanup=strip`: drop `#` lines even without the editor.
+    pub cleanup_strip: bool,
     pub quiet: bool,
+}
+
+/// Parsed arguments of `rgit cherry-pick`; also what `.git/sequencer/opts` stores.
+// Used by: src/cli.rs, src/commands/cherry_pick.rs, src/helpers/sequencer.rs
+#[derive(Debug, Clone, Default)]
+pub struct CherryPickOptions {
+    /// Commits and ranges (`A..B`, `^X`) to pick.
+    pub commits: Vec<String>,
+    /// `-n`: apply to the index and working tree only.
+    pub no_commit: bool,
+    /// `-x`: append `(cherry picked from commit <hash>)`.
+    pub record_origin: bool,
+    /// `-s`: append `Signed-off-by:` for the committer.
+    pub signoff: bool,
+    /// `-m <n>`: diff a merge against its n-th parent.
+    pub mainline: Option<usize>,
+    /// `--ff`: fast-forward when `HEAD` is the commit's parent.
+    pub ff: bool,
+    pub allow_empty: bool,
+    pub allow_empty_message: bool,
+    pub keep_redundant: bool,
+    pub cont: bool,
+    pub skip: bool,
+    pub abort: bool,
+    pub quit: bool,
 }
 
 /// `merge --ff` (default), `--no-ff` or `--ff-only`; the last one given wins.

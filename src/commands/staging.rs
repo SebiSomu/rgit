@@ -352,10 +352,13 @@ pub fn status() -> anyhow::Result<()> {
 
     if !has_staged {
         if need_leading_blank { println!(); }
+        // git's trailers (with its status hints).
         if no_commits_yet && !has_unstaged && !has_untracked {
-            println!("nothing to commit (create/copy files and use 'add' to track)");
-        } else if has_unstaged || has_untracked || !unmerged.is_empty() {
-            println!("no changes added to commit (use 'add' to track or stage changes)");
+            println!("nothing to commit (create/copy files and use \"rgit add\" to track)");
+        } else if has_unstaged || !unmerged.is_empty() {
+            println!("no changes added to commit (use \"rgit add\" and/or \"rgit commit -a\")");
+        } else if has_untracked {
+            println!("nothing added to commit but untracked files present (use \"rgit add\" to track)");
         } else {
             println!("nothing to commit, working tree clean");
         }

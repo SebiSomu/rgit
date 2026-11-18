@@ -72,6 +72,9 @@ pub enum Commands {
         allow_empty_message: bool,
         #[arg(short = 's', long = "signoff")]
         signoff: bool,
+        /// `strip` (drop `#` lines), `whitespace` or `default`.
+        #[arg(long = "cleanup", value_name = "MODE", value_parser = ["strip", "whitespace", "default"])]
+        cleanup: Option<String>,
         #[arg(short = 'q', long = "quiet")]
         quiet: bool,
     },
@@ -236,13 +239,33 @@ pub enum Commands {
         only_ignored: bool
     },
     CherryPick {
-        commit: Option<String>,
-        #[arg(short = 'n', long = "no-commit", conflicts_with_all = ["cont", "abort"])]
+        commits: Vec<String>,
+        #[arg(short = 'n', long = "no-commit", overrides_with = "commit")]
         no_commit: bool,
-        #[arg(long = "continue", conflicts_with_all = ["abort", "no_commit"])]
+        #[arg(long = "commit", overrides_with = "no_commit")]
+        commit: bool,
+        #[arg(short = 'x')]
+        record_origin: bool,
+        #[arg(short = 's', long = "signoff")]
+        signoff: bool,
+        #[arg(short = 'm', long = "mainline", value_name = "PARENT-NUMBER")]
+        mainline: Option<usize>,
+        #[arg(long = "ff")]
+        ff: bool,
+        #[arg(long = "allow-empty")]
+        allow_empty: bool,
+        #[arg(long = "allow-empty-message")]
+        allow_empty_message: bool,
+        #[arg(long = "keep-redundant-commits")]
+        keep_redundant: bool,
+        #[arg(long = "continue", conflicts_with_all = ["skip", "abort", "quit"])]
         cont: bool,
-        #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
-        abort: bool
+        #[arg(long = "skip", conflicts_with_all = ["cont", "abort", "quit"])]
+        skip: bool,
+        #[arg(long = "abort", conflicts_with_all = ["cont", "skip", "quit"])]
+        abort: bool,
+        #[arg(long = "quit", conflicts_with_all = ["cont", "skip", "abort"])]
+        quit: bool,
     },
     BananaSplit {
         commit: Option<String>,
@@ -1001,6 +1024,7 @@ pub fn handle_commands() -> Result<()> {
             allow_empty,
             allow_empty_message,
             signoff,
+            cleanup,
             quiet,
         } => {
             let opts = crate::objects::CommitOptions {
@@ -1018,6 +1042,7 @@ pub fn handle_commands() -> Result<()> {
                 allow_empty,
                 allow_empty_message,
                 signoff,
+                cleanup_strip: cleanup.as_deref() == Some("strip"),
                 quiet,
             };
             crate::commands::commit(opts)?;
@@ -1082,8 +1107,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Clean { dry_run, force, dirs, ignored, only_ignored } => {
             crate::commands::clean(dry_run, force, dirs, ignored, only_ignored)?;
         }
-        Commands::CherryPick { commit, no_commit, cont, abort } => {
-            crate::commands::cherry_pick(commit, no_commit, cont, abort)?;
+        Commands::CherryPick { commits, no_commit, commit: _, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit } => {
+            crate::commands::cherry_pick(crate::objects::CherryPickOptions { commits, no_commit, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit })?;
         }
         Commands::BananaSplit { commit, by_dir, dry_run } => {
             crate::commands::banana_split(commit, by_dir, dry_run)?;

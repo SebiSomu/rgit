@@ -4,6 +4,7 @@ pub mod objects;
 pub mod diff;
 pub mod gitignore;
 pub mod merge;
+pub mod sequencer;
 pub mod commit;
 pub mod checkout;
 pub mod bisect;

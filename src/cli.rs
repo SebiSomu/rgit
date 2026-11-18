@@ -82,7 +82,19 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
     },
-    Status,
+    Status {
+        #[arg(short = 's', long = "short")]
+        short: bool,
+        #[arg(short = 'b', long = "branch")]
+        branch: bool,
+        /// `--porcelain[=v1]`: the short format, stable for scripts.
+        #[arg(long = "porcelain", num_args = 0..=1, default_missing_value = "v1", require_equals = true)]
+        porcelain: Option<String>,
+        #[arg(short = 'z')]
+        nul: bool,
+        #[arg(short = 'u', long = "untracked-files", num_args = 0..=1, default_missing_value = "all")]
+        untracked: Option<String>,
+    },
     #[command(disable_help_flag = true)]
     Branch {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
@@ -1059,8 +1071,16 @@ pub fn handle_commands() -> Result<()> {
         Commands::Log { args } => {
             crate::commands::log(raw_args_after("log", args))?;
         }
-        Commands::Status => {
-            crate::commands::status()?;
+        Commands::Status { short, branch, porcelain, nul, untracked } => {
+            if let Some(v) = porcelain.as_deref().filter(|v| *v != "v1") {
+                anyhow::bail!("fatal: unsupported porcelain version '{}'", v);
+            }
+            let untracked = untracked.unwrap_or_else(|| "normal".to_string());
+            if !["no", "normal", "all"].contains(&untracked.as_str()) {
+                anyhow::bail!("fatal: Invalid untracked files mode '{}'", untracked);
+            }
+            // `-z` implies the porcelain format, like git.
+            crate::commands::status(crate::objects::StatusOptions { short: short || porcelain.is_some() || nul, branch, nul, untracked })?;
         }
         Commands::Branch { args } => {
             crate::commands::branch(raw_args_after("branch", args))?;

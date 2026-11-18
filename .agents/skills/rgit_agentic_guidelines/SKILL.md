@@ -37,7 +37,7 @@ src/
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
 │   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
 │   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
-│   ├── staging.rs            # add, status, rm, mv
+│   ├── staging.rs            # add, status (long, -s/--short, -b, --porcelain[=v1], -z, -u[no|normal|all]), rm, mv
 │   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
 │   ├── branch.rs             # branch (list -a/-r/-v/-vv/patterns/--merged/--contains/--points-at, create -f/-t/--no-track, -d/-D/-r, -m/-M, -c/-C, -u, --unset-upstream, --show-current), switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
@@ -138,6 +138,7 @@ src/
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
 │   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
 │   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
+│   ├── status.rs             # status --short rendering (XY codes, path quoting, -z), untracked dir collapsing, ## branch header
 │   ├── branch.rs             # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity

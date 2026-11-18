@@ -3658,3 +3658,16 @@ pub struct BranchListEntry {
     /// Target of a symbolic remote-tracking ref (`origin/HEAD -> origin/main`).
     pub symref: Option<String>,
 }
+
+/// Options of `rgit status`: the short/porcelain format and its `-b` header and `-z`
+/// terminators, and which untracked files are shown (`no`, `normal` = collapsed directories,
+/// `all` = every file).
+// Used by: src/cli.rs, src/commands/staging.rs, src/helpers/status.rs
+// Used by command/helper: the `status` command and `format_short_status`
+#[derive(Debug, Clone, Default)]
+pub struct StatusOptions {
+    pub short: bool,
+    pub branch: bool,
+    pub nul: bool,
+    pub untracked: String,
+}

@@ -281,7 +281,7 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         let keep = opts.keep_redundant || (originally_empty && opts.allow_empty);
         if !keep {
             fs::write(&pick_head, format!("{}\n", commit))?;
-            crate::commands::status()?;
+            crate::commands::status(crate::objects::StatusOptions { untracked: "normal".to_string(), ..Default::default() })?;
             eprintln!("The previous cherry-pick is now empty, possibly due to conflict resolution.");
             eprintln!("If you wish to commit it anyway, use:");
             eprintln!();

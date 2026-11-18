@@ -139,7 +139,10 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn status() -> anyhow::Result<()> {
+pub fn status(opts: crate::objects::StatusOptions) -> anyhow::Result<()> {
+    let short = opts.short;
+    // The long format's header lines; the short format prints none of them.
+    macro_rules! say { ($($t:tt)*) => { if !short { println!($($t)*); } } }
     let head_state = refs::resolve_head()?;
 
     let mut no_commits_yet = false;
@@ -147,18 +150,18 @@ pub fn status() -> anyhow::Result<()> {
 
     match &head_state {
         refs::HeadState::Branch(branch_name) => {
-            println!("On branch {}", branch_name);
+            say!("On branch {}", branch_name);
             let ref_path = format!("refs/heads/{}", branch_name);
             if let Some(commit_hash) = refs::read_ref(&ref_path)? {
                 let tree_hash = tree_hash_of_commit(&commit_hash)?;
                 flatten_tree(&tree_hash, "", &mut head_tree)?;
             } else {
                 no_commits_yet = true;
-                println!("\nNo commits yet");
+                say!("\nNo commits yet");
             }
         }
         refs::HeadState::Detached(hash) => {
-            println!("HEAD detached at {}", &hash[..7]);
+            say!("HEAD detached at {}", &hash[..7]);
             let tree_hash = tree_hash_of_commit(hash)?;
             flatten_tree(&tree_hash, "", &mut head_tree)?;
         }
@@ -186,15 +189,15 @@ pub fn status() -> anyhow::Result<()> {
         state_lines.push(format!("You are currently reverting commit {}.", revert.trim().get(..7).unwrap_or(revert.trim())));
     }
     for line in &state_lines {
-        println!("{}", line);
+        say!("{}", line);
     }
     if !state_lines.is_empty() {
-        println!();
+        say!();
     }
 
     if crate::helpers::sparse::sparse_checkout_enabled() && !index_entries.is_empty() {
         let present = index_entries.iter().filter(|e| !e.skip_worktree).count();
-        println!("You are in a sparse checkout with {}% of tracked files present.", 100 - (index_entries.len() - present) * 100 / index_entries.len());
+        say!("You are in a sparse checkout with {}% of tracked files present.", 100 - (index_entries.len() - present) * 100 / index_entries.len());
     }
 
     let mut staged_new = Vec::new();
@@ -287,6 +290,29 @@ pub fn status() -> anyhow::Result<()> {
         }
     }
 
+    // `-u`: no untracked files, git's collapsed directories (default), or every file.
+    let untracked = match opts.untracked.as_str() {
+        "no" => Vec::new(),
+        "all" => untracked,
+        _ => {
+            let tracked: std::collections::BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
+            crate::helpers::status::collapse_untracked(&untracked, &tracked)
+        }
+    };
+
+    if short {
+        let mut staged: Vec<(char, String)> = Vec::new();
+        staged.extend(staged_new.iter().map(|p| ('A', p.clone())));
+        staged.extend(staged_modified.iter().map(|p| ('M', p.clone())));
+        staged.extend(staged_deleted.iter().map(|p| ('D', p.clone())));
+        let mut unstaged: Vec<(char, String)> = Vec::new();
+        unstaged.extend(unstaged_modified.iter().map(|p| ('M', p.strip_suffix(" (new commits)").unwrap_or(p).to_string())));
+        unstaged.extend(unstaged_deleted.iter().map(|p| ('D', p.clone())));
+        let header = opts.branch.then(|| crate::helpers::status::status_branch_header(&head_state, no_commits_yet));
+        print!("{}", crate::helpers::status::format_short_status(&opts, header, &staged, &staged_renamed, &unstaged, &unmerged, &untracked));
+        return Ok(());
+    }
+
     let has_staged = !staged_new.is_empty() || !staged_modified.is_empty() || !staged_deleted.is_empty() || !staged_renamed.is_empty();
     let has_unstaged = !unstaged_modified.is_empty() || !unstaged_deleted.is_empty();
     let has_untracked = !untracked.is_empty();
@@ -350,6 +376,12 @@ pub fn status() -> anyhow::Result<()> {
         need_leading_blank = false;
     }
 
+    if opts.untracked == "no" {
+        if need_leading_blank { println!(); }
+        println!("Untracked files not listed (use -u option to show untracked files)");
+        need_leading_blank = false;
+    }
+
     if !has_staged {
         if need_leading_blank { println!(); }
         // git's trailers (with its status hints).
@@ -359,6 +391,8 @@ pub fn status() -> anyhow::Result<()> {
             println!("no changes added to commit (use \"rgit add\" and/or \"rgit commit -a\")");
         } else if has_untracked {
             println!("nothing added to commit but untracked files present (use \"rgit add\" to track)");
+        } else if opts.untracked == "no" {
+            println!("nothing to commit (use -u to show untracked files)");
         } else {
             println!("nothing to commit, working tree clean");
         }

@@ -191,6 +191,12 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
     ensure_working_tree_clean(action)?;
 
     let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
+    // A stash made with `-u`/`-a` keeps the untracked files in the `w` commit's third parent.
+    if let Ok((_, content)) = read_object(&list[idx].hash) {
+        if let Some(untracked) = commit_parents(&String::from_utf8_lossy(&content)).get(2) {
+            restore_untracked_files(untracked)?;
+        }
+    }
 
     let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
         Some(commit_hash) => {
@@ -247,5 +253,91 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
         println!("Applied stash@{{{}}} ({})", idx, message);
     }
 
+    Ok(())
+}
+/// Writes a stash commit object with any number of parents (the `w` commit has HEAD, the
+/// index commit and, with `-u`/`-a`, the untracked-files commit; that one has none).
+// Used by `stash push -u` / `-a`.
+pub fn build_stash_commit(tree_hash: &str, parents: &[&str], message: &str) -> anyhow::Result<String> {
+    let mut content = format!("tree {}\n", tree_hash);
+    for parent in parents {
+        content.push_str(&format!("parent {}\n", parent));
+    }
+    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
+    let author = crate::helpers::config::author_identity()?;
+    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
+    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
+    content.push_str(&format!("\n{}\n", message));
+    crate::helpers::objects::write_object("commit", content.as_bytes())
+}
+
+/// Lists the untracked files of the working tree (`.gitignore`-aware; with `include_ignored`,
+/// ignored files too), as repository-relative paths.
+// Used by `stash push -u` / `-a`.
+pub fn collect_untracked_files(tracked: &std::collections::BTreeSet<String>, include_ignored: bool) -> anyhow::Result<Vec<String>> {
+    let mut tracked_dirs = std::collections::BTreeSet::new();
+    for path in tracked {
+        let mut prefix = String::new();
+        let mut parts: Vec<&str> = path.split('/').collect();
+        parts.pop();
+        for part in parts {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(part);
+            tracked_dirs.insert(prefix.clone());
+        }
+    }
+    let mode = if include_ignored { crate::objects::CleanMode::IncludeIgnored } else { crate::objects::CleanMode::Normal };
+    let (mut files, mut dirs, mut rules) = (Vec::new(), Vec::new(), Vec::new());
+    crate::helpers::clean::collect_clean_candidates(Path::new("."), &mut rules, tracked, &tracked_dirs, &mode, false, &mut files, &mut dirs)?;
+    files.sort();
+    Ok(files)
+}
+
+/// Removes `path` and then every parent directory it leaves empty.
+// Used by `stash push -u` / `-a` (after the untracked files are saved).
+pub fn remove_file_and_empty_parents(path: &str) {
+    let _ = fs::remove_file(path);
+    let mut parent = Path::new(path).parent();
+    while let Some(dir) = parent {
+        if dir.as_os_str().is_empty() || fs::remove_dir(dir).is_err() {
+            break;
+        }
+        parent = dir.parent();
+    }
+}
+
+/// Restores the untracked files saved in a stash's third parent, refusing (before writing
+/// anything) when one of them already exists, like git's "already exists, no checkout".
+// Used by `stash apply` / `stash pop`.
+fn restore_untracked_files(untracked_commit: &str) -> anyhow::Result<()> {
+    let tree_hash = tree_hash_of_commit(untracked_commit)?;
+    let mut tree = BTreeMap::new();
+    flatten_tree(&tree_hash, "", &mut tree)?;
+    let existing: Vec<&String> = tree.keys().filter(|p| Path::new(p.as_str()).exists()).collect();
+    if !existing.is_empty() {
+        for path in existing {
+            eprintln!("{} already exists, no checkout", path);
+        }
+        eprintln!("error: could not restore untracked files from stash");
+        std::process::exit(1);
+    }
+    for (path, (hash, mode)) in &tree {
+        let (_, content) = read_object(&hex::encode(hash))?;
+        if let Some(parent) = Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let file_mode = if (*mode & 0o111) != 0 { 0o755 } else { 0o644 };
+            fs::set_permissions(path, fs::Permissions::from_mode(file_mode))?;
+        }
+        let _ = mode;
+    }
     Ok(())
 }

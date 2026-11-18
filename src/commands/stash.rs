@@ -17,8 +17,10 @@ use crate::refs;
 ///
 /// Snapshots the current index and (tracked) working directory into a pair
 /// of commit objects, records the stash entry, then resets the working
-/// directory and index back to exactly match HEAD.
-pub fn stash_push(message: Option<String>) -> anyhow::Result<()> {
+/// directory and index back to exactly match HEAD. With `untracked` (`-u`: Some(false),
+/// `-a`: Some(true), ignored files included) the untracked files go into a third,
+/// parentless commit and are removed from the working tree, like git.
+pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::Result<()> {
     let head_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: You do not have the initial commit yet"))?;
 
@@ -56,7 +58,13 @@ pub fn stash_push(message: Option<String>) -> anyhow::Result<()> {
 
     let working_tree_hash = build_tree_from_map(&working_tree)?;
 
-    if index_tree_hash == head_tree_hash && working_tree_hash == head_tree_hash {
+    let tracked_now: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
+    let untracked_files = match untracked {
+        Some(include_ignored) => crate::helpers::state_files::collect_untracked_files(&tracked_now, include_ignored)?,
+        None => Vec::new(),
+    };
+
+    if index_tree_hash == head_tree_hash && working_tree_hash == head_tree_hash && untracked_files.is_empty() {
         println!("No local changes to save");
         return Ok(());
     }
@@ -71,7 +79,29 @@ pub fn stash_push(message: Option<String>) -> anyhow::Result<()> {
         Some(m) => format!("On {}: {}", branch_label, m),
         None => format!("WIP on {}: {} {}", branch_label, short_head, subject),
     };
-    let w_commit_hash = build_merge_commit(working_tree_hash, &head_commit, &i_commit_hash, &stash_message)?;
+    let w_commit_hash = if untracked_files.is_empty() {
+        build_merge_commit(working_tree_hash, &head_commit, &i_commit_hash, &stash_message)?
+    } else {
+        let mut untracked_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
+        for path in &untracked_files {
+            let content = fs::read(path).with_context(|| format!("Failed to read {}", path))?;
+            let hash = write_object("blob", &content)?;
+            let mut raw = [0u8; 20];
+            hex::decode_to_slice(&hash, &mut raw)?;
+            #[cfg(unix)]
+            let mode: u32 = {
+                use std::os::unix::fs::PermissionsExt;
+                if fs::metadata(path)?.permissions().mode() & 0o111 != 0 { 0o100755 } else { 0o100644 }
+            };
+            #[cfg(not(unix))]
+            let mode: u32 = 0o100644;
+            untracked_tree.insert(path.clone(), (raw, mode));
+        }
+        let u_tree = build_tree_from_map(&untracked_tree)?;
+        let u_message = format!("untracked files on {}: {} {}", branch_label, short_head, subject);
+        let u_commit = crate::helpers::state_files::build_stash_commit(&u_tree, &[], &u_message)?;
+        crate::helpers::state_files::build_stash_commit(&working_tree_hash, &[&head_commit, &i_commit_hash, &u_commit], &stash_message)?
+    };
 
     append_stash_entry(&w_commit_hash, &stash_message)?;
 
@@ -82,6 +112,9 @@ pub fn stash_push(message: Option<String>) -> anyhow::Result<()> {
     hard_reset_working_tree(&head_tree, &tracked_paths)?;
     let mut new_entries = build_index_entries_for_tree(&head_tree, true)?;
     write_index(&mut new_entries)?;
+    for path in &untracked_files {
+        crate::helpers::state_files::remove_file_and_empty_parents(path);
+    }
 
     println!("Saved working directory and index state {}", stash_message);
 
@@ -209,9 +242,12 @@ pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> 
         std::process::exit(1);
     }
     match action {
-        None => stash_push(None),
-        Some(StashAction::Push { message, patch: true, paths }) => crate::commands::stash_patch(message, paths),
-        Some(StashAction::Push { message, .. }) => stash_push(message),
+        None => stash_push(None, None),
+        Some(StashAction::Push { message, patch: true, paths, .. }) => crate::commands::stash_patch(message, paths),
+        Some(StashAction::Push { message, include_untracked, all, .. }) => {
+            let untracked = if all { Some(true) } else if include_untracked { Some(false) } else { None };
+            stash_push(message, untracked)
+        }
         Some(StashAction::Pop { stash }) => stash_pop(stash),
         Some(StashAction::Apply { stash }) => stash_apply(stash),
         Some(StashAction::List) => stash_list(),

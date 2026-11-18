@@ -64,6 +64,12 @@ pub enum StashAction {
         message: Option<String>,
         #[arg(short = 'p', long = "patch")]
         patch: bool,
+        /// `-u`: also stash (and then remove) untracked files.
+        #[arg(short = 'u', long = "include-untracked", conflicts_with = "all")]
+        include_untracked: bool,
+        /// `-a`: also stash untracked and ignored files.
+        #[arg(short = 'a', long = "all")]
+        all: bool,
         #[arg(last = true)]
         paths: Vec<String>,
     },

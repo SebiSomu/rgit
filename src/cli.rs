@@ -282,6 +282,10 @@ pub enum Commands {
     Stash {
         #[arg(short = 'p', long = "patch")]
         patch: bool,
+        #[arg(short = 'u', long = "include-untracked", conflicts_with = "all")]
+        include_untracked: bool,
+        #[arg(short = 'a', long = "all")]
+        all: bool,
         #[command(subcommand)]
         action: Option<StashAction>
     },
@@ -1121,8 +1125,11 @@ pub fn handle_commands() -> Result<()> {
         Commands::Revert { commit, no_commit, cont, abort } => {
             crate::commands::revert(commit, no_commit, cont, abort)?;
         }
-        Commands::Stash { patch: true, action: None } => {
+        Commands::Stash { patch: true, action: None, .. } => {
             crate::commands::stash_patch(None, Vec::new())?;
+        }
+        Commands::Stash { action: None, include_untracked, all, .. } if include_untracked || all => {
+            crate::commands::stash(Some(crate::objects::StashAction::Push { message: None, patch: false, include_untracked, all, paths: Vec::new() }))?;
         }
         Commands::Stash { action, .. } => {
             crate::commands::stash(action)?;

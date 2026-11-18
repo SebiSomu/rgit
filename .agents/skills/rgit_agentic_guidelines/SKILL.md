@@ -51,7 +51,7 @@ src/
 │   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
 │   ├── tag.rs                # tag (list/filters/-n, lightweight + annotated, -f, -d), describe (--tags/--always/--long/--abbrev/--exact-match)
 │   ├── config.rs             # config (get, set, unset, list)
-│   ├── rebase.rs             # rebase (-i, --continue, --abort, --skip, --edit-todo)
+│   ├── rebase.rs             # rebase (--onto, --keep-base, <branch>, --reapply-cherry-picks, -i, --continue, --abort, --skip, --edit-todo)
 │   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
 │   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
 │   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
@@ -142,7 +142,7 @@ src/
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
 │   ├── banana_split.rs       # Path grouping helpers for banana-split
-│   ├── rebase.rs             # Interactive rebase engine, todo editor, replay runner
+│   ├── rebase.rs             # Rebase engine: git's commit selection, up-to-date check, todo editor, replay runner
 │   ├── push.rs               # Remote repo resolution, object enumeration, loose object copier, ref updates
 │   ├── github.rs             # GitHub Git Data API client, blob/tree/commit uploader, remote ref updates
 │   ├── fetch.rs              # Local filesystem fetch transport, remote branch walking, object downloading

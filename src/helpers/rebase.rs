@@ -24,6 +24,10 @@ pub const REBASE_ORIG_HEAD_PATH: &str = ".git/REBASE_ORIG_HEAD";
 pub const REBASE_ONTO_PATH: &str = ".git/REBASE_ONTO";
 pub const REBASE_PAUSE_PATH: &str = ".git/REBASE_PAUSE";
 pub const REBASE_MSG_PATH: &str = ".git/REBASE_MSG";
+/// Number of todo items the rebase started with (for git's `Rebasing (i/n)` progress).
+pub const REBASE_TOTAL_PATH: &str = ".git/REBASE_TOTAL";
+/// Present for `rebase -i`.
+pub const REBASE_INTERACTIVE_PATH: &str = ".git/REBASE_INTERACTIVE";
 
 /// Splits off the first whitespace-delimited word: `"a  b c"` -> `("a", "b c")`.
 // Used by `rebase` todo parsing.
@@ -254,7 +258,7 @@ pub fn rebase_in_progress() -> bool {
 }
 
 /// Replays commits onto `onto` using the rebase engine.
-// Used by `rebase` and `banana_split`.
+// Used by `banana_split`.
 pub fn replay_onto(head_state: &refs::HeadState, orig_head: &str, onto: &str, commits: &[String]) -> anyhow::Result<()> {
     if rebase_in_progress() {
         anyhow::bail!(
@@ -266,27 +270,88 @@ pub fn replay_onto(head_state: &refs::HeadState, orig_head: &str, onto: &str, co
     for hash in commits {
         items.push(TodoItem { action: Action::Pick, hash: hash.clone(), subject: subject_of(hash)? });
     }
-    begin_replay(head_state, orig_head, onto, items)
+    begin_replay(head_state, orig_head, onto, items, false)
 }
 
-/// Writes the rebase state, checks out `onto`, and runs the replay loop.
+/// git's commit selection for `rebase`: the non-merge commits of `<upstream>..<head>`, oldest
+/// first in topological order, minus (unless `reapply`) those whose patch is already in
+/// `<head>..<upstream>` (git's `--cherry-pick --right-only`). Returns the commits to replay
+/// and the ones skipped as already applied.
 // Used by `rebase`.
-pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, items: Vec<TodoItem>) -> anyhow::Result<()> {
+pub fn select_commits_to_rebase(upstream: &str, head: &str, reapply: bool) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+    use crate::helpers::cherry::{commit_patch_id, walk_non_merge_commits};
+    use crate::helpers::rev_list::{parse_rev_list_args, select_rev_list_commits};
+    let args = vec![head.to_string(), format!("^{}", upstream), "--no-merges".to_string(), "--topo-order".to_string()];
+    let (walked, _) = select_rev_list_commits(&parse_rev_list_args(&args)?)?;
+    let mut ours: Vec<crate::objects::ParsedCommit> = walked.into_iter().filter(|w| !w.hidden).map(|w| w.commit).collect();
+    ours.reverse();
+    let mut upstream_ids = std::collections::HashSet::new();
+    if !reapply {
+        for commit in walk_non_merge_commits(upstream, &[head])? {
+            upstream_ids.insert(commit_patch_id(&commit)?);
+        }
+    }
+    let (mut keep, mut skipped) = (Vec::new(), Vec::new());
+    for commit in &ours {
+        let empty = commit_is_empty(&commit.hash)?;
+        if !empty && !upstream_ids.is_empty() && upstream_ids.contains(&commit_patch_id(commit)?) {
+            skipped.push(commit.hash.clone());
+        } else {
+            keep.push(commit.hash.clone());
+        }
+    }
+    Ok((keep, skipped))
+}
+
+/// Whether a commit changes nothing against its first parent (or is an empty root).
+// Used by `rebase` (empty commits are kept; commits that become empty are dropped).
+pub fn commit_is_empty(hash: &str) -> anyhow::Result<bool> {
+    let commit = crate::helpers::format_patch::parse_commit_object(hash)?;
+    let parent_tree = match commit.parents.first() {
+        Some(parent) => crate::helpers::format_patch::parse_commit_object(parent)?.tree,
+        None => "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string(),
+    };
+    Ok(commit.tree == parent_tree)
+}
+
+/// git's `can_fast_forward`: nothing needs rewriting when `onto` is the only merge base of
+/// `onto` and `head`, and also the merge base of `upstream` and `head`.
+// Used by `rebase` ("Current branch <b> is up to date.").
+pub fn can_fast_forward(onto: &str, upstream: &str, head: &str) -> anyhow::Result<bool> {
+    use crate::helpers::merge::find_all_merge_bases;
+    let bases = find_all_merge_bases(onto, head)?;
+    if bases.len() != 1 || bases[0] != onto {
+        return Ok(false);
+    }
+    let bases = find_all_merge_bases(upstream, head)?;
+    Ok(bases.len() == 1 && bases[0] == onto)
+}
+
+/// Writes the rebase state, records `ORIG_HEAD`, checks out `onto` (detached) from wherever
+/// `HEAD` is now, and runs the replay loop.
+// Used by `rebase` and `banana_split`.
+pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, items: Vec<TodoItem>, interactive: bool) -> anyhow::Result<()> {
     let branch_marker = match head_state {
         refs::HeadState::Branch(branch_name) => format!("refs/heads/{}", branch_name),
         refs::HeadState::Detached(_) => "HEAD".to_string(),
     };
+    let current_head = refs::resolve_head_commit()?.unwrap_or_else(|| orig_head.to_string());
     fs::write(crate::repo::path(REBASE_BRANCH_PATH), format!("{}\n", branch_marker))
         .context("Failed to write .git/REBASE_BRANCH")?;
     fs::write(crate::repo::path(REBASE_ORIG_HEAD_PATH), format!("{}\n", orig_head))
         .context("Failed to write .git/REBASE_ORIG_HEAD")?;
     fs::write(crate::repo::path(REBASE_ONTO_PATH), format!("{}\n", onto))
         .context("Failed to write .git/REBASE_ONTO")?;
+    fs::write(crate::repo::path(REBASE_TOTAL_PATH), format!("{}\n", items.len()))?;
+    if interactive {
+        fs::write(crate::repo::path(REBASE_INTERACTIVE_PATH), "")?;
+    }
+    fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", orig_head))?;
     write_todo(&items)?;
 
     let checkout = || -> anyhow::Result<()> {
         let target_tree = resolve_tree_from_source(onto)?;
-        let head_tree = resolve_tree_from_source(orig_head)?;
+        let head_tree = resolve_tree_from_source(&current_head)?;
         let index_entries = read_index().unwrap_or_default();
         let index_map: BTreeMap<String, [u8; 20]> =
             index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
@@ -294,6 +359,7 @@ pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, i
         check_switch_safety(&target_tree, &head_tree, &index_map)?;
         sync_working_tree(&target_tree, &head_tree, &index_map)?;
         update_index_from_tree(&target_tree, &head_tree)?;
+        crate::helpers::reflog::set_reflog_action(&format!("rebase (start): checkout {}", onto));
         refs::set_head_detached(onto)?;
         Ok(())
     };
@@ -302,9 +368,22 @@ pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, i
         return Err(e);
     }
 
-    println!("Rebasing {} commit(s) onto {}...", items.len(), short_hash(onto));
-
     process_rebase_todo()
+}
+
+/// The raw message of a commit object (everything after the header), as stored.
+fn raw_message(hash: &str) -> anyhow::Result<String> {
+    let (_, content) = read_object(hash)?;
+    let text = String::from_utf8_lossy(&content).to_string();
+    Ok(text.split_once("\n\n").map(|(_, m)| m.to_string()).unwrap_or_default())
+}
+
+/// git's `Rebasing (i/n)` progress line (stderr, carriage return, no newline).
+fn print_progress(remaining: usize) {
+    let total: usize = fs::read_to_string(crate::repo::path(REBASE_TOTAL_PATH)).ok().and_then(|t| t.trim().parse().ok()).unwrap_or(remaining);
+    if total >= remaining {
+        eprint!("Rebasing ({}/{})\r", total - remaining + 1, total);
+    }
 }
 
 /// Continues an in-progress rebase after conflict resolution or an edit pause.
@@ -337,7 +416,7 @@ pub fn rebase_continue() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD -- this should not happen"))?;
     let tree_hash = write_tree_from_index_prefix(&entries, "")?;
 
-    match commit_item(item, rest, &current_head, tree_hash)? {
+    match commit_item(item, rest, &current_head, tree_hash, true)? {
         ItemResult::Done => process_rebase_todo(),
         ItemResult::PausedForEdit => Ok(()),
     }
@@ -386,9 +465,6 @@ pub fn rebase_abort() -> anyhow::Result<()> {
     }
 
     cleanup_rebase_state();
-
-    println!("Rebase aborted; HEAD left at {}.", short_hash(&orig_head));
-
     Ok(())
 }
 
@@ -418,7 +494,6 @@ pub fn rebase_skip() -> anyhow::Result<()> {
                 hard_reset_working_tree(&parent_tree, &tracked_paths)?;
                 let mut new_entries = build_index_entries_for_tree(&parent_tree, true)?;
                 write_index(&mut new_entries)?;
-                println!("Skipped commit {}.", short_hash(&current_head));
                 return process_rebase_todo();
             }
         }
@@ -441,7 +516,6 @@ pub fn rebase_skip() -> anyhow::Result<()> {
         let mut new_index_entries = build_index_entries_for_tree(&head_tree, true)?;
         write_index(&mut new_index_entries)?;
 
-        println!("Skipped {}... {}", short_hash(&item.hash), item.subject);
         write_todo(rest)?;
     } else {
         hard_reset_working_tree(&head_tree, &tracked_paths)?;
@@ -495,7 +569,8 @@ pub fn rebase_edit_todo() -> anyhow::Result<()> {
     }
 }
 
-/// Drives the replay loop against the stored todo list.
+/// Drives the replay loop against the stored todo list: git's `Rebasing (i/n)` progress,
+/// fast-forwarding picks whose parent is already `HEAD`, git's conflict stop.
 // Used by `rebase`.
 pub fn process_rebase_todo() -> anyhow::Result<()> {
     loop {
@@ -505,9 +580,9 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
         };
         let item = item.clone();
         let rest = rest.to_vec();
+        print_progress(todo.len());
 
         if item.action == Action::Drop {
-            println!("Dropped {}... {}", short_hash(&item.hash), item.subject);
             write_todo(&rest)?;
             continue;
         }
@@ -528,6 +603,25 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
             );
         }
 
+        // Like git's sequencer, a pick whose parent is HEAD needs no new commit.
+        if matches!(item.action, Action::Pick | Action::Edit) && parents.first().map(String::as_str) == Some(current_head.as_str()) {
+            let target = resolve_tree_from_source(&item.hash)?;
+            let head_tree = resolve_tree_from_source(&current_head)?;
+            let index_map: BTreeMap<String, [u8; 20]> = read_index().unwrap_or_default().iter().map(|e| (e.path.clone(), e.hash)).collect();
+            sync_working_tree(&target, &head_tree, &index_map)?;
+            update_index_from_tree(&target, &head_tree)?;
+            crate::helpers::reflog::set_reflog_action(&format!("rebase (pick): {}", item.subject));
+            refs::set_head_detached(&item.hash)?;
+            write_todo(&rest)?;
+            if item.action == Action::Edit {
+                fs::write(crate::repo::path(REBASE_PAUSE_PATH), "edit\n").context("Failed to write .git/REBASE_PAUSE")?;
+                println!("Stopped at {}... {}", short_hash(&item.hash), item.subject);
+                println!("hint: add further commits if you like, then run 'rgit rebase --continue'");
+                return Ok(());
+            }
+            continue;
+        }
+
         let base_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(parent) = parents.first() {
             resolve_tree_from_source(parent)?
         } else {
@@ -538,11 +632,12 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
 
         let their_label = format!("{} ({})", short_hash(&item.hash), item.subject);
         let result = merge_into_worktree(&base_tree, &our_tree, &their_tree, "HEAD", &their_label, "merge")?;
-        for message in &result.messages {
-            println!("{}", message.text);
-        }
 
         if !result.conflicted.is_empty() {
+            // Like git's sequencer in a rebase, the merge messages show only when a pick stops.
+            for message in &result.messages {
+                println!("{}", message.text);
+            }
             eprintln!("error: could not apply {}... {}", short_hash(&item.hash), item.subject);
             eprintln!("hint: Resolve all conflicts manually, mark them as resolved with");
             eprintln!("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
@@ -554,16 +649,21 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
 
         let tree_hash = crate::helpers::build_tree_from_map(&result.tree)?;
 
-        match commit_item(&item, &rest, &current_head, tree_hash)? {
+        match commit_item(&item, &rest, &current_head, tree_hash, false)? {
             ItemResult::Done => continue,
             ItemResult::PausedForEdit => return Ok(()),
         }
     }
 }
 
-/// Applies a single todo item's commit action on top of the current head.
+/// Applies a single todo item's commit action on top of the current head, keeping the
+/// original author (the first commit's, for squash/fixup) and message. A commit that becomes
+/// empty is dropped (git's `--empty=drop` and its "dropping ... -- patch contents already
+/// upstream" line; `rebase -i` says "Skipping"); one that was empty to begin with is kept. With `summary`, prints git's commit summary (concluding a conflicted pick).
 // Used by `rebase`.
-pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_hash: String) -> anyhow::Result<ItemResult> {
+pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_hash: String, summary: bool) -> anyhow::Result<ItemResult> {
+    use crate::helpers::commit::{current_signature, print_commit_summary, write_commit_object};
+    use crate::helpers::format_patch::parse_commit_object;
     let (object_type, content) = read_object(&item.hash)?;
     if object_type != "commit" {
         anyhow::bail!("fatal: '{}' does not point to a commit object", item.hash);
@@ -571,6 +671,8 @@ pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_
     let original_message = extract_commit_message(&String::from_utf8_lossy(&content))
         .trim_end()
         .to_string();
+    let picked = parse_commit_object(&item.hash)?;
+    let committer = current_signature()?;
 
     let onto = fs::read_to_string(crate::repo::path(REBASE_ONTO_PATH))
         .map(|s| s.trim().to_string())
@@ -607,7 +709,9 @@ pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_
             message = edit_message(&message)?;
         }
 
-        let new_commit = build_commit(tree_hash, Some(head_parent.clone()), &message)?;
+        let head_author = parse_commit_object(current_head)?.author;
+        crate::helpers::reflog::set_reflog_action(&format!("rebase ({}): {}", item.action.name(), item.subject));
+        let new_commit = write_commit_object(&tree_hash, &[head_parent.clone()], &head_author, &committer, &format!("{}\n", message.trim_end()))?;
         refs::set_head_detached(&new_commit)?;
         println!(
             "[detached {}] {} ({} into previous)",
@@ -619,21 +723,33 @@ pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_
         return Ok(ItemResult::Done);
     }
 
-    if tree_hash_of_commit(current_head)? == tree_hash {
-        println!("Skipping {}... {} (now empty)", short_hash(&item.hash), item.subject);
+    if tree_hash_of_commit(current_head)? == tree_hash && !commit_is_empty(&item.hash)? {
+        if crate::repo::path(REBASE_INTERACTIVE_PATH).exists() {
+            println!("Skipping {}... {} (now empty)", short_hash(&item.hash), item.subject);
+        } else {
+            // git's `--empty=drop`.
+            eprintln!("dropping {} {} -- patch contents already upstream", item.hash, item.subject);
+        }
+        crate::helpers::merge::clear_merge_state();
         write_todo(rest)?;
         return Ok(ItemResult::Done);
     }
 
     let message = if item.action == Action::Reword {
-        edit_message(&original_message)?
+        format!("{}\n", edit_message(&original_message)?.trim_end())
     } else {
-        original_message
+        raw_message(&item.hash)?
     };
 
-    let new_commit = build_commit(tree_hash, Some(current_head.to_string()), &message)?;
+    crate::helpers::reflog::set_reflog_action(&format!("rebase ({}): {}", item.action.name(), item.subject));
+    let new_commit = write_commit_object(&tree_hash, &[current_head.to_string()], &picked.author, &committer, &message)?;
     refs::set_head_detached(&new_commit)?;
-    println!("[detached {}] {}", short_hash(&new_commit), message.lines().next().unwrap_or(""));
+    crate::helpers::merge::clear_merge_state();
+    if summary {
+        print_commit_summary(&refs::HeadState::Detached(new_commit.clone()), &new_commit, &picked.author, &committer, false)?;
+    } else if item.action == Action::Reword {
+        println!("[detached {}] {}", short_hash(&new_commit), message.lines().next().unwrap_or(""));
+    }
     write_todo(rest)?;
 
     if item.action == Action::Edit {
@@ -657,13 +773,16 @@ pub fn finish_rebase() -> anyhow::Result<()> {
         .trim()
         .to_string();
 
+    // git: `\r\x1b[K` clears the progress line.
     if branch_marker != "HEAD" {
         let branch_name = branch_marker.strip_prefix("refs/heads/").unwrap_or(&branch_marker).to_string();
+        let onto = fs::read_to_string(crate::repo::path(REBASE_ONTO_PATH)).map(|s| s.trim().to_string()).unwrap_or_default();
+        crate::helpers::reflog::set_reflog_action(&format!("rebase (finish): {} onto {}", branch_marker, onto));
         refs::write_ref(&branch_marker, &final_commit)?;
         refs::set_head(&branch_name)?;
-        println!("Successfully rebased and updated {}.", branch_marker);
+        eprintln!("\r\x1b[KSuccessfully rebased and updated {}.", branch_marker);
     } else {
-        println!("Successfully rebased onto {} (detached HEAD).", short_hash(&final_commit));
+        eprintln!("\r\x1b[KSuccessfully rebased and updated detached HEAD.");
     }
 
     cleanup_rebase_state();
@@ -681,6 +800,8 @@ pub fn cleanup_rebase_state() {
         REBASE_ONTO_PATH,
         REBASE_PAUSE_PATH,
         REBASE_MSG_PATH,
+        REBASE_TOTAL_PATH,
+        REBASE_INTERACTIVE_PATH,
     ] {
         let _ = fs::remove_file(crate::repo::path(path));
     }

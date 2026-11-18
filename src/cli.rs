@@ -352,6 +352,15 @@ pub enum Commands {
     },
     Rebase {
         upstream: Option<String>,
+        branch: Option<String>,
+        #[arg(long = "onto", value_name = "NEWBASE", conflicts_with = "keep_base")]
+        onto: Option<String>,
+        #[arg(long = "keep-base")]
+        keep_base: bool,
+        #[arg(long = "reapply-cherry-picks", overrides_with = "no_reapply_cherry_picks")]
+        reapply_cherry_picks: bool,
+        #[arg(long = "no-reapply-cherry-picks", overrides_with = "reapply_cherry_picks")]
+        no_reapply_cherry_picks: bool,
         #[arg(short = 'i', long = "interactive", conflicts_with_all = ["cont", "abort", "skip", "edit_todo"])]
         interactive: bool,
         #[arg(long = "continue")]
@@ -1150,8 +1159,9 @@ pub fn handle_commands() -> Result<()> {
         Commands::Config { key, value, global, list, unset } => {
             crate::commands::config(key, value, global, list, unset)?;
         }
-       Commands::Rebase { upstream, interactive, cont, abort, skip, edit_todo } => {
-            crate::commands::rebase(upstream, interactive, cont, abort, skip, edit_todo)?;
+        Commands::Rebase { upstream, branch, onto, keep_base, reapply_cherry_picks, no_reapply_cherry_picks, interactive, cont, abort, skip, edit_todo } => {
+            let reapply_cherry_picks = if reapply_cherry_picks { Some(true) } else if no_reapply_cherry_picks { Some(false) } else { None };
+            crate::commands::rebase(crate::objects::RebaseOptions { upstream, branch, onto, keep_base, reapply_cherry_picks, interactive, cont, abort, skip, edit_todo })?;
         }
         Commands::Push { remote, refspec, force, set_upstream } => {
             crate::commands::push(remote, refspec, force, set_upstream)?;

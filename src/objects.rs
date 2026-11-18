@@ -1627,8 +1627,33 @@ pub struct CommitOptions {
     pub quiet: bool,
 }
 
+/// Parsed arguments of `rgit rebase`: what to replay (`<upstream>..<branch>`), where to
+/// (`--onto`, `--keep-base`), and the mode (`-i`, `--continue`, `--abort`, `--skip`,
+/// `--edit-todo`).
+// Used by: src/cli.rs, src/commands/rebase.rs
+// Used by command/helper: the `rebase` command
+#[derive(Debug, Clone, Default)]
+pub struct RebaseOptions {
+    /// `<upstream>`; the branch's upstream when omitted.
+    pub upstream: Option<String>,
+    /// `<branch>`: switched to before rebasing.
+    pub branch: Option<String>,
+    /// `--onto <newbase>`: replay onto this instead of `<upstream>`.
+    pub onto: Option<String>,
+    /// `--keep-base`: replay onto the merge base of `<upstream>` and the branch.
+    pub keep_base: bool,
+    /// `--[no-]reapply-cherry-picks`; unset means "no" except with `--keep-base`.
+    pub reapply_cherry_picks: Option<bool>,
+    pub interactive: bool,
+    pub cont: bool,
+    pub abort: bool,
+    pub skip: bool,
+    pub edit_todo: bool,
+}
+
 /// Parsed arguments of `rgit cherry-pick`; also what `.git/sequencer/opts` stores.
 // Used by: src/cli.rs, src/commands/cherry_pick.rs, src/helpers/sequencer.rs
+// Used by command/helper: the `cherry-pick` command and `start_sequence` / `read_sequence_options`
 #[derive(Debug, Clone, Default)]
 pub struct CherryPickOptions {
     /// Commits and ranges (`A..B`, `^X`) to pick.
@@ -1654,6 +1679,7 @@ pub struct CherryPickOptions {
 
 /// `merge --ff` (default), `--no-ff` or `--ff-only`; the last one given wins.
 // Used by: src/cli.rs, src/commands/merge.rs
+// Used by command/helper: the `merge` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FastForwardMode {
     #[default]
@@ -1663,7 +1689,8 @@ pub enum FastForwardMode {
 }
 
 /// Parsed arguments of `rgit merge`.
-// Used by: src/cli.rs, src/commands/merge.rs
+// Used by: src/cli.rs, src/commands/merge.rs, src/commands/pull.rs
+// Used by command/helper: the `merge` and `pull` commands
 #[derive(Debug, Clone, Default)]
 pub struct MergeOptions {
     /// The commit to merge (one; octopus merges are not supported).

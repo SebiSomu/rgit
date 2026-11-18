@@ -324,21 +324,7 @@ fn merge_title(sources: &[MergeSource], current_branch: &str) -> String {
         }
     }
 
-    let configured: Vec<String> = read_all_config_entries().into_iter().filter(|(key, _)| key == "merge.suppressdest").map(|(_, value)| value).collect();
-    let mut patterns: Vec<String> = Vec::new();
-    for value in &configured {
-        if value.is_empty() {
-            patterns.clear();
-        } else {
-            patterns.push(value.clone());
-        }
-    }
-    if configured.is_empty() {
-        patterns = vec!["main".to_string(), "master".to_string()];
-    }
-    if !patterns.iter().any(|pattern| wildmatch(pattern, current_branch, WM_PATHNAME)) {
-        out.push_str(&format!(" into {}", current_branch));
-    }
+    out.push_str(&merge_into_suffix(current_branch));
     out.push('\n');
     out
 }
@@ -510,4 +496,27 @@ fn append_origin_shortlog(out: &mut Vec<u8>, origin: &MergeOrigin, head: &str, l
         }
     }
     Ok(())
+}
+
+/// ` into <branch>` for a merge title, or nothing when the branch matches
+/// `merge.suppressDest` (by default `main` and `master`; an empty value clears the list).
+// Used by `fmt-merge-msg` and `merge`.
+pub fn merge_into_suffix(current_branch: &str) -> String {
+    let configured: Vec<String> = read_all_config_entries().into_iter().filter(|(key, _)| key == "merge.suppressdest").map(|(_, value)| value).collect();
+    let mut patterns: Vec<String> = Vec::new();
+    for value in &configured {
+        if value.is_empty() {
+            patterns.clear();
+        } else {
+            patterns.push(value.clone());
+        }
+    }
+    if configured.is_empty() {
+        patterns = vec!["main".to_string(), "master".to_string()];
+    }
+    if patterns.iter().any(|pattern| wildmatch(pattern, current_branch, WM_PATHNAME)) {
+        String::new()
+    } else {
+        format!(" into {}", current_branch)
+    }
 }

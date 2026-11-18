@@ -132,12 +132,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
         }
     }
 
-    if crate::repo::path(".git/MERGE_HEAD").exists() {
-        let _ = fs::remove_file(crate::repo::path(".git/MERGE_HEAD"));
-    }
-    if crate::repo::path(".git/MERGE_MSG").exists() {
-        let _ = fs::remove_file(crate::repo::path(".git/MERGE_MSG"));
-    }
+    crate::helpers::merge::clear_merge_state();
     // Like git, a reset also ends an in-progress cherry-pick or revert.
     for state in [".git/CHERRY_PICK_HEAD", ".git/CHERRY_PICK_MSG", ".git/REVERT_HEAD", ".git/REVERT_MSG"] {
         let _ = fs::remove_file(crate::repo::path(state));
@@ -205,6 +200,8 @@ fn print_unstaged_after_reset(entries: &[IndexEntry]) {
         match crate::helpers::index_plumbing::worktree_state(entry) {
             crate::objects::IndexFileState::Clean => {}
             crate::objects::IndexFileState::Modified(_) => changes.push(('M', &entry.path)),
+            // A directory where the file was is a type change to git.
+            crate::objects::IndexFileState::Missing if std::path::Path::new(&entry.path).is_dir() => changes.push(('T', &entry.path)),
             crate::objects::IndexFileState::Missing => changes.push(('D', &entry.path)),
         }
     }

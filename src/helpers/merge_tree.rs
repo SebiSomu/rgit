@@ -297,6 +297,14 @@ fn message(paths: &[&str], kind: &str, text: String) -> MergeMessage {
 /// to the object store. `marker_size` grows for the inner merges that build a virtual base.
 // Used by `merge-tree`.
 pub fn merge_trees_in_memory(base: &BTreeMap<String, Entry>, ours: &BTreeMap<String, Entry>, theirs: &BTreeMap<String, Entry>, ours_label: &str, theirs_label: &str, marker_size: usize) -> anyhow::Result<TreeMergeResult> {
+    merge_trees_favoring(base, ours, theirs, ours_label, theirs_label, marker_size, MergeFavor::None)
+}
+
+/// `merge_trees_in_memory` with a favoured side for content conflicts, like `merge -X ours` /
+/// `-X theirs`: conflicting hunks (and binary files) resolve to that side without markers,
+/// while modify/delete, mode, and file/directory conflicts still conflict.
+// Used by `merge -X`.
+pub fn merge_trees_favoring(base: &BTreeMap<String, Entry>, ours: &BTreeMap<String, Entry>, theirs: &BTreeMap<String, Entry>, ours_label: &str, theirs_label: &str, marker_size: usize, favor: MergeFavor) -> anyhow::Result<TreeMergeResult> {
     let mut result = TreeMergeResult::default();
     let paths: BTreeSet<&String> = base.keys().chain(ours.keys()).chain(theirs.keys()).collect();
 
@@ -367,6 +375,19 @@ pub fn merge_trees_in_memory(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Str
         let (base_bytes, our_bytes, their_bytes) = (read_blob(b)?, read_blob(Some(o))?, read_blob(Some(t))?);
 
         if !regular(o.1) || !regular(t.1) || is_binary(&base_bytes) || is_binary(&our_bytes) || is_binary(&their_bytes) {
+            if regular(o.1) && regular(t.1) && matches!(favor, MergeFavor::Ours | MergeFavor::Theirs) {
+                let picked = if favor == MergeFavor::Ours { o.0 } else { t.0 };
+                result.tree.insert(path.clone(), (picked, mode));
+                result.messages.push(message(&[path], "Auto-merging", format!("Auto-merging {}", path)));
+                if mode_conflict {
+                    result.messages.push(message(&[path], "CONFLICT (mode)", format!("CONFLICT (mode): {} had different modes in {} and {}; kept {}", path, ours_label, theirs_label, ours_label)));
+                    result.conflicted.insert(path.clone(), [b.copied(), Some(*o), Some(*t)]);
+                    report(MergePathOutcome::Conflict("mode".into()), None, &mut result);
+                } else {
+                    report(MergePathOutcome::AutoMerged, None, &mut result);
+                }
+                continue;
+            }
             if regular(o.1) && regular(t.1) {
                 result.messages.push(message(&[path], "CONFLICT (binary)", format!("warning: Cannot merge binary files: {} ({} vs. {})", path, ours_label, theirs_label)));
             }
@@ -378,13 +399,11 @@ pub fn merge_trees_in_memory(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Str
             continue;
         }
 
-        let merged = merge_file_lines(
+        let merged = merge_file_lines_with(
             &String::from_utf8_lossy(&base_bytes),
             &String::from_utf8_lossy(&our_bytes),
             &String::from_utf8_lossy(&their_bytes),
-            ours_label,
-            theirs_label,
-            marker_size,
+            &MergeFileOptions { ours_label: ours_label.to_string(), theirs_label: theirs_label.to_string(), marker_size, favor, ..Default::default() },
         );
         let blob = write_object("blob", &merged.content)?;
         let mut hash = [0u8; 20];

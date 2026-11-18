@@ -199,9 +199,15 @@ pub fn report_needs_merge() -> bool {
 /// decide whether to commit.
 // Used by `merge`, `cherry-pick`, `revert` and `rebase`.
 pub fn merge_into_worktree(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str) -> anyhow::Result<crate::objects::TreeMergeResult> {
+    merge_into_worktree_favoring(base, ours, theirs, our_label, their_label, operation, crate::objects::MergeFavor::None)
+}
+
+/// `merge_into_worktree` that resolves content conflicts in favour of one side (`merge -X`).
+// Used by `merge`.
+pub fn merge_into_worktree_favoring(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str, favor: crate::objects::MergeFavor) -> anyhow::Result<crate::objects::TreeMergeResult> {
     use crate::helpers::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};
-    use crate::helpers::merge_tree::merge_trees_in_memory;
-    let result = merge_trees_in_memory(base, ours, theirs, our_label, their_label, 7)?;
+    use crate::helpers::merge_tree::merge_trees_favoring;
+    let result = merge_trees_favoring(base, ours, theirs, our_label, their_label, 7, favor)?;
     let index_entries = crate::index::read_index().unwrap_or_default();
     let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), e.hash)).collect();
     check_switch_safety(&result.tree, ours, &index_map).map_err(|e| {
@@ -211,4 +217,58 @@ pub fn merge_into_worktree(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our
     update_index_from_tree(&result.tree, ours)?;
     write_conflict_stages(&result.conflicted)?;
     Ok(result)
+}
+
+/// Removes the files that record a merge in progress or a pending squash: `MERGE_HEAD`,
+/// `MERGE_MSG`, `MERGE_MODE`, `SQUASH_MSG` and `AUTO_MERGE`.
+// Used by `merge`, `commit` and `reset`.
+pub fn clear_merge_state() {
+    for name in ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG", "AUTO_MERGE"] {
+        let _ = std::fs::remove_file(crate::repo::path(format!(".git/{}", name)));
+    }
+}
+
+/// `merge --abort` (git's `reset --merge`): puts every path the merge touched back to what
+/// `HEAD` has, in the index and the working tree, and leaves local changes to other files
+/// alone. A path counts as touched when its index entry differs from `HEAD` or is unmerged.
+// Used by `merge --abort`.
+pub fn abort_merge_to_head() -> anyhow::Result<()> {
+    use crate::helpers::checkout::{sync_working_tree, update_index_from_tree};
+    let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
+        Some(commit) => crate::helpers::resolve_tree_from_source(&commit)?,
+        None => TreeMap::new(),
+    };
+    let entries = crate::index::read_index().unwrap_or_default();
+    // Where the work tree is now (unmerged paths hold marker content: never equal to a blob)
+    // and where it should end up (HEAD's version of every touched path).
+    let mut current: TreeMap = TreeMap::new();
+    let mut target: TreeMap = TreeMap::new();
+    for entry in &entries {
+        let in_head = head_tree.get(&entry.path).copied();
+        if entry.stage != 0 {
+            current.insert(entry.path.clone(), ([0u8; 20], 0));
+            if let Some(h) = in_head {
+                target.insert(entry.path.clone(), h);
+            }
+        } else if in_head != Some((entry.hash, entry.mode)) {
+            current.insert(entry.path.clone(), (entry.hash, entry.mode));
+            if let Some(h) = in_head {
+                target.insert(entry.path.clone(), h);
+            }
+        } else {
+            current.insert(entry.path.clone(), (entry.hash, entry.mode));
+            target.insert(entry.path.clone(), (entry.hash, entry.mode));
+        }
+    }
+    for (path, h) in &head_tree {
+        if !current.contains_key(path) {
+            // Deleted by the merge: comes back.
+            target.insert(path.clone(), *h);
+        }
+    }
+    let index_map: BTreeMap<String, [u8; 20]> = entries.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), e.hash)).collect();
+    sync_working_tree(&target, &current, &index_map)?;
+    update_index_from_tree(&target, &current)?;
+    clear_merge_state();
+    Ok(())
 }

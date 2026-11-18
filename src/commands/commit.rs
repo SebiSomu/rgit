@@ -104,14 +104,23 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     let template = match (&given, &head_commit) {
         (Some(text), _) => text.clone(),
         (None, Some(c)) if opts.amend => c.message.clone(),
-        _ if merging => fs::read_to_string(crate::repo::path(".git/MERGE_MSG")).unwrap_or_default(),
-        _ => String::new(),
+        // git's order: MERGE_MSG (after SQUASH_MSG when a squash merge conflicted), else
+        // SQUASH_MSG.
+        _ => {
+            let read = |name: &str| fs::read_to_string(crate::repo::path(format!(".git/{}", name))).ok();
+            match (read("MERGE_MSG"), read("SQUASH_MSG")) {
+                (Some(merge_msg), squash) => format!("{}{}", squash.unwrap_or_default(), merge_msg),
+                (None, Some(squash)) => squash,
+                (None, None) => String::new(),
+            }
+        }
     };
     let use_editor = !opts.no_edit && (opts.edit || opts.reedit || given.is_none());
     let mut message = if use_editor {
         cleanup_commit_message(&edit_commit_message(&template, &editor_status(&head_state, &tree, base_tree.as_deref())?)?, true)
     } else {
-        cleanup_commit_message(&template, given.is_none())
+        // Without an editor git's cleanup is "whitespace": `#` lines stay.
+        cleanup_commit_message(&template, false)
     };
     if opts.signoff {
         message = add_signoff(&message, &committer);
@@ -133,9 +142,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
         refs::HeadState::Branch(branch) => refs::write_ref(&format!("refs/heads/{}", branch), &commit_hash)?,
         refs::HeadState::Detached(_) => refs::set_head_detached(&commit_hash)?,
     }
-    for state in ["MERGE_HEAD", "MERGE_MSG"] {
-        let _ = fs::remove_file(crate::repo::path(format!(".git/{}", state)));
-    }
+    crate::helpers::merge::clear_merge_state();
 
     if !opts.quiet {
         let label = match &head_state {

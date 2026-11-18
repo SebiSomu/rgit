@@ -136,7 +136,7 @@ src/
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
-│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals
+│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; merge --abort / state cleanup
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates

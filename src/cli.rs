@@ -150,7 +150,46 @@ pub enum Commands {
         args: Vec<String>,
     },
     Merge {
-        branch: String
+        #[arg(long = "ff", overrides_with_all = ["no_ff", "ff_only"])]
+        ff: bool,
+        #[arg(long = "no-ff", overrides_with_all = ["ff", "ff_only"])]
+        no_ff: bool,
+        #[arg(long = "ff-only", overrides_with_all = ["ff", "no_ff"])]
+        ff_only: bool,
+        #[arg(long = "squash", overrides_with = "no_squash")]
+        squash: bool,
+        #[arg(long = "no-squash", overrides_with = "squash")]
+        no_squash: bool,
+        #[arg(long = "commit", overrides_with = "no_commit")]
+        commit: bool,
+        #[arg(long = "no-commit", overrides_with = "commit")]
+        no_commit: bool,
+        #[arg(short = 'm', long = "message", value_name = "MESSAGE")]
+        messages: Vec<String>,
+        #[arg(short = 'F', long = "file", value_name = "FILE")]
+        file: Option<String>,
+        #[arg(short = 's', long = "strategy", value_name = "STRATEGY")]
+        strategy: Option<String>,
+        #[arg(short = 'X', long = "strategy-option", value_name = "OPTION")]
+        strategy_options: Vec<String>,
+        #[arg(long = "abort")]
+        abort: bool,
+        #[arg(long = "continue")]
+        cont: bool,
+        #[arg(long = "quit")]
+        quit: bool,
+        #[arg(short = 'n', long = "no-stat", overrides_with = "stat")]
+        no_stat: bool,
+        #[arg(long = "stat", overrides_with = "no_stat")]
+        stat: bool,
+        #[arg(short = 'q', long = "quiet")]
+        quiet: bool,
+        /// Accepted for compatibility: rgit never opens an editor for a merge commit.
+        #[arg(long = "no-edit")]
+        no_edit: bool,
+        #[arg(long = "allow-unrelated-histories")]
+        allow_unrelated: bool,
+        commits: Vec<String>,
     },
     MergeBase {
         #[arg(short = 'a', long = "all", conflicts_with = "is_ancestor")]
@@ -1019,8 +1058,11 @@ pub fn handle_commands() -> Result<()> {
         Commands::Diff { args } => {
             crate::commands::diff(raw_args_after("diff", args))?;
         }
-        Commands::Merge { branch } => {
-            crate::commands::merge(branch)?;
+        Commands::Merge { ff: _, no_ff, ff_only, squash, no_squash: _, commit, no_commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, stat: _, quiet, no_edit: _, allow_unrelated, commits } => {
+            use crate::objects::{FastForwardMode, MergeOptions};
+            let ff = if no_ff { FastForwardMode::Never } else if ff_only { FastForwardMode::Only } else { FastForwardMode::Allow };
+            let commit = if commit { Some(true) } else if no_commit { Some(false) } else { None };
+            crate::commands::merge(MergeOptions { commits, ff, squash, commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, quiet, allow_unrelated })?;
         }
         Commands::MergeBase { all, is_ancestor, octopus, commits } => {
             crate::commands::merge_base(all, is_ancestor, octopus, commits)?;

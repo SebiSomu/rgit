@@ -39,7 +39,7 @@ src/
 │   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
 │   ├── staging.rs            # add, status, rm, mv
 │   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
-│   ├── branch.rs             # branch, switch, checkout
+│   ├── branch.rs             # branch (list -a/-r/-v/-vv/patterns/--merged/--contains/--points-at, create -f/-t/--no-track, -d/-D/-r, -m/-M, -c/-C, -u, --unset-upstream, --show-current), switch, checkout
 │   ├── restore.rs            # restore (worktree and staged paths)
 │   ├── diff.rs               # diff (porcelain on the raw diff engine: worktree/index/commits, ranges, all formats, renames)
 │   ├── merge.rs              # merge, merge-base
@@ -138,6 +138,7 @@ src/
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
 │   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
 │   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
+│   ├── branch.rs             # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates

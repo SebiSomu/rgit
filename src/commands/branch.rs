@@ -4,109 +4,265 @@ use crate::helpers::worktree::worktree_using_branch;
 use crate::index::read_index;
 use crate::refs;
 
-pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Option<String>) -> anyhow::Result<()> {
-    if let Some(new_name) = rename {
-        let old_name = match name {
-            Some(ref n) => n.as_str().to_string(),
-            None => {
-                let ref_path = refs::current_branch_ref()?;
-                ref_path
-                    .strip_prefix("refs/heads/")
-                    .unwrap_or(&ref_path)
-                    .to_string()
-            }
+
+/// `rgit branch [<options>] [<args>...]`
+///
+/// Lists, creates, deletes, renames and copies branches, like git's `branch`:
+/// - list (no args, `-l`, `-a`, `-r`, `-v`/`-vv`, patterns, `--merged`/`--no-merged`,
+///   `--contains`/`--no-contains`, `--points-at`), `--show-current`
+/// - `<name> [<start>]` (`-f`, `-t`/`--track`, `--no-track`; a remote-tracking start point
+///   sets the upstream automatically)
+/// - `-d`/`-D` (`-r` for remote-tracking branches), checked against the upstream or HEAD
+/// - `-m`/`-M` and `-c`/`-C` (`branch.<name>.*` config follows the branch)
+/// - `-u`/`--set-upstream-to <upstream> [<branch>]`, `--unset-upstream [<branch>]`
+pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
+    use crate::helpers::branch::*;
+    let opts = parse_branch_args(&args);
+    let has_filter = !(opts.merged.is_empty() && opts.no_merged.is_empty() && opts.contains.is_empty() && opts.no_contains.is_empty() && opts.points_at.is_empty());
+    let mut list = opts.list || has_filter;
+    if !opts.delete && !opts.rename && !opts.copy && opts.set_upstream.is_none() && !opts.unset_upstream && !opts.show_current && opts.args.is_empty() {
+        list = true;
+    }
+    let modes = [opts.delete, opts.rename, opts.copy, opts.set_upstream.is_some(), opts.unset_upstream, opts.show_current, list];
+    if modes.iter().filter(|m| **m).count() > 1 {
+        eprint!("{}", BRANCH_USAGE);
+        std::process::exit(129);
+    }
+    let head = refs::resolve_head()?;
+    let current = match &head {
+        refs::HeadState::Branch(b) => Some(b.clone()),
+        refs::HeadState::Detached(_) => None,
+    };
+
+    if opts.show_current {
+        if let Some(b) = current {
+            println!("{}", b);
+        }
+        return Ok(());
+    }
+    if list {
+        print!("{}", format_branch_list(&opts)?);
+        return Ok(());
+    }
+    if opts.delete {
+        return delete_branches(&opts);
+    }
+    if opts.rename || opts.copy {
+        return rename_or_copy(&opts, current.as_deref());
+    }
+    if let Some(upstream) = &opts.set_upstream {
+        if opts.args.len() > 1 {
+            die("too many arguments to set new upstream");
+        }
+        let branch_name = match opts.args.first().cloned().or(current.clone()) {
+            Some(b) => b,
+            None => die(&format!("could not set upstream of HEAD to {} when it does not point to any branch", upstream)),
         };
-        refs::rename_branch(&old_name, &new_name)?;
-        println!("Renamed branch '{}' to '{}'.", old_name, new_name);
+        if refs::read_ref(&format!("refs/heads/{}", branch_name))?.is_none() {
+            die(&format!("branch '{}' does not exist", branch_name));
+        }
+        let Some((remote, merge, display)) = upstream_for(upstream) else {
+            eprintln!("fatal: the requested upstream branch '{}' does not exist", upstream);
+            eprintln!("hint: \nhint: If you are planning on basing your work on an upstream\nhint: branch that already exists at the remote, you may need to\nhint: run \"rgit fetch\" to retrieve it.\nhint: \nhint: If you are planning to push out a new local branch that\nhint: will track its remote counterpart, you may want to use\nhint: \"rgit push -u\" to set the upstream config as you push.");
+            std::process::exit(128);
+        };
+        if remote == "." && merge == format!("refs/heads/{}", branch_name) {
+            eprintln!("warning: not setting branch '{}' as its own upstream", branch_name);
+            return Ok(());
+        }
+        set_branch_upstream(&branch_name, &remote, &merge)?;
+        if !opts.quiet {
+            println!("branch '{}' set up to track '{}'.", branch_name, display);
+        }
+        return Ok(());
+    }
+    if opts.unset_upstream {
+        if opts.args.len() > 1 {
+            die("too many arguments to unset upstream");
+        }
+        let branch_name = match opts.args.first().cloned().or(current.clone()) {
+            Some(b) => b,
+            None => die("could not unset upstream of HEAD when it does not point to any branch"),
+        };
+        if refs::read_ref(&format!("refs/heads/{}", branch_name))?.is_none() {
+            die(&format!("branch '{}' does not exist", branch_name));
+        }
+        if !unset_branch_upstream(&branch_name)? {
+            die(&format!("branch '{}' has no upstream information", branch_name));
+        }
         return Ok(());
     }
 
-    if delete || force_delete {
-        let branch_name = name.ok_or_else(|| {
-            anyhow::anyhow!("fatal: branch name required for delete")
-        })?;
-        let head = refs::resolve_head()?;
-        if let refs::HeadState::Branch(ref current) = head {
-            if current == &branch_name {
-                anyhow::bail!(
-                    "error: Cannot delete branch '{}' checked out locally.",
-                    branch_name
-                );
-            }
+    // Creating a branch.
+    if opts.remotes || opts.all {
+        die("the -a, and -r, options to 'rgit branch' do not take a branch name.\nDid you mean to use: -a|-r --list <pattern>?");
+    }
+    if opts.args.len() > 2 {
+        eprint!("{}", BRANCH_USAGE);
+        std::process::exit(129);
+    }
+    let name = &opts.args[0];
+    let start = opts.args.get(1).cloned().unwrap_or_else(|| "HEAD".to_string());
+    let commit = match crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", start)) {
+        Ok(c) => c,
+        Err(_) if opts.args.len() == 1 => die(&format!("not a valid object name: '{}'", current.as_deref().unwrap_or("HEAD"))),
+        Err(_) => die(&format!("not a valid object name: '{}'", start)),
+    };
+    let refname = format!("refs/heads/{}", name);
+    if refs::read_ref(&refname)?.is_some() {
+        if !opts.force {
+            die(&format!("a branch named '{}' already exists", name));
         }
-        if let Some(user) = worktree_using_branch(&format!("refs/heads/{}", branch_name), false)? {
-            anyhow::bail!(
-                "error: cannot delete branch '{}' used by worktree at '{}'",
-                branch_name,
-                user.display_path()
-            );
+        if let Some(user) = worktree_using_branch(&refname, true)? {
+            die(&format!("cannot force update the branch '{}' used by worktree at '{}'", name, user.display_path()));
         }
-
-        if delete && !force_delete {
-            let branch_ref = format!("refs/heads/{}", branch_name);
-            if let Some(branch_tip) = refs::read_ref(&branch_ref)? {
-                let head_commit = match &head {
-                    refs::HeadState::Branch(b) => {
-                        let r = format!("refs/heads/{}", b);
-                        refs::read_ref(&r)?
-                    }
-                    refs::HeadState::Detached(h) => Some(h.clone()),
-                };
-
-                let merged = if let Some(head_hash) = head_commit {
-                    is_reachable(&head_hash, &branch_tip)?
-                } else {
-                    false
-                };
-
-                if !merged {
-                    anyhow::bail!("error: The branch '{}' is not fully merged.\n If you are sure you want to delete it, run 'branch -D {}'.", branch_name, branch_name);
-                }
-            }
+        if !refs::is_valid_branch_name(name) {
+            die(&format!("'{}' is not a valid branch name", name));
         }
-
-        refs::delete_branch(&branch_name)?;
-        println!("Deleted branch {}.", branch_name);
-        return Ok(());
+        refs::write_ref(&refname, &commit)?;
+    } else {
+        refs::create_branch(name, &commit)?;
     }
 
-    match name {
-        None => {
-            let head_state = refs::resolve_head()?;
-            let current_branch = match &head_state {
-                refs::HeadState::Branch(b) => Some(b.as_str()),
-                refs::HeadState::Detached(_) => None,
+    let tracking = if opts.args.len() == 2 { upstream_for(&start) } else { None };
+    let track = match opts.track {
+        Some(t) => t,
+        None => tracking.as_ref().is_some_and(|(remote, _, _)| remote != "."),
+    };
+    if track {
+        let Some((remote, merge, display)) = tracking else {
+            die(&format!("cannot set up tracking information; starting point '{}' is not a branch", start));
+        };
+        set_branch_upstream(name, &remote, &merge)?;
+        if !opts.quiet {
+            println!("branch '{}' set up to track '{}'.", name, display);
+        }
+    }
+    Ok(())
+}
+
+/// `branch -d/-D [-r] <name>...`: deletes each branch (or remote-tracking branch), refusing
+/// unmerged ones without `-D`, and reports every failure before exiting 1.
+fn delete_branches(opts: &crate::objects::BranchOptions) -> anyhow::Result<()> {
+    use crate::helpers::branch::*;
+    if opts.args.is_empty() {
+        die("branch name required");
+    }
+    let head_commit = refs::resolve_head_commit()?;
+    let mut failed = false;
+    for name in &opts.args {
+        if opts.remotes {
+            let refname = format!("refs/remotes/{}", name);
+            let was = match symref_target(&refname) {
+                Some(target) => Some(target),
+                None => refs::read_ref(&refname)?.map(|h| h[..7].to_string()),
             };
-
-            let branches = refs::list_branches()?;
-
-            if branches.is_empty() {
-                if let Some(name) = current_branch {
-                    println!("* {}", name);
-                }
-            } else {
-                for branch in &branches {
-                    if Some(branch.as_str()) == current_branch {
-                        println!("* {}", branch);
-                    } else {
-                        println!("  {}", branch);
+            let Some(was) = was else {
+                eprintln!("error: remote-tracking branch '{}' not found.", name);
+                failed = true;
+                continue;
+            };
+            delete_remote_tracking_ref(name)?;
+            if !opts.quiet {
+                println!("Deleted remote-tracking branch {} (was {}).", name, was);
+            }
+            continue;
+        }
+        let refname = format!("refs/heads/{}", name);
+        let in_use = worktree_using_branch(&refname, true)?.map(|w| w.display_path());
+        if let Some(path) = in_use {
+            eprintln!("error: cannot delete branch '{}' used by worktree at '{}'", name, path);
+            failed = true;
+            continue;
+        }
+        let Some(tip) = refs::read_ref(&refname)? else {
+            eprintln!("error: branch '{}' not found", name);
+            failed = true;
+            continue;
+        };
+        if !opts.force {
+            // Merged into its upstream if it has one, else into HEAD (git's branch_merged).
+            let upstream = crate::helpers::for_each_ref::branch_upstream(name).and_then(|u| refs::read_ref(&u).ok().flatten());
+            let into = |base: &Option<String>| -> anyhow::Result<bool> {
+                Ok(match base {
+                    Some(b) => is_reachable(b, &tip)?,
+                    None => false,
+                })
+            };
+            let merged_head = into(&head_commit)?;
+            let merged = match &upstream {
+                Some(_) => {
+                    let merged_up = into(&upstream)?;
+                    let up_name = crate::helpers::for_each_ref::branch_upstream(name).unwrap_or_default();
+                    if merged_up && !merged_head {
+                        eprintln!("warning: deleting branch '{}' that has been merged to\n         '{}', but not yet merged to HEAD.", name, up_name);
+                    } else if !merged_up && merged_head {
+                        eprintln!("warning: not deleting branch '{}' that is not yet merged to\n         '{}', even though it is merged to HEAD.", name, up_name);
                     }
+                    merged_up
                 }
+                None => merged_head,
+            };
+            if !merged {
+                eprintln!("error: the branch '{}' is not fully merged.\nIf you are sure you want to delete it, run 'rgit branch -D {}'", name, name);
+                failed = true;
+                continue;
             }
         }
-        Some(branch_name) => {
-            let ref_path = refs::current_branch_ref()?;
-            let commit_hash = refs::read_ref(&ref_path)?.ok_or_else(|| {
-                anyhow::anyhow!(
-                    "fatal: not a valid object name: '{}' has no commits yet",
-                    ref_path.strip_prefix("refs/heads/").unwrap_or(&ref_path)
-                )
-            })?;
-            refs::create_branch(&branch_name, &commit_hash)?;
-            println!("Created branch '{}' at {}", branch_name, &commit_hash[..7]);
+        refs::delete_branch(name)?;
+        move_branch_config(name, None, false)?;
+        if !opts.quiet {
+            println!("Deleted branch {} (was {}).", name, &tip[..7]);
         }
     }
+    if failed {
+        std::process::exit(1);
+    }
+    Ok(())
+}
 
+/// `branch -m/-M/-c/-C [<old>] <new>`: renames or copies a branch (the current one when only
+/// `<new>` is given) together with its `branch.<name>.*` config.
+fn rename_or_copy(opts: &crate::objects::BranchOptions, current: Option<&str>) -> anyhow::Result<()> {
+    use crate::helpers::branch::*;
+    let verb = if opts.copy { "copy" } else { "rename" };
+    let (old, new) = match opts.args.as_slice() {
+        [] => die("branch name required"),
+        [new] => match current {
+            Some(c) => (c.to_string(), new.clone()),
+            None => die(&format!("cannot {} the current branch while not on any", verb)),
+        },
+        [old, new] => (old.clone(), new.clone()),
+        _ => die(&format!("too many arguments for a {} operation", verb)),
+    };
+    let old_ref = format!("refs/heads/{}", old);
+    let new_ref = format!("refs/heads/{}", new);
+    let Some(tip) = refs::read_ref(&old_ref)? else {
+        die(&format!("no branch named '{}'", old));
+    };
+    if !refs::is_valid_branch_name(&new) {
+        die(&format!("'{}' is not a valid branch name", new));
+    }
+    if old != new && refs::read_ref(&new_ref)?.is_some() {
+        if !opts.force {
+            die(&format!("a branch named '{}' already exists", new));
+        }
+        if let Some(user) = worktree_using_branch(&new_ref, true)? {
+            die(&format!("cannot force update the branch '{}' used by worktree at '{}'", new, user.display_path()));
+        }
+        refs::delete_branch(&new)?;
+    }
+    if old == new && !opts.copy {
+        return Ok(());
+    }
+    if opts.copy {
+        if old != new {
+            refs::write_ref(&new_ref, &tip)?;
+        }
+    } else {
+        refs::rename_branch(&old, &new)?;
+    }
+    move_branch_config(&old, Some(&new), opts.copy)?;
     Ok(())
 }
 

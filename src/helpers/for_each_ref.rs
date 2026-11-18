@@ -1512,7 +1512,10 @@ fn branch_push_remote(branch: &str) -> (String, bool) {
     branch_remote(branch)
 }
 
-fn branch_upstream(branch: &str) -> Option<String> {
+/// The full upstream ref of a local branch (`branch.<b>.remote` + `.merge` through the remote's
+/// fetch refspecs; a `.` remote names a local ref), like git's `branch_get_upstream`.
+// Used by `for-each-ref` (`%(upstream)`) and `branch -v` / `-vv`.
+pub fn branch_upstream(branch: &str) -> Option<String> {
     let remote = config_value(&format!("branch.{}.remote", branch))?;
     let merge = config_values(&format!("branch.{}.merge", branch)).into_iter().next()?;
     if remote == "." {
@@ -1554,7 +1557,10 @@ fn branch_push_ref(branch: &str) -> Option<String> {
     }
 }
 
-fn tracking_counts(local: &str, base: &str) -> Option<(usize, usize)> {
+/// (ahead, behind) commit counts of `local` against `base` (both full refs); None when
+/// either is missing (git's "gone" upstream).
+// Used by `for-each-ref` (`%(upstream:track)`) and `branch -v` / `-vv`.
+pub fn tracking_counts(local: &str, base: &str) -> Option<(usize, usize)> {
     let theirs = peel_to_commit(&resolve_ref_chain(base)?.1)?;
     let ours = peel_to_commit(&resolve_ref_chain(local)?.1)?;
     if theirs == ours {

@@ -1,0 +1,438 @@
+rgit — remaining git commands that fit (round 2)
+=================================================
+Already implemented (113 + 3 synonyms, checked against src/cli.rs on 2026-11-16): add am annotate apply archive banana-split bisect blame branch bundle cat-file check-ignore check-mailmap
+check-ref-format checkout checkout-index cherry cherry-pick clean clone column commit commit-graph commit-tree config
+count-objects describe diff diff-files diff-index diff-tree fast-export fast-import fetch fmt-merge-msg for-each-ref
+for-each-repo format-patch fsck gc get-tar-commit-id grep hash-object help hook index-pack init interpret-trailers
+last-modified log ls-files ls-tree mailinfo mailsplit maintenance merge merge-base merge-file merge-tree mktag mktree
+multi-pack-index mv name-rev notes pack-objects pack-refs patch-id prune prune-packed pull push range-diff read-tree
+rebase reflog refs remote repack replace replay repo request-pull rerere reset restore rev-list rev-parse revert rm
+shortlog show show-branch show-index show-ref sparse-checkout stash status stripspace submodule switch symbolic-ref
+tag unpack-file unpack-objects update-index update-ref var verify-pack version whatchanged worktree write-tree
+(synonyms: stage = add, init-db = init, fsck-objects = fsck)
+
+Source: `git help -a` (2.43) + release notes up to git 2.52 (Nov 2025).
+Legend: ⭐ = recommended next   [S]/[M]/[L] = size   "reuses:" = existing rgit code it builds on
+
+
+LEFT TO DO AT A GLANCE (0 commands; details in the sections below)
+-------------------------------------------------------------------
+1. Quick wins (0):       all done (refs, name-rev, var, stripspace, column, version, help, stage, init-db, fsck-objects)
+2. Message/patch (0):    all done (interpret-trailers, patch-id, mailsplit, mailinfo, check-mailmap, fmt-merge-msg, request-pull)
+3. Index/tree (0):      all done (read-tree, update-index, checkout-index, mktree, mktag, diff-files, diff-index,
+                         diff-tree, merge-file, unpack-file, get-tar-commit-id)
+4. History (0):          all done (range-diff, show-branch, last-modified, repo, notes, replace, whatchanged, annotate)
+5. Workflow (0):         all done (rerere, hook, replay, for-each-repo, maintenance, sparse-checkout, submodule)
+6. Packfiles (0):        all done (pack-objects, unpack-objects, index-pack, verify-pack, show-index, repack,
+                         prune-packed, commit-graph, multi-pack-index, fast-export, fast-import)
+Skipped on purpose:      everything under "Probably not worth it" at the bottom.
+
+
+1. Quick ref & plumbing wins  ✅ ALL DONE
+------------------------------------------
+refs (list / exists / verify / optimize; `migrate` refused: no reftable backend), name-rev, var, stripspace, column,
+version, help, and the synonyms stage / init-db / fsck-objects.
+Notes: `refs` could not be compared with a real git (needs 2.46+; only 2.43 was available). `var` reports rgit's
+own settings (RGIT_EDITOR, ~/.rgitconfig, UTC timestamps), under git's variable names.
+
+
+2. Message, patch & identity tools  ✅ ALL DONE
+----------------------------------------------
+interpret-trailers, patch-id, mailsplit, mailinfo, check-mailmap, fmt-merge-msg, request-pull.
+Follow-ups they make possible: `am` could call the new mailsplit/mailinfo helpers; for-each-ref `:mailmap`,
+shortlog, blame and log `%aN/%aE` could honour .mailmap through helpers/mailmap.rs; mailinfo only converts
+UTF-8, US-ASCII, ISO-8859-1/15 and Windows-1252 (the `encoding_rs` crate would cover the rest).
+
+
+3. Index / tree plumbing  ✅ ALL DONE
+-------------------------------------
+read-tree, update-index, checkout-index, mktree, mktag, diff-files, diff-index, diff-tree, merge-file, unpack-file,
+get-tar-commit-id. `archive` now also writes git's pax global header (commit id) into tar archives.
+
+Limits that come from rgit's index (version 2, one entry per path, no flag bits) — the same prerequisite as
+sparse-checkout in section 5:
+  - read-tree -m with 3 trees resolves only what needs no stages (trivial cases, plus --aggressive); a path that
+    git would leave unmerged (stages 1-3) makes it fail instead.
+  - update-index: no --assume-unchanged / --skip-worktree / --unresolve, no stage numbers in --index-info.
+  - checkout-index --stage=1..3 finds nothing; --stage=all prints nothing.
+Other differences from git:
+  - A file whose cached stat data is stale but whose content is unchanged counts as clean (git needs
+    `update-index --refresh` first). Affects diff-files, diff-index, checkout-index, read-tree -m.
+  - diff-tree / diff-index / diff-files: no combined diffs (-c, --cc) and no -B (rename detection: done); with
+    --pretty/--format, %h stays abbreviated (git's diff-tree prints it in full).
+  - Symlinks are handled like regular files, as everywhere in rgit.
+
+
+4. History & inspection  ✅ ALL DONE
+-----------------------------------
+range-diff, show-branch, last-modified, repo, notes, replace, whatchanged, annotate.
+Known gaps: `notes merge` conflicts need -s ours|theirs|union|cat_sort_uniq (no NOTES_MERGE_WORKTREE workflow);
+`show-branch --reflog` and `replace --convert-graft-file` are missing; last-modified and repo follow git 2.52's
+documentation but could not be compared against a real 2.52.
+Fixed afterwards (were spotted while testing): revision parsing now accepts `heads/<name>` / `tags/<name>` /
+`remotes/<name>`, `@`, and mixed suffix chains like `<rev>~N^0`; a tag wins over a branch of the same name (with
+git's "refname is ambiguous" warning); `log`/`show` no longer print a blank line for an empty commit message.
+
+
+5. Workflow features  ✅ ALL DONE
+---------------------------------
+hook (run), for-each-repo, maintenance (run/register/unregister), replay, rerere, sparse-checkout, submodule.
+Follow-ups: fire pre-commit / commit-msg / post-commit / pre-push from rgit's own commands through helpers/hook.rs;
+call rerere from merge / rebase / cherry-pick / commit when rerere.enabled is set.
+
+Index groundwork done for these two: index version 3 is read and written, entries carry the skip-worktree bit
+(`update-index --[no-]skip-worktree` works now), and gitlink entries (mode 160000) are understood by checkout,
+reset, status, add, diff, archive, gc and local fetch/push. Still missing in the index: conflict stages and
+the assume-unchanged bit.
+
+sparse-checkout: init / set / add / list / reapply / disable / check-rules, cone and non-cone patterns, same files
+and config as git.
+  - Commands that compare the working tree (status, diff, commit -a, stash, switch, diff-files, diff-index,
+    ls-files, checkout-index, update-index --refresh) treat left-out files as unchanged. Commands that rewrite
+    the working tree (checkout, switch, reset, merge, pull, rebase, cherry-pick, revert, stash, restore, ...)
+    write everything and the patterns are applied again afterwards, so files outside the selection appear and
+    disappear during the command; a command that stops half-way (a conflict) leaves them until the next one.
+  - No sparse index (`--sparse-index`), no `clean` subcommand (git 2.52), no escaping of special characters in
+    cone directory names.
+
+submodule: add / status / init / update / deinit / foreach / sync / set-url / set-branch.
+  - The submodule's repository lives in `<path>/.git` (not `.git/modules/<name>`; git accepts both). `deinit`
+    parks it under `.git/modules/<name>` and `update` restores it.
+  - No `summary`, `absorbgitdirs`, `update --remote/--merge/--rebase`, `clone --recurse-submodules`; `merge`
+    takes a changed gitlink only when one side changed it; `status` shows `(new commits)` but not
+    modified/untracked content inside a submodule; `submodule status` names commits by exact tag or branch
+    only (git also prints forms like `v1~1`).
+  - Tags of a submodule are only as available as rgit's clone/fetch makes them.
+
+
+6. Packfiles  ✅ ALL DONE
+-------------------------
+pack-objects, unpack-objects, index-pack, verify-pack, show-index, repack, prune-packed, commit-graph,
+multi-pack-index, fast-export, fast-import.
+Object reads now fall back to packfiles (idx v1/v2, OFS/REF deltas), so every command works on packed
+repositories; fsck, short hashes, gc/prune and local fetch/push/clone (incl. the remote's packed-refs) know packs.
+
+Left out / different from git:
+  - commit-graph and multi-pack-index files are written in git's format (byte-identical in tests) but rgit does
+    not read them itself yet: walks still open commit objects, lookups still go through each pack's .idx.
+    No split graphs, no Bloom filters (--changed-paths), no bitmaps, no `multi-pack-index repack`.
+  - pack-objects / repack: own delta heuristic (16-byte block matching, window 10, depth 50), so packs are valid
+    but not as small as git's; no thin packs on output, no .rev / .bitmap files, no --max-pack-size.
+  - gc still only prunes and expires reflogs; it does not call repack.
+  - fast-import writes loose objects (not a pack), prints statistics only with --stats, and has no
+    cat-blob / ls / --cat-blob-fd; notes (`N`) are stored without fan-out.
+  - fast-export: no -M/-C, --anonymize, --refspec, --reencode or path limiting; a few corner cases with
+    negative revisions (`--all --not x`, `A...B`) name or reset refs differently from git.
+
+
+Probably not worth it (and why)
+-------------------------------
+- GUI / web: gui, citool, gitk, gitweb, instaweb.
+- Foreign VCS & email transport: svn, p4, cvs*, archimport, quiltimport, send-email, imap-send.
+- Network servers & credentials: daemon, http-backend, update-server-info, send-pack/fetch-pack internals,
+  receive-pack, upload-pack, upload-archive, http-fetch, http-push, remote-* transport helpers, shell,
+  credential*, ls-remote (only if rgit's fetch grows a generic smart-HTTP client beyond the GitHub API).
+- GPG/SSH signing: verify-commit, verify-tag (needs gpg/ssh-keygen).
+- External tool launchers: difftool, mergetool.
+- Deprecated / niche: filter-branch (use fast-export instead), pack-redundant, merge-index/merge-one-file,
+  merge-octopus/-ours/-recursive/-resolve/-subtree (strategy backends), subtree (contrib), pickaxe (internal
+  blame alias), diff-pairs (2.50, server-side diff plumbing), sh-setup/sh-i18n, scalar, backfill (partial clone), refs migrate (reftable), bugreport/diagnose.
+- check-attr: only worth it together with full .gitattributes support (eol/text/diff drivers).
+
+
+Suggested order
+---------------
+refs → name-rev → merge-file → diff-tree/diff-index/
+diff-files → read-tree/update-index → index flags (skip-worktree, stages) → sparse-checkout → pack reading + pack-objects.
+
+
+=====================================================================================================
+ROUND 3 — "rgit stops copying git and starts being rgit"            (written 2026-11-16)
+=====================================================================================================
+Every git command worth porting is ported. From here the value is NOT in more clones of git commands,
+it is in (A) closing the fidelity gaps that make the existing commands feel incomplete, (B) new commands
+git doesn't have, and (C) a "verbose / user-friendly" identity that makes rgit the git you can actually
+understand. Same legend as above: ⭐ = recommended next, [S]/[M]/[L] = size, "reuses:" = existing code.
+
+
+A. FIDELITY GAPS — things users will hit within the first hour
+--------------------------------------------------------------
+✅ log --graph              DONE 2026-11-17 (helpers/graph.rs, port of graph.c; identical to git 2.43 on 2080 fuzzed cases).
+✅ log --follow             DONE 2026-11-17 (helpers/follow.rs; git's similarity scoring; identical on ~4150 fuzzed cases).
+                              Known gaps: show/whatchanged reject --graph/--follow; non-UTF-8 text lines in -p are shown lossily
+                              (pre-existing in the line differ, plain log -p too); plain log -p/--stat still has no rename detection.
+✅ add -p / restore -p / reset -p / checkout -p / stash -p   DONE 2026-11-17 (helpers/add_patch.rs + commands/patch.rs;
+                              port of add-patch.c, all 9 git modes; matches git 2.43 on ~98% of 1980 fuzzed sessions).
+                              Known differences: no `git apply` whitespace warnings; editing a split hunk can differ
+                              from git's merge_hunks quirks; git 2.43 bugs not copied (editing the mode-change hunk
+                              crashes git; reset -p rejects both halves of a split hunk at line 1).
+✅ rename detection (-M, -C)  DONE 2026-11-17 (helpers/rename.rs, port of diffcore-rename; diff (rebuilt on the raw
+                              engine), log/show/whatchanged (+ --summary), status, diff-tree/-index/-files, fast-export;
+                              matches git 2.43 on ~5,600 fuzzed runs; the only misses are 2 hunk-placement cases of
+                              rgit's line differ on plain modifications). Not yet: blame -M/-C, format-patch renames,
+                              -B (break rewrites), status --short.
+✅ Index conflict stages 1-3  DONE 2026-11-18 (index.rs stage bits; helpers/merge.rs merge_into_worktree +
+                              write_conflict_stages; helpers/combine_diff.rs, port of combine-diff.c). merge, cherry-pick,
+                              revert and rebase now share merge's line-level ort merge and write stages 1/2/3 byte-identical
+                              to git; status (Unmerged paths + state line), ls-files -s/-u/-t, diff/diff-files/diff-index
+                              (U, * Unmerged path, Unmerged in --stat, -1/-2/-3, diff --cc), add/rm resolve, commit/-a,
+                              write-tree, merge/cherry-pick/revert/rebase/stash/switch/checkout/reset --soft refuse like git,
+                              restore/checkout --ours/--theirs/-m/--conflict, reset clears. Fixed on the way: mode-only
+                              changes were dropped by merge and switch; status/reset ignored mode changes; status sections
+                              now in path order. Not yet: checkout-index --stage on stages, update-index --unresolve /
+                              --index-info stages, read-tree -m writing stages, stash apply conflicts, rerere from index
+                              stages, rebase status header ("interactive rebase in progress").
+✅ rebase --onto            DONE 2026-11-18 (commands/rebase.rs; select_commits_to_rebase / can_fast_forward /
+                              commit_is_empty in helpers/rebase.rs). --onto <newbase>, --keep-base, <branch>,
+                              --[no-]reapply-cherry-picks, upstream from branch config; git's commit selection
+                              (upstream...HEAD right side, no merges, topo order, already-applied commits skipped with
+                              git's warning), "Current branch <b> is up to date.", Rebasing (i/n) progress, git's
+                              success line on stderr, fast-forwarded picks, ORIG_HEAD, error messages. Matches git 2.43
+                              on all ~2,600 fuzzed runs (100 repos × 26 scenarios: onto/keep-base/branch/detached/errors/
+                              tracking/applied commits/conflict+continue/skip/abort).
+                              Fixed on the way: rebased commits lost their original author and date (rgit stamped your
+                              identity and "now"); commits that start empty were dropped (git keeps them); rgit-only
+                              "Rebasing N commit(s)", "[detached x]", "Skipped ..." and "Rebase aborted" lines removed.
+                              Not yet: --autosquash, --rebase-merges, --exec, --root, git's .git/rebase-merge state
+                              layout (rgit keeps its own REBASE_* files), status "rebase in progress" lines.
+   rebase --autosquash / --rebase-merges / --exec [M]
+   commit --fixup=<c> / --squash=<c>  (pairs with rebase --autosquash) [S]
+✅ merge flags               DONE 2026-11-18 (commands/merge.rs; merge_trees_favoring in helpers/merge_tree.rs;
+                              abort_merge_to_head / clear_merge_state in helpers/merge.rs). --ff/--no-ff/--ff-only,
+                              --squash (SQUASH_MSG; commit reads SQUASH_MSG + MERGE_MSG like git), --[no-]commit, -m/-F,
+                              -s ort|recursive|ours, -X ours|theirs, -n/-q, --allow-unrelated-histories, --abort,
+                              --continue, --quit, detached HEAD; diffstat + summary after merges and fast-forwards
+                              (was missing); " into <branch>" per merge.suppressDest; ORIG_HEAD/MERGE_MODE/AUTO_MERGE.
+                              Matches git 2.43 on ~4,100 fuzzed runs (100 repos × 41 scenarios); the only misses: commit
+                              hashes (rgit ignores GIT_AUTHOR_DATE / GIT_COMMITTER_DATE) and merge --abort on a
+                              file/directory conflict, where git itself fails ("not uptodate") and rgit aborts cleanly.
+                              Fixed on the way: commit --no-edit stripped "#" lines (git keeps them without an editor);
+                              reset reported D instead of T for a directory where a file was.
+                              Not yet: octopus, -s resolve/subtree, -X patience/ignore-space-*/renames, --autostash,
+                              --log, -e (editor for the merge message), hooks.
+✅ cherry-pick -x / ranges    DONE 2026-11-18 (commands/cherry_pick.rs rewritten as a port of git's sequencer for
+                              picks; helpers/sequencer.rs for .git/sequencer state and the -x / -s trailers). Commit
+                              lists and ranges (A..B, ^X), -x, -s, -n, -m <n>, --ff, --allow-empty,
+                              --allow-empty-message, --keep-redundant-commits, --continue, --skip, --abort, --quit;
+                              original author kept, git's summary, MERGE_MSG/CHERRY_PICK_HEAD/AUTO_MERGE and
+                              sequencer todo/head/abort-safety/opts byte-identical to git. Matches git 2.43 on
+                              ~5,100 fuzzed runs (100 repos × 51 scenarios); the only misses: --skip/--abort after a
+                              file/directory conflict, where git itself fails ("not uptodate") and rgit resets
+                              cleanly. Fixed on the way: rgit ignored GIT_AUTHOR_* / GIT_COMMITTER_* (so commit hashes
+                              never matched git's in scripts); commit summary had no rename detection and showed
+                              " Date:" by timestamp instead of git's rule; commit --cleanup=strip; reset never wrote
+                              ORIG_HEAD; add/add with only a 100644/100755 clash printed a made-up "CONFLICT (mode)"
+                              instead of ort's "CONFLICT (add/add)"; status trailers now use git's wording.
+                              Not yet: git's status advice hints in status output (e.g. "(use \"git cherry-pick
+                              --skip\" ...)"), -e, --strategy/-X, rerere, revert ranges (revert still single-commit).
+   stash -u / --include-ignored / branch <name> / --keep-index [S]
+   branch -m / -vv / --merged / --no-merged / --contains / --set-upstream-to / --unset-upstream [S]
+   tag -s (needs signing; skip) / tag --contains / --merged / --points-at [S]
+   diff --word-diff / --color-moved / --stat / --compact-summary / --no-index / -w / --ignore-space-change [M]
+   cat-file -t / -s / -e / --batch / --batch-check [S]      (right now only -p)
+   hash-object --stdin / -t / --path [S]
+   ls-remote [S]              Only sensible now that fetch/clone/push have GitHub + local transports.
+   check-attr + .gitattributes (eol, text, binary, diff=, merge=) [L]
+   core.autocrlf / eol conversion [M]
+   gc actually calling repack + commit-graph write [S]     (noted above as still missing)
+   Read commit-graph / multi-pack-index for speed [M]      (files are written but never used)
+   Fire hooks from commit / merge / push / checkout (pre-commit, commit-msg, post-*...) [S]   reuses: helpers/hook.rs
+   Call rerere from merge / rebase / cherry-pick when rerere.enabled [S]
+   Symlink support everywhere (currently treated as regular files) [M]
+   blame -w / -M / -C / --ignore-rev / --ignore-revs-file [M]
+   Smart-HTTP / SSH transport for non-GitHub remotes (GitLab, Gitea, self-hosted) [L]
+   Credential helper (store / cache / env token) so GitHub tokens aren't plain env vars [M]
+   SHA-256 object format [L], reftable backend [L]   (research-grade, only if you want a thesis angle)
+
+
+B. NEW COMMANDS git doesn't have  (the "rgit-only" shelf, in the spirit of banana-split)
+----------------------------------------------------------------------------------------
+Everyday workflow
+⭐ rgit undo [S-M]              Undo the last rgit operation (commit, merge, reset --hard, rebase...). Needs an operation
+                               log (see C.6). Shows what it is about to undo; `rgit undo --list`, `rgit redo`.
+⭐ rgit oops [S]                "I just did something wrong": looks at the reflog + op log and offers the 3 most likely
+                               fixes (undo last commit keeping changes, move commit to another branch, restore deleted branch).
+⭐ rgit save / rgit wip [S]     One-word stash+commit: `rgit save "halfway through parser"` makes a WIP commit on a hidden
+                               ref (refs/rgit/wip/<branch>), restores a clean tree. `rgit save --list / --restore`.
+   rgit sync [M]                fetch + rebase-or-merge current branch on its upstream + (optionally) push, one command,
+                               with a plan printed first. `--dry-run` shows the plan only.
+   rgit start <name> / rgit finish [S]   Create a topic branch from the default branch / merge it back and delete it.
+   rgit amend [S]               Fold staged changes into HEAD without opening the editor (commit --amend --no-edit, shorter).
+⭐ rgit fixup [M]               Pick a recent commit (interactive list or `rgit fixup <commit>`), commit staged changes as a
+                               fixup of it and autosquash immediately. (git needs 3 commands for this.)
+   rgit absorb [L]              Like git-absorb: split staged hunks and attach each to the commit that last touched those lines
+                               (blame + fixup). reuses: blame.rs, rebase.rs.
+   rgit split <commit> [M]      Interactive split of ONE commit into several by hunk (banana-split is by path/dir; this is by hunk).
+   rgit squash-range <a>..<b> [S]   Squash a range into one commit without writing a todo file.
+   rgit move-commit <commit> <branch> [M]   Cherry-pick a commit onto another branch and drop it from the current one.
+   rgit uncommit [S]            `reset --soft HEAD~1` with a proper explanation of where the changes went.
+   rgit branch-clean [S]        List + delete merged / gone-upstream / stale local branches (with a preview and confirmation).
+   rgit rename-branch [S]       Rename local branch + upstream tracking + remote branch together.
+   rgit ignore <pattern> [S]    Append to .gitignore (dedup, sorted, optional --global) and untrack already-tracked matches.
+   rgit default-branch [S]      Show / change the default branch name everywhere it is referenced.
+
+Understanding a repository
+⭐ rgit whereami [S]            One screen: branch, upstream, ahead/behind, last commit, in-progress operation (merge? rebase?
+                               bisect?), stash count, and the NEXT likely command. (Friendlier than `status` + `branch -vv` + `log -1`.)
+⭐ rgit story <file|path> [M]   Human-readable history of a file: who created it, big rewrites, renames, who touches it most,
+                               when it last changed. reuses: log, blame, last-modified, shortlog.
+   rgit hotspots [M]            Files that change most / are touched by most authors / are touched together (coupling).
+   rgit who <path|symbol> [S]   "Who knows this code?" ranked by surviving blame lines + recent commits.
+   rgit stats [M]               Commits per day/week, authors, languages by lines, churn, biggest commits. Table + sparkline output.
+   rgit timeline [S]            Compact day-by-day activity digest of the repo ("Mon: 4 commits by Sebi on feature/x...").
+   rgit diff-summary <a> <b> [M]  Plain-English summary: "3 files added, 2 renamed, parser.rs mostly rewritten (82% changed)".
+   rgit tree [S]                `ls-tree -r` rendered as a tree with sizes / last-change column.
+   rgit size [S]                Repo size report: biggest blobs, biggest trees, what gc would reclaim. reuses: count-objects, pack.rs.
+   rgit big-files [S]           Find large objects in history (with the commit that added them) — pre-filter-repo helper.
+   rgit conflicts [S]           List unresolved files, how many conflict hunks each, which side touched what.
+   rgit compare <a> <b> [S]     "Is a ahead of b / behind / diverged, by how many commits, which files differ" in one answer.
+   rgit find <text> [M]         Search across history, commit messages AND current files in one command (log -S/-G + grep + --grep).
+
+Health & safety
+⭐ rgit doctor [M]              fsck + config sanity + hooks executable + stale locks (.git/*.lock) + broken worktrees + missing
+                               user.name/email + huge untracked files — each finding with a fix command. reuses: fsck, refs verify, repo_info.
+   rgit lock-clean [S]          Remove stale *.lock files safely (checks no rgit process owns them).
+   rgit secrets [M]             Scan staged changes / history for obvious secrets (AWS keys, tokens, private keys); hook-friendly.
+   rgit lint-msg [S]            Check commit messages (length, imperative mood, issue ref); usable as commit-msg hook.
+   rgit verify-clean [S]        Exit 0 only if tree is clean + no untracked — for scripts/CI.
+   rgit backup [S]              `bundle create --all` into ~/.rgit-backups/<repo>-<date>.bundle with retention.
+
+Release & collaboration
+   rgit changelog <a>..<b> [M]  Group commits by conventional-commit type (feat/fix/docs) into Markdown. reuses: log, shortlog.
+   rgit release-notes <tag> [S] Same, between the previous tag and <tag>, with contributors list.
+   rgit bump [S]                Compute next semver from conventional commits since last tag; optionally create the tag.
+   rgit pr-summary [S]          Description draft for a PR: commits, files changed, diffstat. reuses: request-pull.
+   rgit open [S]                Print / open the GitHub URL for a file, commit, branch or PR. reuses: helpers/github.rs.
+   rgit contributors [S]        shortlog + mailmap + first/last commit date per author.
+
+Fun / identity
+   rgit banana-merge [S]        Inverse of banana-split: fold several per-path commits back into one.
+   rgit banana-split --by-hunk  Extension of the existing command.
+   rgit bingo / rgit tip [S]    A random "git tip of the day" taken from the glossary below (teaching feature).
+   rgit zen [S]                 Prints a short project philosophy ("Explain first, act second").
+
+
+C. HOW TO MAKE rgit UNIQUE: "the git that explains itself"
+-----------------------------------------------------------
+Thesis: git's commands are powerful but ambiguous (checkout does 3 things, reset does 3, `git branch -d` vs -D, "detached
+HEAD", "fast-forward", "unmerged paths"...). Output is terse, errors are written for people who already know git.
+rgit's USP: the same commands, same on-disk format (so real git can still read the repo), but every ambiguous or
+destructive moment is narrated in plain language, with the exact next command to run.
+
+C.1  Verbosity levels (global)                                               [M, do this FIRST, everything else hangs on it]
+     rgit.verbosity = quiet | normal | explain | teach        (config key; env RGIT_VERBOSITY; flags -q / -v / --explain / --teach)
+       quiet    git-identical output (scripts, parity tests against real git keep working).
+       normal   today's behaviour + the 3-part errors from C.2.
+       explain  adds one "what just happened / why" block after ambiguous commands.
+       teach    explain + shows the underlying plumbing steps ("1. wrote tree 4f2a…, 2. wrote commit 9c1b…, 3. moved branch main").
+     Implementation: one helper `ui::say(Level, ...)` + a `ui::explain!` macro in a new src/ui.rs; commands never println! raw prose.
+     Keeps parity: tests compare `quiet` output with real git, humans get `normal`+.
+
+C.2  Three-part errors: WHAT happened / WHY / FIX                          [M]
+     Replace `fatal: pathspec 'x' did not match any file(s) known to rgit` with:
+         error: nothing matches 'x'
+         why:   'x' is not in the index and not in HEAD (closest: 'src/x.rs', 'x_test.rs')
+         fix:   rgit status          # see what rgit knows about
+                rgit add -N x        # if x is a brand-new file
+     - Typo suggestions ("did you mean 'switch'?") from edit distance over command names, branch names, tags, paths.
+     - One shared `fail()` (today it is duplicated: commit.rs, tag.rs ...) → `ui::fail(What, Why, Fix)`.
+     - Stable error codes (E0101...) + `rgit explain-error E0101` (like rustc --explain). Fits a Rust project well.
+
+C.3  Disambiguate the notoriously ambiguous commands                       [S each]
+     checkout   Always print how the argument was interpreted:
+                  "'main' is a branch -> switching branches"  /  "'main' is also a file -> restoring the FILE (use `rgit switch main` for the branch)".
+                  Warn when a name matches both a branch and a path, a tag and a branch (you already warn on tag/branch ambiguity).
+                  Suggest `switch` / `restore` equivalents every time, quietly teaching the modern commands.
+     reset      Before acting, print the mode in words:
+                  --soft:  "HEAD moves to abc123. Your index and files are untouched."
+                  --mixed: "HEAD moves; staged changes become unstaged. Files untouched."
+                  --hard:  "HEAD moves AND 4 modified files + 2 staged files will be overwritten. THIS LOSES WORK." + list of files.
+                Plain `reset --hard` with dirty files: auto-save a safety snapshot (rgit/undo ref) and say how to get it back.
+     status     Prose header: "You are on branch feature/x, 2 commits ahead of origin/feature/x (not pushed yet)."
+                Group by intent: "Ready to commit (staged)", "Changed but not staged", "New files rgit isn't tracking".
+                End with "Next:" line (`rgit add <file>` / `rgit commit` / `rgit push`). Mid-merge/rebase/bisect: say which and how to
+                continue or abort. Detached HEAD: explain it in one sentence + how to get back (`rgit switch -`).
+     merge      Announce the plan first: "fast-forward possible: main will simply move from a1 to b2" OR
+                "diverged: creating a merge commit; 3 files changed on both sides". After: list conflicts with a hint per file.
+     rebase     Print the plan ("replaying 4 commits of feature/x on top of main (c3d4)") and, for each todo action in -i, a one-line
+                gloss (pick = keep, reword = keep but edit message, squash = meld into previous...) in the todo file comments.
+                `rebase --explain` = dry run that shows what would happen to each commit.
+     branch -d / -D   "Branch has 3 commits not on any other branch — they'd become unreachable (recoverable via reflog until <date>)".
+     stash      "Saved 3 modified + 1 staged file as stash@{0}: <msg>. Bring them back with `rgit stash pop`."
+     pull       Say which it did: fetch + merge or fetch + rebase, and why (config pull.rebase), plus what changed (n commits, m files).
+     push       Explain rejections: "remote has commits you don't have (non-fast-forward). Options: 1) rgit pull 2) rgit push --force-with-lease (overwrites)".
+     clean      Always preview (default -n) with sizes; `-f` prints a count of removed files.
+     restore    "Discarding changes in a.rs — not recoverable." vs "Unstaging a.rs (file contents untouched)."
+     commit     After commit, one line in explain mode: "Recorded 3 files (+41 −7) on main; HEAD is now 9c1b2a0. Not pushed yet."
+     log        `--explain` header: "Showing commits reachable from HEAD, newest first, 20 of 143".
+     tag        "Lightweight tag (just a name for a commit)" vs "Annotated tag (has author, date, message)" stated on creation.
+     diff       Header says what is compared with what: "working tree vs index (unstaged changes)" / "index vs HEAD (staged)".
+                (git's bare `diff` vs `diff --cached` confuses everybody.)
+     config     `config --explain <key>`: where each value comes from (local / global / default) and what the key does.
+
+C.4  `rgit explain <any rgit command line>`                                  [M-L, very distinctive]
+     Narrates a command WITHOUT running it: `rgit explain reset --hard HEAD~2` →
+        "Moves the current branch back 2 commits (to 7d1e…), resets the index to match, overwrites working files. Commits
+         3f2a… and 8b9c… stay recoverable via reflog. 2 uncommitted files would be lost: a.rs, b.rs."
+     Same info as C.3 but on demand, and usable as a safety net: `rgit --plan <command>` = explain + ask [y/N] + run.
+     Universal `--dry-run` / `--plan` for every state-changing command (many already have -n; unify them).
+
+C.5  `rgit why <thing>` / `rgit what is <thing>`                             [S-M]
+     rgit why detached        → why HEAD is detached, what it means, how to fix.
+     rgit why ignored <path>  → check-ignore -v in plain words (which .gitignore line, which file).
+     rgit why conflict <path> → which commits on each side changed which lines.
+     rgit why behind          → which commits the remote has that you don't.
+     rgit what is HEAD~3 / @{u} / main...feature   → resolves any revision expression and explains the syntax used.
+     rgit glossary [term]     → built-in glossary (index, staging area, HEAD, detached HEAD, fast-forward, reflog...). Terms link from explain output.
+
+C.6  Operation log + universal undo (inspired by Jujutsu)                    [L, biggest differentiator]
+     Record every state-changing rgit command (refs before/after, index hash, HEAD) in .git/rgit-oplog/. Then:
+        rgit oplog            list operations ("12:03 commit -m 'x'", "12:07 reset --hard HEAD~1")
+        rgit undo / redo      move refs back/forward one operation
+        rgit undo --to <id>   time-travel; `rgit oplog show <id>` shows what changed
+     Even `reset --hard` becomes safe if working-tree snapshots are stored as dangling-but-referenced tree objects.
+     This single feature is what makes the "verbose & friendly" promise credible: nothing is scary any more.
+
+C.7  Guided mode / interactive helpers                                      [M]
+     rgit tutor           In-terminal lessons that run in test-sandbox-style temp repos (init → commit → branch → merge conflict...).
+     rgit guide           "What do you want to do?" menu: undo last commit / discard changes / share my work / fix a conflict ...
+                          → maps to the right commands and runs them with explanations.
+     Confirmation prompts for destructive actions in interactive terminals (skip with --yes or when not a TTY).
+     `rgit hint off` / rgit.hints = false so power users aren't nagged.
+
+C.8  Presentation polish                                                    [S-M]
+     - Colour with meaning (green = safe, yellow = changes history, red = destroys data); respect NO_COLOR and non-TTY.
+     - Emoji-free by default, `rgit.icons = true` for ✔ ⚠ ✖ symbols.
+     - Progress + summary lines for long operations (clone, fetch, gc, repack) in normal mode.
+     - Relative dates + human sizes ("3 minutes ago", "1.2 MiB") in explain mode; ISO stays in quiet mode.
+     - `--json` output for status / log / branch / oplog / doctor (editor & tooling integration; also makes testing easier).
+     - Shell completions (`rgit completions bash|zsh|fish|powershell`) — clap gives this almost for free via clap_complete. [S]
+     - Aliases in plain language: `rgit unstage <f>` (= restore --staged), `rgit discard <f>` (= restore, with warning),
+       `rgit last` (= show HEAD), `rgit amend`, `rgit uncommit`, `rgit branches`, `rgit tags`, `rgit current`. Printed alongside the
+       git-equivalent in explain mode, so users learn both vocabularies.
+
+C.9  Learning-friendly plumbing output                                      [S]
+     `rgit cat-file --explain <hash>`: describes an object ("commit by Sebi on 2026-11-02, tree 4f2a…, 1 parent, message: …").
+     `rgit inspect .git`: annotated tour of the .git directory (HEAD, refs/, objects/, index, logs/) — fits rgit's origin as a
+     learning project and is great for the README / thesis demo.
+     `rgit --trace`: print every object read/written and ref updated by a command (teach level, but for debugging).
+
+
+D. SUGGESTED ORDER
+------------------
+ 1. src/ui.rs + verbosity levels (C.1) and the shared 3-part error type (C.2)      <- foundation, touches every command lightly
+ 2. status / reset / checkout / diff headers (C.3)                                 <- the 4 most-confusing commands, quick visible win
+ 3. whereami, oops, doctor, ignore, branch-clean                                  <- cheap new commands that feel "rgit"
+ 4. operation log + undo/redo (C.6)                                               <- the big differentiator
+ 5. rename detection (log --graph/--follow, patch mode done)                                        <- biggest fidelity gaps
+ 6. explain / why / glossary (C.4, C.5), completions, --json                      <- polish and teaching layer
+ 7. index conflict stages, rebase --onto/--autosquash, merge flags                <- deeper git parity
+ 8. story / hotspots / stats / changelog                                          <- "insight" commands for the demo
+
+E. GUARD-RAILS SO "FRIENDLY" DOESN'T BREAK "CORRECT"
+----------------------------------------------------
+ - Prose goes to stderr or behind verbosity >= explain; stdout in quiet mode stays byte-identical to git where it is today
+   (your tests against real git depend on it).
+ - Never change what a command DOES for friendliness — only what it says (the exception is opt-in safety nets: auto-snapshot, prompts).
+ - Keep messages in one place (ui.rs / a messages table) so they can be translated later (Romanian + English fits your audience).
+ - Add a tiny golden-output test suite (rtest-driven): each ambiguous command × each verbosity level, so wording changes are intentional.

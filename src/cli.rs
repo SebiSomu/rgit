@@ -83,14 +83,10 @@ pub enum Commands {
         args: Vec<String>,
     },
     Status,
+    #[command(disable_help_flag = true)]
     Branch {
-        name: Option<String>,
-        #[arg(short = 'd', long = "delete", conflicts_with = "force_delete")]
-        delete: bool,
-        #[arg(short = 'D', conflicts_with = "delete")]
-        force_delete: bool,
-        #[arg(short = 'm', long = "move", value_name = "NEW")]
-        rename: Option<String>
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
     },
     Switch {
         branch: String,
@@ -1062,8 +1058,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Status => {
             crate::commands::status()?;
         }
-        Commands::Branch { name, delete, force_delete, rename } => {
-            crate::commands::branch(name, delete, force_delete, rename)?;
+        Commands::Branch { args } => {
+            crate::commands::branch(raw_args_after("branch", args))?;
         }
         Commands::Switch { branch, create, detach, force } => {
             crate::commands::die_if_operation_in_progress()?;

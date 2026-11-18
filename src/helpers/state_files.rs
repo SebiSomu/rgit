@@ -140,6 +140,7 @@ pub fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::R
             hash: *hash,
             path: path.clone(),
             skip_worktree: false,
+            stage: 0,
         })
         .collect();
 

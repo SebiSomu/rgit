@@ -49,6 +49,12 @@ pub fn rebase(
         );
     }
 
+    if crate::helpers::merge::report_needs_merge() {
+        eprintln!("error: cannot rebase: You have unstaged changes.");
+        eprintln!("error: additionally, your index contains uncommitted changes.");
+        eprintln!("error: Please commit or stash them.");
+        std::process::exit(1);
+    }
     ensure_working_tree_clean("start a rebase")?;
 
     let head_state = refs::resolve_head()?;

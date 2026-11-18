@@ -42,6 +42,19 @@ pub fn cat_file(pretty_print: bool, object_hash: String) -> anyhow::Result<()> {
 
 pub fn write_tree() -> anyhow::Result<()> {
     let entries = read_index().unwrap_or_default();
+    // A tree can't hold a conflict: every unmerged entry is reported and nothing is written.
+    if entries.iter().any(|e| e.stage != 0) {
+        // git lists the first ten, then "...".
+        for (n, entry) in entries.iter().filter(|e| e.stage != 0).enumerate() {
+            if n == 10 {
+                eprintln!("...");
+                break;
+            }
+            eprintln!("{}: unmerged ({})", entry.path, hex::encode(entry.hash));
+        }
+        eprintln!("fatal: rgit-write-tree: error building trees");
+        std::process::exit(128);
+    }
     let tree_hash = write_tree_from_index_prefix(&entries, "")?;
     println!("{}", tree_hash);
     Ok(())

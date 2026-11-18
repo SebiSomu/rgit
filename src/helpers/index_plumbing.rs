@@ -110,7 +110,7 @@ pub fn add_cache_entry(entries: &mut Vec<IndexEntry>, entry: IndexEntry, flags: 
 /// An index entry without stat data, as `--cacheinfo` and tree-reading commands create them.
 // Used by `update-index --cacheinfo` / `--index-info` and `read-tree`.
 pub fn bare_index_entry(path: &str, hash: [u8; 20], mode: u32) -> IndexEntry {
-    IndexEntry { ctime_secs: 0, ctime_nsecs: 0, mtime_secs: 0, mtime_nsecs: 0, dev: 0, ino: 0, mode, uid: 0, gid: 0, size: 0, hash, path: path.to_string(), skip_worktree: false }
+    IndexEntry { ctime_secs: 0, ctime_nsecs: 0, mtime_secs: 0, mtime_nsecs: 0, dev: 0, ino: 0, mode, uid: 0, gid: 0, size: 0, hash, path: path.to_string(), skip_worktree: false, stage: 0 }
 }
 
 /// git's `create_ce_mode`: any mode becomes one an index entry can have — `120000` for

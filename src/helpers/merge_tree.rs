@@ -339,7 +339,6 @@ pub fn merge_trees_in_memory(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Str
 
         let kind = if b.is_none() { "add/add" } else { "content" };
         let regular = |mode: u32| mode & 0o170000 == 0o100000;
-        let (base_bytes, our_bytes, their_bytes) = (read_blob(b)?, read_blob(Some(o))?, read_blob(Some(t))?);
         let base_mode = b.map(|e| e.1);
         let (mode, mode_conflict) = if o.1 == t.1 || base_mode == Some(t.1) {
             (o.1, false)
@@ -348,6 +347,24 @@ pub fn merge_trees_in_memory(base: &BTreeMap<String, Entry>, ours: &BTreeMap<Str
         } else {
             (o.1, true)
         };
+        // Only the modes differ on one side: the content resolves without a file merge (and
+        // without an "Auto-merging" message), like git's ort.
+        let base_hash = b.map(|e| e.0);
+        let trivial_content = if o.0 == t.0 || base_hash == Some(t.0) {
+            Some(o.0)
+        } else if base_hash == Some(o.0) {
+            Some(t.0)
+        } else {
+            None
+        };
+        if let (Some(hash), false) = (trivial_content, mode_conflict) {
+            if regular(o.1) == regular(t.1) {
+                result.tree.insert(path.clone(), (hash, mode));
+                report(MergePathOutcome::AutoMerged, None, &mut result);
+                continue;
+            }
+        }
+        let (base_bytes, our_bytes, their_bytes) = (read_blob(b)?, read_blob(Some(o))?, read_blob(Some(t))?);
 
         if !regular(o.1) || !regular(t.1) || is_binary(&base_bytes) || is_binary(&our_bytes) || is_binary(&their_bytes) {
             if regular(o.1) && regular(t.1) {
@@ -410,7 +427,9 @@ fn resolve_file_directory_clashes(result: &mut TreeMergeResult, ours: &BTreeMap<
         result.tree.insert(moved.clone(), entry);
         let stage = if side == ours_label { [None, Some(entry), None] } else { [None, None, Some(entry)] };
         result.conflicted.insert(moved.clone(), stage);
-        result.messages.push(message(
+        // git lists messages by path; this one goes under the moved path (`dir~side`).
+        let at = result.messages.iter().position(|m| m.paths.first().is_some_and(|p| p.as_str() > moved.as_str())).unwrap_or(result.messages.len());
+        result.messages.insert(at, message(
             &[&moved, &path],
             "CONFLICT (file/directory)",
             format!("CONFLICT (file/directory): directory in the way of {} from {}; moving it to {} instead.", path, side, moved),

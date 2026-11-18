@@ -136,9 +136,10 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
     }
 
     for (path, (hash, _mode)) in target_tree {
+        // A mode-only change (the executable bit) is applied too.
         let should_write = match head_tree.get(path) {
             None => true,
-            Some((head_hash, _)) => head_hash != hash,
+            Some((head_hash, head_mode)) => head_hash != hash || head_mode != _mode,
         };
 
         if should_write {
@@ -150,6 +151,13 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
             let (_, content) = read_object(&hex::encode(hash))?;
             if let Some(parent) = Path::new(&path).parent() {
                 fs::create_dir_all(parent)?;
+            }
+            // A directory where the file goes: git removes it when nothing is left in it.
+            if Path::new(path).is_dir() {
+                if dir_holds_files(Path::new(path)) {
+                    anyhow::bail!("error: Updating the following directories would lose untracked files in them:\n\t{}\n\nAborting", path);
+                }
+                fs::remove_dir_all(path)?;
             }
             fs::write(path, &content)?;
 
@@ -165,21 +173,31 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
     Ok(())
 }
 
+/// Whether a directory contains any file (at any depth); empty directories don't count.
+fn dir_holds_files(dir: &Path) -> bool {
+    fs::read_dir(dir).map(|entries| entries.flatten().any(|e| {
+        let p = e.path();
+        if p.is_dir() { dir_holds_files(&p) } else { true }
+    })).unwrap_or(false)
+}
+
 /// Updates the index entries to reflect target branch files after a switch.
 // Used by `switch` and `checkout` commands.
 pub fn update_index_from_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_tree: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::Result<()> {
     let mut entries = read_index().unwrap_or_default();
     entries.retain(|e| target_tree.contains_key(&e.path));
 
-    for (path, (hash, _)) in target_tree {
+    for (path, (hash, mode)) in target_tree {
         let should_update = match head_tree.get(path) {
             None => true,
-            Some((head_hash, _)) => head_hash != hash,
+            Some((head_hash, head_mode)) => head_hash != hash || head_mode != mode,
         };
 
         if should_update {
             let metadata = fs::metadata(path)?;
             let mut new_entry = build_entry(path, *hash, &metadata);
+            // The tree's mode, also where the file system has no executable bit.
+            new_entry.mode = *mode;
             if target_tree.get(path).is_some_and(|(_, mode)| *mode == 0o160000) {
                 new_entry.mode = 0o160000;
                 new_entry.size = 0;
@@ -353,6 +371,7 @@ pub fn build_index_entries_for_tree(target_tree: &BTreeMap<String, ([u8; 20], u3
             hash: *hash,
             path: path.clone(),
             skip_worktree: false,
+            stage: 0,
         });
     }
 

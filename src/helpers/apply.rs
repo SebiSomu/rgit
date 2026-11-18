@@ -836,6 +836,7 @@ pub fn cached_index_entry(path: &str, hash: [u8; 20], size: usize) -> IndexEntry
         hash,
         path: path.to_string(),
         skip_worktree: false,
+        stage: 0,
     }
 }
 

@@ -6,14 +6,15 @@ use crate::helpers::ls_files::{collect_untracked_paths, is_tracked_path_ignored,
 use crate::index::{read_index, IndexEntry};
 use crate::objects::{LsFilesOptions, WorktreeState};
 
-/// `rgit ls-files [-c] [-d] [-m] [-o] [-i] [--exclude-standard] [-s] [-t] [-z] [<pathspec>...]`
+/// `rgit ls-files [-c] [-d] [-m] [-o] [-i] [--exclude-standard] [-s] [-u] [-t] [-z] [<pathspec>...]`
 ///
 /// Shows information about files in the index and the working tree.
 /// With no mode flag, lists every tracked path (`--cached`). `-m`/`-d` list tracked paths whose
 /// working-tree file was modified/deleted (`-m` also includes deleted files, like git), `-o` lists
 /// untracked files, and `-i` restricts output to `.gitignore`-excluded paths. As in git, untracked
 /// files are printed first, then index entries in path order; a single index entry may be printed
-/// once per matching mode (e.g. both cached and modified).
+/// once per matching mode (e.g. both cached and modified), and an unmerged path once per stage;
+/// `-u` lists only the unmerged entries, with their stages.
 pub fn ls_files(opts: LsFilesOptions) -> Result<()> {
     if opts.ignored && !opts.others && !opts.cached {
         anyhow::bail!("fatal: ls-files -i must be used with either -o or -c");
@@ -57,9 +58,11 @@ pub fn ls_files(opts: LsFilesOptions) -> Result<()> {
             continue;
         }
 
-        if show_index {
-            // `S` marks skip-worktree entries (files left out by a sparse checkout).
-            write_entry(&mut out, entry, tag(if entry.skip_worktree { "S " } else { "H " }), opts.stage, terminator)?;
+        if show_index && (!opts.unmerged || entry.stage != 0) {
+            // `M` marks unmerged entries, `S` skip-worktree ones (files left out by a sparse
+            // checkout). An unmerged path is listed once per stage, as git does.
+            let t = if entry.stage != 0 { "M " } else if entry.skip_worktree { "S " } else { "H " };
+            write_entry(&mut out, entry, tag(t), opts.stage, terminator)?;
         }
 
         if check_worktree && !(entry.skip_worktree && !std::path::Path::new(&entry.path).exists()) {
@@ -79,7 +82,7 @@ pub fn ls_files(opts: LsFilesOptions) -> Result<()> {
 
 fn write_entry(out: &mut impl Write, entry: &IndexEntry, tag: &str, stage: bool, terminator: char) -> io::Result<()> {
     if stage {
-        write!(out, "{}{:06o} {} 0\t{}{}", tag, entry.mode, hex::encode(entry.hash), entry.path, terminator)
+        write!(out, "{}{:06o} {} {}\t{}{}", tag, entry.mode, hex::encode(entry.hash), entry.stage, entry.path, terminator)
     } else {
         write!(out, "{}{}{}", tag, entry.path, terminator)
     }

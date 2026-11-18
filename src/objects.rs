@@ -54,17 +54,6 @@ pub enum DiffOp {
     Insert(String),
 }
 
-/// Holds conflicting three-way file contents (base, ours, and theirs) for conflict marker generation.
-// Used by: src/helpers/merge.rs, src/commands/merge.rs, src/helpers/rebase.rs
-// Used by command/helper: `three_way_tree_merge`, `generate_conflict_markers`, and the `merge`/`rebase` commands
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MergeConflict {
-    pub path: String,
-    pub base: Vec<u8>,
-    pub ours: Vec<u8>,
-    pub theirs: Vec<u8>,
-}
-
 /// Enum of subcommands supported by the stash command.
 // Used by: src/cli.rs, src/commands/stash.rs
 // Used by command/helper: CLI argument parser and the `stash` command dispatcher
@@ -741,7 +730,9 @@ pub struct LsFilesOptions {
     pub exclude_standard: bool,
     /// `-s` / `--stage`: print `<mode> <hash> <stage>\t<path>` instead of just the path.
     pub stage: bool,
-    /// `-t`: prefix each line with a status tag (`H`, `C`, `R`, `?`).
+    /// `-u` / `--unmerged`: show only unmerged (stage 1-3) entries; implies `--stage`.
+    pub unmerged: bool,
+    /// `-t`: prefix each line with a status tag (`H`, `S`, `M`, `C`, `R`, `?`).
     pub show_tags: bool,
     /// `-z`: terminate lines with NUL instead of newline.
     pub null_terminated: bool,
@@ -1072,6 +1063,8 @@ pub struct DiffStatEntry {
     pub added: usize,
     pub deleted: usize,
     pub binary_sizes: Option<(usize, usize)>,
+    /// An unmerged path: shown as `Unmerged`, not counted as a changed file.
+    pub unmerged: bool,
 }
 
 /// The git-format diff of one path between two trees: the full `diff --git` section, its
@@ -2985,6 +2978,21 @@ impl Default for MergeFileOptions {
     }
 }
 
+/// Which version of an unmerged path `restore` / `checkout -- <paths>` write to the working tree.
+// Used by: src/cli.rs, src/commands/restore.rs
+// Used by command/helper: `writeout_stage`, `restore`, `checkout_paths`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteoutStage {
+    /// The index entry; an unmerged path is an error.
+    Index,
+    /// `--ours`: stage 2.
+    Ours,
+    /// `--theirs`: stage 3.
+    Theirs,
+    /// `--merge` / `--conflict=<style>`: stages 1-3 merged again, with conflict markers.
+    Merge(MergeConflictStyle),
+}
+
 /// How conflicts are written by a file merge.
 // Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs
 // Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
@@ -3144,6 +3152,8 @@ pub struct DiffChange {
     pub new: Option<DiffSide>,
     /// For a detected rename or copy: the source path, `R` or `C`, and git's 0..60000 score.
     pub renamed_from: Option<(String, char, u32)>,
+    /// An unmerged path (status `U`): `* Unmerged path` in a patch, `Unmerged` in `--stat`.
+    pub unmerged: bool,
 }
 
 /// Which renames/copies `diffcore_rename` looks for (git's `-M`, `-C`, `--find-copies-harder`,
@@ -3171,6 +3181,11 @@ impl Default for RenameOptions {
 // Used by command/helper: `parse_diff_plumbing_args`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
 #[derive(Debug, Clone, Default)]
 pub struct DiffPlumbingOptions {
+    /// `-1`/`--base`, `-2`/`--ours`, `-3`/`--theirs` (`diff-files`, `diff`): the stage of an
+    /// unmerged path compared with the working tree; with none, a patch shows a combined diff.
+    pub unmerged_stage: Option<u8>,
+    /// `--cc`: combined diffs for unmerged paths even without a patch format asked for.
+    pub combined: bool,
     /// `--raw` (the default when no other format is asked for).
     pub raw: bool,
     /// `-p` / `-u` / `--patch`.

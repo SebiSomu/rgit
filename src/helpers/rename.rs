@@ -275,12 +275,13 @@ pub fn detect_renames(changes: Vec<DiffChange>, opts: &RenameOptions, unmodified
 
     // Destinations: creations. Sources: deletions, plus (copies) modified files, plus
     // (--find-copies-harder) unchanged files, all in path order.
-    let dsts: Vec<usize> = (0..changes.len()).filter(|&i| changes[i].old.is_none() && changes[i].new.as_ref().is_some_and(usable)).collect();
+    let dsts: Vec<usize> = (0..changes.len()).filter(|&i| !changes[i].unmerged && changes[i].old.is_none() && changes[i].new.as_ref().is_some_and(usable)).collect();
     if dsts.is_empty() {
         return changes;
     }
     let mut sources: Vec<Source> = Vec::new();
-    for change in &changes {
+    // Unmerged paths take no part in rename detection.
+    for change in changes.iter().filter(|c| !c.unmerged) {
         match (&change.old, &change.new) {
             (Some(old), None) if usable(old) => sources.push(Source { path: change.path.clone(), side: old.clone(), used: 0, deleted: true, id: old.hash }),
             (Some(old), Some(_)) if copies && usable(old) => sources.push(Source { path: change.path.clone(), side: old.clone(), used: 1, deleted: false, id: old.hash }),
@@ -465,6 +466,7 @@ pub fn detect_renames(changes: Vec<DiffChange>, opts: &RenameOptions, unmodified
                 old: Some(src.side.clone()),
                 new,
                 renamed_from: Some((src.path.clone(), status, score as u32)),
+                unmerged: false,
             });
             continue;
         }

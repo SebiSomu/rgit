@@ -11,7 +11,7 @@ use crate::helpers::commit::{
     build_commit, commit_parents, extract_commit_message, resolve_tree_from_source, short_hash,
 };
 use crate::helpers::config::get_config_value;
-use crate::helpers::merge::{generate_conflict_markers, three_way_tree_merge};
+use crate::helpers::merge::merge_into_worktree;
 use crate::helpers::objects::{read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::helpers::state_files::read_lines_set;
 use crate::index::{build_entry, read_index, write_index};
@@ -311,7 +311,8 @@ pub fn begin_replay(head_state: &refs::HeadState, orig_head: &str, onto: &str, i
 // Used by `rebase`.
 pub fn rebase_continue() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
-        anyhow::bail!("fatal: no rebase in progress");
+        eprintln!("fatal: No rebase in progress?");
+        std::process::exit(128);
     }
 
     if crate::repo::path(REBASE_PAUSE_PATH).exists() {
@@ -325,17 +326,12 @@ pub fn rebase_continue() -> anyhow::Result<()> {
         return finish_rebase();
     };
 
-    let entries = read_index().unwrap_or_default();
-    for entry in &entries {
-        if let Ok(content) = fs::read(&entry.path) {
-            if content.windows(7).any(|w| w == b"<<<<<<<") {
-                anyhow::bail!(
-                    "error: '{}' still has unresolved conflict markers; fix it and 'rgit add' it first",
-                    entry.path
-                );
-            }
-        }
+    if crate::helpers::merge::report_needs_merge() {
+        eprintln!("You must edit all merge conflicts and then");
+        eprintln!("mark them as resolved using rgit add");
+        std::process::exit(1);
     }
+    let entries = read_index().unwrap_or_default();
 
     let current_head = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: rebase lost HEAD -- this should not happen"))?;
@@ -351,7 +347,8 @@ pub fn rebase_continue() -> anyhow::Result<()> {
 // Used by `rebase`.
 pub fn rebase_abort() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
-        anyhow::bail!("fatal: no rebase in progress");
+        eprintln!("fatal: No rebase in progress?");
+        std::process::exit(128);
     }
 
     let orig_head = fs::read_to_string(crate::repo::path(REBASE_ORIG_HEAD_PATH))
@@ -400,7 +397,8 @@ pub fn rebase_abort() -> anyhow::Result<()> {
 // Used by the `rebase` command.
 pub fn rebase_skip() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
-        anyhow::bail!("fatal: no rebase in progress");
+        eprintln!("fatal: No rebase in progress?");
+        std::process::exit(128);
     }
 
     if crate::repo::path(REBASE_PAUSE_PATH).exists() {
@@ -458,7 +456,8 @@ pub fn rebase_skip() -> anyhow::Result<()> {
 // Used by the `rebase` command.
 pub fn rebase_edit_todo() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
-        anyhow::bail!("fatal: no rebase in progress");
+        eprintln!("fatal: No rebase in progress?");
+        std::process::exit(128);
     }
 
     let items = read_todo()?;
@@ -537,67 +536,23 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
         let their_tree = resolve_tree_from_source(&item.hash)?;
         let our_tree = resolve_tree_from_source(&current_head)?;
 
-        let (merged_tree, conflicts) = three_way_tree_merge(&base_tree, &our_tree, &their_tree)?;
-
-        if !conflicts.is_empty() {
-            for conflict in &conflicts {
-                let conflict_content = generate_conflict_markers(
-                    &conflict.ours,
-                    &conflict.theirs,
-                    &format!("{}...", short_hash(&item.hash)),
-                );
-                if let Some(parent) = Path::new(&conflict.path).parent() {
-                    if !parent.as_os_str().is_empty() {
-                        fs::create_dir_all(parent)?;
-                    }
-                }
-                fs::write(&conflict.path, &conflict_content)?;
-                println!("CONFLICT (content): Merge conflict in {}", conflict.path);
-            }
-
-            for (path, (hash, _mode)) in &merged_tree {
-                let (_, content) = read_object(&hex::encode(hash))?;
-                if let Some(parent) = Path::new(path).parent() {
-                    if !parent.as_os_str().is_empty() {
-                        fs::create_dir_all(parent)?;
-                    }
-                }
-                fs::write(path, &content)?;
-            }
-
-            println!("error: could not apply {}... {}", short_hash(&item.hash), item.subject);
-            println!("hint: after resolving the conflicts, mark the corrected paths");
-            println!("hint: with 'rgit add <paths>' and run 'rgit rebase --continue'");
-            println!("hint: (or 'rgit rebase --abort' to give up)");
-            return Ok(());
+        let their_label = format!("{} ({})", short_hash(&item.hash), item.subject);
+        let result = merge_into_worktree(&base_tree, &our_tree, &their_tree, "HEAD", &their_label, "merge")?;
+        for message in &result.messages {
+            println!("{}", message.text);
         }
 
-        for path in our_tree.keys() {
-            if !merged_tree.contains_key(path) {
-                let path_obj = Path::new(path);
-                if path_obj.exists() {
-                    let _ = fs::remove_file(path_obj);
-                }
-            }
+        if !result.conflicted.is_empty() {
+            eprintln!("error: could not apply {}... {}", short_hash(&item.hash), item.subject);
+            eprintln!("hint: Resolve all conflicts manually, mark them as resolved with");
+            eprintln!("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
+            eprintln!("hint: You can instead skip this commit: run \"rgit rebase --skip\".");
+            eprintln!("hint: To abort and get back to the state before \"rgit rebase\", run \"rgit rebase --abort\".");
+            eprintln!("Could not apply {}... {}", short_hash(&item.hash), item.subject);
+            std::process::exit(1);
         }
 
-        let mut new_index_entries = Vec::new();
-        for (path, (hash, _mode)) in &merged_tree {
-            let (_, content) = read_object(&hex::encode(hash))?;
-            if let Some(parent) = Path::new(path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(path, &content)?;
-
-            let metadata = fs::metadata(path)?;
-            let entry = build_entry(path, *hash, &metadata);
-            new_index_entries.push(entry);
-        }
-        write_index(&mut new_index_entries)?;
-
-        let tree_hash = write_tree_from_index_prefix(&new_index_entries, "")?;
+        let tree_hash = crate::helpers::build_tree_from_map(&result.tree)?;
 
         match commit_item(&item, &rest, &current_head, tree_hash)? {
             ItemResult::Done => continue,

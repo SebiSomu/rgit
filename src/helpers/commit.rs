@@ -256,8 +256,17 @@ pub fn write_commit_object(tree: &str, parents: &[String], author: &CommitSignat
 /// modified file and `('D', path)` for a deleted one, in path order.
 // Used by `commit -a` and `commit`'s "no changes added to commit" report.
 pub fn tracked_worktree_changes() -> anyhow::Result<Vec<(char, String)>> {
-    let mut changes = Vec::new();
+    let mut changes: Vec<(char, String)> = Vec::new();
     for entry in read_index().unwrap_or_default() {
+        // An unmerged path is always a change: its working-tree file (or its absence)
+        // resolves the conflict.
+        if entry.stage != 0 {
+            if changes.last().map(|c| &c.1) != Some(&entry.path) {
+                let kind = if std::path::Path::new(&entry.path).is_file() { 'M' } else { 'D' };
+                changes.push((kind, entry.path));
+            }
+            continue;
+        }
         // Submodules are staged with `add`, not picked up by `commit -a`.
         if entry.mode == 0o160000 {
             continue;
@@ -296,30 +305,6 @@ pub fn stage_tracked_changes() -> anyhow::Result<()> {
         }
     }
     write_index(&mut entries)
-}
-
-/// Lists the paths of an in-progress merge that are still unresolved: those recorded under
-/// `# Conflicts:` in `MERGE_MSG` whose working-tree file or staged copy still contains
-/// conflict markers.
-// Used by `commit` to refuse concluding a merge with unresolved conflicts.
-pub fn unresolved_merge_paths() -> anyhow::Result<Vec<String>> {
-    let Ok(msg) = fs::read_to_string(crate::repo::path(".git/MERGE_MSG")) else {
-        return Ok(Vec::new());
-    };
-    let has_markers = |bytes: &[u8]| {
-        let text = String::from_utf8_lossy(bytes);
-        text.lines().any(|l| l.starts_with("<<<<<<< ")) && text.lines().any(|l| l.starts_with(">>>>>>> "))
-    };
-    let staged: BTreeMap<String, [u8; 20]> = read_index().unwrap_or_default().into_iter().map(|e| (e.path, e.hash)).collect();
-    let mut unresolved = Vec::new();
-    for path in msg.lines().filter_map(|l| l.strip_prefix("#\t")) {
-        let in_worktree = fs::read(path).map(|b| has_markers(&b)).unwrap_or(false);
-        let in_index = staged.get(path).and_then(|h| read_object(&hex::encode(h)).ok()).is_some_and(|(_, b)| has_markers(&b));
-        if in_worktree || in_index {
-            unresolved.push(path.to_string());
-        }
-    }
-    Ok(unresolved)
 }
 
 /// Formats a commit date the way `git commit` prints it (`Sat Oct 24 12:19:34 2026 +0300`).

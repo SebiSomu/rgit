@@ -87,6 +87,7 @@ pub mod graph;
 pub mod follow;
 pub mod add_patch;
 pub mod rename;
+pub mod combine_diff;
 
 pub use objects::*;
 pub use diff::*;

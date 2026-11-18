@@ -307,7 +307,7 @@ pub fn run_fast_export(opts: &FastExportOptions, out: &mut impl Write) -> Result
         for path in paths {
             let (old, new) = (old_files.get(path), new_files.get(path));
             if old != new {
-                diff.push(DiffChange { path: path.clone(), old: old.map(side), new: new.map(side), renamed_from: None });
+                diff.push(DiffChange { path: path.clone(), old: old.map(side), new: new.map(side), renamed_from: None, unmerged: false });
             }
         }
         let unmodified = if opts.renames.find_copies_harder { crate::helpers::diff_plumbing::unmodified_files(&old_files, &diff) } else { Vec::new() };

@@ -136,7 +136,7 @@ src/
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
-│   ├── merge.rs              # Three-way tree merge & conflict marker formatting
+│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
@@ -212,6 +212,7 @@ src/
 │   ├── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
 │   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
 │   ├── rename.rs             # git diffcore-rename port: exact/basename/similarity rename+copy detection, -M/-C parsing, limit warnings
+│   ├── combine_diff.rs       # git combine-diff.c port: diff --cc of unmerged paths vs the working tree
 │   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │
 ├── objects.rs                # Special types, enums, structs, and type aliases

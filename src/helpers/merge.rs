@@ -1,88 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 use crate::helpers::objects::{read_object, write_object};
-use crate::objects::MergeConflict;
-
-/// Runs a git-style three-way tree merge given base/ours/theirs, returning the
-/// resulting merged tree plus any paths that conflict and need manual resolution.
-/// Identical to the diff loop `merge` uses inline, factored out here so both
-/// `cherry_pick` and `cherry_pick_abort` (which has to recompute what an in-progress pick touched) can share it.
-// Used by `cherry_pick` and `cherry_pick_abort`.
-pub fn three_way_tree_merge(base_tree: &BTreeMap<String, ([u8; 20], u32)>, our_tree: &BTreeMap<String, ([u8; 20], u32)>, their_tree: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::Result<(BTreeMap<String, ([u8; 20], u32)>, Vec<MergeConflict>)> {
-    let mut all_paths = BTreeSet::new();
-    for p in base_tree.keys() { all_paths.insert(p.clone()); }
-    for p in our_tree.keys() { all_paths.insert(p.clone()); }
-    for p in their_tree.keys() { all_paths.insert(p.clone()); }
-
-    let mut merged_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
-    let mut conflicts: Vec<MergeConflict> = Vec::new();
-
-    for path in all_paths {
-        let base_entry = base_tree.get(&path);
-        let our_entry = our_tree.get(&path);
-        let their_entry = their_tree.get(&path);
-
-        if our_entry == their_entry {
-            if let Some(entry) = our_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else if their_entry == base_entry {
-            if let Some(entry) = our_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else if our_entry == base_entry {
-            if let Some(entry) = their_entry {
-                merged_tree.insert(path, *entry);
-            }
-        } else {
-            let our_bytes = if let Some(our) = our_entry {
-                read_object(&hex::encode(our.0))?.1
-            } else {
-                Vec::new()
-            };
-            let their_bytes = if let Some(their) = their_entry {
-                read_object(&hex::encode(their.0))?.1
-            } else {
-                Vec::new()
-            };
-            let base_bytes = if let Some(base) = base_entry {
-                read_object(&hex::encode(base.0))?.1
-            } else {
-                Vec::new()
-            };
-
-            conflicts.push(MergeConflict {
-                path,
-                base: base_bytes,
-                ours: our_bytes,
-                theirs: their_bytes,
-            });
-        }
-    }
-
-    Ok((merged_tree, conflicts))
-}
-
-/// Generates file content containing conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
-// Used by the `merge` command when conflicts are detected.
-pub fn generate_conflict_markers(ours_content: &[u8], theirs_content: &[u8], branch_name: &str) -> Vec<u8> {
-    let ours_str = String::from_utf8_lossy(ours_content);
-    let theirs_str = String::from_utf8_lossy(theirs_content);
-
-    let mut out = String::new();
-    out.push_str("<<<<<<< HEAD\n");
-    out.push_str(&ours_str);
-    if !ours_str.ends_with('\n') && !ours_str.is_empty() {
-        out.push('\n');
-    }
-    out.push_str("=======\n");
-    out.push_str(&theirs_str);
-    if !theirs_str.ends_with('\n') && !theirs_str.is_empty() {
-        out.push('\n');
-    }
-    out.push_str(&format!(">>>>>>> {}\n", branch_name));
-
-    out.into_bytes()
-}
 
 /// Finds all best common ancestors (merge bases) between two commits.
 // Used by `merge_base`.
@@ -192,4 +109,106 @@ pub fn build_merge_commit(tree_hash: String, parent1: &str, parent2: &str, messa
     content.push_str(&format!("\n{}\n", message));
 
     write_object("commit", content.as_bytes())
+}
+type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
+
+/// Replaces the index entries of every conflicted path with its unmerged stages: 1 for the
+/// common ancestor, 2 for ours and 3 for theirs, leaving out the sides that don't have the
+/// path (a modify/delete conflict has no stage 2 or 3; an add/add one no stage 1).
+// Used by `merge`, `cherry-pick`, `revert` and `rebase` after a conflicted merge.
+pub fn write_conflict_stages(conflicted: &BTreeMap<String, [Option<([u8; 20], u32)>; 3]>) -> anyhow::Result<()> {
+    use crate::index::{read_index, write_index, IndexEntry};
+    if conflicted.is_empty() {
+        return Ok(());
+    }
+    let mut entries = read_index().unwrap_or_default();
+    entries.retain(|e| !conflicted.contains_key(&e.path));
+    for (path, sides) in conflicted {
+        for (i, side) in sides.iter().enumerate() {
+            if let Some((hash, mode)) = side {
+                entries.push(IndexEntry::unmerged(path, *hash, *mode, i as u8 + 1));
+            }
+        }
+    }
+    write_index(&mut entries)
+}
+
+/// Paths that have unmerged (stage 1-3) entries in the index, in index order.
+// Used by every command that must refuse to run on an unresolved conflict, and by `status`.
+pub fn unmerged_paths(entries: &[crate::index::IndexEntry]) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::new();
+    for entry in entries.iter().filter(|e| e.stage != 0) {
+        if paths.last() != Some(&entry.path) {
+            paths.push(entry.path.clone());
+        }
+    }
+    paths
+}
+
+/// git's `die_resolve_conflict` / `error_resolve_conflict`: when the index has unmerged paths,
+/// prints `error: <Verb> is not possible because you have unmerged files.`, the resolve hints,
+/// and `fatal: <fatal>`, then exits with 128. Does nothing on a fully merged index.
+// Used by `merge`, `cherry-pick`, `revert` and (through `die_if_unmerged_for_commit`) `commit`.
+pub fn die_if_unmerged(verb: &str, fatal: &str) -> anyhow::Result<()> {
+    resolve_conflict_or_die(verb, fatal, false)
+}
+
+/// `commit`'s refusal on an unmerged index: git's `die_if_unmerged("Committing", ...)` text on
+/// stderr, then each unmerged path as `U\t<path>` on stdout (the porcelain refresh report,
+/// which git flushes last when its output is piped).
+// Used by `commit` and the `--continue` of `cherry-pick` and `revert`.
+pub fn die_if_unmerged_for_commit() -> anyhow::Result<()> {
+    resolve_conflict_or_die("Committing", "Exiting because of an unresolved conflict.", true)
+}
+
+fn resolve_conflict_or_die(verb: &str, fatal: &str, list_paths: bool) -> anyhow::Result<()> {
+    let entries = crate::index::read_index().unwrap_or_default();
+    let paths = unmerged_paths(&entries);
+    if paths.is_empty() {
+        return Ok(());
+    }
+    eprintln!("error: {} is not possible because you have unmerged files.", verb);
+    eprintln!("hint: Fix them up in the work tree, and then use 'rgit add/rm <file>'");
+    eprintln!("hint: as appropriate to mark resolution and make a commit.");
+    eprintln!("fatal: {}", fatal);
+    if list_paths {
+        for path in &paths {
+            println!("U\t{}", path);
+        }
+    }
+    std::process::exit(128);
+}
+
+/// Prints `<path>: needs merge` for each unmerged path (git's refresh-index report) and
+/// returns whether there were any.
+// Used by `switch`/`checkout <branch>`, `reset --soft` and the sequencer before they refuse.
+pub fn report_needs_merge() -> bool {
+    let entries = crate::index::read_index().unwrap_or_default();
+    let paths = unmerged_paths(&entries);
+    for path in &paths {
+        println!("{}: needs merge", path);
+    }
+    !paths.is_empty()
+}
+
+/// Merges `theirs` into `ours` relative to `base` and writes the result into the working tree
+/// and index, the way git's sequencer and `merge` do: files that merged cleanly are staged,
+/// conflicted files get their marker content in the working tree and their stages 1-3 in the
+/// index. Fails without touching anything when local changes would be overwritten (the error
+/// names `operation`). Returns the merge result so the caller can print its messages and
+/// decide whether to commit.
+// Used by `merge`, `cherry-pick`, `revert` and `rebase`.
+pub fn merge_into_worktree(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str) -> anyhow::Result<crate::objects::TreeMergeResult> {
+    use crate::helpers::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};
+    use crate::helpers::merge_tree::merge_trees_in_memory;
+    let result = merge_trees_in_memory(base, ours, theirs, our_label, their_label, 7)?;
+    let index_entries = crate::index::read_index().unwrap_or_default();
+    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), e.hash)).collect();
+    check_switch_safety(&result.tree, ours, &index_map).map_err(|e| {
+        anyhow::anyhow!("{}", e.to_string().replace("by switch", &format!("by {}", operation)).replace("before you switch branches", &format!("before you {}", operation)))
+    })?;
+    sync_working_tree(&result.tree, ours, &index_map)?;
+    update_index_from_tree(&result.tree, ours)?;
+    write_conflict_stages(&result.conflicted)?;
+    Ok(result)
 }

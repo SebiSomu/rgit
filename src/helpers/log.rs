@@ -463,7 +463,7 @@ pub fn commit_diff_output_width(commit: &ParsedCommit, opts: &LogOptions, stat_w
     for path in paths {
         let (a, b) = (old.get(path), new.get(path));
         if a != b {
-            changes.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None });
+            changes.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None, unmerged: false });
         }
     }
     if opts.renames.level > 0 {

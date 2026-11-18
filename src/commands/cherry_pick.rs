@@ -1,21 +1,23 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
 use anyhow::Context;
 use crate::helpers::{
-    build_commit, build_index_entries_for_tree, commit_parents, extract_commit_message,
-    generate_conflict_markers, hard_reset_working_tree, read_object, resolve_commit_from_source,
-    resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit, write_tree_from_index_prefix,
+    build_commit, build_index_entries_for_tree, build_tree_from_map, commit_parents, extract_commit_message,
+    hard_reset_working_tree, read_object, resolve_commit_from_source, resolve_tree_from_source,
+    tree_hash_of_commit, write_tree_from_index_prefix,
 };
-use crate::index::{build_entry, read_index, write_index};
+use crate::helpers::merge::{die_if_unmerged, die_if_unmerged_for_commit, merge_into_worktree};
+use crate::index::{read_index, write_index};
 use crate::refs;
 
 /// Replays a single commit's changes (relative to its own parent) onto the current
 /// HEAD, similar to `git cherry-pick <commit>`. On a clean apply, creates a new
 /// commit with a single parent (the current HEAD) carrying the original message
-/// plus a `(cherry picked from commit ...)` trailer. On conflicts, writes conflict
-/// markers into the working tree and records `.git/CHERRY_PICK_HEAD` /
-/// `.git/CHERRY_PICK_MSG` so `--continue` or `--abort` can finish the job later.
+/// plus a `(cherry picked from commit ...)` trailer. The merge is git's line-level three-way
+/// merge with `HEAD` and `<abbrev> (<subject>)` as labels. On conflicts, the markers go into
+/// the working tree, the conflicted paths get their stages 1-3 in the index, and
+/// `.git/CHERRY_PICK_HEAD` / `.git/CHERRY_PICK_MSG` are recorded so `--continue` or `--abort`
+/// can finish the job later.
 // Used by the `cherry-pick` command.
 pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) -> anyhow::Result<()> {
     if abort {
@@ -29,6 +31,7 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
         anyhow::anyhow!("fatal: cherry-pick requires a <commit>, or --continue / --abort")
     })?;
 
+    die_if_unmerged("Cherry-picking", "cherry-pick failed")?;
     if crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         anyhow::bail!(
             "fatal: a cherry-pick is already in progress\n\
@@ -67,68 +70,33 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
     let their_tree = resolve_tree_from_source(&pick_commit)?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
 
-    let (merged_tree, conflicts) = three_way_tree_merge(&base_tree, &our_tree, &their_tree)?;
-
-    if !conflicts.is_empty() {
-        for conflict in &conflicts {
-            let conflict_content =
-                generate_conflict_markers(&conflict.ours, &conflict.theirs, &format!("{}...", &pick_commit[..7]));
-            if let Some(parent) = Path::new(&conflict.path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(&conflict.path, &conflict_content)?;
-            println!("CONFLICT (content): Merge conflict in {}", conflict.path);
+    let their_label = format!("{} ({})", &pick_commit[..7], subject);
+    let result = match merge_into_worktree(&base_tree, &our_tree, &their_tree, "HEAD", &their_label, "merge") {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("{}", e);
+            eprintln!("fatal: cherry-pick failed");
+            std::process::exit(128);
         }
+    };
+    for message in &result.messages {
+        println!("{}", message.text);
+    }
 
-        for (path, (hash, _mode)) in &merged_tree {
-            let (_, content) = read_object(&hex::encode(hash))?;
-            if let Some(parent) = Path::new(path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(path, &content)?;
-        }
-
+    if !result.conflicted.is_empty() {
         fs::write(crate::repo::path(".git/CHERRY_PICK_HEAD"), format!("{}\n", pick_commit))?;
         fs::write(crate::repo::path(".git/CHERRY_PICK_MSG"), format!("{}\n", final_message))?;
 
-        println!("error: could not apply {}... {}", &pick_commit[..7], subject);
-        println!("hint: after resolving the conflicts, mark the corrected paths");
-        println!("hint: with 'rgit add <paths>' and run 'rgit cherry-pick --continue'");
-        println!("hint: (or 'rgit cherry-pick --abort' to give up)");
-        return Ok(());
+        eprintln!("error: could not apply {}... {}", &pick_commit[..7], subject);
+        eprintln!("hint: After resolving the conflicts, mark them with");
+        eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
+        eprintln!("hint: \"rgit cherry-pick --continue\".");
+        eprintln!("hint: To abort and get back to the state before \"rgit cherry-pick\",");
+        eprintln!("hint: run \"rgit cherry-pick --abort\".");
+        std::process::exit(1);
     }
 
-    for path in our_tree.keys() {
-        if !merged_tree.contains_key(path) {
-            let path_obj = Path::new(path);
-            if path_obj.exists() {
-                let _ = fs::remove_file(path_obj);
-            }
-        }
-    }
-
-    let mut new_index_entries = Vec::new();
-    for (path, (hash, _mode)) in &merged_tree {
-        let (_, content) = read_object(&hex::encode(hash))?;
-        if let Some(parent) = Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-        fs::write(path, &content)?;
-
-        let metadata = fs::metadata(path)?;
-        let entry = build_entry(path, *hash, &metadata);
-        new_index_entries.push(entry);
-    }
-
-    write_index(&mut new_index_entries)?;
-
-    let tree_hash = write_tree_from_index_prefix(&new_index_entries, "")?;
+    let tree_hash = build_tree_from_map(&result.tree)?;
 
     if tree_hash_of_commit(&our_commit)? == tree_hash {
         println!(
@@ -163,13 +131,13 @@ pub fn cherry_pick(commit: Option<String>, no_commit: bool, cont: bool, abort: b
 }
 
 /// Finishes an in-progress cherry-pick after conflicts have been resolved and
-/// staged with `add`. Refuses if unresolved `<<<<<<<` markers remain anywhere in
-/// the index's files, then commits with the original message + trailer that was
+/// staged with `add`. Refuses while the index still has unmerged paths, then commits with the original message + trailer that was
 /// saved to `.git/CHERRY_PICK_MSG` when the conflict was first hit.
 // Used by `cherry-pick --continue`.
 fn cherry_pick_continue() -> anyhow::Result<()> {
     if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
-        anyhow::bail!("fatal: no cherry-pick in progress");
+        eprintln!("error: no cherry-pick or revert in progress\nfatal: cherry-pick failed");
+        std::process::exit(128);
     }
 
     let pick_commit = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD"))?.trim().to_string();
@@ -178,17 +146,8 @@ fn cherry_pick_continue() -> anyhow::Result<()> {
         .trim_end_matches('\n')
         .to_string();
 
+    die_if_unmerged_for_commit()?;
     let entries = read_index().unwrap_or_default();
-    for entry in &entries {
-        if let Ok(content) = fs::read(&entry.path) {
-            if content.windows(7).any(|w| w == b"<<<<<<<") {
-                anyhow::bail!(
-                    "error: '{}' still has unresolved conflict markers; fix it and 'rgit add' it first",
-                    entry.path
-                );
-            }
-        }
-    }
 
     let our_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
@@ -230,7 +189,8 @@ fn cherry_pick_continue() -> anyhow::Result<()> {
 // Used by `cherry-pick --abort`.
 fn cherry_pick_abort() -> anyhow::Result<()> {
     if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
-        anyhow::bail!("fatal: no cherry-pick in progress");
+        eprintln!("error: no cherry-pick or revert in progress\nfatal: cherry-pick failed");
+        std::process::exit(128);
     }
 
     let pick_commit = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD"))?.trim().to_string();
@@ -238,26 +198,10 @@ fn cherry_pick_abort() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
 
-    let (object_type, content) = read_object(&pick_commit)?;
-    let (merged_tree, conflicts) = if object_type == "commit" {
-        let text = String::from_utf8_lossy(&content).to_string();
-        let parents = commit_parents(&text);
-        let base_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(parent) = parents.first() {
-            resolve_tree_from_source(parent)?
-        } else {
-            BTreeMap::new()
-        };
-        let their_tree = resolve_tree_from_source(&pick_commit)?;
-        three_way_tree_merge(&base_tree, &our_tree, &their_tree)?
-    } else {
-        (BTreeMap::new(), Vec::new())
-    };
-
+    // Every path the pick touched is in the index (conflicted ones as stages 1-3).
     let index_entries = read_index().unwrap_or_default();
     let mut tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
     tracked_paths.extend(our_tree.keys().cloned());
-    tracked_paths.extend(merged_tree.keys().cloned());
-    tracked_paths.extend(conflicts.iter().map(|c| c.path.clone()));
 
     hard_reset_working_tree(&our_tree, &tracked_paths)?;
 

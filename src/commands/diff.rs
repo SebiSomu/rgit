@@ -24,7 +24,9 @@ type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 /// format is asked for (`--stat`, `--shortstat`, `--numstat`, `--summary`, `--name-only`,
 /// `--name-status`, `--raw`, `-s`); `-z`, `-R`, `--abbrev`, `--exit-code` and `--quiet` work as
 /// for the raw commands. Renames are detected by default (`diff.renames`; `-M[<n>]`, `-C[<n>]`,
-/// `--find-copies-harder`, `-l<n>`, `--no-renames`). Files left out by a sparse checkout count
+/// `--find-copies-harder`, `-l<n>`, `--no-renames`). Unmerged paths show as `U` (`* Unmerged
+/// path`); with no revision, a path with both sides gets a combined diff (`diff --cc`) unless
+/// a stage is chosen with `-1`/`-2`/`-3` (`--base`/`--ours`/`--theirs`). Files left out by a sparse checkout count
 /// as unchanged. Exit status: 0 (1 with `--exit-code` and differences), 128 on errors.
 pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
     let usage = format!("usage: rgit diff [<options>] [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] --cached [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] <commit> [<commit>...] <commit> [--] [<path>...]\n\n{}", DIFF_COMMON_OPTIONS);
@@ -92,11 +94,17 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
 
     let index = read_index().unwrap_or_default();
     let skipped: std::collections::HashSet<String> = index.iter().filter(|e| e.skip_worktree).map(|e| e.path.clone()).collect();
+    let mut combined_text = String::new();
     let (mut changes, start): (Vec<DiffChange>, TreeMap) = match (opts.cached, revs.len()) {
         (false, 0) => {
             let tracked: Vec<_> = index.iter().filter(|e| !e.skip_worktree).cloned().collect();
-            let start = index.iter().map(|e| (e.path.clone(), (e.hash, e.mode))).collect();
-            (diff_files_changes(&tracked, &specs), start)
+            let start = index.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), (e.hash, e.mode))).collect();
+            // Unmerged paths with both sides: a combined diff when a patch is shown.
+            let combined = opts.patch && opts.unmerged_stage.is_none();
+            if combined && !opts.reverse {
+                combined_text = crate::helpers::combine_diff::combined_worktree_diffs(&tracked, &specs)?;
+            }
+            (diff_files_changes(&tracked, &specs, opts.unmerged_stage.unwrap_or(2), combined, true), start)
         }
         (true, 0) | (true, 1) => {
             let tree = match revs.first() {
@@ -104,11 +112,11 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
                 None if refs::resolve_head_commit()?.is_some() => tree_of("HEAD"),
                 None => TreeMap::new(),
             };
-            (diff_index_changes(&tree, &index, true, false, &specs), tree)
+            (diff_index_changes(&tree, &index, true, false, true, &specs), tree)
         }
         (false, 1) => {
             let tree = tree_of(&revs[0]);
-            let mut changes = diff_index_changes(&tree, &index, false, false, &specs);
+            let mut changes = diff_index_changes(&tree, &index, false, false, true, &specs);
             // A file left out by a sparse checkout stands for its staged content.
             for change in changes.iter_mut().filter(|c| skipped.contains(&c.path)) {
                 change.new = index.iter().find(|e| e.path == change.path).map(|e| DiffSide { mode: e.mode, hash: e.hash, worktree: false });
@@ -128,14 +136,18 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
         reverse_changes(&mut changes);
     }
     if opts.renames.level > 0 {
+        crate::helpers::diff_plumbing::fill_rename_destination_hashes(&mut changes);
         let mut start = if opts.renames.find_copies_harder && !opts.reverse { start } else { TreeMap::new() };
         start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, &specs));
         let unmodified = unmodified_files(&start, &changes);
         changes = detect_renames(changes, &opts.renames, &unmodified);
     }
+    if !(opts.quiet || opts.no_output) {
+        std::io::stdout().lock().write_all(combined_text.as_bytes())?;
+    }
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
     warn_rename_limit("diff.renameLimit");
-    if (opts.exit_code || opts.quiet) && !changes.is_empty() {
+    if (opts.exit_code || opts.quiet) && (!changes.is_empty() || !combined_text.is_empty()) {
         std::process::exit(1);
     }
     Ok(())

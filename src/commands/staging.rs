@@ -34,7 +34,29 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     if gitlinks_changed > 0 {
         write_index(&mut entries)?;
     }
+    // A tracked path that no longer exists on disk is staged as a deletion (this is how a
+    // conflict is resolved by removing the file); its unmerged stages go with it.
+    let mut removed = 0;
+    for path in &paths {
+        let given = normalize_path(path);
+        if path.exists() || given.is_empty() || given == "." {
+            continue;
+        }
+        let below = format!("{}/", given);
+        let before = entries.len();
+        let gone: std::collections::BTreeSet<String> = entries.iter().filter(|e| e.path == given || e.path.starts_with(&below)).map(|e| e.path.clone()).collect();
+        entries.retain(|e| e.path != given && !e.path.starts_with(&below));
+        if entries.len() != before {
+            removed += gone.len();
+        }
+    }
+    if removed > 0 {
+        write_index(&mut entries)?;
+    }
     for path in paths {
+        if !path.exists() && removed > 0 {
+            continue;
+        }
         // The submodule itself was handled above; its files are not ours.
         if path.is_dir() && path.join(".git").exists() && !normalize_path(&path).is_empty() && normalize_path(&path) != "." {
             continue;
@@ -42,6 +64,10 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
         collect_files(&path, &mut files_to_add)?;
     }
 
+    if files_to_add.is_empty() && removed > 0 {
+        println!("Staged files to index ({} removed).", removed);
+        return Ok(());
+    }
     if files_to_add.is_empty() && gitlinks_changed > 0 {
         println!("Staged files to index ({} submodule{}).", gitlinks_changed, if gitlinks_changed == 1 { "" } else { "s" });
         return Ok(());
@@ -62,7 +88,10 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
         let hash = hash_content("blob", &content);
         let rel_path = normalize_path(&file_path);
 
-        match entries.iter().find(|e| e.path == rel_path) {
+        // An unmerged path always gets its stages replaced by the new stage-0 entry.
+        let conflicted = entries.iter().any(|e| e.path == rel_path && e.stage != 0);
+        match entries.iter().find(|e| e.path == rel_path && e.stage == 0) {
+            _ if conflicted => modified += 1,
             Some(existing) if existing.hash == hash => {
                 // Content already matches what's staged -- nothing to do.
                 unchanged += 1;
@@ -82,7 +111,7 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
         entries.push(new_entry);
     }
 
-    if added == 0 && modified == 0 {
+    if added == 0 && modified == 0 && removed == 0 {
         println!(
             "nothing to add: {} file(s) already up to date, no modifications found",
             unchanged
@@ -98,6 +127,9 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     }
     if modified > 0 {
         summary.push(format!("{} modified", modified));
+    }
+    if removed > 0 {
+        summary.push(format!("{} removed", removed));
     }
     if unchanged > 0 {
         summary.push(format!("{} unchanged", unchanged));
@@ -135,8 +167,30 @@ pub fn status() -> anyhow::Result<()> {
     let index_entries = read_index().unwrap_or_default();
     let index_map: BTreeMap<String, ([u8; 20], u32)> = index_entries
         .iter()
+        .filter(|e| e.stage == 0)
         .map(|e| (e.path.clone(), (e.hash, e.mode)))
         .collect();
+    // Unmerged paths and which of stages 1-3 each has (bit `stage - 1`).
+    let mut unmerged: BTreeMap<String, u8> = BTreeMap::new();
+    for entry in index_entries.iter().filter(|e| e.stage != 0) {
+        *unmerged.entry(entry.path.clone()).or_default() |= 1 << (entry.stage - 1);
+    }
+
+    // The in-progress operation, as git reports it (with status hints off).
+    let mut state_lines: Vec<String> = Vec::new();
+    if crate::repo::path(".git/MERGE_HEAD").exists() {
+        state_lines.push(if unmerged.is_empty() { "All conflicts fixed but you are still merging.".into() } else { "You have unmerged paths.".into() });
+    } else if let Ok(pick) = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD")) {
+        state_lines.push(format!("You are currently cherry-picking commit {}.", pick.trim().get(..7).unwrap_or(pick.trim())));
+    } else if let Ok(revert) = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD")) {
+        state_lines.push(format!("You are currently reverting commit {}.", revert.trim().get(..7).unwrap_or(revert.trim())));
+    }
+    for line in &state_lines {
+        println!("{}", line);
+    }
+    if !state_lines.is_empty() {
+        println!();
+    }
 
     if crate::helpers::sparse::sparse_checkout_enabled() && !index_entries.is_empty() {
         let present = index_entries.iter().filter(|e| !e.skip_worktree).count();
@@ -147,15 +201,15 @@ pub fn status() -> anyhow::Result<()> {
     let mut staged_modified = Vec::new();
     let mut staged_deleted = Vec::new();
 
-    for (path, (hash, _mode)) in &index_map {
+    for (path, (hash, mode)) in &index_map {
         match head_tree.get(path) {
             None => staged_new.push(path.clone()),
-            Some((head_hash, _)) if head_hash != hash => staged_modified.push(path.clone()),
+            Some((head_hash, head_mode)) if head_hash != hash || head_mode != mode => staged_modified.push(path.clone()),
             _ => {}
         }
     }
     for path in head_tree.keys() {
-        if !index_map.contains_key(path) {
+        if !index_map.contains_key(path) && !unmerged.contains_key(path) {
             staged_deleted.push(path.clone());
         }
     }
@@ -168,8 +222,8 @@ pub fn status() -> anyhow::Result<()> {
         let paths: std::collections::BTreeSet<&String> = head_tree.keys().chain(index_map.keys()).collect();
         let changes: Vec<DiffChange> = paths
             .into_iter()
-            .filter(|p| head_tree.get(*p) != index_map.get(*p))
-            .map(|p| DiffChange { path: p.clone(), old: head_tree.get(p).map(side), new: index_map.get(p).map(side), renamed_from: None })
+            .filter(|p| head_tree.get(*p) != index_map.get(*p) && !unmerged.contains_key(*p))
+            .map(|p| DiffChange { path: p.clone(), old: head_tree.get(p).map(side), new: index_map.get(p).map(side), renamed_from: None, unmerged: false })
             .collect();
         let unmodified = if rename_opts.find_copies_harder { crate::helpers::diff_plumbing::unmodified_files(&head_tree, &changes) } else { Vec::new() };
         for change in crate::helpers::rename::detect_renames(changes, &rename_opts, &unmodified) {
@@ -209,6 +263,9 @@ pub fn status() -> anyhow::Result<()> {
     let mut untracked = Vec::new();
 
     for (path, hash) in &working_map {
+        if unmerged.contains_key(path) {
+            continue;
+        }
         match index_map.get(path) {
             None => untracked.push(path.clone()),
             Some((idx_hash, _)) if idx_hash != hash => unstaged_modified.push(path.clone()),
@@ -235,15 +292,40 @@ pub fn status() -> anyhow::Result<()> {
     let has_untracked = !untracked.is_empty();
     let mut need_leading_blank = no_commits_yet;
 
+    // Each section lists its paths in path order, whatever kind of change they are (a rename
+    // sorts by its new path), like git.
     if has_staged {
         if need_leading_blank { println!(); }
         println!("Changes to be committed:");
-        for p in &staged_new { println!("\tnew file:   {}", p); }
-        for p in &staged_modified { println!("\tmodified:   {}", p); }
+        let mut lines: Vec<(String, String)> = Vec::new();
+        lines.extend(staged_new.iter().map(|p| (p.clone(), format!("new file:   {}", p))));
+        lines.extend(staged_modified.iter().map(|p| (p.clone(), format!("modified:   {}", p))));
+        lines.extend(staged_deleted.iter().map(|p| (p.clone(), format!("deleted:    {}", p))));
         for (status, from, to) in &staged_renamed {
-            println!("\t{}{} -> {}", if *status == 'R' { "renamed:    " } else { "copied:     " }, from, to);
+            lines.push((to.clone(), format!("{}{} -> {}", if *status == 'R' { "renamed:    " } else { "copied:     " }, from, to)));
         }
-        for p in &staged_deleted { println!("\tdeleted:    {}", p); }
+        lines.sort();
+        for (_, line) in &lines { println!("\t{}", line); }
+        println!();
+        need_leading_blank = false;
+    }
+
+    if !unmerged.is_empty() {
+        if need_leading_blank { println!(); }
+        println!("Unmerged paths:");
+        for (path, mask) in &unmerged {
+            let how = match mask {
+                1 => "both deleted:",
+                2 => "added by us:",
+                3 => "deleted by them:",
+                4 => "added by them:",
+                5 => "deleted by us:",
+                6 => "both added:",
+                _ => "both modified:",
+            };
+            // Labels are padded to the longest one ("deleted by them:") plus a space.
+            println!("\t{:<17}{}", how, path);
+        }
         println!();
         need_leading_blank = false;
     }
@@ -251,8 +333,11 @@ pub fn status() -> anyhow::Result<()> {
     if has_unstaged {
         if need_leading_blank { println!(); }
         println!("Changes not staged for commit:");
-        for p in &unstaged_modified { println!("\tmodified:   {}", p); }
-        for p in &unstaged_deleted { println!("\tdeleted:    {}", p); }
+        let mut lines: Vec<(String, String)> = Vec::new();
+        lines.extend(unstaged_modified.iter().map(|p| (p.clone(), format!("modified:   {}", p))));
+        lines.extend(unstaged_deleted.iter().map(|p| (p.clone(), format!("deleted:    {}", p))));
+        lines.sort();
+        for (_, line) in &lines { println!("\t{}", line); }
         println!();
         need_leading_blank = false;
     }
@@ -269,7 +354,7 @@ pub fn status() -> anyhow::Result<()> {
         if need_leading_blank { println!(); }
         if no_commits_yet && !has_unstaged && !has_untracked {
             println!("nothing to commit (create/copy files and use 'add' to track)");
-        } else if has_unstaged || has_untracked {
+        } else if has_unstaged || has_untracked || !unmerged.is_empty() {
             println!("no changes added to commit (use 'add' to track or stage changes)");
         } else {
             println!("nothing to commit, working tree clean");
@@ -336,6 +421,10 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> an
         let mut modified_files = Vec::new();
 
         for path in &paths_to_remove {
+            // An unmerged path is removed without the up-to-date checks, as in git.
+            if index_entries.iter().any(|e| &e.path == path && e.stage != 0) {
+                continue;
+            }
             let entry = index_entries.iter().find(|e| &e.path == path);
             let idx_hash = entry.map(|e| e.hash);
 

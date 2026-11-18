@@ -24,6 +24,32 @@ pub struct IndexEntry {
     /// The skip-worktree bit (index version 3 extended flag): the file is deliberately absent
     /// from the working tree, as set by `sparse-checkout`, and counts as unchanged.
     pub skip_worktree: bool,
+    /// Merge stage (index flag bits 12-13): 0 for a normal entry; 1 (common ancestor),
+    /// 2 (ours) and 3 (theirs) for the sides of an unresolved conflict.
+    pub stage: u8,
+}
+
+impl IndexEntry {
+    /// An unmerged entry as git records one: only mode, object id, path and stage are kept;
+    /// every stat field is zero.
+    pub fn unmerged(path: &str, hash: [u8; 20], mode: u32, stage: u8) -> IndexEntry {
+        IndexEntry {
+            ctime_secs: 0,
+            ctime_nsecs: 0,
+            mtime_secs: 0,
+            mtime_nsecs: 0,
+            dev: 0,
+            ino: 0,
+            mode,
+            uid: 0,
+            gid: 0,
+            size: 0,
+            hash,
+            path: path.to_string(),
+            skip_worktree: false,
+            stage,
+        }
+    }
 }
 
 pub fn read_index() -> Result<Vec<IndexEntry>> {
@@ -117,6 +143,7 @@ pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
             hash,
             path,
             skip_worktree,
+            stage: ((flags >> 12) & 3) as u8,
         });
     }
 
@@ -124,7 +151,7 @@ pub fn read_index_from(index_path: &Path) -> Result<Vec<IndexEntry>> {
 }
 
 pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
-    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    entries.sort_by(|a, b| a.path.cmp(&b.path).then(a.stage.cmp(&b.stage)));
 
     let mut buf = Vec::new();
     buf.extend_from_slice(SIGNATURE);
@@ -148,7 +175,7 @@ pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
         buf.extend_from_slice(&entry.hash);
 
         let name_bytes = entry.path.as_bytes();
-        let name_len = name_bytes.len().min(0x0FFF) as u16;
+        let name_len = name_bytes.len().min(0x0FFF) as u16 | ((entry.stage as u16 & 3) << 12);
         if entry.skip_worktree {
             // Extended-flags bit, then the extended word with the skip-worktree bit.
             buf.extend_from_slice(&(name_len | 0x4000).to_be_bytes());
@@ -253,6 +280,7 @@ pub fn build_entry(rel_path: &str, hash: [u8; 20], metadata: &fs::Metadata) -> I
         hash,
         path: rel_path.to_string(),
         skip_worktree: false,
+        stage: 0,
     }
 }
 

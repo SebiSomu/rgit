@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
 use anyhow::Context;
 use crate::helpers::{
-    build_commit, build_index_entries_for_tree, commit_parents, commit_subject_line,
-    generate_conflict_markers, hard_reset_working_tree, read_object, resolve_commit_from_source,
-    resolve_tree_from_source, three_way_tree_merge, tree_hash_of_commit, write_tree_from_index_prefix,
+    build_commit, build_index_entries_for_tree, build_tree_from_map, commit_parents, commit_subject_line,
+    hard_reset_working_tree, read_object, resolve_commit_from_source, resolve_tree_from_source,
+    tree_hash_of_commit, write_tree_from_index_prefix,
 };
-use crate::index::{build_entry, read_index, write_index};
+use crate::helpers::merge::{die_if_unmerged, die_if_unmerged_for_commit, merge_into_worktree};
+use crate::index::{read_index, write_index};
 use crate::refs;
 
 /// `rgit revert <commit>` / `--continue` / `--abort`
@@ -23,6 +23,7 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
         anyhow::anyhow!("fatal: revert requires a <commit>, or --continue / --abort")
     })?;
 
+    die_if_unmerged("Reverting", "revert failed")?;
     if crate::repo::path(".git/REVERT_HEAD").exists() {
         anyhow::bail!(
             "fatal: a revert is already in progress\n\
@@ -61,71 +62,33 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
     };
     let our_tree = resolve_tree_from_source(&our_commit)?;
 
-    let (merged_tree, conflicts) = three_way_tree_merge(&base_tree, &our_tree, &their_tree)?;
-
-    if !conflicts.is_empty() {
-        for conflict in &conflicts {
-            let conflict_content = generate_conflict_markers(
-                &conflict.ours,
-                &conflict.theirs,
-                &format!("parent of {}...", &revert_commit[..7]),
-            );
-            if let Some(parent) = Path::new(&conflict.path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(&conflict.path, &conflict_content)?;
-            println!("CONFLICT (content): Merge conflict in {}", conflict.path);
+    let their_label = format!("parent of {} ({})", &revert_commit[..7], original_subject);
+    let result = match merge_into_worktree(&base_tree, &our_tree, &their_tree, "HEAD", &their_label, "merge") {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("{}", e);
+            eprintln!("fatal: revert failed");
+            std::process::exit(128);
         }
+    };
+    for message in &result.messages {
+        println!("{}", message.text);
+    }
 
-        for (path, (hash, _mode)) in &merged_tree {
-            let (_, content) = read_object(&hex::encode(hash))?;
-            if let Some(parent) = Path::new(path).parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(path, &content)?;
-        }
-
+    if !result.conflicted.is_empty() {
         fs::write(crate::repo::path(".git/REVERT_HEAD"), format!("{}\n", revert_commit))?;
         fs::write(crate::repo::path(".git/REVERT_MSG"), format!("{}\n", final_message))?;
 
-        println!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
-        println!("hint: after resolving the conflicts, mark the corrected paths");
-        println!("hint: with 'rgit add <paths>' and run 'rgit revert --continue'");
-        println!("hint: (or 'rgit revert --abort' to give up)");
-        return Ok(());
+        eprintln!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
+        eprintln!("hint: After resolving the conflicts, mark them with");
+        eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
+        eprintln!("hint: \"rgit revert --continue\".");
+        eprintln!("hint: To abort and get back to the state before \"rgit revert\",");
+        eprintln!("hint: run \"rgit revert --abort\".");
+        std::process::exit(1);
     }
 
-    for path in our_tree.keys() {
-        if !merged_tree.contains_key(path) {
-            let path_obj = Path::new(path);
-            if path_obj.exists() {
-                let _ = fs::remove_file(path_obj);
-            }
-        }
-    }
-
-    let mut new_index_entries = Vec::new();
-    for (path, (hash, _mode)) in &merged_tree {
-        let (_, content) = read_object(&hex::encode(hash))?;
-        if let Some(parent) = Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-        fs::write(path, &content)?;
-
-        let metadata = fs::metadata(path)?;
-        let entry = build_entry(path, *hash, &metadata);
-        new_index_entries.push(entry);
-    }
-
-    write_index(&mut new_index_entries)?;
-
-    let tree_hash = write_tree_from_index_prefix(&new_index_entries, "")?;
+    let tree_hash = build_tree_from_map(&result.tree)?;
 
     if tree_hash_of_commit(&our_commit)? == tree_hash {
         println!("The revert is now empty, possibly due to conflict resolution.");
@@ -160,7 +123,8 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
 /// `rgit revert --continue`
 fn revert_continue() -> anyhow::Result<()> {
     if !crate::repo::path(".git/REVERT_HEAD").exists() {
-        anyhow::bail!("fatal: no revert in progress");
+        eprintln!("error: no cherry-pick or revert in progress\nfatal: revert failed");
+        std::process::exit(128);
     }
 
     let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();
@@ -169,17 +133,8 @@ fn revert_continue() -> anyhow::Result<()> {
         .trim_end_matches('\n')
         .to_string();
 
+    die_if_unmerged_for_commit()?;
     let entries = read_index().unwrap_or_default();
-    for entry in &entries {
-        if let Ok(content) = fs::read(&entry.path) {
-            if content.windows(7).any(|w| w == b"<<<<<<<") {
-                anyhow::bail!(
-                    "error: '{}' still has unresolved conflict markers; fix it and 'rgit add' it first",
-                    entry.path
-                );
-            }
-        }
-    }
 
     let our_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
@@ -218,7 +173,8 @@ fn revert_continue() -> anyhow::Result<()> {
 /// `rgit revert --abort`
 fn revert_abort() -> anyhow::Result<()> {
     if !crate::repo::path(".git/REVERT_HEAD").exists() {
-        anyhow::bail!("fatal: no revert in progress");
+        eprintln!("error: no cherry-pick or revert in progress\nfatal: revert failed");
+        std::process::exit(128);
     }
 
     let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();
@@ -226,26 +182,10 @@ fn revert_abort() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
 
-    let (object_type, content) = read_object(&revert_commit)?;
-    let (merged_tree, conflicts) = if object_type == "commit" {
-        let text = String::from_utf8_lossy(&content).to_string();
-        let parents = commit_parents(&text);
-        let base_tree = resolve_tree_from_source(&revert_commit)?;
-        let their_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(parent) = parents.first() {
-            resolve_tree_from_source(parent)?
-        } else {
-            BTreeMap::new()
-        };
-        three_way_tree_merge(&base_tree, &our_tree, &their_tree)?
-    } else {
-        (BTreeMap::new(), Vec::new())
-    };
-
+    // Every path the revert touched is in the index (conflicted ones as stages 1-3).
     let index_entries = read_index().unwrap_or_default();
     let mut tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
     tracked_paths.extend(our_tree.keys().cloned());
-    tracked_paths.extend(merged_tree.keys().cloned());
-    tracked_paths.extend(conflicts.iter().map(|c| c.path.clone()));
 
     hard_reset_working_tree(&our_tree, &tracked_paths)?;
 

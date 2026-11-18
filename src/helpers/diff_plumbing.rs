@@ -66,7 +66,14 @@ pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> 
             "--cached" if command == "diff-index" || command == "diff" => opts.cached = true,
             "--staged" if command == "diff" => opts.cached = true,
             "-q" if command == "diff-files" => {}
-            "-c" | "--cc" | "--combined-all-paths" => return Err(unsupported(arg, "no combined diffs")),
+            "-1" | "--base" if command == "diff-files" || command == "diff" => opts.unmerged_stage = Some(1),
+            "-2" | "--ours" if command == "diff-files" || command == "diff" => opts.unmerged_stage = Some(2),
+            "-3" | "--theirs" if command == "diff-files" || command == "diff" => opts.unmerged_stage = Some(3),
+            "--cc" if command == "diff-files" || command == "diff" => {
+                opts.combined = true;
+                opts.patch = true;
+            }
+            "-c" | "--cc" | "--combined-all-paths" => return Err(unsupported(arg, "only dense combined diffs of unmerged paths (--cc with diff/diff-files)")),
             other => {
                 if let Some(n) = other.strip_prefix("--abbrev=") {
                     let n: usize = n.parse().map_err(|_| (format!("error: option `abbrev' expects a numerical value\n{}", usage), 129))?;
@@ -83,6 +90,23 @@ pub fn parse_diff_plumbing_args(args: &[String], command: &str, usage: &str) -> 
         }
     }
     Ok(opts)
+}
+
+/// git's porcelain diff hashes the working-tree side of every added path (`U` ones included)
+/// when rename detection gets as far as looking for them, which takes a deleted file as a
+/// possible source; raw output then shows those hashes instead of zeros.
+// Used by `diff`.
+pub fn fill_rename_destination_hashes(changes: &mut [DiffChange]) {
+    if !changes.iter().any(|c| !c.unmerged && c.old.is_some() && c.new.is_none()) {
+        return;
+    }
+    for change in changes.iter_mut().filter(|c| c.old.is_none()) {
+        if let Some(side) = change.new.as_mut().filter(|s| s.worktree && s.hash == [0; 20]) {
+            if let Ok(content) = std::fs::read(&change.path) {
+                side.hash = hash_content("blob", &content);
+            }
+        }
+    }
 }
 
 /// Parses a raw tree object into `(mode, name, hash)` entries, in the tree's own order.
@@ -166,14 +190,14 @@ pub fn diff_trees(old: Option<&str>, new: Option<&str>, prefix: &str, opts: &Dif
         }
         if tree {
             if !opts.recursive || opts.show_trees {
-                out.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None });
+                out.push(DiffChange { path: path.clone(), old: a.map(side), new: b.map(side), renamed_from: None, unmerged: false });
             }
             if opts.recursive {
                 let (old_sub, new_sub) = (a.map(|e| hex::encode(e.2)), b.map(|e| hex::encode(e.2)));
                 diff_trees(old_sub.as_deref(), new_sub.as_deref(), &format!("{}/", path), opts, specs, out)?;
             }
         } else {
-            out.push(DiffChange { path, old: a.map(side), new: b.map(side), renamed_from: None });
+            out.push(DiffChange { path, old: a.map(side), new: b.map(side), renamed_from: None, unmerged: false });
         }
     }
     Ok(())
@@ -190,12 +214,27 @@ fn worktree_side(entry: &IndexEntry) -> Option<DiffSide> {
     }
 }
 
+/// The working-tree side of an unmerged path: its file's mode with a zero hash (unmerged
+/// entries carry no stat data, so git always sees the file as changed), or `None` when gone.
+// Used by `diff_index_changes` and `diff_files_changes`.
+fn unmerged_worktree_side(path: &str, mode_hint: u32) -> Option<DiffSide> {
+    let metadata = std::fs::metadata(path).ok().filter(|m| m.is_file())?;
+    let mode = crate::helpers::index_plumbing::worktree_file_mode(&metadata, Some(mode_hint));
+    Some(DiffSide { mode, hash: [0; 20], worktree: true })
+}
+
 /// `diff-index`: compares a flattened tree with the index (`cached`) or with the working
 /// tree as far as the index tracks it. A tracked file missing from the working tree counts
-/// as deleted, or as unchanged with `ignore_missing` (`-m`).
-// Used by `diff-index`.
-pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[IndexEntry], cached: bool, ignore_missing: bool, specs: &[String]) -> Vec<DiffChange> {
-    let by_path: BTreeMap<&str, &IndexEntry> = index.iter().map(|e| (e.path.as_str(), e)).collect();
+/// as deleted, or as unchanged with `ignore_missing` (`-m`). An unmerged path is one `U`
+/// change with `cached`; without it, the tree is compared with the file in the working tree
+/// (always as changed, unless `porcelain`, where only a real content difference counts).
+// Used by `diff-index` and `diff`.
+pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[IndexEntry], cached: bool, ignore_missing: bool, porcelain: bool, specs: &[String]) -> Vec<DiffChange> {
+    // The first entry of each path: stage 0, or the lowest stage of an unmerged path.
+    let mut by_path: BTreeMap<&str, &IndexEntry> = BTreeMap::new();
+    for entry in index {
+        by_path.entry(entry.path.as_str()).or_insert(entry);
+    }
     let paths: std::collections::BTreeSet<&str> = tree.keys().map(String::as_str).chain(by_path.keys().copied()).collect();
     let mut changes = Vec::new();
     for path in paths {
@@ -203,6 +242,27 @@ pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[Ind
             continue;
         }
         let old = tree.get(path).map(|(hash, mode)| DiffSide { mode: *mode, hash: *hash, worktree: false });
+        if let Some(entry) = by_path.get(path).filter(|e| e.stage != 0) {
+            if cached {
+                changes.push(DiffChange { path: path.to_string(), old, new: None, renamed_from: None, unmerged: true });
+                continue;
+            }
+            let mut new = unmerged_worktree_side(path, entry.mode);
+            if porcelain {
+                if let Some(side) = new.as_mut() {
+                    let content = std::fs::read(path).unwrap_or_default();
+                    side.hash = hash_content("blob", &content);
+                    if old.as_ref().is_some_and(|o| o.hash == side.hash && o.mode == side.mode) {
+                        continue;
+                    }
+                    side.hash = [0; 20];
+                }
+            }
+            if old.is_some() || new.is_some() {
+                changes.push(DiffChange { path: path.to_string(), old, new, renamed_from: None, unmerged: false });
+            }
+            continue;
+        }
         let new = by_path.get(path).and_then(|entry| {
             let staged = DiffSide { mode: entry.mode, hash: entry.hash, worktree: false };
             if cached {
@@ -214,24 +274,55 @@ pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[Ind
             }
         });
         if old != new {
-            changes.push(DiffChange { path: path.to_string(), old, new, renamed_from: None });
+            changes.push(DiffChange { path: path.to_string(), old, new, renamed_from: None, unmerged: false });
         }
     }
     changes
 }
 
-/// `diff-files`: compares the index with the working tree.
-// Used by `diff-files`.
-pub fn diff_files_changes(index: &[IndexEntry], specs: &[String]) -> Vec<DiffChange> {
+/// `diff-files`: compares the index with the working tree. An unmerged path shows as a `U`
+/// change (new side: the working-tree file's mode with a zero hash),
+/// followed by the comparison of its stage `stage` (default 2, ours) with the working tree
+/// when it has that stage; with `combined`, a path that has both stage 2 and stage 3 is left
+/// out here, for the combined diff (`diff --cc`). In `porcelain` mode a stage whose content
+/// equals the working tree is not reported.
+// Used by `diff-files` and `diff`.
+pub fn diff_files_changes(index: &[IndexEntry], specs: &[String], stage: u8, combined: bool, porcelain: bool) -> Vec<DiffChange> {
     let mut changes = Vec::new();
-    for entry in index {
+    let mut i = 0;
+    while i < index.len() {
+        let entry = &index[i];
         if !diff_path_selected(&entry.path, false, specs) {
+            i += 1;
             continue;
         }
-        let old = DiffSide { mode: entry.mode, hash: entry.hash, worktree: false };
-        let new = worktree_side(entry);
-        if new.as_ref() != Some(&old) {
-            changes.push(DiffChange { path: entry.path.clone(), old: Some(old), new, renamed_from: None });
+        if entry.stage == 0 {
+            let old = DiffSide { mode: entry.mode, hash: entry.hash, worktree: false };
+            let new = worktree_side(entry);
+            if new.as_ref() != Some(&old) {
+                changes.push(DiffChange { path: entry.path.clone(), old: Some(old), new, renamed_from: None, unmerged: false });
+            }
+            i += 1;
+            continue;
+        }
+        let end = index[i..].iter().position(|e| e.path != entry.path).map_or(index.len(), |n| i + n);
+        let stages = &index[i..end];
+        i = end;
+        if combined && stages.iter().any(|e| e.stage == 2) && stages.iter().any(|e| e.stage == 3) {
+            continue;
+        }
+        let mut worktree = unmerged_worktree_side(&entry.path, entry.mode);
+        let content_hash = if porcelain { worktree.as_ref().map(|_| hash_content("blob", &std::fs::read(&entry.path).unwrap_or_default())) } else { None };
+        changes.push(DiffChange { path: entry.path.clone(), old: None, new: worktree.clone(), renamed_from: None, unmerged: true });
+        if let Some(chosen) = stages.iter().find(|e| e.stage == stage) {
+            let old = DiffSide { mode: chosen.mode, hash: chosen.hash, worktree: false };
+            if porcelain && worktree.as_ref().is_some_and(|w| w.mode == old.mode) && content_hash == Some(old.hash) {
+                continue;
+            }
+            if let Some(side) = worktree.as_mut() {
+                side.hash = [0; 20];
+            }
+            changes.push(DiffChange { path: entry.path.clone(), old: Some(old), new: worktree, renamed_from: None, unmerged: false });
         }
     }
     changes
@@ -240,6 +331,9 @@ pub fn diff_files_changes(index: &[IndexEntry], specs: &[String]) -> Vec<DiffCha
 /// The status letter of a change: `A`dded, `D`eleted, `T`ype changed, else `M`odified.
 // Used by `render_diff_changes`.
 fn status_letter(change: &DiffChange) -> char {
+    if change.unmerged {
+        return 'U';
+    }
     if let Some((_, status, _)) = &change.renamed_from {
         return *status;
     }
@@ -322,6 +416,10 @@ fn side_content(path: &str, side: &Option<DiffSide>) -> anyhow::Result<(Option<(
 /// when the file type changed. Tree entries have no patch.
 // Used by `render_diff_changes`.
 fn change_patch(change: &DiffChange) -> anyhow::Result<Vec<FileDiff>> {
+    if change.unmerged {
+        let stat = DiffStatEntry { name: change.path.clone(), unmerged: true, ..Default::default() };
+        return Ok(vec![FileDiff { text: format!("* Unmerged path {}\n", quote_c_path(&change.path)), stat, summary: None }]);
+    }
     let is_tree = |side: &Option<DiffSide>| side.as_ref().is_some_and(|s| is_tree_mode(s.mode));
     if is_tree(&change.old) || is_tree(&change.new) {
         return Ok(Vec::new());
@@ -333,6 +431,16 @@ fn change_patch(change: &DiffChange) -> anyhow::Result<Vec<FileDiff>> {
     }
     let (old, old_bytes) = side_content(&change.path, &change.old)?;
     let (new, new_bytes) = side_content(&change.path, &change.new)?;
+    // Stale stat data with the same content (an unmerged stage that matches the working tree):
+    // nothing to show in a patch or a diffstat.
+    if old.is_some() && old == new {
+        // git still counts a binary file whose working-tree side it never hashed.
+        if old_bytes[..old_bytes.len().min(8000)].contains(&0) {
+            let stat = DiffStatEntry { name: change.path.clone(), binary_sizes: Some((old_bytes.len(), new_bytes.len())), ..Default::default() };
+            return Ok(vec![FileDiff { text: String::new(), stat, summary: None }]);
+        }
+        return Ok(Vec::new());
+    }
     if status_letter(change) == 'T' {
         return Ok(vec![
             diff_file_contents(&change.path, old, None, old_bytes, Vec::new())?,
@@ -436,8 +544,12 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
         return Ok(out);
     }
     let mut diffs: Vec<FileDiff> = Vec::new();
+    let mut diff_changes: Vec<&DiffChange> = Vec::new();
     for change in changes {
-        diffs.extend(change_patch(change)?);
+        for diff in change_patch(change)? {
+            diffs.push(diff);
+            diff_changes.push(change);
+        }
     }
     if opts.numstat {
         for diff in &diffs {
@@ -468,7 +580,7 @@ pub fn render_diff_changes(changes: &[DiffChange], opts: &DiffPlumbingOptions) -
         if !out.is_empty() {
             out.push('\n');
         }
-        for (diff, change) in diffs.iter().zip(changes.iter().flat_map(|c| std::iter::repeat_n(c, if status_letter(c) == 'T' && c.renamed_from.is_none() { 2 } else { 1 }))) {
+        for (diff, change) in diffs.iter().zip(diff_changes.iter().copied()) {
             // Like git without --binary: no binary patch, just "Binary files ... differ".
             let source = change.renamed_from.as_ref().map(|r| r.0.as_str()).unwrap_or(&change.path);
             let text = crate::helpers::log::binary_patch_as_notice(&diff.text, source, &change.path);

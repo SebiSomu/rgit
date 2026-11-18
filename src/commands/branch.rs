@@ -110,6 +110,30 @@ pub fn branch(name: Option<String>, delete: bool, force_delete: bool, rename: Op
     Ok(())
 }
 
+/// `switch` refuses to run in the middle of a merge, cherry-pick, revert, rebase or bisect,
+/// as git's does (`checkout` doesn't check this).
+// Used by the `switch` command.
+pub fn die_if_operation_in_progress() -> anyhow::Result<()> {
+    let state = |p: &str| crate::repo::path(p).exists();
+    let (doing, quit) = if state(".git/MERGE_HEAD") {
+        ("merging", "rgit reset --hard\" (which discards the merge)")
+    } else if crate::helpers::rebase::rebase_in_progress() {
+        ("rebasing", "rgit rebase --abort\"")
+    } else if state(".git/CHERRY_PICK_HEAD") {
+        ("cherry-picking", "rgit cherry-pick --abort\"")
+    } else if state(".git/REVERT_HEAD") {
+        ("reverting", "rgit revert --abort\"")
+    } else if state(crate::commands::bisect::BISECT_START_PATH) {
+        ("bisecting", "rgit bisect reset\"")
+    } else {
+        return Ok(());
+    };
+    eprintln!("fatal: cannot switch branch while {}", doing);
+    // git suggests `--quit`; rgit points at the commands it has.
+    eprintln!("Consider \"{} or \"rgit worktree add\".", quit);
+    std::process::exit(128);
+}
+
 pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow::Result<()> {
     if create {
         let commit_hash = refs::resolve_head_commit()?.ok_or_else(|| {
@@ -159,12 +183,28 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow
     flatten_tree(&target_tree_hash, "", &mut target_tree)?;
 
     let mut head_tree = BTreeMap::new();
-    if let Some(current_commit) = refs::resolve_head_commit()? {
-        let current_tree_hash = tree_hash_of_commit(&current_commit)?;
+    let current_commit = refs::resolve_head_commit()?;
+    if let Some(current_commit) = &current_commit {
+        let current_tree_hash = tree_hash_of_commit(current_commit)?;
         flatten_tree(&current_tree_hash, "", &mut head_tree)?;
     }
 
     let index_entries = read_index().unwrap_or_default();
+    let unmerged = crate::helpers::merge::unmerged_paths(&index_entries);
+    if !unmerged.is_empty() {
+        if !force && current_commit.as_deref() != Some(target_commit.as_str()) {
+            // git's refusal: the error on stderr, then its refresh report on stdout.
+            eprintln!("error: you need to resolve your current index first");
+            for path in &unmerged {
+                println!("{}: needs merge", path);
+            }
+            std::process::exit(1);
+        }
+        // `-f` throws the conflicts away: unmerged paths are rewritten from the target.
+        for path in &unmerged {
+            head_tree.remove(path);
+        }
+    }
     let index_map: BTreeMap<String, [u8; 20]> = index_entries
         .iter()
         .map(|e| (e.path.clone(), e.hash))
@@ -232,4 +272,4 @@ pub fn checkout(target: Option<String>, create_branch: Option<String>, detach: b
     }
 
     Ok(())
-}
+}

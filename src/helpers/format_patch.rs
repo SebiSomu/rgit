@@ -10,7 +10,7 @@ use crate::helpers::{flatten_tree, myers_diff, read_object};
 use crate::objects::{CommitSignature, DiffOp, DiffStatEntry, FileDiff, ParsedCommit};
 
 const CONTEXT_LINES: usize = 3;
-const NO_EOL_MARK: &str = "\u{0}\\ No newline at end of file";
+pub const NO_EOL_MARK: &str = "\u{0}\\ No newline at end of file";
 const BASE85_ALPHABET: &[u8; 85] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
 
 /// Reads and parses a commit object into tree, parents, author, committer, and message.
@@ -901,6 +901,11 @@ pub fn format_diffstat(entries: &[DiffStatEntry], width: usize) -> String {
     let mut bin_width = 0;
     for e in entries {
         max_len = max_len.max(e.name.chars().count());
+        if e.unmerged {
+            // "Unmerged" is 8 characters.
+            bin_width = bin_width.max(8);
+            continue;
+        }
         if let Some((old, new)) = e.binary_sizes {
             bin_width = bin_width.max(14 + decimal_width(new) + decimal_width(old));
             number_width = 3;
@@ -944,6 +949,10 @@ pub fn format_diffstat(entries: &[DiffStatEntry], width: usize) -> String {
         }
         let padding = (len - name.chars().count() as i64).max(0) as usize;
 
+        if e.unmerged {
+            out.push_str(&format!(" {}{}{} | {:>w$}\n", prefix, name, " ".repeat(padding), "Unmerged", w = number_width));
+            continue;
+        }
         if let Some((old, new)) = e.binary_sizes {
             out.push_str(&format!(" {}{}{} | {:>w$}", prefix, name, " ".repeat(padding), "Bin", w = number_width));
             if old != 0 || new != 0 {
@@ -984,7 +993,11 @@ pub fn format_diffstat(entries: &[DiffStatEntry], width: usize) -> String {
         ));
     }
 
-    let files = entries.len();
+    let files = entries.iter().filter(|e| !e.unmerged).count();
+    if files == 0 {
+        out.push_str(" 0 files changed\n");
+        return out;
+    }
     let mut summary = format!(" {} file{} changed", files, if files == 1 { "" } else { "s" });
     if adds > 0 || dels == 0 {
         summary.push_str(&format!(", {} insertion{}(+)", adds, if adds == 1 { "" } else { "s" }));

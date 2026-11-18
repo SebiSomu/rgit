@@ -52,6 +52,10 @@ fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
         }
 
         for m in matches {
+            // Resetting an unmerged path replaces all of its stages.
+            if index_entries.iter().any(|e| e.path == m && e.stage != 0) {
+                index_entries.retain(|e| e.path != m);
+            }
             match source_tree.get(&m) {
                 Some(&(hash, mode)) => {
                     if let Some(entry) = index_entries.iter_mut().find(|e| e.path == m) {
@@ -73,6 +77,7 @@ fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
                             hash,
                             path: m.clone(),
                             skip_worktree: false,
+                            stage: 0,
                         });
                     }
                 }
@@ -84,6 +89,7 @@ fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
     }
 
     write_index(&mut index_entries)?;
+    print_unstaged_after_reset(&index_entries);
     Ok(())
 }
 
@@ -105,6 +111,10 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     } else {
         ResetMode::Mixed
     };
+    if soft && (crate::repo::path(".git/MERGE_HEAD").exists() || read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
+        eprintln!("fatal: Cannot do a soft reset in the middle of a merge.");
+        std::process::exit(128);
+    }
 
     let source = commit.as_deref().unwrap_or("HEAD");
     let target_commit = resolve_commit_from_source(source)?;
@@ -127,6 +137,10 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     }
     if crate::repo::path(".git/MERGE_MSG").exists() {
         let _ = fs::remove_file(crate::repo::path(".git/MERGE_MSG"));
+    }
+    // Like git, a reset also ends an in-progress cherry-pick or revert.
+    for state in [".git/CHERRY_PICK_HEAD", ".git/CHERRY_PICK_MSG", ".git/REVERT_HEAD", ".git/REVERT_MSG"] {
+        let _ = fs::remove_file(crate::repo::path(state));
     }
 
     if let ResetMode::Soft = mode {
@@ -165,7 +179,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
             println!("HEAD is now at {} {}", &target_commit[..7], subject);
         }
         ResetMode::Mixed => {
-            print_unstaged_after_reset(&old_index_map, &target_tree);
+            print_unstaged_after_reset(&new_entries);
         }
         ResetMode::Soft => unreachable!("soft reset returns earlier"),
     }
@@ -173,30 +187,32 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     Ok(())
 }
 
-fn print_unstaged_after_reset(old_index_map: &BTreeMap<String, [u8; 20]>, target_tree: &BTreeMap<String, ([u8; 20], u32)>) {
-    let mut changes: Vec<(String, char)> = Vec::new();
-
-    for (path, old_hash) in old_index_map {
-        match target_tree.get(path) {
-            None => changes.push((path.clone(), 'D')),
-            Some((new_hash, _)) if new_hash != old_hash => changes.push((path.clone(), 'M')),
-            _ => {}
+/// git's refresh report after a mixed or path reset: every index entry whose working-tree
+/// file now differs (`M`) or is missing (`D`), and every still-unmerged path (`U`), in index order.
+fn print_unstaged_after_reset(entries: &[IndexEntry]) {
+    let mut changes: Vec<(char, &str)> = Vec::new();
+    for entry in entries {
+        // Paths still unmerged are reported once, as `U`.
+        if entry.stage != 0 {
+            if changes.last().map(|c| c.1) != Some(entry.path.as_str()) {
+                changes.push(('U', &entry.path));
+            }
+            continue;
+        }
+        if entry.skip_worktree || entry.mode == 0o160000 {
+            continue;
+        }
+        match crate::helpers::index_plumbing::worktree_state(entry) {
+            crate::objects::IndexFileState::Clean => {}
+            crate::objects::IndexFileState::Modified(_) => changes.push(('M', &entry.path)),
+            crate::objects::IndexFileState::Missing => changes.push(('D', &entry.path)),
         }
     }
-    for path in target_tree.keys() {
-        if !old_index_map.contains_key(path) {
-            changes.push((path.clone(), 'A'));
-        }
-    }
-
     if changes.is_empty() {
         return;
     }
-
-    changes.sort_by(|a, b| a.0.cmp(&b.0));
-
     println!("Unstaged changes after reset:");
-    for (path, status) in changes {
+    for (status, path) in changes {
         println!("{}\t{}", status, path);
     }
 }

@@ -15,7 +15,8 @@ use crate::repo;
 /// `--cached`, each tracked file is looked at in the working tree: if it still matches the
 /// index, the index entry is compared with the tree; if it was edited, it shows as changed
 /// with an all-zero hash for the new side (its content is not in the object store); if it
-/// is gone, it shows as deleted (`-m`: as unchanged). Untracked files are never reported.
+/// is gone, it shows as deleted (`-m`: as unchanged). An unmerged path is one `U` change with
+/// `--cached`; without it, the tree is compared with its working-tree file. Untracked files are never reported.
 /// Output formats are those of `diff-tree` (raw by default, `-p`, `--name-only`,
 /// `--name-status`, `--stat`, `--numstat`, `--summary`, `-z`, `--abbrev`, `-R`, `--quiet`,
 /// `--exit-code`). Unlike git, a file whose cached stat data is stale but whose content is
@@ -60,7 +61,7 @@ pub fn diff_index(args: Vec<String>) -> Result<()> {
     }
     paths.extend(std::mem::take(&mut opts.paths));
     let specs = normalize_pathspecs(&paths);
-    let mut changes = diff_index_changes(&tree_map, &read_index()?, opts.cached, opts.merges, &specs);
+    let mut changes = diff_index_changes(&tree_map, &read_index()?, opts.cached, opts.merges, false, &specs);
     if opts.reverse {
         reverse_changes(&mut changes);
     }

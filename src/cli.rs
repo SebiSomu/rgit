@@ -108,7 +108,18 @@ pub enum Commands {
         force: bool,
         #[arg(short = 'p', long = "patch")]
         patch: bool,
-        /// Paths after `--` (with `-p`).
+        /// For unmerged paths, take stage 2 (ours) / stage 3 (theirs).
+        #[arg(long = "ours", overrides_with = "theirs")]
+        ours: bool,
+        #[arg(long = "theirs", overrides_with = "ours")]
+        theirs: bool,
+        /// Recreate the conflicted merge of unmerged paths.
+        #[arg(short = 'm', long = "merge")]
+        merge: bool,
+        /// Like `--merge`, with `merge`, `diff3` or `zdiff3` markers.
+        #[arg(long = "conflict", value_name = "STYLE")]
+        conflict: Option<String>,
+        /// Paths after `--`: restore them instead of switching branches.
         #[arg(last = true)]
         paths: Vec<String>
     },
@@ -121,7 +132,18 @@ pub enum Commands {
         #[arg(short = 'W', long = "worktree")]
         worktree: bool,
         #[arg(long = "source")]
-        source: Option<String>
+        source: Option<String>,
+        /// For unmerged paths, take stage 2 (ours) / stage 3 (theirs).
+        #[arg(long = "ours", overrides_with = "theirs")]
+        ours: bool,
+        #[arg(long = "theirs", overrides_with = "ours")]
+        theirs: bool,
+        /// Recreate the conflicted merge of unmerged paths.
+        #[arg(short = 'm', long = "merge")]
+        merge: bool,
+        /// Like `--merge`, with `merge`, `diff3` or `zdiff3` markers.
+        #[arg(long = "conflict", value_name = "STYLE")]
+        conflict: Option<String>,
     },
     Diff {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
@@ -453,6 +475,8 @@ pub enum Commands {
         exclude_standard: bool,
         #[arg(short = 's', long = "stage")]
         stage: bool,
+        #[arg(short = 'u', long = "unmerged")]
+        unmerged: bool,
         #[arg(short = 't')]
         show_tags: bool,
         #[arg(short = 'z')]
@@ -969,19 +993,28 @@ pub fn handle_commands() -> Result<()> {
             crate::commands::branch(name, delete, force_delete, rename)?;
         }
         Commands::Switch { branch, create, detach, force } => {
+            crate::commands::die_if_operation_in_progress()?;
             crate::commands::switch(branch, create, detach, force)?;
         }
         Commands::Checkout { patch: true, .. } => {
             crate::commands::checkout_patch(raw_args_after("checkout", Vec::new()))?;
         }
-        Commands::Checkout { target, create_branch, detach, force, .. } => {
+        Commands::Checkout { target, create_branch: None, ours, theirs, merge, conflict, paths, .. } if !paths.is_empty() => {
+            let stage = crate::commands::writeout_stage(ours, theirs, merge, conflict)?;
+            crate::commands::checkout_paths(target, stage, paths.iter().map(PathBuf::from).collect())?;
+        }
+        Commands::Checkout { target, create_branch, detach, force, ours, theirs, merge, conflict, .. } => {
+            if ours || theirs || merge || conflict.is_some() {
+                anyhow::bail!("fatal: --ours, --theirs, --merge and --conflict need paths after '--' (e.g. 'rgit checkout --theirs -- <file>')");
+            }
             crate::commands::checkout(target, create_branch, detach, force)?;
         }
-        Commands::Restore { patch: true, files, staged, worktree, source } => {
+        Commands::Restore { patch: true, files, staged, worktree, source, .. } => {
             crate::commands::restore_patch(files.iter().map(|p| p.to_string_lossy().to_string()).collect(), staged, worktree, source)?;
         }
-        Commands::Restore { patch: false, files, staged, worktree, source } => {
-            crate::commands::restore(files, staged, worktree, source)?;
+        Commands::Restore { patch: false, files, staged, worktree, source, ours, theirs, merge, conflict } => {
+            let stage = crate::commands::writeout_stage(ours, theirs, merge, conflict)?;
+            crate::commands::restore(files, staged, worktree, source, stage)?;
         }
         Commands::Diff { args } => {
             crate::commands::diff(raw_args_after("diff", args))?;
@@ -1197,6 +1230,7 @@ pub fn handle_commands() -> Result<()> {
             ignored,
             exclude_standard,
             stage,
+            unmerged,
             show_tags,
             null_terminated,
             pathspecs,
@@ -1208,7 +1242,9 @@ pub fn handle_commands() -> Result<()> {
                 others,
                 ignored,
                 exclude_standard,
-                stage,
+                // Unmerged entries only make sense with their stage numbers.
+                stage: stage || unmerged,
+                unmerged,
                 show_tags,
                 null_terminated,
                 pathspecs,

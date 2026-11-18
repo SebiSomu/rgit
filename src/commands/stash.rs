@@ -204,6 +204,10 @@ pub fn stash_clear() -> anyhow::Result<()> {
 pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> {
     use crate::objects::StashAction;
 
+    // Saving a stash needs a fully merged index: git just lists what needs merging.
+    if matches!(action, None | Some(StashAction::Push { .. })) && crate::helpers::merge::report_needs_merge() {
+        std::process::exit(1);
+    }
     match action {
         None => stash_push(None),
         Some(StashAction::Push { message, patch: true, paths }) => crate::commands::stash_patch(message, paths),

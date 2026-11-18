@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Read;
 use crate::helpers::commit::{
     add_signoff, cleanup_commit_message, current_signature, edit_commit_message, format_commit_date, parse_author_option, parse_commit_date,
-    stage_tracked_changes, tracked_worktree_changes, unresolved_merge_paths, write_commit_object,
+    stage_tracked_changes, tracked_worktree_changes, write_commit_object,
 };
 use crate::helpers::format_patch::{diff_commit_against_parent, format_diffstat, parse_commit_object, resolve_commit_rev, split_commit_message};
 use crate::helpers::reflog::set_reflog_action;
@@ -26,27 +26,19 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 /// author), or the editor, which opens when none is given (and with `-e`, `--amend`, or to
 /// conclude a merge), prefilled and with `#` lines stripped. `-a` stages tracked changes first;
 /// `--amend` replaces the tip, keeping its parents, message and author unless told otherwise.
-/// Refuses empty commits and empty messages unless allowed, and refuses to conclude a merge
-/// while conflict markers remain. Prints git's summary: `[branch hash] subject` plus a
+/// Refuses empty commits and empty messages unless allowed, and refuses to commit while the
+/// index has unmerged paths. Prints git's summary: `[branch hash] subject` plus a
 /// diffstat line and create/delete modes.
 pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     let merging = crate::repo::path(".git/MERGE_HEAD").exists();
     if merging && opts.amend {
         fail(128, "fatal: You are in the middle of a merge -- cannot amend.");
     }
-    if merging {
-        let unresolved = unresolved_merge_paths()?;
-        if !unresolved.is_empty() {
-            let mut text = String::from("error: Committing is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'rgit add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.");
-            for path in unresolved {
-                text.push_str(&format!("\nU\t{}", path));
-            }
-            fail(128, &text);
-        }
-    }
+    // `-a` resolves conflicts by staging the working tree; otherwise unmerged paths block.
     if opts.all {
         stage_tracked_changes()?;
     }
+    crate::helpers::merge::die_if_unmerged_for_commit()?;
 
     let head_state = refs::resolve_head()?;
     let head = refs::resolve_head_commit()?;

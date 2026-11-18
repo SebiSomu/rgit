@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
-use crate::helpers::merge_tree::{merge_base_tree, merge_trees_in_memory};
+use crate::helpers::merge_tree::merge_base_tree;
+use crate::helpers::merge::{die_if_unmerged, merge_into_worktree};
 use crate::helpers::{build_merge_commit, build_tree_from_map, check_switch_safety, find_all_merge_bases, find_merge_base, is_reachable, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree};
 use crate::index::read_index;
 use crate::refs;
@@ -15,9 +16,10 @@ use crate::refs;
 /// merged cleanly is staged, and `MERGE_HEAD`/`MERGE_MSG` are written so `rgit commit`
 /// records the merge once the conflicts are resolved and added.
 pub fn merge(branch: String) -> anyhow::Result<()> {
+    die_if_unmerged("Merging", "Exiting because of an unresolved conflict.")?;
     if crate::repo::path(".git/MERGE_HEAD").exists() {
-        anyhow::bail!("fatal: You have not concluded your merge (MERGE_HEAD exists).
-Please, commit your changes before you merge.");
+        eprintln!("fatal: You have not concluded your merge (MERGE_HEAD exists).\nPlease, commit your changes before you merge.");
+        std::process::exit(128);
     }
     let head_state = refs::resolve_head()?;
     let current_branch = match head_state {
@@ -64,33 +66,17 @@ Please, commit your changes before you merge.");
     let (base_tree, _bases) = merge_base_tree(&our_commit, &their_commit, false)?;
     let our_tree = resolve_tree_from_source(&our_commit)?;
     let their_tree = resolve_tree_from_source(&their_commit)?;
-    let result = merge_trees_in_memory(&base_tree, &our_tree, &their_tree, "HEAD", &branch, 7)?;
-
-    let index_entries = read_index().unwrap_or_default();
-    let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
-    check_switch_safety(&result.tree, &our_tree, &index_map).map_err(|e| {
-        anyhow::anyhow!("{}", e.to_string().replace("by switch", "by merge").replace("before you switch branches", "before you merge"))
-    })?;
+    let result = merge_into_worktree(&base_tree, &our_tree, &their_tree, "HEAD", &branch, "merge")?;
 
     fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", our_commit))?;
-    sync_working_tree(&result.tree, &our_tree, &index_map)?;
     for message in &result.messages {
         println!("{}", message.text);
     }
     let merge_msg = merge_message(&branch);
 
     if !result.conflicted.is_empty() {
-        // The index has no conflict stages: conflicted paths keep our version there (their
-        // markers live only in the working tree), and everything that merged cleanly is staged.
-        let mut index_tree = result.tree.clone();
-        for path in result.conflicted.keys() {
-            match our_tree.get(path) {
-                Some(entry) => index_tree.insert(path.clone(), *entry),
-                None => index_tree.remove(path),
-            };
-        }
-        update_index_from_tree(&index_tree, &our_tree)?;
-
+        // Clean paths are staged; conflicted ones hold their stages 1-3 in the index and the
+        // marker content in the working tree.
         let mut msg = format!("{}\n\n# Conflicts:\n", merge_msg);
         for path in result.conflicted.keys() {
             msg.push_str(&format!("#\t{}\n", path));
@@ -101,7 +87,6 @@ Please, commit your changes before you merge.");
         std::process::exit(1);
     }
 
-    update_index_from_tree(&result.tree, &our_tree)?;
     let tree_hash = build_tree_from_map(&result.tree)?;
     let commit_hash = build_merge_commit(tree_hash, &our_commit, &their_commit, &merge_msg)?;
     refs::write_ref(&format!("refs/heads/{}", current_branch), &commit_hash)?;

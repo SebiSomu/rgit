@@ -14,7 +14,7 @@ const UPDATE_INDEX_USAGE: &str = "usage: rgit update-index [<options>] [--] [<fi
 /// Prints a message and exits with the given status.
 fn die(message: &str, code: i32) -> ! {
     eprintln!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }
 
 /// Handles one path the way `update-index <file>` does, including `--force-remove`,
@@ -140,7 +140,7 @@ fn read_index_info(entries: &mut Vec<IndexEntry>, input: &[u8], nul_terminated: 
 pub fn update_index(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", UPDATE_INDEX_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         die("fatal: not a git repository (or any of the parent directories): .git", 128);
@@ -150,7 +150,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
     let (mut nul, mut read_stdin, mut index_info, mut needs_update) = (false, false, false, false);
     let usage_error = |message: String| -> ! {
         eprint!("{}\n{}", message, UPDATE_INDEX_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
 
     let mut i = 0;
@@ -205,7 +205,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
             "--cacheinfo" => {
                 let expects = || -> ! {
                     eprintln!("error: option 'cacheinfo' expects <mode>,<sha1>,<path>");
-                    std::process::exit(129);
+                    crate::ui::exit(129);
                 };
                 let Some(first) = args.get(i).cloned() else { expects() };
                 let is_hash = |s: &str| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit());
@@ -242,7 +242,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
                     "-x" => Some(false),
                     _ => {
                         eprintln!("error: option 'chmod' expects \"+x\" or \"-x\"");
-                        std::process::exit(129);
+                        crate::ui::exit(129);
                     }
                 };
             }
@@ -288,7 +288,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
 
     write_index(&mut entries)?;
     if needs_update {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

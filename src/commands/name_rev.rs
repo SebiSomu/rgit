@@ -28,16 +28,16 @@ pub fn name_rev(args: Vec<String>) -> Result<()> {
             } else {
                 eprint!("{}", message);
             }
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if [opts.all, opts.annotate_stdin, !opts.revs.is_empty()].iter().filter(|on| **on).count() > 1 {
         eprint!("error: Specify either a list, or --all, not both!\n{}", NAME_REV_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
 
     // Resolve the arguments first: the oldest commit among them limits how far back names go.
@@ -103,7 +103,7 @@ pub fn name_rev(args: Vec<String>) -> Result<()> {
                 }
                 out.flush()?;
                 eprintln!("fatal: cannot describe '{}'", hash);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
         };
         if opts.name_only {

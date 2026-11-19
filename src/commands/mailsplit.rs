@@ -21,7 +21,7 @@ use crate::objects::MailsplitOptions;
 pub fn mailsplit(args: Vec<String>) -> Result<()> {
     if args.first().is_some_and(|a| a == "-h" || a == "--help") {
         print!("{}", MAILSPLIT_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_mailsplit_args(&args) {
         Ok(opts) => opts,
@@ -29,10 +29,10 @@ pub fn mailsplit(args: Vec<String>) -> Result<()> {
             let message = e.to_string();
             if message.starts_with("usage:") {
                 eprint!("{}", message);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             eprintln!("{}", message);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
 
@@ -45,7 +45,7 @@ pub fn mailsplit(args: Vec<String>) -> Result<()> {
             match fs::metadata(input) {
                 Err(e) => {
                     eprintln!("error: cannot stat {}: {}", input, io_reason(&e));
-                    std::process::exit(1);
+                    crate::ui::exit(1);
                 }
                 Ok(meta) if meta.is_dir() => split_maildir_input(input, &opts, number),
                 Ok(_) => split_mbox_input(input, &opts, number),
@@ -58,7 +58,7 @@ pub fn mailsplit(args: Vec<String>) -> Result<()> {
             }
             None => {
                 eprintln!("error: cannot split patches from {}", if input == "-" { "stdin" } else { input });
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
     }
@@ -86,7 +86,7 @@ fn split_mbox_input(input: &str, opts: &MailsplitOptions, mut number: usize) -> 
         }
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
     };
     for message in messages {
@@ -128,7 +128,7 @@ fn split_maildir_input(input: &str, opts: &MailsplitOptions, mut number: usize) 
 fn write_or_die(opts: &MailsplitOptions, number: usize, message: &[u8]) {
     if let Err(e) = write_split_message(&opts.directory, opts.precision, number, message) {
         eprintln!("{:#}", e);
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 }
 

@@ -120,14 +120,14 @@ pub fn diff_tree(args: Vec<String>) -> Result<()> {
     let usage = format!("usage: rgit diff-tree [--stdin] [-m] [-s] [-v] [--no-commit-id] [--pretty]\n              [-t] [-r] [--root] [<common-diff-options>] <tree-ish> [<tree-ish>] [<path>...]\n\n  -r            diff recursively\n  -t            show tree entries as well\n  --root        include the initial commit as diff against /dev/null\n\n{}", DIFF_COMMON_OPTIONS);
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let mut opts = match parse_diff_plumbing_args(&args, "diff-tree", &usage) {
         Ok(opts) => opts,
         Err((message, code)) => {
             if code == 129 && message.starts_with("usage:") {
                 print!("{}", message);
-                std::process::exit(code);
+                crate::ui::exit(code);
             }
             die(&message, code)
         }
@@ -238,7 +238,7 @@ pub fn diff_tree(args: Vec<String>) -> Result<()> {
     out.flush()?;
     crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && differs {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

@@ -316,7 +316,7 @@ fn reject_log_only_options(opts: &LogOptions) {
 fn write_or_quit(out: &mut impl Write, text: &str) {
     if let Err(e) = out.write_all(text.as_bytes()) {
         if e.kind() == io::ErrorKind::BrokenPipe {
-            std::process::exit(0);
+            crate::ui::exit(0);
         }
         exit_with(&format!("fatal: {}", e), 128);
     }
@@ -324,5 +324,5 @@ fn write_or_quit(out: &mut impl Write, text: &str) {
 
 fn exit_with(message: &str, code: i32) -> ! {
     eprintln!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }

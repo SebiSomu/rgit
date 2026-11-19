@@ -191,12 +191,12 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
     ensure_working_tree_clean(action)?;
 
     let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
+    let stash_parents = read_object(&list[idx].hash).map(|(_, c)| commit_parents(&String::from_utf8_lossy(&c))).unwrap_or_default();
     // A stash made with `-u`/`-a` keeps the untracked files in the `w` commit's third parent.
-    if let Ok((_, content)) = read_object(&list[idx].hash) {
-        if let Some(untracked) = commit_parents(&String::from_utf8_lossy(&content)).get(2) {
-            restore_untracked_files(untracked)?;
-        }
+    if let Some(untracked) = stash_parents.get(2) {
+        restore_untracked_files(untracked)?;
     }
+    crate::helpers::narrate::clear_stash_conflict();
 
     let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
         Some(commit_hash) => {
@@ -207,6 +207,13 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
         }
         None => BTreeMap::new(),
     };
+
+    // HEAD moved since the stash was made: three-way merge the stashed changes onto it
+    // (base = HEAD at stash time), like git, instead of overwriting the newer commits.
+    let head_now = refs::resolve_head_commit()?;
+    if let Some(base) = stash_parents.first().filter(|b| head_now.as_deref() != Some(b.as_str())) {
+        return apply_stash_by_merge(base, &head_tree, &w_tree, idx, list, drop_after);
+    }
 
     // Remove tracked files that existed at HEAD but were deleted in the
     // stash's working-tree snapshot.
@@ -255,6 +262,44 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
 
     Ok(())
 }
+/// `stash apply` when HEAD is no longer the commit the stash was made on: merges the stash's
+/// working tree onto HEAD (markers labelled "Updated upstream" / "Stashed changes", as in git).
+/// Clean result: the changes are left unstaged, new files staged. Conflicts: cleanly merged
+/// files stay staged, conflicted ones get stages 1-3, the entry is kept and the exit code is 1.
+fn apply_stash_by_merge(base: &str, head_tree: &BTreeMap<String, ([u8; 20], u32)>, w_tree: &BTreeMap<String, ([u8; 20], u32)>, idx: usize, list: Vec<StashEntry>, drop_after: bool) -> anyhow::Result<()> {
+    let base_tree = crate::helpers::resolve_tree_from_source(base)?;
+    let result = crate::helpers::merge::merge_into_worktree(&base_tree, head_tree, w_tree, "Updated upstream", "Stashed changes", "apply stash")?;
+    for m in &result.messages {
+        println!("{}", m.text);
+    }
+    if !result.conflicted.is_empty() {
+        let _ = fs::write(crate::repo::path(crate::helpers::narrate::STASH_CONFLICT_PATH), format!("stash@{{{}}}\n", idx));
+        if drop_after {
+            eprintln!("The stash entry is kept in case you need it again.");
+        }
+        crate::ui::exit(1);
+    }
+    // Clean: back to HEAD in the index, except files the stash adds, which stay staged.
+    let mut staged = head_tree.clone();
+    for (path, entry) in &result.tree {
+        if !head_tree.contains_key(path) {
+            staged.insert(path.clone(), *entry);
+        }
+    }
+    let mut entries = build_index_entries_for_tree(&staged, true)?;
+    write_index(&mut entries)?;
+    let message = list[idx].message.clone();
+    if drop_after {
+        let mut remaining = list;
+        remaining.remove(idx);
+        write_stash_list(&remaining)?;
+        println!("Dropped stash@{{{}}} ({})", idx, message);
+    } else {
+        println!("Applied stash@{{{}}} ({})", idx, message);
+    }
+    Ok(())
+}
+
 /// Writes a stash commit object with any number of parents (the `w` commit has HEAD, the
 /// index commit and, with `-u`/`-a`, the untracked-files commit; that one has none).
 // Used by `stash push -u` / `-a`.
@@ -321,7 +366,7 @@ fn restore_untracked_files(untracked_commit: &str) -> anyhow::Result<()> {
             eprintln!("{} already exists, no checkout", path);
         }
         eprintln!("error: could not restore untracked files from stash");
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     for (path, (hash, mode)) in &tree {
         let (_, content) = read_object(&hex::encode(hash))?;

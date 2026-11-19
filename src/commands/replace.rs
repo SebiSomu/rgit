@@ -27,18 +27,18 @@ use crate::repo;
 pub fn replace(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", REPLACE_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_replace_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             eprint!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let resolve = |name: &str| resolve_rev(name).map_err(|_| anyhow::anyhow!("error: failed to resolve '{}' as a valid ref", name));
@@ -56,7 +56,7 @@ pub fn replace(args: Vec<String>) -> Result<()> {
                 println!("{}", message);
             }
             if had_error {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
             Ok(())
         }
@@ -92,7 +92,7 @@ pub fn replace(args: Vec<String>) -> Result<()> {
     })();
     if let Err(e) = result {
         eprintln!("{}", e);
-        std::process::exit(255);
+        crate::ui::exit(255);
     }
     Ok(())
 }

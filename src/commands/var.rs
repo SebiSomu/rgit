@@ -17,7 +17,7 @@ use crate::helpers::var::{var_value, VAR_NAMES, VAR_USAGE};
 pub fn var(args: Vec<String>) -> Result<()> {
     let usage = || -> ! {
         eprint!("{}", VAR_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     match args.as_slice() {
         [flag] if flag == "-l" => {
@@ -32,7 +32,7 @@ pub fn var(args: Vec<String>) -> Result<()> {
         }
         [name] => match var_value(name)? {
             Some(value) => println!("{}", value),
-            None if VAR_NAMES.contains(&name.as_str()) => std::process::exit(1),
+            None if VAR_NAMES.contains(&name.as_str()) => crate::ui::exit(1),
             None => usage(),
         },
         _ => usage(),

@@ -165,7 +165,7 @@ const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 fn fail(code: i32, message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }
 
 /// Prints git's explanation of why there is nothing to commit and exits with status 1.
@@ -177,7 +177,7 @@ fn report_nothing_to_commit(head_state: &refs::HeadState, unborn: bool, amend: b
     if amend {
         println!("No changes");
         eprintln!("You asked to amend the most recent commit, but doing so would make\nit empty. You can repeat your command with --allow-empty, or you can\nremove the commit entirely with \"rgit reset HEAD^\".");
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     let changes = tracked_worktree_changes()?;
     if unborn {
@@ -191,7 +191,7 @@ fn report_nothing_to_commit(head_state: &refs::HeadState, unborn: bool, amend: b
         }
         println!("\nno changes added to commit (use \"rgit add\" and/or \"rgit commit -a\")");
     }
-    std::process::exit(1);
+    crate::ui::exit(1);
 }
 
 /// The commented status block shown in the editor: the branch and what will be committed.

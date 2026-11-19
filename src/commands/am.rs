@@ -28,10 +28,10 @@ use crate::refs;
 pub fn am(opts: AmOptions) -> Result<()> {
     match run_am(&opts) {
         Ok(true) => Ok(()),
-        Ok(false) => std::process::exit(128),
+        Ok(false) => crate::ui::exit(128),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

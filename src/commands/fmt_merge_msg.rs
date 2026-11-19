@@ -23,7 +23,7 @@ use crate::repo;
 pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
     if args.iter().any(|a| a == "-h") {
         print!("{}", FMT_MERGE_MSG_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         fatal("fatal: not a git repository (or any of the parent directories): .git");
@@ -36,7 +36,7 @@ pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
                 fatal(&message);
             }
             eprint!("{}", message);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
 
@@ -69,5 +69,5 @@ pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
 
 fn fatal(message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }

@@ -23,15 +23,15 @@ pub fn mktag(args: Vec<String>) -> Result<()> {
             "--no-strict" => strict = false,
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--") => {
                 eprint!("error: unknown option `{}'\n{}", &other[2..], USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') && other.len() > 1 => {
                 eprint!("error: unknown switch `{}'\n{}", other.chars().nth(1).unwrap_or('-'), USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             // Like git, plain arguments are ignored.
             _ => {}
@@ -39,7 +39,7 @@ pub fn mktag(args: Vec<String>) -> Result<()> {
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let mut text = Vec::new();
@@ -56,22 +56,22 @@ pub fn mktag(args: Vec<String>) -> Result<()> {
     }
     if rejected {
         eprintln!("fatal: tag on stdin did not pass our strict fsck check");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let (Some(object), Some(tagged_type)) = (object, tagged_type) else {
         eprintln!("fatal: tag on stdin did not pass our strict fsck check");
-        std::process::exit(128);
+        crate::ui::exit(128);
     };
     match read_object(&object) {
         Ok((actual, _)) if actual != tagged_type => {
             eprintln!("fatal: object '{}' tagged as '{}', but is a '{}' type", object, tagged_type, actual);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
         Ok(_) => {}
         Err(_) => {
             eprintln!("fatal: could not read tagged object '{}'", object);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
     println!("{}", write_object("tag", &text)?);

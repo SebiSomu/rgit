@@ -40,7 +40,7 @@ pub fn checkout_paths(target: Option<String>, stage: WriteoutStage, paths: Vec<P
     match target {
         Some(_) if stage != WriteoutStage::Index => {
             eprintln!("fatal: '--merge', '--ours', or '--theirs' cannot be used when checking out of a tree");
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
         Some(tree) => {
             let rel: Vec<String> = paths.iter().map(|p| normalize_path(p)).collect();
@@ -49,7 +49,7 @@ pub fn checkout_paths(target: Option<String>, stage: WriteoutStage, paths: Vec<P
         None => {
             let rel: Vec<String> = paths.iter().map(|p| normalize_path(p)).collect();
             if !write_from_index(&rel, stage, true)? {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
             Ok(())
         }
@@ -159,21 +159,21 @@ pub fn restore(files: Vec<PathBuf>, staged: bool, worktree: bool, source: Option
     }
     if staged && matches!(stage, WriteoutStage::Ours | WriteoutStage::Theirs) {
         eprintln!("fatal: '--ours' or '--theirs' cannot be used with --staged");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if staged && matches!(stage, WriteoutStage::Merge(_)) {
         eprintln!("fatal: '--merge' or '--conflict' cannot be used with --staged");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if source.is_some() && stage != WriteoutStage::Index {
         eprintln!("fatal: '--merge', '--ours', or '--theirs' cannot be used when checking out of a tree");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     // Plain `restore <paths>`: the working tree from the index, unmerged paths included.
     if !staged && source.is_none() {
         let rel: Vec<String> = files.iter().map(|p| normalize_path(p)).collect();
         if !write_from_index(&rel, stage, false)? {
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         return Ok(());
     }
@@ -217,7 +217,7 @@ fn restore_from_tree(paths: &[String], tree: &BTreeMap<String, ([u8; 20], u32)>,
         for error in errors {
             eprintln!("{}", error);
         }
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
 
     for path in paths {

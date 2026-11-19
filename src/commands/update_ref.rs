@@ -26,7 +26,7 @@ pub fn update_ref(args: Vec<String>) -> Result<()> {
     let before_dashdash = args.iter().take_while(|a| a.as_str() != "--");
     if before_dashdash.clone().any(|a| a == "-h" || a == "--help") {
         print!("{}", UPDATE_REF_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
 
     let opts = match parse_update_ref_args(&args) {
@@ -55,12 +55,12 @@ pub fn update_ref(args: Vec<String>) -> Result<()> {
 
 fn usage_exit(message: &str) -> ! {
     eprint!("{}", message);
-    std::process::exit(129);
+    crate::ui::exit(129);
 }
 
 fn fatal(message: &str) -> ! {
     eprintln!("fatal: {}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 /// The argument form: one update or deletion. Failed deletions are reported as `error:` with
@@ -106,7 +106,7 @@ fn run_single_update(opts: &UpdateRefOptions) {
     if let Err(e) = result {
         if opts.delete {
             eprintln!("error: {}", e);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         fatal(&format!("update_ref failed for ref '{}': {}", refname, e));
     }

@@ -29,7 +29,7 @@ const CHECKOUT_INDEX_USAGE: &str = "usage: rgit checkout-index [<options>] [--] 
 pub fn checkout_index(args: Vec<String>) -> Result<()> {
     let die = |message: &str, code: i32| -> ! {
         eprintln!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let (mut all, mut force, mut quiet, mut no_create, mut update_stat, mut nul, mut read_stdin, mut temp) = (false, false, false, false, false, false, false, false);
     let mut prefix = String::new();
@@ -53,7 +53,7 @@ pub fn checkout_index(args: Vec<String>) -> Result<()> {
                         Some(value) => value.clone(),
                         None => {
                             eprintln!("error: option `{}' requires a value", name);
-                            std::process::exit(129);
+                            crate::ui::exit(129);
                         }
                     }
                 }
@@ -63,7 +63,7 @@ pub fn checkout_index(args: Vec<String>) -> Result<()> {
             "--" => options_done = true,
             "-h" => {
                 print!("{}", CHECKOUT_INDEX_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             "-a" | "--all" => all = true,
             "--no-all" => all = false,
@@ -92,11 +92,11 @@ pub fn checkout_index(args: Vec<String>) -> Result<()> {
             }
             other if other.starts_with("--") => {
                 eprint!("error: unknown option `{}'\n{}", &other[2..], CHECKOUT_INDEX_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other => {
                 eprint!("error: unknown switch `{}'\n{}", other.chars().nth(1).unwrap_or('-'), CHECKOUT_INDEX_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         }
     }
@@ -232,7 +232,7 @@ pub fn checkout_index(args: Vec<String>) -> Result<()> {
         write_index(&mut entries)?;
     }
     if errors > 0 {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

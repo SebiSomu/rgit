@@ -23,7 +23,7 @@ use crate::repo;
 pub fn show_branch(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", SHOW_BRANCH_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         fatal("fatal: not a git repository (or any of the parent directories): .git");
@@ -33,7 +33,7 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
         Err(e) => {
             let message = e.to_string();
             eprint!("{}", message);
-            std::process::exit(if message.starts_with("fatal:") { 128 } else { 129 });
+            crate::ui::exit(if message.starts_with("fatal:") { 128 } else { 129 });
         }
     };
     let (names, head) = collect_show_branch_names(&opts).unwrap_or_else(|e| fatal(&e.to_string()));
@@ -45,7 +45,7 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
         Ok((output, status)) => {
             print!("{}", output);
             if status != 0 {
-                std::process::exit(status);
+                crate::ui::exit(status);
             }
             Ok(())
         }
@@ -55,5 +55,5 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
 
 fn fatal(message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }

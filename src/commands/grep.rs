@@ -109,7 +109,7 @@ pub fn grep(pattern: String, revisions: Vec<String>, path_specs: Vec<String>, op
     }
 
     if total_matches == 0 {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
 
     Ok(())

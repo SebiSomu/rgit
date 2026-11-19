@@ -13,7 +13,7 @@ use crate::refs;
 
 fn die(code: i32, message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }
 
 /// `rgit rebase [-i] [--onto <newbase> | --keep-base] [<upstream> [<branch>]]` /
@@ -58,7 +58,7 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
             Some(tracking) => tracking,
             None => {
                 print_no_upstream_help()?;
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         },
     };
@@ -107,7 +107,7 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
         eprintln!("error: cannot rebase: You have unstaged changes.");
         eprintln!("error: additionally, your index contains uncommitted changes.");
         eprintln!("error: Please commit or stash them.");
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     ensure_working_tree_clean("start a rebase")?;
 

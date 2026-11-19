@@ -33,7 +33,11 @@ pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
     let recorded = load_conflict_list();
     let resolved: Vec<&String> = recorded.iter().filter(|p| !unmerged.contains_key(*p)).collect();
     if unmerged.is_empty() {
-        match &operation {
+        match operation.as_deref() {
+            Some("stash") => {
+                println!("All conflicted files are resolved. The stash entry was kept: `rgit stash drop` when you're done with it.");
+                crate::helpers::narrate::clear_stash_conflict();
+            }
             Some(_) if !recorded.is_empty() => {
                 println!("All {} conflicted files are resolved.", recorded.len());
                 println!("Next: rgit {} --continue", op);
@@ -60,8 +64,11 @@ pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
         println!("Resolved: {}", resolved.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
     }
     println!();
-    println!("Next: edit each file, then `rgit add <file>`; when all are done, `rgit {} --continue`.", op);
-    println!("      `rgit conflicts --explain <file>` shows each conflict side by side; `rgit {} --abort` gives up.", op);
+    println!("Next: edit each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,");
+    for l in crate::ui::conflict_next_steps(operation.as_deref().unwrap_or("merge")) {
+        println!("      {}", l);
+    }
+    println!("      `rgit conflicts --explain <file>` shows each conflict side by side.");
     Ok(())
 }
 

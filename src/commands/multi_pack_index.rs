@@ -22,7 +22,7 @@ pub fn multi_pack_index(args: Vec<String>) -> Result<()> {
     const USAGE: &str = "usage: rgit multi-pack-index write [--preferred-pack=<pack>]\n   or: rgit multi-pack-index verify\n   or: rgit multi-pack-index expire\n";
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let mut action: Option<&str> = None;
     let mut preferred: Option<String> = None;
@@ -39,7 +39,7 @@ pub fn multi_pack_index(args: Vec<String>) -> Result<()> {
             }
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--preferred-pack=") => preferred = Some(other["--preferred-pack=".len()..].to_string()),
             other if other.starts_with("--object-dir") => die("fatal: --object-dir is not supported by rgit multi-pack-index\n", 128),
@@ -77,7 +77,7 @@ pub fn multi_pack_index(args: Vec<String>) -> Result<()> {
                 eprintln!("error: {}", problem);
             }
             if !problems.is_empty() {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
         "expire" => {

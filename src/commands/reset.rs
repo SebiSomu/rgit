@@ -113,7 +113,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     };
     if soft && (crate::repo::path(".git/MERGE_HEAD").exists() || read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
         eprintln!("fatal: Cannot do a soft reset in the middle of a merge.");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let source = commit.as_deref().unwrap_or("HEAD");

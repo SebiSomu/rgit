@@ -176,7 +176,7 @@ fn resolve_conflict_or_die(verb: &str, fatal: &str, list_paths: bool) -> anyhow:
             println!("U\t{}", path);
         }
     }
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 /// Prints `<path>: needs merge` for each unmerged path (git's refresh-index report) and

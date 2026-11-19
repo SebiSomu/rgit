@@ -24,15 +24,15 @@ pub fn mktree(args: Vec<String>) -> Result<()> {
             "--no-batch" => batch = false,
             "-h" => {
                 print!("{}", MKTREE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--") => {
                 eprint!("error: unknown option `{}'\n{}", &other[2..], MKTREE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') && other.len() > 1 => {
                 eprint!("error: unknown switch `{}'\n{}", other.chars().nth(1).unwrap_or('-'), MKTREE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             // Like git, plain arguments are ignored.
             _ => {}
@@ -40,7 +40,7 @@ pub fn mktree(args: Vec<String>) -> Result<()> {
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let mut input = Vec::new();
@@ -54,7 +54,7 @@ pub fn mktree(args: Vec<String>) -> Result<()> {
 
     let fail = |message: String| -> ! {
         eprintln!("{}", message);
-        std::process::exit(128);
+        crate::ui::exit(128);
     };
     let mut entries: Vec<(u32, [u8; 20], Vec<u8>)> = Vec::new();
     let mut in_block = false;

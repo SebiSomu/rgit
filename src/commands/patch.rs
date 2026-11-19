@@ -107,7 +107,7 @@ pub fn stash_patch(message: Option<String>, paths: Vec<String>) -> anyhow::Resul
     })?;
     if stashed == head {
         eprintln!("No changes selected");
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
 
     // The stash: index as it is, working tree = HEAD plus the chosen hunks.
@@ -135,7 +135,7 @@ pub fn stash_patch(message: Option<String>, paths: Vec<String>) -> anyhow::Resul
             Err(message) => {
                 eprintln!("{}", message);
                 eprintln!("Cannot remove worktree changes");
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
     }

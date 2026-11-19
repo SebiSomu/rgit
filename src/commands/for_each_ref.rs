@@ -27,7 +27,7 @@ pub fn for_each_ref(args: Vec<String>) -> Result<()> {
         if !exit.stderr.is_empty() {
             eprintln!("{}", exit.stderr);
         }
-        std::process::exit(exit.code);
+        crate::ui::exit(exit.code);
     }
     Ok(())
 }

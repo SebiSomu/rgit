@@ -26,7 +26,7 @@ pub fn fast_import(args: Vec<String>) -> Result<()> {
     const USAGE: &str = "usage: rgit fast-import [--date-format=<f>] [--force] [--quiet] [--stats] [--done] [--export-marks=<marks.file>] [--import-marks=<marks.file>]\n";
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     if !repo::exists() {
         die("fatal: not a git repository (or any of the parent directories): .git\n", 128);
@@ -62,7 +62,7 @@ pub fn fast_import(args: Vec<String>) -> Result<()> {
             "--relative-marks" | "--no-relative-marks" | "--max-pack-size" | "--big-file-threshold" | "--depth" | "--active-branches" | "--export-pack-edges" | "--allow-unsafe-features" | "--signed-commits" | "--signed-tags" => Ok(()),
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             "--cat-blob-fd" | "--rewrite-submodules-from" | "--rewrite-submodules-to" => die(&format!("fatal: {} is not supported by rgit fast-import\n", name), 128),
             _ => die(&format!("fatal: unknown option {}\n{}", arg, USAGE), 129),
@@ -88,7 +88,7 @@ pub fn fast_import(args: Vec<String>) -> Result<()> {
         eprintln!("      refs   : {:>10}", state.refs.values().filter(|tip| tip.is_some()).count());
     }
     if skipped {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

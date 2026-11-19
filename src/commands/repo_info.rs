@@ -17,16 +17,16 @@ use crate::helpers::repo_info::{format_structure_table, repo_info_value, repo_st
 pub fn repo(args: Vec<String>) -> Result<()> {
     let usage = || -> ! {
         eprint!("{}", REPO_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     let Some((subcommand, rest)) = args.split_first() else { usage() };
     if subcommand == "-h" || rest.iter().any(|a| a == "-h") {
         print!("{}", REPO_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !crate::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let mut format: Option<String> = None;
@@ -57,11 +57,11 @@ pub fn repo(args: Vec<String>) -> Result<()> {
             let format = format.unwrap_or_else(|| "keyvalue".to_string());
             if !matches!(format.as_str(), "keyvalue" | "nul") {
                 eprintln!("fatal: invalid format '{}'", format);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
             if all && !keys.is_empty() {
                 eprintln!("fatal: --all and <key> cannot be used together");
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
             let wanted: Vec<String> = if all { REPO_INFO_KEYS.iter().map(|k| k.to_string()).collect() } else { keys.iter().map(|k| k.to_string()).collect() };
             let mut failed = false;
@@ -75,7 +75,7 @@ pub fn repo(args: Vec<String>) -> Result<()> {
                 }
             }
             if failed {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
         "structure" => {
@@ -89,7 +89,7 @@ pub fn repo(args: Vec<String>) -> Result<()> {
                 "keyvalue" | "nul" => counts.iter().for_each(|(key, count)| print(&format, key, &count.to_string())),
                 other => {
                     eprintln!("fatal: invalid format '{}'", other);
-                    std::process::exit(128);
+                    crate::ui::exit(128);
                 }
             }
         }

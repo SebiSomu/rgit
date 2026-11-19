@@ -22,14 +22,14 @@ pub fn cherry(opts: CherryOptions) -> Result<()> {
             None => {
                 eprintln!("Could not find a tracked remote branch, please specify <upstream> manually.");
                 eprintln!("usage: rgit cherry [-v] [--abbrev[=<n>]] [<upstream> [<head> [<limit>]]]");
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         },
     };
     let resolve = |name: &str| -> String {
         resolve_commit_rev(name).unwrap_or_else(|_| {
             eprintln!("fatal: unknown commit {}", name);
-            std::process::exit(128);
+            crate::ui::exit(128);
         })
     };
     let head = resolve(opts.head.as_deref().unwrap_or("HEAD"));

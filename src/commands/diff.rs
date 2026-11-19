@@ -32,7 +32,7 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
     let usage = format!("usage: rgit diff [<options>] [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] --cached [<commit>] [--] [<path>...]\n   or: rgit diff [<options>] <commit> [<commit>...] <commit> [--] [<path>...]\n\n{}", DIFF_COMMON_OPTIONS);
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let mut opts = match parse_diff_plumbing_args(&args, "diff", &usage) {
         Ok(opts) => opts,
@@ -148,7 +148,7 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
     warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && (!changes.is_empty() || !combined_text.is_empty()) {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

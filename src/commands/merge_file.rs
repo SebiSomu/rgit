@@ -38,12 +38,12 @@ pub fn merge_file(args: Vec<String>) -> Result<()> {
             } else {
                 eprint!("{}", message);
             }
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if opts.object_id && !in_repo {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let mut contents: Vec<String> = Vec::new();
@@ -51,7 +51,7 @@ pub fn merge_file(args: Vec<String>) -> Result<()> {
         let bytes = if opts.object_id {
             let Ok(hash) = resolve_rev(name) else {
                 eprintln!("error: object '{}' does not exist", name);
-                std::process::exit(255);
+                crate::ui::exit(255);
             };
             read_object(&hash)?.1
         } else {
@@ -60,13 +60,13 @@ pub fn merge_file(args: Vec<String>) -> Result<()> {
                 Err(e) => {
                     let reason = if e.kind() == std::io::ErrorKind::NotFound { "No such file or directory".to_string() } else { e.to_string() };
                     eprintln!("error: Could not stat {}: {}", name, reason);
-                    std::process::exit(255);
+                    crate::ui::exit(255);
                 }
             }
         };
         if bytes[..bytes.len().min(8000)].contains(&0) {
             eprintln!("error: Cannot merge binary files: {}", name);
-            std::process::exit(255);
+            crate::ui::exit(255);
         }
         contents.push(String::from_utf8_lossy(&bytes).to_string());
     }
@@ -81,11 +81,11 @@ pub fn merge_file(args: Vec<String>) -> Result<()> {
         std::io::stdout().lock().write_all(&result.content)?;
     } else if let Err(e) = std::fs::write(&opts.files[0], &result.content) {
         eprintln!("error: Could not open {} for writing: {}", opts.files[0], e);
-        std::process::exit(255);
+        crate::ui::exit(255);
     }
     let conflicts = result.conflicts.len().min(127);
     if conflicts > 0 {
-        std::process::exit(conflicts as i32);
+        crate::ui::exit(conflicts as i32);
     }
     Ok(())
 }

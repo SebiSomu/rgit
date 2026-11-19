@@ -35,12 +35,12 @@ pub fn read_tree(args: Vec<String>) -> Result<()> {
             } else {
                 eprint!("{}", message);
             }
-            std::process::exit(code);
+            crate::ui::exit(code);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if opts.trees.is_empty() {
         if !opts.empty {
@@ -55,13 +55,13 @@ pub fn read_tree(args: Vec<String>) -> Result<()> {
         Ok(plan) => plan,
         Err(message) => {
             eprintln!("{}", message);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
     if !plan.errors.is_empty() {
         // Like git's plumbing, stop at the first problem.
         eprintln!("{}", plan.errors[0]);
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if !plan.unmerged.is_empty() {
         if opts.trivial {
@@ -72,7 +72,7 @@ pub fn read_tree(args: Vec<String>) -> Result<()> {
             }
             eprintln!("fatal: rgit's index has no conflict stages, so read-tree cannot leave paths unmerged; use merge or merge-tree");
         }
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if opts.dry_run {
         return Ok(());
@@ -97,7 +97,7 @@ pub fn read_tree(args: Vec<String>) -> Result<()> {
             let Some(entry) = plan.entries.iter_mut().find(|e| &e.path == path) else { continue };
             if let Err(message) = write_entry_to_worktree(entry, Path::new(path), true) {
                 eprintln!("{}", message);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
             if let Ok(metadata) = fs::metadata(path) {
                 let mode = entry.mode;

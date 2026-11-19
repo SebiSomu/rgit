@@ -21,7 +21,7 @@ use crate::helpers::rerere::{conflicted_paths, read_merge_rr, record_and_replay,
 pub fn rerere(args: Vec<String>) -> Result<()> {
     let usage = || -> ! {
         eprint!("{}", RERERE_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     let args: Vec<&String> = args.iter().filter(|a| !matches!(a.as_str(), "--rerere-autoupdate" | "--no-rerere-autoupdate")).collect();
     if args.iter().any(|a| a.as_str() == "-h") {
@@ -29,7 +29,7 @@ pub fn rerere(args: Vec<String>) -> Result<()> {
     }
     if !crate::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let result: Result<()> = (|| {
         match args.split_first() {
@@ -60,7 +60,7 @@ pub fn rerere(args: Vec<String>) -> Result<()> {
     })();
     if let Err(e) = result {
         eprintln!("{}", e);
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

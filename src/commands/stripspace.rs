@@ -20,24 +20,24 @@ pub fn stripspace(args: Vec<String>) -> Result<()> {
             "-c" | "--comment-lines" => "-c",
             "-h" => {
                 print!("{}", STRIPSPACE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--") && other.len() > 2 => {
                 eprint!("error: unknown option `{}'\n{}", &other[2..], STRIPSPACE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') && other.len() > 1 => {
                 eprint!("error: unknown switch `{}'\n{}", other.chars().nth(1).unwrap_or('-'), STRIPSPACE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             _ => {
                 eprint!("{}", STRIPSPACE_USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         };
         if let Some(previous) = mode.filter(|m| *m != this) {
             eprintln!("error: {} is incompatible with {}", this, previous);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
         mode = Some(this);
     }

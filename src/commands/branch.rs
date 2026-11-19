@@ -26,7 +26,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     let modes = [opts.delete, opts.rename, opts.copy, opts.set_upstream.is_some(), opts.unset_upstream, opts.show_current, list];
     if modes.iter().filter(|m| **m).count() > 1 {
         eprint!("{}", BRANCH_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let head = refs::resolve_head()?;
     let current = match &head {
@@ -64,7 +64,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
         let Some((remote, merge, display)) = upstream_for(upstream) else {
             eprintln!("fatal: the requested upstream branch '{}' does not exist", upstream);
             eprintln!("hint: \nhint: If you are planning on basing your work on an upstream\nhint: branch that already exists at the remote, you may need to\nhint: run \"rgit fetch\" to retrieve it.\nhint: \nhint: If you are planning to push out a new local branch that\nhint: will track its remote counterpart, you may want to use\nhint: \"rgit push -u\" to set the upstream config as you push.");
-            std::process::exit(128);
+            crate::ui::exit(128);
         };
         if remote == "." && merge == format!("refs/heads/{}", branch_name) {
             eprintln!("warning: not setting branch '{}' as its own upstream", branch_name);
@@ -99,7 +99,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     }
     if opts.args.len() > 2 {
         eprint!("{}", BRANCH_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let name = &opts.args[0];
     let start = opts.args.get(1).cloned().unwrap_or_else(|| "HEAD".to_string());
@@ -216,7 +216,7 @@ fn delete_branches(opts: &crate::objects::BranchOptions) -> anyhow::Result<()> {
         }
     }
     if failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }
@@ -287,7 +287,7 @@ pub fn die_if_operation_in_progress() -> anyhow::Result<()> {
     eprintln!("fatal: cannot switch branch while {}", doing);
     // git suggests `--quit`; rgit points at the commands it has.
     eprintln!("Consider \"{} or \"rgit worktree add\".", quit);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow::Result<()> {
@@ -354,7 +354,7 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow
             for path in &unmerged {
                 println!("{}: needs merge", path);
             }
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         // `-f` throws the conflicts away: unmerged paths are rewritten from the target.
         for path in &unmerged {

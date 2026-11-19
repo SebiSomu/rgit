@@ -45,7 +45,7 @@ pub fn fsck(connectivity_only: bool, no_dangling: bool, unreachable: bool, no_re
     );
 
     if report.error_count() > 0 {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

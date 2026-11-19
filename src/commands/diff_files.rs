@@ -29,12 +29,12 @@ pub fn diff_files(args: Vec<String>) -> Result<()> {
             } else {
                 eprint!("{}", message);
             }
-            std::process::exit(code);
+            crate::ui::exit(code);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let mut paths = std::mem::take(&mut opts.args);
     paths.extend(std::mem::take(&mut opts.paths));
@@ -63,7 +63,7 @@ pub fn diff_files(args: Vec<String>) -> Result<()> {
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
     crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && (!changes.is_empty() || !combined_text.is_empty()) {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

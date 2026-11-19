@@ -158,7 +158,7 @@ pub fn selected_submodules(paths: &[String]) -> Result<Vec<SubmoduleInfo>> {
             Some(module) => selected.push(module.clone()),
             None => {
                 eprintln!("error: pathspec '{}' did not match any file(s) known to git", path);
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
     }

@@ -31,7 +31,7 @@ pub fn prune(dry_run: bool, verbose: bool, expire: Option<String>, heads: Vec<St
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let cutoff = prune_expiry_cutoff(expire.as_deref(), now).unwrap_or_else(|e| {
         eprintln!("{}", e);
-        std::process::exit(128);
+        crate::ui::exit(128);
     });
 
     let mut extra_roots = Vec::new();
@@ -40,7 +40,7 @@ pub fn prune(dry_run: bool, verbose: bool, expire: Option<String>, heads: Vec<St
             Ok(hash) => extra_roots.push(hash),
             Err(_) => {
                 eprintln!("fatal: unrecognized argument: {}", head);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
         }
     }

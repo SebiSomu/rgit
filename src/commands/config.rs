@@ -53,7 +53,7 @@ pub fn config(key: Option<String>, value: Option<String>, global: bool, list: bo
             };
             match found {
                 Some(v) => println!("{}", v),
-                None => std::process::exit(1),
+                None => crate::ui::exit(1),
             }
         }
     }

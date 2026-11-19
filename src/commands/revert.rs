@@ -68,7 +68,7 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
         Err(e) => {
             eprintln!("{}", e);
             eprintln!("fatal: revert failed");
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
     for message in &result.messages {
@@ -80,12 +80,15 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
         fs::write(crate::repo::path(".git/REVERT_MSG"), format!("{}\n", final_message))?;
 
         eprintln!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
-        eprintln!("hint: After resolving the conflicts, mark them with");
-        eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
-        eprintln!("hint: \"rgit revert --continue\".");
-        eprintln!("hint: To abort and get back to the state before \"rgit revert\",");
-        eprintln!("hint: run \"rgit revert --abort\".");
-        std::process::exit(1);
+        // The narration's conflict report replaces these on a terminal.
+        if !crate::ui::narration_replaces_hints() {
+            eprintln!("hint: After resolving the conflicts, mark them with");
+            eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
+            eprintln!("hint: \"rgit revert --continue\".");
+            eprintln!("hint: To abort and get back to the state before \"rgit revert\",");
+            eprintln!("hint: run \"rgit revert --abort\".");
+        }
+        crate::ui::exit(1);
     }
 
     let tree_hash = build_tree_from_map(&result.tree)?;
@@ -124,7 +127,7 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
 fn revert_continue() -> anyhow::Result<()> {
     if !crate::repo::path(".git/REVERT_HEAD").exists() {
         eprintln!("error: no cherry-pick or revert in progress\nfatal: revert failed");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();
@@ -174,7 +177,7 @@ fn revert_continue() -> anyhow::Result<()> {
 fn revert_abort() -> anyhow::Result<()> {
     if !crate::repo::path(".git/REVERT_HEAD").exists() {
         eprintln!("error: no cherry-pick or revert in progress\nfatal: revert failed");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let revert_commit = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD"))?.trim().to_string();

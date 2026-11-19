@@ -17,25 +17,25 @@ use crate::repo;
 pub fn last_modified(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", LAST_MODIFIED_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let opts = match parse_last_modified_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             let message = e.to_string();
             eprint!("{}{}", message, if message.ends_with('\n') { "" } else { "\n" });
-            std::process::exit(if message.starts_with("error: unknown option") { 129 } else { 128 });
+            crate::ui::exit(if message.starts_with("error: unknown option") { 129 } else { 128 });
         }
     };
     let entries = match last_modified_paths(&opts) {
         Ok(entries) => entries,
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
     let stdout = io::stdout();

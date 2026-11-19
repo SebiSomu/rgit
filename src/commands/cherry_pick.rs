@@ -48,7 +48,7 @@ pub fn cherry_pick(opts: CherryPickOptions) -> anyhow::Result<()> {
     if let Some(flag) = action {
         if !opts.commits.is_empty() {
             eprintln!("fatal: cherry-pick: {} takes no commit arguments", flag);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     }
     let outcome = if opts.quit {
@@ -67,7 +67,7 @@ pub fn cherry_pick(opts: CherryPickOptions) -> anyhow::Result<()> {
     };
     match outcome {
         Pick::Done => Ok(()),
-        Pick::Stop(code) => std::process::exit(code),
+        Pick::Stop(code) => crate::ui::exit(code),
     }
 }
 
@@ -250,16 +250,22 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         fs::write(&merge_msg, text)?;
         eprintln!("error: could not apply {}... {}", abbrev, subject);
         if opts.no_commit {
-            eprintln!("hint: after resolving the conflicts, mark the corrected paths");
-            eprintln!("hint: with 'rgit add <paths>' or 'rgit rm <paths>'");
+            // The narration's conflict report replaces these on a terminal.
+            if !crate::ui::narration_replaces_hints() {
+                eprintln!("hint: after resolving the conflicts, mark the corrected paths");
+                eprintln!("hint: with 'rgit add <paths>' or 'rgit rm <paths>'");
+            }
         } else {
             fs::write(&pick_head, format!("{}\n", commit))?;
-            eprintln!("hint: After resolving the conflicts, mark them with");
-            eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
-            eprintln!("hint: \"rgit cherry-pick --continue\".");
-            eprintln!("hint: You can instead skip this commit with \"rgit cherry-pick --skip\".");
-            eprintln!("hint: To abort and get back to the state before \"rgit cherry-pick\",");
-            eprintln!("hint: run \"rgit cherry-pick --abort\".");
+            // The narration's conflict report replaces these on a terminal.
+            if !crate::ui::narration_replaces_hints() {
+                eprintln!("hint: After resolving the conflicts, mark them with");
+                eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
+                eprintln!("hint: \"rgit cherry-pick --continue\".");
+                eprintln!("hint: You can instead skip this commit with \"rgit cherry-pick --skip\".");
+                eprintln!("hint: To abort and get back to the state before \"rgit cherry-pick\",");
+                eprintln!("hint: run \"rgit cherry-pick --abort\".");
+            }
         }
         return Ok(Pick::Stop(1));
     }

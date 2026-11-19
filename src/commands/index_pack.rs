@@ -23,7 +23,7 @@ pub fn index_pack(args: Vec<String>) -> Result<()> {
     const USAGE: &str = "usage: rgit index-pack [-v] [-o <index-file>] [--keep | --keep=<msg>] [--verify] [--strict] (<pack-file> | --stdin [--fix-thin] [<pack-file>])\n";
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let (mut stdin, mut fix_thin, mut verify) = (false, false, false);
     let mut keep: Option<String> = None;
@@ -45,7 +45,7 @@ pub fn index_pack(args: Vec<String>) -> Result<()> {
             }
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--keep=") => keep = Some(other["--keep=".len()..].to_string()),
             other if other.starts_with("--threads=") || other.starts_with("--strict=") || other.starts_with("--max-input-size=") || other.starts_with("--object-format=") => {}

@@ -17,11 +17,11 @@ use crate::objects::{CheckIgnoreOptions, SourcedIgnoreRule};
 /// none were, and 128 on usage errors, so scripts can tell "not ignored" apart from a failure.
 pub fn check_ignore(opts: CheckIgnoreOptions) -> Result<()> {
     match run_check_ignore(&opts) {
-        Ok(0) => std::process::exit(1),
+        Ok(0) => crate::ui::exit(1),
         Ok(_) => Ok(()),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

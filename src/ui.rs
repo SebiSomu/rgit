@@ -141,7 +141,7 @@ fn list(paths: &[String], max: usize) -> String {
 fn narrated(command: &str) -> Option<bool> {
     match command {
         "add" | "stage" | "commit" | "reset" | "restore" | "checkout" | "switch" | "stash" | "rm" | "clean" | "diff" => Some(true),
-        "merge" | "pull" | "fetch" | "push" | "rebase" | "cherry-pick" | "revert" | "tag" | "branch" | "status" | "clone" => Some(false),
+        "merge" | "pull" | "fetch" | "push" | "rebase" | "cherry-pick" | "revert" | "tag" | "branch" | "status" | "clone" | "log" => Some(false),
         _ => None,
     }
 }
@@ -189,9 +189,21 @@ extern "C" fn at_exit() {
     let _ = std::panic::catch_unwind(finish);
 }
 
-/// Called once the command returned normally (true) or with an error (false). A command that
-/// ends with `process::exit` never calls this, so its outcome stays unknown and only facts read
-/// from the repository are narrated.
+/// Called once the command returned normally (true) or with an error (false). Commands that
+/// stop early go through `ui::exit`, which records the outcome from the exit code.
+/// Whether git-style conflict hints should be left out because the narration will explain the
+/// same stop in its own words (narrating at normal level or above). Piped output keeps them.
+pub fn narration_replaces_hints() -> bool {
+    level() >= Verbosity::Normal && PENDING.lock().map(|p| p.is_some()).unwrap_or(false)
+}
+
+/// Ends the process like `std::process::exit`, recording the outcome first so the exit hook
+/// knows whether the command succeeded. Every early exit in rgit goes through here.
+pub fn exit(code: i32) -> ! {
+    set_outcome(code == 0);
+    std::process::exit(code)
+}
+
 pub fn set_outcome(ok: bool) {
     if let Ok(mut o) = OUTCOME.lock() {
         *o = Some(ok);
@@ -307,6 +319,7 @@ fn report(command: &str, args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok
         "branch" => report_branch(args, b, a),
         "diff" => report_diff(args, b, ok),
         "status" => report_status_progress(a),
+        "log" => report_log(args, a),
         _ => {}
     }
 }
@@ -811,6 +824,7 @@ fn report_conflicts(a: &RepoSnapshot, b: &RepoSnapshot) {
         }
         "cherry-pick" => "Cherry-pick stopped".to_string(),
         "revert" => "Revert stopped".to_string(),
+        "stash" => "Stash apply stopped".to_string(),
         _ => if b.stash_count != a.stash_count || a.operation.is_none() { "Applying stopped".to_string() } else { "Merge stopped".to_string() },
     };
     // What merged cleanly is what is staged against the (new) HEAD, conflicts aside.
@@ -835,16 +849,50 @@ fn report_conflicts(a: &RepoSnapshot, b: &RepoSnapshot) {
     if conflicted.len() > 20 {
         line(&format!("... and {} more (`rgit conflicts` lists them all)", conflicted.len() - 20));
     }
-    let op = if operation == "merge" || operation == "bisect" { "merge" } else { operation.as_str() };
     next("open each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,");
-    next(&format!("then `rgit add <file>` for each one and `rgit {} --continue`.", op));
-    let abort = match op {
-        "rebase" => "`rgit rebase --skip` drops this commit; `rgit rebase --abort` returns to before the rebase.".to_string(),
-        _ => format!("Changed your mind? `rgit {} --abort` puts everything back as it was.", op),
-    };
-    next(&abort);
+    for l in conflict_next_steps(&operation) {
+        next(&l);
+    }
     detail("`rgit conflicts --explain <file>` shows each conflict as YOURS / THEIRS side by side.");
     save_conflict_list(&conflicted);
+}
+
+/// `log` on a branch with no commits: git only says "does not have any commits yet".
+fn report_log(args: &[String], a: &RepoSnapshot) {
+    if a.head.is_some() || !positionals(args, &[]).is_empty() || has(args, &["--all"]) {
+        return;
+    }
+    note("There is no history yet: nothing has been committed on this branch.");
+    let others: Vec<String> = a.refs.keys().filter_map(|r| r.strip_prefix("refs/heads/")).map(String::from).collect();
+    if !others.is_empty() {
+        next(&format!("other branches have commits: {} (`rgit log {}` or `rgit log --all`).", list(&others, 4), others[0]));
+    }
+    if a.staged.is_empty() {
+        next("`rgit add <files>`, then `rgit commit -m \"<message>\"` makes the first commit.");
+    } else {
+        next(&format!("{} staged; `rgit commit -m \"<message>\"` makes the first commit.", plural(a.staged.len(), "file is", "files are")));
+    }
+}
+
+/// What to do after editing the conflicted files, and how to give up, for each operation.
+// Used by the conflict report and `rgit conflicts`.
+pub fn conflict_next_steps(operation: &str) -> Vec<String> {
+    let op = if operation == "merge" || operation == "bisect" { "merge" } else { operation };
+    match op {
+        "stash" => vec![
+            "then `rgit add <file>` for each one. There is nothing to continue: the stash entry was kept,".to_string(),
+            "so `rgit stash drop` once you're happy with the result.".to_string(),
+            "Changed your mind? `rgit reset --hard` undoes the apply (the tree was clean before it); the stash is still there.".to_string(),
+        ],
+        "rebase" => vec![
+            "then `rgit add <file>` for each one and `rgit rebase --continue`.".to_string(),
+            "`rgit rebase --skip` drops this commit; `rgit rebase --abort` returns to before the rebase.".to_string(),
+        ],
+        _ => vec![
+            format!("then `rgit add <file>` for each one and `rgit {} --continue`.", op),
+            format!("Changed your mind? `rgit {} --abort` puts everything back as it was.", op),
+        ],
+    }
 }
 
 /// "2 of 3 conflicted files resolved" while an operation that stopped on conflicts is in progress.
@@ -860,7 +908,12 @@ fn report_status_progress(a: &RepoSnapshot) {
     };
     if left.is_empty() {
         note(&if all.len() == 1 { "The conflicted file is resolved.".to_string() } else { format!("All {} conflicted files are resolved.", all.len()) });
-        next(&format!("`rgit {} --continue` to finish.", op));
+        if op == "stash" {
+            next("the stashed changes are in; the stash entry was kept: `rgit stash drop` when you're done with it.");
+            crate::helpers::narrate::clear_stash_conflict();
+        } else {
+            next(&format!("`rgit {} --continue` to finish.", op));
+        }
     } else {
         note(&format!("Conflicts: {} of {} resolved; still to do: {}.", all.len() - left.len(), all.len(), list(&left, 4)));
     }
@@ -881,6 +934,9 @@ fn head_move(b: &RepoSnapshot, a: &RepoSnapshot) -> Option<String> {
 }
 
 fn report_reset(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok: Option<bool>) {
+    if b.operation.as_deref() == Some("stash") && a.unmerged.is_empty() {
+        crate::helpers::narrate::clear_stash_conflict();
+    }
     let paths = positionals(args, &[]);
     let hard = has(args, &["--hard"]);
     let soft = has(args, &["--soft"]);

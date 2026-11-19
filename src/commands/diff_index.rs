@@ -27,14 +27,14 @@ pub fn diff_index(args: Vec<String>) -> Result<()> {
     let usage = format!("usage: rgit diff-index [-m] [--cached] [<common-diff-options>] <tree-ish> [<path>...]\n\n{}", DIFF_COMMON_OPTIONS);
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let mut opts = match parse_diff_plumbing_args(&args, "diff-index", &usage) {
         Ok(opts) => opts,
         Err((message, code)) => {
             if code == 129 && message.starts_with("usage:") {
                 print!("{}", message);
-                std::process::exit(code);
+                crate::ui::exit(code);
             }
             die(&message, code)
         }
@@ -74,7 +74,7 @@ pub fn diff_index(args: Vec<String>) -> Result<()> {
     std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
     crate::helpers::rename::warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && !changes.is_empty() {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

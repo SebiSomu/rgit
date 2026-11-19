@@ -28,19 +28,19 @@ pub fn verify_pack(args: Vec<String>) -> Result<()> {
             "--no-stat-only" => stat_only = false,
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') && other.len() > 1 => {
                 let shown = if let Some(long) = other.strip_prefix("--") { format!("unknown option `{}'", long) } else { format!("unknown switch `{}'", &other[1..2]) };
                 eprint!("error: {}\n{}", shown, USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             _ => packs.push(arg.clone()),
         }
     }
     if packs.is_empty() {
         eprint!("{}", USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
 
     let mut failed = false;
@@ -105,7 +105,7 @@ pub fn verify_pack(args: Vec<String>) -> Result<()> {
         }
     }
     if failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

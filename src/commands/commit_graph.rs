@@ -28,7 +28,7 @@ pub fn commit_graph(args: Vec<String>) -> Result<()> {
     const USAGE: &str = "usage: rgit commit-graph verify\n   or: rgit commit-graph write [--append] [--reachable | --stdin-packs | --stdin-commits]\n";
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let (mut reachable, mut stdin_commits, mut stdin_packs, mut append) = (false, false, false, false);
     let mut action: Option<&str> = None;
@@ -43,7 +43,7 @@ pub fn commit_graph(args: Vec<String>) -> Result<()> {
             "--changed-paths" => eprintln!("warning: --changed-paths is ignored: rgit does not write Bloom filters"),
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--object-dir") => die("fatal: --object-dir is not supported by rgit commit-graph\n", 128),
             other if other.starts_with("--split") || other.starts_with("--max-commits") || other.starts_with("--size-multiple") || other.starts_with("--expire-time") => {
@@ -65,7 +65,7 @@ pub fn commit_graph(args: Vec<String>) -> Result<()> {
             eprintln!("error: {}", problem);
         }
         if !problems.is_empty() {
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         return Ok(());
     }

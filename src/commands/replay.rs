@@ -16,18 +16,18 @@ use crate::helpers::replay::{parse_replay_args, replay_commits, REPLAY_USAGE};
 pub fn replay(args: Vec<String>) -> Result<()> {
     if args.iter().any(|a| a == "-h") {
         print!("{}", REPLAY_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !crate::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let opts = match parse_replay_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             let message = e.to_string();
             eprint!("{}", message);
-            std::process::exit(if message.starts_with("fatal:") { 128 } else { 129 });
+            crate::ui::exit(if message.starts_with("fatal:") { 128 } else { 129 });
         }
     };
     match replay_commits(&opts) {
@@ -37,10 +37,10 @@ pub fn replay(args: Vec<String>) -> Result<()> {
             }
             Ok(())
         }
-        Ok(None) => std::process::exit(1),
+        Ok(None) => crate::ui::exit(1),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

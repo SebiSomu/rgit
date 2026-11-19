@@ -23,7 +23,7 @@ use crate::helpers::mailinfo::{extract_mail_info, parse_mailinfo_args, MAILINFO_
 pub fn mailinfo(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h" || a == "--help") {
         print!("{}", MAILINFO_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_mailinfo_args(&args) {
         Ok(opts) => opts,
@@ -31,10 +31,10 @@ pub fn mailinfo(args: Vec<String>) -> Result<()> {
             let message = e.to_string();
             if message.starts_with("fatal:") {
                 eprintln!("{}", message);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
             eprint!("{}", message);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
 
@@ -45,7 +45,7 @@ pub fn mailinfo(args: Vec<String>) -> Result<()> {
     for (path, content) in [(&opts.msg_file, &result.message), (&opts.patch_file, &result.patch)] {
         if let Err(e) = fs::write(path, content) {
             eprintln!("{}: {}", path, e);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
     }
 
@@ -54,7 +54,7 @@ pub fn mailinfo(args: Vec<String>) -> Result<()> {
     out.write_all(&result.info)?;
     out.flush()?;
     if result.failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

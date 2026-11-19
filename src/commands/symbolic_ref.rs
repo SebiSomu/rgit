@@ -23,7 +23,7 @@ pub fn symbolic_ref(args: Vec<String>) -> Result<()> {
     let before_dashdash = args.iter().take_while(|a| a.as_str() != "--");
     if before_dashdash.clone().any(|a| a == "-h" || a == "--help") {
         print!("{}", SYMBOLIC_REF_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
 
     let opts = match parse_symbolic_ref_args(&args) {
@@ -32,22 +32,22 @@ pub fn symbolic_ref(args: Vec<String>) -> Result<()> {
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     match run_symbolic_ref(&opts) {
         Ok(0) => Ok(()),
-        Ok(code) => std::process::exit(code),
+        Ok(code) => crate::ui::exit(code),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }
 
 fn usage_exit(message: &str) -> ! {
     eprint!("{}", message);
-    std::process::exit(129);
+    crate::ui::exit(129);
 }
 
 fn run_symbolic_ref(opts: &SymbolicRefOptions) -> Result<i32> {

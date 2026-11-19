@@ -22,15 +22,15 @@ pub fn show_ref(args: Vec<String>) -> Result<()> {
         Ok(opts) => opts,
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     match run_show_ref(&opts) {
         Ok(0) => Ok(()),
-        Ok(code) => std::process::exit(code),
+        Ok(code) => crate::ui::exit(code),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

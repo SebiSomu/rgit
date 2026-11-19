@@ -27,7 +27,7 @@ pub fn column(args: Vec<String>) -> Result<()> {
             if let Err(message) = apply_column_mode(&mut opts, &value) {
                 eprintln!("{}", message);
                 eprintln!("fatal: bad config variable '{}'", key);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
         }
     }
@@ -37,7 +37,7 @@ pub fn column(args: Vec<String>) -> Result<()> {
         } else {
             eprint!("{}", message);
         }
-        std::process::exit(code);
+        crate::ui::exit(code);
     }
 
     let mut input = Vec::new();

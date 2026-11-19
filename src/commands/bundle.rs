@@ -26,7 +26,7 @@ pub fn bundle(action: BundleAction) -> Result<()> {
     let needs_repo = !matches!(action, BundleAction::ListHeads { .. });
     if needs_repo && !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let result = match action {
         BundleAction::Create { quiet, progress: _, version, file, revs } => bundle_create(quiet, version.unwrap_or(2), &file, &revs),
@@ -37,7 +37,7 @@ pub fn bundle(action: BundleAction) -> Result<()> {
     if let Err(e) = result {
         let message = e.to_string();
         eprintln!("{}", message);
-        std::process::exit(if message.starts_with("error:") { 1 } else { 128 });
+        crate::ui::exit(if message.starts_with("error:") { 1 } else { 128 });
     }
     Ok(())
 }

@@ -24,17 +24,17 @@ pub fn unpack_objects(args: Vec<String>) -> Result<()> {
             other if other.starts_with("--strict=") || other.starts_with("--max-input-size=") || other.starts_with("--pack_header=") => {}
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             _ => {
                 eprint!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         }
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let mut pack = Vec::new();
     io::stdin().lock().read_to_end(&mut pack)?;
@@ -42,7 +42,7 @@ pub fn unpack_objects(args: Vec<String>) -> Result<()> {
         Ok((objects, _)) => objects,
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
     if dry_run {
@@ -54,12 +54,12 @@ pub fn unpack_objects(args: Vec<String>) -> Result<()> {
             eprintln!("error: unable to write object {}: {}", object.hash, e);
             failed = true;
             if !recover {
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
         }
     }
     if failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }

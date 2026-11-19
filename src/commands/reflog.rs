@@ -35,7 +35,7 @@ pub fn reflog(action: Option<ReflogAction>) -> Result<()> {
         ReflogAction::Exists { reference } => {
             let ref_name = resolve_reflog_ref_name(&reference);
             if read_reflog(&ref_name)?.is_empty() {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
 

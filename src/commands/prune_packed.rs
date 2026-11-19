@@ -19,18 +19,18 @@ pub fn prune_packed(args: Vec<String>) -> Result<()> {
             "-q" | "--quiet" | "--no-quiet" => {}
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other => {
                 let shown = if let Some(long) = other.strip_prefix("--") { format!("error: unknown option `{}'\n", long) } else if other.starts_with('-') { format!("error: unknown switch `{}'\n", &other[1..2.min(other.len())]) } else { String::new() };
                 eprint!("{}{}", shown, USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         }
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     for path in prune_packed_objects(dry_run)? {
         if dry_run {

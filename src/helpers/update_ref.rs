@@ -255,7 +255,7 @@ pub fn commit_ref_transaction(prepared: &[PreparedRefUpdate], message: &str) -> 
 /// Prints a fatal `update-ref --stdin` error and exits 128, like git's `die`.
 fn die(message: impl AsRef<str>) -> ! {
     eprintln!("fatal: {}", message.as_ref());
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 /// A position inside one `--stdin` command (with its terminator, and with `-z` its following

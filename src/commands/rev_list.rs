@@ -21,12 +21,12 @@ pub fn rev_list(args: Vec<String>) -> Result<()> {
         Err(e) => {
             let message = e.to_string();
             eprintln!("{}", message);
-            std::process::exit(if message.starts_with("usage:") { 129 } else { 128 });
+            crate::ui::exit(if message.starts_with("usage:") { 129 } else { 128 });
         }
     };
     if let Err(e) = run_rev_list(&opts) {
         eprintln!("{}", e);
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     Ok(())
 }

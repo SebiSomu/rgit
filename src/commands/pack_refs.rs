@@ -15,23 +15,23 @@ use crate::repo;
 pub fn pack_refs(args: Vec<String>) -> Result<()> {
     if args.iter().any(|a| a == "-h" || a == "--help") {
         print!("{}", PACK_REFS_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_pack_refs_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             eprint!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if let Err(e) = pack_refs_matching(&opts) {
         let message = format!("{:#}", e);
         eprintln!("{}", if message.starts_with("fatal: ") { message } else { format!("fatal: {}", message) });
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     Ok(())
 }

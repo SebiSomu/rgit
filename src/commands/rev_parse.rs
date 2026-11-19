@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::process;
 
 use crate::helpers::rev_parse::{
     abbrev_ref_symbolic, find_work_tree_root, is_inside_work_tree, resolve_rev,
@@ -43,7 +42,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
             }
             Err(e) => {
                 eprintln!("{}", e);
-                process::exit(128);
+                crate::ui::exit(128);
             }
         }
         handled_flag = true;
@@ -59,7 +58,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
             }
             Err(e) => {
                 eprintln!("{}", e);
-                process::exit(128);
+                crate::ui::exit(128);
             }
         }
         handled_flag = true;
@@ -85,7 +84,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
         if !opts.quiet {
             eprintln!("fatal: --verify requires exactly one revision");
         }
-        process::exit(1);
+        crate::ui::exit(1);
     }
 
     let mut outputs: Vec<String> = Vec::new();
@@ -99,7 +98,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
                         if !opts.quiet {
                             eprintln!("{}", e);
                         }
-                        process::exit(1);
+                        crate::ui::exit(1);
                     }
                     return Err(e);
                 }
@@ -112,7 +111,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
                         if !opts.quiet {
                             eprintln!("{}", e);
                         }
-                        process::exit(1);
+                        crate::ui::exit(1);
                     }
                     return Err(e);
                 }
@@ -132,7 +131,7 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
                         if !opts.quiet {
                             eprintln!("{}", e);
                         }
-                        process::exit(1);
+                        crate::ui::exit(1);
                     }
                     return Err(e);
                 }

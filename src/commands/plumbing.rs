@@ -53,7 +53,7 @@ pub fn write_tree() -> anyhow::Result<()> {
             eprintln!("{}: unmerged ({})", entry.path, hex::encode(entry.hash));
         }
         eprintln!("fatal: rgit-write-tree: error building trees");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let tree_hash = write_tree_from_index_prefix(&entries, "")?;
     println!("{}", tree_hash);

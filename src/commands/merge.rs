@@ -11,7 +11,7 @@ type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
 fn die(code: i32, message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }
 
 /// `rgit merge [<options>] <commit>` / `--abort` / `--continue` / `--quit`
@@ -124,7 +124,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         return Ok(());
     }
     if opts.ff == FastForwardMode::Only {
-        eprintln!("hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \tgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \tgit rebase\nhint: \nhint: Disable this message with \"git config advice.diverging false\"");
+        eprintln!("hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \trgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \trgit rebase\nhint: \nhint: Disable this message with \"rgit config advice.diverging false\"");
         die(128, "fatal: Not possible to fast-forward, aborting.");
     }
 
@@ -174,7 +174,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         }
         if conflicted {
             println!("Automatic merge failed; fix conflicts and then commit the result.");
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         eprintln!("Automatic merge went well; stopped before committing as requested");
         return Ok(());
@@ -314,7 +314,7 @@ pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<Str
         if is_reachable(&commit2, &commit1)? {
             return Ok(());
         } else {
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
     }
 
@@ -355,7 +355,7 @@ pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<Str
             }
             current_bases = maximal_bases;
             if current_bases.is_empty() {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
 
@@ -367,7 +367,7 @@ pub fn merge_base(all: bool, is_ancestor: bool, _octopus: bool, commits: Vec<Str
         for next_commit in &resolved[1..] {
             match find_merge_base(&current_base, next_commit)? {
                 Some(base) => current_base = base,
-                None => std::process::exit(1),
+                None => crate::ui::exit(1),
             }
         }
         println!("{}", current_base);

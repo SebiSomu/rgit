@@ -28,7 +28,7 @@ pub fn pack_objects(args: Vec<String>) -> Result<()> {
     const USAGE: &str = "usage: rgit pack-objects [-q | --progress] [--revs] [--all] [--unpacked | --incremental] [--non-empty]\n                         [--window=<n>] [--depth=<n>] (--stdout | <base-name>) < <object-list>\n";
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let (mut revs, mut all, mut stdout, mut unpacked, mut non_empty, mut progress) = (false, false, false, false, false, false);
     let mut build = PackBuildOptions { window: 10, depth: 50 };
@@ -49,7 +49,7 @@ pub fn pack_objects(args: Vec<String>) -> Result<()> {
             "--all-progress-implied" | "--no-reuse-delta" | "--no-reuse-object" | "--delta-base-offset" | "--include-tag" | "--honor-pack-keep" | "--keep-true-parents" | "--local" | "--thin" | "--reflog" | "--indexed-objects" | "--keep-unreachable" | "--pack-loose-unreachable" => {}
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--window=") => build.window = number(&other["--window=".len()..]),
             other if other.starts_with("--depth=") => build.depth = number(&other["--depth=".len()..]) as u32,

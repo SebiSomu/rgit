@@ -27,11 +27,11 @@ use crate::repo;
 pub fn notes(args: Vec<String>) -> Result<()> {
     if args.iter().any(|a| a == "-h") {
         print!("{}", NOTES_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let mut notes_ref = default_notes_ref();
@@ -71,7 +71,7 @@ pub fn notes(args: Vec<String>) -> Result<()> {
     };
     if let Err(e) = result {
         eprintln!("{}", e);
-        std::process::exit(if e.to_string().starts_with("fatal:") { 128 } else { 1 });
+        crate::ui::exit(if e.to_string().starts_with("fatal:") { 128 } else { 1 });
     }
     Ok(())
 }
@@ -79,7 +79,7 @@ pub fn notes(args: Vec<String>) -> Result<()> {
 fn usage_error(message: &str) -> ! {
     eprintln!("{}", message);
     eprint!("{}", NOTES_USAGE);
-    std::process::exit(129);
+    crate::ui::exit(129);
 }
 
 /// Resolves the object a subcommand works on (`HEAD` when none is named).
@@ -272,7 +272,7 @@ fn notes_remove(notes_ref: &str, args: &[String]) -> Result<()> {
         }
     }
     if failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     commit_notes_tree(&tree, "Notes removed by 'git notes remove'\n", None)?;
     Ok(())

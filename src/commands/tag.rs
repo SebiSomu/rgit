@@ -40,7 +40,7 @@ pub fn tag(opts: TagOptions) -> Result<()> {
             }
         }
         if failed {
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
         return Ok(());
     }
@@ -83,7 +83,7 @@ pub fn tag(opts: TagOptions) -> Result<()> {
 
 fn fail(message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 /// The message of an annotated tag: `-m` paragraphs, `-F` file contents, or what was typed

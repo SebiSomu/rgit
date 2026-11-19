@@ -21,11 +21,11 @@ use crate::repo;
 pub fn range_diff(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", RANGE_DIFF_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let opts = match parse_range_diff_args(&args) {
         Ok(opts) => opts,
@@ -33,10 +33,10 @@ pub fn range_diff(args: Vec<String>) -> Result<()> {
             let message = e.to_string();
             if message.starts_with("fatal:") {
                 eprintln!("{}", message);
-                std::process::exit(128);
+                crate::ui::exit(128);
             }
             eprint!("{}", message.strip_prefix("usage-error: ").unwrap_or(&message));
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
 
@@ -44,7 +44,7 @@ pub fn range_diff(args: Vec<String>) -> Result<()> {
         read_range_patches(range).unwrap_or_else(|e| {
             eprintln!("{}", e);
             eprintln!("error: could not parse log for '{}'", range);
-            std::process::exit(255);
+            crate::ui::exit(255);
         })
     };
     let mut a = load(&opts.range1);

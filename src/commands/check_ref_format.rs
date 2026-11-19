@@ -16,7 +16,7 @@ pub fn check_ref_format(opts: CheckRefFormatOptions) -> Result<()> {
     if let Some(branch) = &opts.branch {
         if !is_valid_branch_shorthand(branch) {
             eprintln!("fatal: '{}' is not a valid branch name", branch);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
         println!("{}", branch);
         return Ok(());
@@ -26,7 +26,7 @@ pub fn check_ref_format(opts: CheckRefFormatOptions) -> Result<()> {
     let refname = if opts.normalize { collapse_ref_slashes(refname) } else { refname.to_string() };
 
     if !check_refname_format(&refname, opts.allow_onelevel, opts.refspec_pattern) {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     if opts.normalize {
         println!("{}", refname);

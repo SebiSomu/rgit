@@ -12,7 +12,7 @@ use crate::repo;
 /// Prints a message and exits.
 fn die(message: &str, code: i32) -> ! {
     eprint!("{}", message);
-    std::process::exit(code);
+    crate::ui::exit(code);
 }
 
 /// `rgit submodule [add | status | init | update | deinit | foreach | sync | set-url | set-branch]`
@@ -55,7 +55,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
         None => "status".to_string(),
         Some("-h") => {
             print!("{}", SUBMODULE_USAGE);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
         Some(flag) if flag.starts_with('-') => "status".to_string(),
         Some(name) => {
@@ -253,7 +253,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
                 }
             }
             if failed {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
         "deinit" => {

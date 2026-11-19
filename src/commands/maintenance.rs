@@ -18,7 +18,7 @@ pub fn for_each_repo(args: Vec<String>) -> Result<()> {
             eprintln!("{}", message);
         }
         eprint!("{}", FOR_EACH_REPO_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     let (mut key, mut keep_going) = (None, false);
     let mut command: Vec<String> = Vec::new();
@@ -47,7 +47,7 @@ pub fn for_each_repo(args: Vec<String>) -> Result<()> {
     }
     let Some(key) = key else {
         eprintln!("fatal: missing --config=<config>");
-        std::process::exit(128);
+        crate::ui::exit(128);
     };
 
     let mut failed = false;
@@ -55,13 +55,13 @@ pub fn for_each_repo(args: Vec<String>) -> Result<()> {
         let status = run_rgit_in(Path::new(&repo), &command);
         if status != 0 {
             if !keep_going {
-                std::process::exit(status);
+                crate::ui::exit(status);
             }
             failed = true;
         }
     }
     if failed {
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     Ok(())
 }
@@ -86,11 +86,11 @@ pub fn maintenance(args: Vec<String>) -> Result<()> {
             eprintln!("{}", message);
         }
         eprint!("{}", MAINTENANCE_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     let fatal = |message: String| -> ! {
         eprintln!("{}", message);
-        std::process::exit(128);
+        crate::ui::exit(128);
     };
     let Some((subcommand, rest)) = args.split_first() else { usage("") };
     if subcommand == "-h" || rest.iter().any(|a| a == "-h") {
@@ -144,7 +144,7 @@ pub fn maintenance(args: Vec<String>) -> Result<()> {
                 }
             }
             if failed {
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
         }
         "register" | "unregister" => {

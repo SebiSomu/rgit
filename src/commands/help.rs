@@ -20,11 +20,11 @@ pub fn help(args: Vec<String>) -> Result<()> {
             "-a" | "--all" => {}
             "-h" => {
                 println!("usage: rgit help [-a | --all] [<command>]");
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') => {
                 eprintln!("error: unknown option `{}'\nusage: rgit help [-a | --all] [<command>]", other.trim_start_matches('-'));
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other => {
                 topic.get_or_insert(other);
@@ -57,7 +57,7 @@ pub fn help(args: Vec<String>) -> Result<()> {
         }
         None => {
             eprintln!("rgit: '{}' is not a rgit command. See 'rgit help'.", topic);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
     }
     Ok(())

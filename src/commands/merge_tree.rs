@@ -25,10 +25,10 @@ const PREVIEW_LINES: usize = 6;
 /// merge, 1 for conflicts, and 128 on errors.
 pub fn merge_tree(opts: MergeTreeOptions) -> Result<()> {
     match run_merge_tree(&opts) {
-        Ok(clean) => std::process::exit(if clean { 0 } else { 1 }),
+        Ok(clean) => crate::ui::exit(if clean { 0 } else { 1 }),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }
@@ -37,7 +37,7 @@ fn run_merge_tree(opts: &MergeTreeOptions) -> Result<bool> {
     let resolve = |name: &str, kind: &str| -> String {
         resolve_rev(name).and_then(|h| peel_to_type(h, kind)).unwrap_or_else(|_| {
             eprintln!("merge-tree: {} - not something we can merge", name);
-            std::process::exit(1);
+            crate::ui::exit(1);
         })
     };
     let tree_of = |hash: &str| -> Result<BTreeMap<String, ([u8; 20], u32)>> {

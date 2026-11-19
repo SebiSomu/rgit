@@ -16,7 +16,7 @@ pub fn show_index(args: Vec<String>) -> Result<()> {
         } else {
             eprintln!("usage: rgit show-index");
         }
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let mut data = Vec::new();
     io::stdin().lock().read_to_end(&mut data)?;
@@ -24,7 +24,7 @@ pub fn show_index(args: Vec<String>) -> Result<()> {
         Ok(index) => index,
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
     let stdout = io::stdout();

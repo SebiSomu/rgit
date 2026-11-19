@@ -17,10 +17,10 @@ use crate::objects::{ApplyOptions, FilePatch, PlannedChanges};
 pub fn apply(opts: ApplyOptions) -> Result<()> {
     match run_apply(&opts) {
         Ok(true) => Ok(()),
-        Ok(false) => std::process::exit(1),
+        Ok(false) => crate::ui::exit(1),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

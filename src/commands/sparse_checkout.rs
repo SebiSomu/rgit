@@ -29,12 +29,12 @@ use crate::repo;
 pub fn sparse_checkout(args: Vec<String>) -> Result<()> {
     let die = |message: &str, code: i32| -> ! {
         eprint!("{}", message);
-        std::process::exit(code);
+        crate::ui::exit(code);
     };
     let Some(action) = args.first().map(String::as_str) else { die(SPARSE_CHECKOUT_USAGE, 129) };
     if action == "-h" {
         print!("{}", SPARSE_CHECKOUT_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let (mut cone, mut stdin, mut nul, mut skip_checks) = (None, false, false, false);
     let mut rules_file: Option<String> = None;

@@ -16,14 +16,14 @@ pub fn hook(args: Vec<String>) -> Result<()> {
             eprintln!("{}", message);
         }
         eprint!("{}", HOOK_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     };
     if args.first().map(String::as_str) != Some("run") || args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         usage("");
     }
     if !crate::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let (mut ignore_missing, mut to_stdin) = (false, None);
@@ -56,14 +56,14 @@ pub fn hook(args: Vec<String>) -> Result<()> {
             return Ok(());
         }
         eprintln!("error: cannot find a hook named {}", name);
-        std::process::exit(1);
+        crate::ui::exit(1);
     };
     match run_hook(&script, &hook_args, to_stdin.as_deref()) {
         Ok(0) => Ok(()),
-        Ok(status) => std::process::exit(status),
+        Ok(status) => crate::ui::exit(status),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }

@@ -18,21 +18,21 @@ pub fn unpack_file(args: Vec<String>) -> Result<()> {
         } else {
             eprintln!("usage: rgit unpack-file <blob>");
         }
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     let Ok(hash) = resolve_rev(&args[0]) else {
         eprintln!("fatal: Not a valid object name {}", args[0]);
-        std::process::exit(128);
+        crate::ui::exit(128);
     };
     let content = match read_object(&hash) {
         Ok((object_type, content)) if object_type == "blob" => content,
         _ => {
             eprintln!("fatal: unable to read blob object {}", hash);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     };
 
@@ -40,7 +40,7 @@ pub fn unpack_file(args: Vec<String>) -> Result<()> {
         Ok(name) => println!("{}", name),
         Err(e) => {
             eprintln!("fatal: unable to create temporary file: {}", e);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
     Ok(())

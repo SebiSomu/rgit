@@ -37,7 +37,7 @@ pub fn repack(args: Vec<String>) -> Result<()> {
             };
             value.parse().unwrap_or_else(|_| {
                 eprint!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             })
         };
         match arg {
@@ -52,7 +52,7 @@ pub fn repack(args: Vec<String>) -> Result<()> {
             "--depth" => build.depth = number(None) as u32,
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--window=") => build.window = number(Some(&other["--window=".len()..])),
             other if other.starts_with("--depth=") => build.depth = number(Some(&other["--depth=".len()..])) as u32,
@@ -65,13 +65,13 @@ pub fn repack(args: Vec<String>) -> Result<()> {
             }
             other => {
                 eprint!("error: unknown option `{}'\n{}", other.trim_start_matches('-'), USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
         }
     }
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let pack_dir = repo::path(".git/objects/pack");

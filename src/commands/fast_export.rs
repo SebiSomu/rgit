@@ -30,23 +30,23 @@ pub fn fast_export(args: Vec<String>) -> Result<()> {
             } else {
                 eprint!("{}", message);
             }
-            std::process::exit(code);
+            crate::ui::exit(code);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if opts.revs.is_empty() {
         eprint!("{}", FAST_EXPORT_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let stdout = io::stdout();
     let mut out = io::BufWriter::new(stdout.lock());
     if let Err(e) = run_fast_export(&opts, &mut out) {
         out.flush()?;
         eprintln!("{}", e);
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     out.flush()?;
     Ok(())

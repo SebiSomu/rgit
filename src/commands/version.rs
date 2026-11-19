@@ -15,15 +15,15 @@ pub fn version(args: Vec<String>) -> Result<()> {
             "--no-build-options" => build_options = false,
             "-h" => {
                 print!("{}", USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with("--") => {
                 eprint!("error: unknown option `{}'\n{}", &other[2..], USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             other if other.starts_with('-') && other.len() > 1 => {
                 eprint!("error: unknown switch `{}'\n{}", other.chars().nth(1).unwrap_or('-'), USAGE);
-                std::process::exit(129);
+                crate::ui::exit(129);
             }
             // Like git, plain arguments are ignored.
             _ => {}

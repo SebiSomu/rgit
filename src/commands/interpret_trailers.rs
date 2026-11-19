@@ -27,13 +27,13 @@ use crate::helpers::interpret_trailers::{parse_interpret_trailers_args, process_
 pub fn interpret_trailers(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", INTERPRET_TRAILERS_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_interpret_trailers_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             eprint!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     let config = read_trailer_config();
@@ -76,5 +76,5 @@ pub fn interpret_trailers(args: Vec<String>) -> Result<()> {
 
 fn fatal(message: &str) -> ! {
     eprintln!("{}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }

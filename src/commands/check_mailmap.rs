@@ -21,22 +21,22 @@ use crate::repo;
 pub fn check_mailmap(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         print!("{}", CHECK_MAILMAP_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_check_mailmap_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             eprint!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     if opts.contacts.is_empty() && !opts.stdin {
         eprintln!("fatal: no contacts specified");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let map = read_mailmap(opts.mailmap_file.as_deref(), opts.mailmap_blob.as_deref());

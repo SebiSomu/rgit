@@ -23,6 +23,9 @@ pub fn operation_in_progress() -> Option<String> {
         Some("revert".into())
     } else if exists(crate::commands::bisect::BISECT_START_PATH) {
         Some("bisect".into())
+    } else if exists(STASH_CONFLICT_PATH) && (exists(CONFLICTS_LIST_PATH) || crate::index::read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
+        // `stash apply` that stopped on conflicts: git keeps no state file for it.
+        Some("stash".into())
     } else {
         None
     }
@@ -401,6 +404,17 @@ pub fn scan_risks(paths: &[String]) -> (Vec<(String, String)>, Vec<String>, Vec<
 /// Where `rgit` keeps the list of files that conflicted when the current operation stopped,
 /// so later commands can say "2 of 3 resolved".
 pub const CONFLICTS_LIST_PATH: &str = ".git/RGIT_CONFLICTS";
+
+/// Marks that a `stash apply` / `stash pop` stopped on conflicts (written by the stash code,
+/// removed once the conflicts are resolved or thrown away).
+pub const STASH_CONFLICT_PATH: &str = ".git/RGIT_STASH_CONFLICT";
+
+/// Forgets a finished stash conflict: the marker and the recorded file list.
+// Used by `stash`, `reset` and the "all resolved" progress line.
+pub fn clear_stash_conflict() {
+    let _ = fs::remove_file(crate::repo::path(STASH_CONFLICT_PATH));
+    let _ = fs::remove_file(crate::repo::path(CONFLICTS_LIST_PATH));
+}
 
 /// Records the conflicted paths of the operation that just stopped.
 // Used by the conflict reports.

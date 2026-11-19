@@ -42,22 +42,22 @@ pub fn request_pull(args: Vec<String>) -> Result<()> {
             let message = e.to_string();
             if message.starts_with("usage:") {
                 print!("{}", message);
-                std::process::exit(1);
+                crate::ui::exit(1);
             }
             eprint!("{}", message);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
     match write_pull_request(&opts) {
         Ok(0) => Ok(()),
-        Ok(status) => std::process::exit(status),
+        Ok(status) => crate::ui::exit(status),
         Err(e) => {
             eprintln!("{}", e);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
     }
 }

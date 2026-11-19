@@ -16,13 +16,13 @@ use crate::helpers::patch_id::{compute_patch_ids, parse_patch_id_args, PATCH_ID_
 pub fn patch_id(args: Vec<String>) -> Result<()> {
     if args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h" || a == "--help") {
         print!("{}", PATCH_ID_USAGE);
-        std::process::exit(129);
+        crate::ui::exit(129);
     }
     let opts = match parse_patch_id_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             eprint!("{}", e);
-            std::process::exit(129);
+            crate::ui::exit(129);
         }
     };
 

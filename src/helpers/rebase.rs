@@ -391,7 +391,7 @@ fn print_progress(remaining: usize) {
 pub fn rebase_continue() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         eprintln!("fatal: No rebase in progress?");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     if crate::repo::path(REBASE_PAUSE_PATH).exists() {
@@ -408,7 +408,7 @@ pub fn rebase_continue() -> anyhow::Result<()> {
     if crate::helpers::merge::report_needs_merge() {
         eprintln!("You must edit all merge conflicts and then");
         eprintln!("mark them as resolved using rgit add");
-        std::process::exit(1);
+        crate::ui::exit(1);
     }
     let entries = read_index().unwrap_or_default();
 
@@ -427,7 +427,7 @@ pub fn rebase_continue() -> anyhow::Result<()> {
 pub fn rebase_abort() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         eprintln!("fatal: No rebase in progress?");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let orig_head = fs::read_to_string(crate::repo::path(REBASE_ORIG_HEAD_PATH))
@@ -474,7 +474,7 @@ pub fn rebase_abort() -> anyhow::Result<()> {
 pub fn rebase_skip() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         eprintln!("fatal: No rebase in progress?");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     if crate::repo::path(REBASE_PAUSE_PATH).exists() {
@@ -531,7 +531,7 @@ pub fn rebase_skip() -> anyhow::Result<()> {
 pub fn rebase_edit_todo() -> anyhow::Result<()> {
     if !crate::repo::path(REBASE_ORIG_HEAD_PATH).exists() {
         eprintln!("fatal: No rebase in progress?");
-        std::process::exit(128);
+        crate::ui::exit(128);
     }
 
     let items = read_todo()?;
@@ -639,12 +639,15 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
                 println!("{}", message.text);
             }
             eprintln!("error: could not apply {}... {}", short_hash(&item.hash), item.subject);
-            eprintln!("hint: Resolve all conflicts manually, mark them as resolved with");
-            eprintln!("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
-            eprintln!("hint: You can instead skip this commit: run \"rgit rebase --skip\".");
-            eprintln!("hint: To abort and get back to the state before \"rgit rebase\", run \"rgit rebase --abort\".");
+            // The narration's conflict report replaces these on a terminal.
+            if !crate::ui::narration_replaces_hints() {
+                eprintln!("hint: Resolve all conflicts manually, mark them as resolved with");
+                eprintln!("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
+                eprintln!("hint: You can instead skip this commit: run \"rgit rebase --skip\".");
+                eprintln!("hint: To abort and get back to the state before \"rgit rebase\", run \"rgit rebase --abort\".");
+            }
             eprintln!("Could not apply {}... {}", short_hash(&item.hash), item.subject);
-            std::process::exit(1);
+            crate::ui::exit(1);
         }
 
         let tree_hash = crate::helpers::build_tree_from_map(&result.tree)?;

@@ -49,7 +49,7 @@ pub const BRANCH_USAGE: &str = "usage: rgit branch [<options>] [-r | -a] [--merg
 fn usage_error(message: &str) -> ! {
     eprintln!("error: {}", message);
     eprint!("{}", BRANCH_USAGE);
-    std::process::exit(129);
+    crate::ui::exit(129);
 }
 
 /// Resolves a `--merged`/`--contains`/... argument to a commit, exiting 128 with git's
@@ -60,7 +60,7 @@ fn resolve_filter_commit(rev: &str) -> String {
         Ok(hash) => hash,
         Err(_) => {
             eprintln!("fatal: malformed object name {}", rev);
-            std::process::exit(128);
+            crate::ui::exit(128);
         }
     }
 }
@@ -122,7 +122,7 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
                         Ok(hash) => opts.points_at.push(hash),
                         Err(_) => {
                             eprintln!("error: malformed object name '{}'", v);
-                            std::process::exit(129);
+                            crate::ui::exit(129);
                         }
                     }
                 }
@@ -201,7 +201,7 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
 // Used by the `branch` command and the helpers below.
 pub fn die(message: &str) -> ! {
     eprintln!("fatal: {}", message);
-    std::process::exit(128);
+    crate::ui::exit(128);
 }
 
 /// The first paragraph of a commit message joined into one line, like `%(contents:subject)`.

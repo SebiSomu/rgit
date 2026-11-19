@@ -66,11 +66,11 @@ pub fn status_branch_header(head: &crate::core::refs::HeadState, unborn: bool) -
     if unborn {
         return format!("## No commits yet on {}", branch);
     }
-    let Some(upstream) = crate::references::for_each_ref::engine::branch_upstream(branch) else {
+    let Some(upstream) = crate::references::for_each_ref::engine::upstream::branch_upstream(branch) else {
         return format!("## {}", branch);
     };
-    let short = crate::references::for_each_ref::engine::shorten_unambiguous_ref(&upstream);
-    let track = match crate::references::for_each_ref::engine::tracking_counts(&format!("refs/heads/{}", branch), &upstream) {
+    let short = crate::references::for_each_ref::engine::upstream::shorten_unambiguous_ref(&upstream);
+    let track = match crate::references::for_each_ref::engine::upstream::tracking_counts(&format!("refs/heads/{}", branch), &upstream) {
         None => " [gone]".to_string(),
         Some((0, 0)) => String::new(),
         Some((a, 0)) => format!(" [ahead {}]", a),

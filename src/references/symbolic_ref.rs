@@ -5,7 +5,7 @@ pub mod types;
 use anyhow::Result;
 
 use crate::core::check_ref_format::check_refname_format;
-use crate::references::for_each_ref::engine::shorten_unambiguous_ref_with;
+use crate::references::for_each_ref::engine::upstream::shorten_unambiguous_ref_with;
 use crate::references::symbolic_ref::engine::{
     delete_symbolic_ref, parse_symbolic_ref_args, resolve_ref_unsafe, write_symbolic_ref, SYMBOLIC_REF_USAGE,
 };

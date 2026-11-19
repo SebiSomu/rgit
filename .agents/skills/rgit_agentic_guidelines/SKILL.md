@@ -34,7 +34,13 @@ src/
 ├── cli.rs                    # Global flags, the `Commands` enum (one variant per subcommand) and one dispatch line per command
 ├── ui.rs                     # Narration layer (--explain/--teach/--plain, RGIT_VERBOSITY): before/after snapshots, reports, exit hook
 ├── ui/
+│   ├── before.rs             # Narration printed before a command acts: warnings the user should see first (e.g. pushing a protected branch).
 │   ├── narrate.rs            # Narration support: repo snapshots, tree/line counts, last change per path, conflict hunks, risk scan, suggestions
+│   ├── report.rs             # Narration after a command: the `report` dispatcher, per-command reports and the shared summaries they use.
+│   │   ├── merge.rs          # Reports for merge, rebase, cherry-pick/revert and conflicts, with the next steps to take.
+│   │   ├── refs.rs           # Reports for log, tag and branch.
+│   │   ├── remote.rs         # Reports for fetch, pull, push and clone.
+│   │   └── workspace.rs      # Reports for working-tree commands: add, commit, status, reset, restore, switch, checkout, stash, rm, clean, diff.
 │   └── types.rs              # Types: RepoSnapshot, Verbosity
 ├── core.rs                   # Declares the core modules
 ├── core/                     # Repository fundamentals every domain builds on (no command entry points)
@@ -265,6 +271,17 @@ src/
 │   ├── for_each_ref.rs       # for-each-ref (formats/atoms, --sort, --count, filters, quoting, --color, --stdin)
 │   │   ├── cli.rs            # CLI: for-each-ref (clap args + dispatch)
 │   │   ├── engine.rs         # for-each-ref: ref-filter port (option/atom parsing, ref collection, filters, values, if/align stack, quoting, versioncmp)
+│   │   │   ├── atoms.rs      # Format preparation: atom table, atom lookup, and parsing of each atom's arguments (ref-filter.c's `parse_ref_filter_atom`).
+│   │   │   ├── color.rs      # git's `color_parse`: color specifications to ANSI escape sequences for `%(color:...)`.
+│   │   │   ├── dates.rs      # Date atoms: date modes, timezone math, relative dates, `strftime` formats.
+│   │   │   ├── message.rs    # Commit/tag message atoms: subject, body, signature, sanitized subject.
+│   │   │   ├── options.rs    # Argument parsing for `for-each-ref`, like git's parse-options: unique prefixes, `--no-` negations, bundled switches.
+│   │   │   ├── output.rs     # Output: quoting styles, display width, `%(align)`/`%(if)` stack, and `format_ref_item`.
+│   │   │   ├── refs.rs       # Ref reading and collection: loose and packed refs, symref chains, pattern filters, `--points-at`, worktree branches.
+│   │   │   ├── sort.rs       # Sorting: `versioncmp` (with versionsort.suffix) and the `--sort` key comparison.
+│   │   │   ├── trailers.rs   # `%(trailers)`: trailer block detection, unfolding and formatting (ref-filter's port of trailer.c).
+│   │   │   ├── upstream.rs   # Ref name shortening and remote tracking: `:lstrip`/`:rstrip`/`:short`, refspecs, upstream/push refs, ahead/behind.
+│   │   │   └── values.rs     # Atom values for one ref: object fields, people, describe output (ref-filter.c's `grab_values`).
 │   │   └── types.rs          # Types: ForEachRefExit, ForEachRefOptions, RefAlign, RefArrayItem, RefAtomArg, ...
 │   ├── notes.rs              # notes (list, add, append, edit, copy, show, remove, prune, merge, get-ref; --ref)
 │   │   ├── cli.rs            # CLI: notes (clap args + dispatch)
@@ -466,15 +483,16 @@ src/
 - **Error Handling**: Use `anyhow::Result` and add context with `.context()` or `.with_context()` to help debug file system issues.
 - **Branch Validation**: All branch creation and renaming must pass through `refs::is_valid_branch_name` to prevent formatting conflicts (following `git-check-ref-format`).
 - **Core vs. Domains**: Code in `core/` must not depend on any domain. When a domain engine grows something several domains need (commit parsing, dates, editors...), move it into `core/`.
-- **Explicit Imports**: Import items from the module that defines them (`use crate::core::object_store::read_object;`, `crate::merge::merge::merge(...)`). Never add `pub use x::*` re-exports to module files, and never `#![allow(unused_imports)]` to hide them.
+- **Explicit Imports** (no glob imports of modules, not even inside functions; importing an enum's variants locally, like `use std::cmp::Ordering::*;`, is fine): Import items from the module that defines them (`use crate::core::object_store::read_object;`, `crate::merge::merge::merge(...)`). Never add `pub use x::*` re-exports to module files, and never `#![allow(unused_imports)]` to hide them.
 - **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `core/commit.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
+- **File Size**: When a file passes ~1,000 lines, split it into submodules by topic (e.g. `references/for_each_ref/engine/{options,atoms,refs,values,dates,trailers,output,sort}.rs`), keeping helpers private or `pub(super)`.
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
 
-### Narration (src/ui.rs)
+### Narration (src/ui.rs, src/ui/)
 - rgit's own explanations go through `crate::ui` (`note`, `detail`, `warn`, `danger`) and are written to **stderr** only; never `println!` prose from a command.
 - Levels: `quiet` (git-identical) / `normal` / `explain` / `teach`, from `rgit --plain|--explain|--teach`, `RGIT_VERBOSITY`, or `rgit.verbosity`. Default is `normal` only when stderr is a terminal, so piped runs and parity tests are unchanged; set `RGIT_VERBOSITY=quiet` in test scripts to be explicit.
-- New narration belongs in the `report_*` functions in ui.rs (they compare the before/after `RepoSnapshot`), not inside command code.
+- New narration belongs in the `report_*` functions under `src/ui/report/` (one file per area: `workspace`, `merge`, `remote`, `refs`; they compare the before/after `RepoSnapshot`) and is wired into the `report` dispatcher in `src/ui/report.rs`; warnings shown before a command acts go in `src/ui/before.rs`. Never narrate from command code.
 - Never call `std::process::exit` in rgit code: use `crate::ui::exit(code)`, so the narration knows how the command ended (`src/bin/` tools are the exception).
 - To stop with an error message, use the shared helpers in `ui.rs` instead of writing a local `die`/`fatal`/`fail`: `crate::ui::die(code, msg)` (prints `msg` + newline to stderr), `crate::ui::die_fatal(msg)` (prints `fatal: msg`, exits 128) and `crate::ui::die_raw(code, msg)` (prints `msg` as-is, for usage texts with their own line breaks). Commands whose errors are returned as values (like `for-each-ref`'s `ForEachRefExit`) keep their own mechanism.
 - Git-style conflict `hint:` blocks are wrapped in `if !crate::ui::narration_replaces_hints()`; do the same for new hints the narration already explains.

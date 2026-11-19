@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::references::for_each_ref::engine::versioncmp;
+use crate::references::for_each_ref::engine::sort::versioncmp;
 use crate::core::commit::{parse_commit_object, split_commit_message};
 use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};

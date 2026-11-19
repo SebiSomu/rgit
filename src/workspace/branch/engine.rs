@@ -4,7 +4,10 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::core::config::{read_all_config_entries, read_entries_from, set_in, unset_in, write_entries_to, LOCAL_CONFIG_PATH};
-use crate::references::for_each_ref::engine::{branch_upstream, collect_ref_items, filter_ref_items, shorten_unambiguous_ref, tracking_counts};
+use crate::references::{
+    for_each_ref::engine::refs::{collect_ref_items, filter_ref_items},
+    for_each_ref::engine::upstream::{branch_upstream, shorten_unambiguous_ref, tracking_counts},
+};
 use crate::core::object_store::read_object;
 use crate::core::wildmatch::wildmatch;
 use crate::references::for_each_ref::types::{ForEachRefOptions, RefArrayItem};

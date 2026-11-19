@@ -58,7 +58,7 @@ pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
     println!("{}: {} left{}.", title, unmerged.len(), if recorded.is_empty() { String::new() } else { format!(" of {}", recorded.len()) });
     println!();
     for (path, mask) in &unmerged {
-        for line in crate::ui::conflict_file_lines(path, *mask, operation.as_deref().unwrap_or("merge"), head.as_deref()) {
+        for line in crate::ui::report::merge::conflict_file_lines(path, *mask, operation.as_deref().unwrap_or("merge"), head.as_deref()) {
             println!("  {}", line);
         }
     }
@@ -68,7 +68,7 @@ pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
     }
     println!();
     println!("Next: edit each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,");
-    for l in crate::ui::conflict_next_steps(operation.as_deref().unwrap_or("merge")) {
+    for l in crate::ui::report::merge::conflict_next_steps(operation.as_deref().unwrap_or("merge")) {
         println!("      {}", l);
     }
     println!("      `rgit conflicts --explain <file>` shows each conflict side by side.");

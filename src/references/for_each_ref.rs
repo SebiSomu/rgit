@@ -6,9 +6,13 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, BufWriter, Write};
 use anyhow::Result;
 
-use crate::references::for_each_ref::engine::{
-    collect_ref_items, compare_ref_items, filter_ref_items, format_ref_item, parse_for_each_ref_args, populate_ref_values, prepare_ref_format,
-    ref_iteration_prefixes, version_suffixes, want_ref_color, worktree_paths_by_branch,
+use crate::references::{
+    for_each_ref::engine::atoms::{prepare_ref_format, want_ref_color},
+    for_each_ref::engine::options::parse_for_each_ref_args,
+    for_each_ref::engine::output::format_ref_item,
+    for_each_ref::engine::refs::{collect_ref_items, filter_ref_items, ref_iteration_prefixes, worktree_paths_by_branch},
+    for_each_ref::engine::sort::{compare_ref_items, version_suffixes},
+    for_each_ref::engine::values::populate_ref_values,
 };
 use crate::references::for_each_ref::types::{ForEachRefExit, RefAtomKind};
 

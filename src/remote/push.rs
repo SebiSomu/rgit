@@ -3,8 +3,18 @@ pub mod engine;
 pub mod types;
 
 use anyhow::Result;
-use crate::remote::github::*;
-use crate::remote::push::engine::*;
+use crate::remote::github::{parse_github_remote, push_to_github, resolve_github_token};
+use crate::remote::push::engine::{
+    collect_missing_objects,
+    copy_object_to_remote,
+    delete_remote_ref,
+    delete_remote_tracking_ref,
+    read_remote_ref,
+    resolve_remote_repo_path,
+    set_upstream_branch,
+    write_remote_ref,
+    write_remote_tracking_ref,
+};
 use crate::core::commit::{is_reachable, resolve_commit_from_source, short_hash};
 use crate::remote::{push::types::PushStatus, types::GitHubTarget};
 use crate::core::refs::{self, HeadState};

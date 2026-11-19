@@ -21,7 +21,14 @@ use crate::core::refs;
 /// - `-m`/`-M` and `-c`/`-C` (`branch.<name>.*` config follows the branch)
 /// - `-u`/`--set-upstream-to <upstream> [<branch>]`, `--unset-upstream [<branch>]`
 pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
-    use crate::workspace::branch::engine::*;
+    use crate::workspace::branch::engine::{
+        BRANCH_USAGE,
+        format_branch_list,
+        parse_branch_args,
+        set_branch_upstream,
+        unset_branch_upstream,
+        upstream_for,
+    };
     let opts = parse_branch_args(&args);
     let has_filter = !(opts.merged.is_empty() && opts.no_merged.is_empty() && opts.contains.is_empty() && opts.no_contains.is_empty() && opts.points_at.is_empty());
     let mut list = opts.list || has_filter;
@@ -149,7 +156,11 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
 /// `branch -d/-D [-r] <name>...`: deletes each branch (or remote-tracking branch), refusing
 /// unmerged ones without `-D`, and reports every failure before exiting 1.
 fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> anyhow::Result<()> {
-    use crate::workspace::branch::engine::*;
+    use crate::workspace::branch::engine::{
+        delete_remote_tracking_ref,
+        move_branch_config,
+        symref_target,
+    };
     if opts.args.is_empty() {
         crate::ui::die_fatal("branch name required");
     }
@@ -187,7 +198,7 @@ fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> any
         };
         if !opts.force {
             // Merged into its upstream if it has one, else into HEAD (git's branch_merged).
-            let upstream = crate::references::for_each_ref::engine::branch_upstream(name).and_then(|u| refs::read_ref(&u).ok().flatten());
+            let upstream = crate::references::for_each_ref::engine::upstream::branch_upstream(name).and_then(|u| refs::read_ref(&u).ok().flatten());
             let into = |base: &Option<String>| -> anyhow::Result<bool> {
                 Ok(match base {
                     Some(b) => is_reachable(b, &tip)?,
@@ -198,7 +209,7 @@ fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> any
             let merged = match &upstream {
                 Some(_) => {
                     let merged_up = into(&upstream)?;
-                    let up_name = crate::references::for_each_ref::engine::branch_upstream(name).unwrap_or_default();
+                    let up_name = crate::references::for_each_ref::engine::upstream::branch_upstream(name).unwrap_or_default();
                     if merged_up && !merged_head {
                         eprintln!("warning: deleting branch '{}' that has been merged to\n         '{}', but not yet merged to HEAD.", name, up_name);
                     } else if !merged_up && merged_head {
@@ -229,7 +240,7 @@ fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> any
 /// `branch -m/-M/-c/-C [<old>] <new>`: renames or copies a branch (the current one when only
 /// `<new>` is given) together with its `branch.<name>.*` config.
 fn rename_or_copy(opts: &crate::workspace::branch::types::BranchOptions, current: Option<&str>) -> anyhow::Result<()> {
-    use crate::workspace::branch::engine::*;
+    use crate::workspace::branch::engine::move_branch_config;
     let verb = if opts.copy { "copy" } else { "rename" };
     let (old, new) = match opts.args.as_slice() {
         [] => crate::ui::die_fatal("branch name required"),

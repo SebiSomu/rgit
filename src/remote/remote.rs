@@ -6,7 +6,15 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use crate::core::config::{read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
-use crate::remote::remote::engine::*;
+use crate::remote::remote::engine::{
+    add_remote,
+    get_remote_info,
+    get_remote_urls,
+    list_remote_names,
+    remote_exists,
+    remove_remote,
+    rename_remote,
+};
 use crate::remote::remote::types::RemoteAction;
 
 /// `rgit remote [-v | --verbose]`

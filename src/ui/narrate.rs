@@ -56,7 +56,7 @@ pub fn take_snapshot(worktree: bool) -> RepoSnapshot {
         _ => None,
     };
     let head = refs::resolve_head_commit().ok().flatten();
-    let refs: BTreeMap<String, String> = crate::references::for_each_ref::engine::collect_ref_items(None).into_iter().map(|i| (i.refname, i.oid)).collect();
+    let refs: BTreeMap<String, String> = crate::references::for_each_ref::engine::refs::collect_ref_items(None).into_iter().map(|i| (i.refname, i.oid)).collect();
     let entries = crate::core::index::read_index().unwrap_or_default();
     let mut index = BTreeMap::new();
     let mut unmerged: BTreeMap<String, u8> = BTreeMap::new();

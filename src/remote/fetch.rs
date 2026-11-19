@@ -3,7 +3,15 @@ pub mod engine;
 pub mod types;
 
 use anyhow::Result;
-use crate::remote::fetch::engine::*;
+use crate::remote::fetch::engine::{
+    enumerate_objects_to_fetch,
+    fetch_object_from_remote,
+    list_remote_refs,
+    read_local_remote_tracking_ref,
+    read_remote_head,
+    write_fetch_head,
+    write_local_remote_tracking_ref,
+};
 use crate::remote::github::{fetch_from_github, parse_github_remote, resolve_github_token};
 use crate::remote::push::engine::resolve_remote_repo_path;
 use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};

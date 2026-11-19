@@ -10,6 +10,7 @@ pub mod checkout;
 pub mod bisect;
 pub mod branch;
 pub mod status;
+pub mod narrate;
 pub mod state_files;
 pub mod config;
 pub mod clean;

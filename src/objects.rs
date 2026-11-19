@@ -3671,3 +3671,54 @@ pub struct StatusOptions {
     pub nul: bool,
     pub untracked: String,
 }
+
+/// How much rgit narrates around a command: `Quiet` prints exactly what git would, `Normal`
+/// adds one-line notes about what actually happened, conflict reports and warnings, `Explain`
+/// adds what it means, `Teach` adds the refs and index changes underneath.
+// Used by: src/ui.rs, src/cli.rs
+// Used by command/helper: `ui::init`, `ui::level` and every narration helper in ui.rs
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Verbosity {
+    Quiet,
+    Normal,
+    Explain,
+    Teach,
+}
+
+/// Repository state captured before and after a command so rgit can narrate the difference:
+/// HEAD, all refs, the index (stage 0 and unmerged stage masks), what is staged against HEAD,
+/// the stash count, the operation in progress and (when needed) the working tree's tracked
+/// changes and untracked files.
+// Used by: src/helpers/narrate.rs, src/ui.rs
+// Used by command/helper: `take_snapshot` and the exit-time narration
+#[derive(Debug, Clone, Default)]
+pub struct RepoSnapshot {
+    /// Branch HEAD points at; None when detached.
+    pub head_branch: Option<String>,
+    pub head: Option<String>,
+    pub refs: std::collections::BTreeMap<String, String>,
+    pub index: std::collections::BTreeMap<String, [u8; 20]>,
+    /// Unmerged paths and which of stages 1-3 each has (bit `stage - 1`).
+    pub unmerged: std::collections::BTreeMap<String, u8>,
+    /// Paths whose staged content differs from HEAD (new, modified or deleted).
+    pub staged: Vec<String>,
+    pub stash_count: usize,
+    pub operation: Option<String>,
+    pub worktree_changes: Option<Vec<(char, String)>>,
+    pub untracked: Option<Vec<String>>,
+}
+
+/// One block of conflict markers in a file: its 1-based line range, the lines of each side
+/// (and of the common ancestor, with the diff3 style) and the labels after the markers.
+// Used by: src/helpers/narrate.rs, src/ui.rs, src/commands/conflicts.rs
+// Used by command/helper: `parse_conflict_hunks`, the conflict reports and `rgit conflicts`
+#[derive(Debug, Clone)]
+pub struct ConflictHunk {
+    pub start: usize,
+    pub end: usize,
+    pub ours: Vec<String>,
+    pub base: Option<Vec<String>>,
+    pub theirs: Vec<String>,
+    pub ours_label: String,
+    pub theirs_label: String,
+}

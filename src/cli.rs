@@ -6,6 +6,15 @@ pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashA
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_subcommand = true)]
 pub struct Cli {
+    /// Narrate what the command actually did, and what it means (`rgit --explain merge x`).
+    #[arg(long = "explain", conflicts_with_all = ["teach", "plain"])]
+    pub explain: bool,
+    /// Like --explain, plus the refs and index changes underneath.
+    #[arg(long = "teach", conflicts_with = "plain")]
+    pub teach: bool,
+    /// Exactly git's output, no rgit narration.
+    #[arg(long = "plain")]
+    pub plain: bool,
     #[command(subcommand)]
     pub command: Box<Commands>,
 }
@@ -782,6 +791,12 @@ pub enum Commands {
         args: Vec<String>,
     },
     #[command(disable_help_flag = true)]
+    /// List unresolved conflicts with who changed what; `--explain <file>` shows each one side by side.
+    #[command(disable_help_flag = true)]
+    Conflicts {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
+        args: Vec<String>,
+    },
     ShowBranch {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
         args: Vec<String>,
@@ -996,6 +1011,9 @@ fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
+    use crate::objects::Verbosity;
+    crate::ui::init(if cli.plain { Some(Verbosity::Quiet) } else if cli.teach { Some(Verbosity::Teach) } else if cli.explain { Some(Verbosity::Explain) } else { None });
+    crate::ui::begin();
 
     // These commands copy, verify or delete objects by hash, so they must not see replacements.
     if matches!(
@@ -1556,6 +1574,9 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Notes { args } => {
             crate::commands::notes(raw_args_after("notes", args))?;
+        }
+        Commands::Conflicts { args } => {
+            crate::commands::conflicts(raw_args_after("conflicts", args))?;
         }
         Commands::ShowBranch { args } => {
             crate::commands::show_branch(raw_args_after("show-branch", args))?;

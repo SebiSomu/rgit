@@ -44,6 +44,7 @@ src/
 │   ├── diff.rs               # diff (porcelain on the raw diff engine: worktree/index/commits, ranges, all formats, renames)
 │   ├── merge.rs              # merge, merge-base
 │   ├── reset.rs              # reset
+│   ├── conflicts.rs          # conflicts (rgit-only: unresolved files, who changed each side, --explain <file> side by side)
 │   ├── clean.rs              # clean
 │   ├── cherry_pick.rs        # cherry-pick (commit lists/ranges, -x, -s, -n, -m, --ff, --continue, --skip, --abort, --quit)
 │   ├── revert.rs             # revert (--continue, --abort)
@@ -139,6 +140,7 @@ src/
 │   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
 │   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
 │   ├── status.rs             # status --short rendering (XY codes, path quoting, -z), untracked dir collapsing, ## branch header
+│   ├── narrate.rs            # Narration support: repo snapshots, tree/line counts, last change per path, conflict hunks, risk scan, suggestions
 │   ├── branch.rs             # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
@@ -218,6 +220,7 @@ src/
 │   ├── combine_diff.rs       # git combine-diff.c port: diff --cc of unmerged paths vs the working tree
 │   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │
+├── ui.rs                     # Narration layer (C.1/C.10): verbosity levels, before/after snapshot + exit hook, ALL narration wording (stderr only)
 ├── objects.rs                # Special types, enums, structs, and type aliases
 ├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
 ├── repo.rs                   # Repository path resolution (`repo::path(".git/...")`), main vs linked worktree
@@ -246,6 +249,11 @@ src/
 - **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `helpers.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
+
+### Narration (src/ui.rs)
+- rgit's own explanations go through `crate::ui` (`note`, `detail`, `warn`, `danger`) and are written to **stderr** only; never `println!` prose from a command.
+- Levels: `quiet` (git-identical) / `normal` / `explain` / `teach`, from `rgit --plain|--explain|--teach`, `RGIT_VERBOSITY`, or `rgit.verbosity`. Default is `normal` only when stderr is a terminal, so piped runs and parity tests are unchanged; set `RGIT_VERBOSITY=quiet` in test scripts to be explicit.
+- New narration belongs in the `report_*` functions in ui.rs (they compare the before/after `RepoSnapshot`), not inside command code.
 
 ### Helper Functions vs. Methods:
 - **Methods on Types (`impl Type`) in `objects.rs`**: Use methods for pure data transformations that do not perform disk I/O, process spawning, or repository lookups (e.g., `Action::parse`, `Action::name`, `TodoItem::format_line`, `CleanMode::wants`).

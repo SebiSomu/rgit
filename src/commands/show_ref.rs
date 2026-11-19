@@ -1,7 +1,7 @@
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::refs::list_all_refs;
 use crate::helpers::show_ref::{matches_show_ref_pattern, parse_show_ref_args, resolve_show_ref, show_ref_exclude_existing, show_ref_exists, show_ref_line};
 use crate::objects::ShowRefOptions;
 

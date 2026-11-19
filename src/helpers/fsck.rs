@@ -5,12 +5,10 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
-use crate::helpers::gc::{
-    hashes_in_file, list_loose_objects, GC_LENIENT_STATE_FILES,
-    GC_STRICT_STATE_FILES,
-};
+use crate::core::object_store::list_loose_objects;
+use crate::helpers::gc::{GC_LENIENT_STATE_FILES, GC_STRICT_STATE_FILES, hashes_in_file};
 use crate::core::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
-use crate::helpers::worktree::all_worktree_git_dirs;
+use crate::core::repo::all_worktree_git_dirs;
 use crate::core::index::{read_index, read_index_from};
 use crate::objects::{FsckIssue, FsckNode, FsckReport, LooseObject};
 

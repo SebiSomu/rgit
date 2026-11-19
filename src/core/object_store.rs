@@ -8,6 +8,9 @@ use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use sha1::{Digest, Sha1};
+use anyhow::Result;
+use crate::objects::LooseObject;
+use std::time::UNIX_EPOCH;
 
 /// Hashes content, writes the zlib-compressed object to `.git/objects/`,
 /// and returns the hexadecimal SHA-1 string.
@@ -143,8 +146,6 @@ pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
 
     Ok((object_type, content))
 }
-
-
 
 /// Parses a commit object to retrieve the tree hash associated with it.
 // Used by `status`, `switch`, `checkout`, and `restore` to load trees.
@@ -283,4 +284,91 @@ pub fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> any
     }
 
     write_object("tree", &tree_content)
+}
+
+/// Lists every loose object in `.git/objects/xx/`, with its size and last-modified time. Only
+/// two-hex-digit directories and 38-hex-digit file names count; `pack/`, `info/` and stray
+/// files are ignored.
+// Used by `plan_gc`.
+pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
+    let root = &crate::core::repo::path(".git/objects");
+    if !root.is_dir() {
+        anyhow::bail!("fatal: not an rgit repository (no .git/objects)");
+    }
+
+    let is_hex = |s: &str, len: usize| s.len() == len && s.chars().all(|c| c.is_ascii_hexdigit());
+    let mut objects = Vec::new();
+
+    for dir in fs::read_dir(root).context("Failed to read .git/objects")? {
+        let dir = dir?;
+        let prefix = dir.file_name().to_string_lossy().to_string();
+        if !is_hex(&prefix, 2) || !dir.path().is_dir() {
+            continue;
+        }
+        for file in fs::read_dir(dir.path()).with_context(|| format!("Failed to read {}", dir.path().display()))? {
+            let file = file?;
+            let rest = file.file_name().to_string_lossy().to_string();
+            if !is_hex(&rest, 38) {
+                continue;
+            }
+            let metadata = file.metadata()?;
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            objects.push(LooseObject {
+                hash: format!("{}{}", prefix, rest).to_ascii_lowercase(),
+                path: file.path(),
+                size: metadata.len(),
+                modified,
+            });
+        }
+    }
+
+    objects.sort_by(|a, b| a.hash.cmp(&b.hash));
+    Ok(objects)
+}
+
+/// Deletes one loose object file (clearing a read-only flag first if needed, as objects copied
+/// from a real git repository are read-only, which blocks deletion on Windows) and removes its
+/// `xx/` directory if that leaves it empty.
+// Used by the `gc` command.
+pub fn remove_loose_object(object: &LooseObject) -> Result<()> {
+    if fs::remove_file(&object.path).is_err() {
+        let mut permissions = fs::metadata(&object.path)
+            .with_context(|| format!("Failed to stat {}", object.path.display()))?
+            .permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        fs::set_permissions(&object.path, permissions)
+            .with_context(|| format!("Failed to make {} writable", object.path.display()))?;
+        fs::remove_file(&object.path)
+            .with_context(|| format!("Failed to delete {}", object.path.display()))?;
+    }
+
+    if let Some(dir) = object.path.parent() {
+        let is_empty = fs::read_dir(dir).map(|mut d| d.next().is_none()).unwrap_or(false);
+        if is_empty {
+            let _ = fs::remove_dir(dir);
+        }
+    }
+    Ok(())
+}
+
+/// Shortens a hash to at least `min_len` characters (clamped to 4..=40), lengthening it until
+/// no other object (loose or packed) shares the prefix.
+// Used by `cherry --abbrev`, `tag`/`describe --abbrev`, `rev-list --abbrev-commit`, `show-ref --hash=<n>` / `--abbrev`,
+// and `for-each-ref` (`%(objectname:short)`).
+pub fn abbreviate_hash_min(hash: &str, min_len: usize) -> String {
+    let mut others: Vec<String> = fs::read_dir(crate::core::repo::path(format!(".git/objects/{}", &hash[..2])))
+        .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
+        .unwrap_or_default();
+    others.extend(crate::core::pack::packed_object_names(&hash[..min_len.clamp(4, hash.len())]).into_iter().filter(|h| h != hash));
+    let mut len = min_len.clamp(4, hash.len());
+    while len < hash.len() && others.iter().any(|o| o.starts_with(&hash[..len])) {
+        len += 1;
+    }
+    hash[..len].to_string()
 }

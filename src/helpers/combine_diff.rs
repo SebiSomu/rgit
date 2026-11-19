@@ -6,7 +6,7 @@
 //! follows them, with a `-` in each column of a parent that had them. Dense mode then drops
 //! hunks where the result simply took one side, and hunks get 3 lines of context.
 
-use crate::helpers::cherry::abbreviate_hash_min;
+use crate::core::object_store::abbreviate_hash_min;
 use crate::helpers::diff_plumbing::{diff_path_selected, quote_c_path};
 use crate::helpers::format_patch::{compacted_changes, split_diff_lines};
 use crate::core::object_store::read_object;

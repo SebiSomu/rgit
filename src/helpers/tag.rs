@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
-use crate::helpers::bisect::collect_ancestors;
+use crate::core::commit::collect_ancestors;
 use crate::core::commit::current_signature;
-use crate::helpers::format_patch::parse_commit_object;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::commit::parse_commit_object;
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::peel_to_type;
 use crate::core::object_store::{read_object, write_object};
 

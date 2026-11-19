@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
+use crate::core::repo;
 
 /// Where the repository behind the current directory keeps its data when the current
 /// directory is a linked worktree (its `.git` is a file, not a directory).
@@ -179,3 +180,30 @@ pub fn to_git_path_string(path: &Path) -> String {
 #[cfg(test)]
 #[path = "../../tests/unit/core/repo.rs"]
 mod tests;
+
+/// Returns the `.git`-like directory of every worktree, main first: the shared `.git`, then
+/// each `.git/worktrees/<id>`. Whatever a worktree keeps privately (HEAD, index, merge or rebase
+/// state) lives in one of these.
+// Used by `gc` and `fsck` (roots from every worktree) and `rename_branch` (HEADs elsewhere).
+pub fn all_worktree_git_dirs() -> Result<Vec<PathBuf>> {
+    let mut dirs = vec![repo::normalize(&repo::common_dir())];
+    let root = worktrees_admin_root();
+    if root.is_dir() {
+        let mut linked: Vec<PathBuf> = fs::read_dir(&root)
+            .with_context(|| format!("Failed to read {}", root.display()))?
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        linked.sort();
+        dirs.extend(linked);
+    }
+    Ok(dirs)
+}
+
+/// The directory under the shared `.git` that holds one administrative directory per linked
+/// worktree.
+// Used by `list_worktrees`, `all_worktree_git_dirs`, `create_worktree_admin_dir` and `prune_worktrees`.
+pub fn worktrees_admin_root() -> PathBuf {
+    repo::normalize(&repo::common_dir()).join("worktrees")
+}

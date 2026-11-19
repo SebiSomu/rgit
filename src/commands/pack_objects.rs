@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::core::pack::{build_pack, packed_object_exists, reachable_objects, store_pack, write_pack_index};
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::resolve_rev;
 use crate::objects::PackBuildOptions;
 use crate::core::repo;

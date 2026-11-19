@@ -1,8 +1,7 @@
 use anyhow::Result;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::helpers::gc::{
-    expire_all_reflogs, expiry_cutoff, format_byte_size, plan_gc, remove_loose_object,
-};
+use crate::core::object_store::remove_loose_object;
+use crate::helpers::gc::{expire_all_reflogs, expiry_cutoff, format_byte_size, plan_gc};
 
 /// `rgit gc [--prune <days|now|never>] [--reflog-expire <days|now|never>] [-n]`
 ///

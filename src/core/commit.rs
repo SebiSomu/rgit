@@ -5,7 +5,9 @@ use crate::core::config::author_identity;
 use crate::core::object_store::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object};
 use crate::core::index::{build_entry, read_index, write_index};
 use crate::objects::CommitSignature;
-use crate::core::refs;
+use crate::objects::ParsedCommit;
+use anyhow::Result;
+use std::collections::{HashSet, VecDeque};
 
 /// Resolves a commit's parent hashes from its raw object content, in order.
 // Used by `cherry_pick`.
@@ -184,48 +186,6 @@ fn signature_from_env(role: &str) -> anyhow::Result<CommitSignature> {
     Ok(CommitSignature { name, email, timestamp, tz })
 }
 
-/// Prints git's commit summary: `[<branch> <abbrev>] <subject>`, then ` Author:` when the
-/// author is not the committer, ` Date:` when `show_date` (an author taken from another commit,
-/// or `--date`), and for non-merges the diffstat line and create/delete-mode summary.
-// Used by `commit` and `cherry-pick`.
-pub fn print_commit_summary(head_state: &refs::HeadState, commit_hash: &str, author: &CommitSignature, committer: &CommitSignature, show_date: bool) -> anyhow::Result<()> {
-    use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
-    let commit = parse_commit_object(commit_hash)?;
-    let label = match head_state {
-        refs::HeadState::Branch(branch) => branch.clone(),
-        refs::HeadState::Detached(_) => "detached HEAD".to_string(),
-    };
-    let root = if commit.parents.is_empty() { " (root-commit)" } else { "" };
-    let subject = split_commit_message(&commit.message).0;
-    println!("[{}{} {}] {}", label, root, &commit_hash[..7], subject);
-    if author.name != committer.name || author.email != committer.email {
-        println!(" Author: {} <{}>", author.name, author.email);
-    }
-    if show_date {
-        println!(" Date: {}", format_commit_date(author.timestamp, &author.tz));
-    }
-    if commit.parents.len() <= 1 {
-        // git's summary: `--shortstat --summary` against the parent, renames detected.
-        use crate::helpers::diff_plumbing::{diff_trees, render_diff_changes};
-        let opts = crate::objects::DiffPlumbingOptions {
-            recursive: true,
-            shortstat: true,
-            summary: true,
-            renames: crate::helpers::rename::default_rename_options("diff.renames"),
-            ..Default::default()
-        };
-        let parent_tree = match commit.parents.first() {
-            Some(parent) => Some(parse_commit_object(parent)?.tree),
-            None => None,
-        };
-        let mut changes = Vec::new();
-        diff_trees(parent_tree.as_deref(), Some(&commit.tree), "", &opts, &[], &mut changes)?;
-        let changes = crate::helpers::rename::detect_renames(changes, &opts.renames, &[]);
-        print!("{}", render_diff_changes(&changes, &opts)?);
-    }
-    Ok(())
-}
-
 /// Parses `commit --author="Name <email>"` into its name and email.
 // Used by `commit --author`.
 pub fn parse_author_option(value: &str) -> anyhow::Result<(String, String)> {
@@ -249,7 +209,7 @@ pub fn parse_commit_date(value: &str) -> anyhow::Result<(i64, String)> {
             }
         }
     }
-    let ts = crate::helpers::rev_list::parse_approx_date(value).ok_or_else(|| anyhow::anyhow!("fatal: invalid date format: {}", value))?;
+    let ts = crate::core::date::parse_approx_date(value).ok_or_else(|| anyhow::anyhow!("fatal: invalid date format: {}", value))?;
     let tz = value
         .rsplit(|c: char| c == ' ' || c == 'T')
         .next()
@@ -376,10 +336,10 @@ pub fn stage_tracked_changes() -> anyhow::Result<()> {
 pub fn format_commit_date(timestamp: i64, tz: &str) -> String {
     const DAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
     const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let local = timestamp + crate::helpers::format_patch::tz_offset_seconds(tz);
+    let local = timestamp + crate::core::date::tz_offset_seconds(tz);
     let days = local.div_euclid(86_400);
     let secs = local.rem_euclid(86_400);
-    let (year, month, day) = crate::helpers::format_patch::civil_from_days(days);
+    let (year, month, day) = crate::core::date::civil_from_days(days);
     format!(
         "{} {} {} {:02}:{:02}:{:02} {} {}",
         DAYS[days.rem_euclid(7) as usize],
@@ -403,6 +363,98 @@ pub fn edit_commit_message(initial: &str, comments: &str) -> anyhow::Result<Stri
     text.push_str("\n# Please enter the commit message for your changes. Lines starting\n# with '#' will be ignored, and an empty message aborts the commit.\n#\n");
     text.push_str(comments);
     fs::write(&path, text)?;
-    crate::helpers::rebase::run_editor(&path, false)?;
+    crate::core::editor::run_editor(&path, false)?;
     Ok(fs::read_to_string(&path)?)
+}
+
+/// Reads and parses a commit object into tree, parents, author, committer, and message.
+/// Multi-line headers (such as `gpgsig`) are skipped.
+// Used by `format-patch` and `am`.
+pub fn parse_commit_object(hash: &str) -> anyhow::Result<ParsedCommit> {
+    let (object_type, content) = read_object(hash)?;
+    if object_type != "commit" {
+        anyhow::bail!("fatal: {} is not a commit", hash);
+    }
+    let text = String::from_utf8_lossy(&content).into_owned();
+    let (header, message) = text.split_once("\n\n").unwrap_or((text.as_str(), ""));
+
+    let mut commit = ParsedCommit { hash: hash.to_string(), message: message.to_string(), ..Default::default() };
+    for line in header.lines() {
+        if let Some(tree) = line.strip_prefix("tree ") {
+            commit.tree = tree.to_string();
+        } else if let Some(parent) = line.strip_prefix("parent ") {
+            commit.parents.push(parent.to_string());
+        } else if let Some(author) = line.strip_prefix("author ") {
+            commit.author = parse_signature(author);
+        } else if let Some(committer) = line.strip_prefix("committer ") {
+            commit.committer = parse_signature(committer);
+        }
+    }
+    Ok(commit)
+}
+
+/// Splits a commit message into its subject (first paragraph, lines joined by spaces) and
+/// body (everything after it, without leading blank lines or trailing whitespace).
+// Used by `format-patch` and `am`.
+pub fn split_commit_message(message: &str) -> (String, String) {
+    let mut lines = message.lines().peekable();
+    while lines.peek().is_some_and(|l| l.trim().is_empty()) {
+        lines.next();
+    }
+    let mut subject_lines = Vec::new();
+    while let Some(line) = lines.peek() {
+        if line.trim().is_empty() {
+            break;
+        }
+        subject_lines.push(line.trim().to_string());
+        lines.next();
+    }
+    while lines.peek().is_some_and(|l| l.trim().is_empty()) {
+        lines.next();
+    }
+    let body: Vec<&str> = lines.collect();
+    (subject_lines.join(" "), body.join("\n").trim_end().to_string())
+}
+
+pub fn parse_signature(value: &str) -> CommitSignature {
+    let (name, rest) = value.split_once('<').unwrap_or((value, ""));
+    let (email, tail) = rest.split_once('>').unwrap_or((rest, ""));
+    let mut parts = tail.split_whitespace();
+    CommitSignature {
+        name: name.trim().to_string(),
+        email: email.trim().to_string(),
+        timestamp: parts.next().and_then(|t| t.parse().ok()).unwrap_or(0),
+        tz: parts.next().unwrap_or("+0000").to_string(),
+    }
+}
+
+/// Collects the full ancestor set of `start` (inclusive), following parent
+/// links via BFS.
+pub fn collect_ancestors(start: &str) -> Result<HashSet<String>> {
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(start.to_string());
+
+    while let Some(hash) = queue.pop_front() {
+        if visited.contains(&hash) {
+            continue;
+        }
+        visited.insert(hash.clone());
+
+        let (object_type, content) = read_object(&hash)?;
+        if object_type != "commit" {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&content);
+        for line in text.lines() {
+            if line.is_empty() {
+                break;
+            }
+            if let Some(parent) = line.strip_prefix("parent ") {
+                queue.push_back(parent.to_string());
+            }
+        }
+    }
+
+    Ok(visited)
 }

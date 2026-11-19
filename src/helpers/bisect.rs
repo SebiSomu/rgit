@@ -9,37 +9,7 @@ use crate::helpers::state_files::{append_line, read_lines_set};
 use crate::core::index::read_index;
 use crate::objects::BisectOutcome;
 use crate::core::refs;
-
-/// Collects the full ancestor set of `start` (inclusive), following parent
-/// links via BFS.
-pub fn collect_ancestors(start: &str) -> Result<HashSet<String>> {
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::new();
-    queue.push_back(start.to_string());
-
-    while let Some(hash) = queue.pop_front() {
-        if visited.contains(&hash) {
-            continue;
-        }
-        visited.insert(hash.clone());
-
-        let (object_type, content) = read_object(&hash)?;
-        if object_type != "commit" {
-            continue;
-        }
-        let text = String::from_utf8_lossy(&content);
-        for line in text.lines() {
-            if line.is_empty() {
-                break;
-            }
-            if let Some(parent) = line.strip_prefix("parent ") {
-                queue.push_back(parent.to_string());
-            }
-        }
-    }
-
-    Ok(visited)
-}
+use crate::core::commit::collect_ancestors;
 
 /// BFS from `start` over the *entire* ancestor graph (so it can walk through
 /// non-candidate commits to reach further candidates), collecting only the

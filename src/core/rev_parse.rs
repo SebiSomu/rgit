@@ -473,3 +473,10 @@ pub fn symbolic_full_name_symbolic(rev: &str) -> Result<String> {
 #[cfg(test)]
 #[path = "../../tests/unit/core/rev_parse.rs"]
 mod tests;
+
+/// Resolves any revision expression to a commit hash (peeling annotated tags).
+// Used by `format-patch` commit selection.
+pub fn resolve_commit_rev(rev: &str) -> anyhow::Result<String> {
+    let hash = resolve_rev(rev).map_err(|_| anyhow::anyhow!("fatal: ambiguous argument '{}': unknown revision or path not in the working tree.", rev))?;
+    peel_to_type(hash, "commit")
+}

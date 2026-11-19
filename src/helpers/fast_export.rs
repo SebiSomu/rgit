@@ -5,7 +5,8 @@ use anyhow::{bail, Result};
 
 use crate::helpers::diff_plumbing::quote_c_path;
 use crate::core::object_store::{flatten_tree, read_object};
-use crate::helpers::rev_list::{list_all_refs, parse_rev_list_args, select_rev_list_commits};
+use crate::core::refs::list_all_refs;
+use crate::helpers::rev_list::{parse_rev_list_args, select_rev_list_commits};
 use crate::core::rev_parse::resolve_rev;
 use crate::objects::{DiffChange, DiffSide, FastExportOptions};
 use crate::core::refs::read_ref;

@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::core::repo;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub enum HeadState {
@@ -218,7 +219,6 @@ pub fn create_branch(name: &str, commit_hash: &str) -> Result<()> {
     Ok(())
 }
 
-
 /// Updates `.git/HEAD` to point to a specific local branch ref.
 // Used by `switch`, `checkout`, and `branch -m` (active branch rename).
 pub fn set_head(branch_name: &str) -> Result<()> {
@@ -315,7 +315,7 @@ pub fn rename_branch(old: &str, new: &str) -> Result<()> {
 
     // Other worktrees that have the branch checked out follow the rename too.
     let own_git_dir = repo::normalize(&repo::git_dir());
-    for git_dir in crate::helpers::worktree::all_worktree_git_dirs()? {
+    for git_dir in crate::core::repo::all_worktree_git_dirs()? {
         let head_file = git_dir.join("HEAD");
         if git_dir != own_git_dir
             && fs::read_to_string(&head_file).is_ok_and(|c| c.trim() == current_ref)
@@ -535,5 +535,48 @@ pub fn prune_empty_ref_dirs(ref_file: &Path) {
             break;
         }
         parent = dir.parent();
+    }
+}
+
+/// Lists every ref under `.git/refs` and in `packed-refs` (loose refs win) with the object
+/// it points at, in name order. Symbolic refs (`refs/remotes/origin/HEAD` holding
+/// `ref: refs/remotes/origin/main`) are listed with their target's object.
+// Used by `collect_ref_tips`, `bundle create --all`, `log` decorations, and `tag`.
+pub fn list_all_refs() -> BTreeMap<String, String> {
+    let mut refs: BTreeMap<String, String> = BTreeMap::new();
+    if let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) {
+        for line in packed.lines() {
+            if let Some((hash, name)) = line.split_once(' ') {
+                if hash.len() == 40 && !line.starts_with('#') {
+                    refs.insert(name.to_string(), hash.to_string());
+                }
+            }
+        }
+    }
+    let mut symbolic = Vec::new();
+    collect_loose_refs(&crate::core::repo::path(".git/refs"), "refs", &mut refs, &mut symbolic);
+    for (name, target) in symbolic {
+        if let Some(hash) = refs.get(&target).cloned() {
+            refs.insert(name, hash);
+        }
+    }
+    refs
+}
+
+pub fn collect_loose_refs(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>, symbolic: &mut Vec<(String, String)>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let name = format!("{}/{}", prefix, entry.file_name().to_string_lossy());
+        let path = entry.path();
+        if path.is_dir() {
+            collect_loose_refs(&path, &name, out, symbolic);
+        } else if let Ok(content) = fs::read_to_string(&path) {
+            let hash = content.trim();
+            if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                out.insert(name, hash.to_string());
+            } else if let Some(target) = hash.strip_prefix("ref: ") {
+                symbolic.push((name, target.trim().to_string()));
+            }
+        }
     }
 }

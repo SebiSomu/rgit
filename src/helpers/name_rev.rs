@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::core::object_store::read_object;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::refs::list_all_refs;
 use crate::core::wildmatch::wildmatch;
 use crate::objects::{NameRevOptions, NameRevTip, RevName, RevNames};
 use crate::core::refs::read_ref;

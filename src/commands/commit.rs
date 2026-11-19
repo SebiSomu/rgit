@@ -5,7 +5,10 @@ use crate::core::commit::{
     add_signoff, cleanup_commit_message, current_author_signature, current_signature, edit_commit_message, parse_author_option, parse_commit_date,
     stage_tracked_changes, tracked_worktree_changes, write_commit_object,
 };
-use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
+use crate::core::{
+    commit::{parse_commit_object, split_commit_message},
+    rev_parse::resolve_commit_rev,
+};
 use crate::core::reflog::set_reflog_action;
 use crate::core::commit::build_commit;
 use crate::core::object_store::{flatten_tree, write_tree_from_index_prefix};
@@ -157,7 +160,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     crate::helpers::sequencer::post_commit_cleanup();
 
     if !opts.quiet {
-        crate::core::commit::print_commit_summary(&head_state, &commit_hash, &author, &committer, show_date)?;
+        crate::helpers::commit_summary::print_commit_summary(&head_state, &commit_hash, &author, &committer, show_date)?;
     }
     Ok(())
 }

@@ -905,7 +905,7 @@ fn edit_hunk_manually(mode: &PatchModeSpec, hunk: &InteractiveHunk) -> anyhow::R
     }
     let path = crate::core::repo::path(".git/addp-hunk-edit.diff");
     std::fs::write(&path, &text)?;
-    crate::helpers::rebase::run_editor(&path, false)?;
+    crate::core::editor::run_editor(&path, false)?;
     let edited = std::fs::read(&path)?;
     let _ = std::fs::remove_file(&path);
 

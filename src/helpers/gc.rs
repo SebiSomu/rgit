@@ -2,13 +2,13 @@ use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 use crate::helpers::fetch::local_has_object;
 use crate::core::object_store::read_object;
 use crate::core::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
-use crate::helpers::worktree::all_worktree_git_dirs;
+use crate::core::repo::all_worktree_git_dirs;
 use crate::core::index::read_index_from;
 use crate::objects::{GcReport, LooseObject};
+use crate::core::object_store::list_loose_objects;
 
 /// State files under `.git/` whose contents name commits that must stay alive: refs HEAD
 /// points at, stashes, and the bookkeeping of merges, cherry-picks, reverts, rebases and
@@ -229,51 +229,6 @@ pub fn mark_reachable(roots: &[String], visited: &mut HashSet<String>, strict: b
     Ok(())
 }
 
-/// Lists every loose object in `.git/objects/xx/`, with its size and last-modified time. Only
-/// two-hex-digit directories and 38-hex-digit file names count; `pack/`, `info/` and stray
-/// files are ignored.
-// Used by `plan_gc`.
-pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
-    let root = &crate::core::repo::path(".git/objects");
-    if !root.is_dir() {
-        anyhow::bail!("fatal: not an rgit repository (no .git/objects)");
-    }
-
-    let is_hex = |s: &str, len: usize| s.len() == len && s.chars().all(|c| c.is_ascii_hexdigit());
-    let mut objects = Vec::new();
-
-    for dir in fs::read_dir(root).context("Failed to read .git/objects")? {
-        let dir = dir?;
-        let prefix = dir.file_name().to_string_lossy().to_string();
-        if !is_hex(&prefix, 2) || !dir.path().is_dir() {
-            continue;
-        }
-        for file in fs::read_dir(dir.path()).with_context(|| format!("Failed to read {}", dir.path().display()))? {
-            let file = file?;
-            let rest = file.file_name().to_string_lossy().to_string();
-            if !is_hex(&rest, 38) {
-                continue;
-            }
-            let metadata = file.metadata()?;
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            objects.push(LooseObject {
-                hash: format!("{}{}", prefix, rest).to_ascii_lowercase(),
-                path: file.path(),
-                size: metadata.len(),
-                modified,
-            });
-        }
-    }
-
-    objects.sort_by(|a, b| a.hash.cmp(&b.hash));
-    Ok(objects)
-}
-
 /// Works out what a `gc` would prune, without changing anything. Everything reachable from the
 /// roots is kept (the strict roots must be intact, the reflog roots needn't be); of the rest,
 /// anything modified at or after `prune_cutoff` is kept as too new to judge, and so is
@@ -337,32 +292,6 @@ pub fn expire_all_reflogs(cutoff: Option<u64>, dry_run: bool) -> Result<usize> {
         };
     }
     Ok(total)
-}
-
-/// Deletes one loose object file (clearing a read-only flag first if needed, as objects copied
-/// from a real git repository are read-only, which blocks deletion on Windows) and removes its
-/// `xx/` directory if that leaves it empty.
-// Used by the `gc` command.
-pub fn remove_loose_object(object: &LooseObject) -> Result<()> {
-    if fs::remove_file(&object.path).is_err() {
-        let mut permissions = fs::metadata(&object.path)
-            .with_context(|| format!("Failed to stat {}", object.path.display()))?
-            .permissions();
-        #[allow(clippy::permissions_set_readonly_false)]
-        permissions.set_readonly(false);
-        fs::set_permissions(&object.path, permissions)
-            .with_context(|| format!("Failed to make {} writable", object.path.display()))?;
-        fs::remove_file(&object.path)
-            .with_context(|| format!("Failed to delete {}", object.path.display()))?;
-    }
-
-    if let Some(dir) = object.path.parent() {
-        let is_empty = fs::read_dir(dir).map(|mut d| d.next().is_none()).unwrap_or(false);
-        if is_empty {
-            let _ = fs::remove_dir(dir);
-        }
-    }
-    Ok(())
 }
 
 /// Formats a byte count for humans (`512 B`, `3.4 KiB`, `1.2 MiB`).

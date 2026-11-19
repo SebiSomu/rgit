@@ -5,11 +5,14 @@ use flate2::bufread::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
-use crate::helpers::apply::apply_git_delta;
-use crate::helpers::bisect::collect_ancestors;
-use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
+use crate::core::pack::apply_git_delta;
+use crate::core::commit::collect_ancestors;
+use crate::core::{
+    commit::{parse_commit_object, split_commit_message},
+    rev_parse::resolve_commit_rev,
+};
 use crate::helpers::merge::find_all_merge_bases;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::peel_to_type;
 use crate::core::object_store::{read_object, write_object};
 use crate::objects::BundleHeader;

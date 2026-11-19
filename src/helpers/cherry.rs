@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use sha1::{Digest, Sha1};
 use crate::core::config::get_config_value;
-use crate::helpers::format_patch::{parse_commit_object, split_diff_lines, unified_hunks_with};
+use crate::core::commit::parse_commit_object;
+use crate::helpers::format_patch::{split_diff_lines, unified_hunks_with};
 use crate::helpers::rev_list::run_rev_list_walk;
 use crate::core::object_store::{flatten_tree, read_object};
 use crate::objects::{ParsedCommit, RevListOptions, RevListRoots};
@@ -124,18 +124,3 @@ fn strip_whitespace(text: &str) -> String {
     text.chars().filter(|c| !matches!(c, ' ' | '\t' | '\n' | '\r')).collect()
 }
 
-/// Shortens a hash to at least `min_len` characters (clamped to 4..=40), lengthening it until
-/// no other object (loose or packed) shares the prefix.
-// Used by `cherry --abbrev`, `tag`/`describe --abbrev`, `rev-list --abbrev-commit`, `show-ref --hash=<n>` / `--abbrev`,
-// and `for-each-ref` (`%(objectname:short)`).
-pub fn abbreviate_hash_min(hash: &str, min_len: usize) -> String {
-    let mut others: Vec<String> = fs::read_dir(crate::core::repo::path(format!(".git/objects/{}", &hash[..2])))
-        .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
-        .unwrap_or_default();
-    others.extend(crate::core::pack::packed_object_names(&hash[..min_len.clamp(4, hash.len())]).into_iter().filter(|h| h != hash));
-    let mut len = min_len.clamp(4, hash.len());
-    while len < hash.len() && others.iter().any(|o| o.starts_with(&hash[..len])) {
-        len += 1;
-    }
-    hash[..len].to_string()
-}

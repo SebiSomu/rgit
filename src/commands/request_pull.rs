@@ -2,7 +2,8 @@ use std::io::{self, Write};
 use anyhow::Result;
 
 use crate::helpers::fmt_merge_msg::read_branch_description;
-use crate::helpers::format_patch::{format_diffstat, parse_commit_object};
+use crate::core::commit::parse_commit_object;
+use crate::helpers::format_patch::format_diffstat;
 use crate::helpers::github::parse_github_remote;
 use crate::helpers::mailmap::read_mailmap;
 use crate::helpers::merge::find_merge_base;

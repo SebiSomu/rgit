@@ -34,7 +34,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => sandbox_root.clone(),
     };
 
-
     if clean {
         if sandbox_root.exists() {
             println!("[rtest] Cleaning sandbox...");

@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::helpers::format_patch::parse_commit_object;
+use crate::core::commit::parse_commit_object;
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::core::object_store::flatten_tree;
 use crate::helpers::rev_list::{parse_revision_args, select_rev_list_commits};

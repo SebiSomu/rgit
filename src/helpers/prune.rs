@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
-use crate::helpers::rev_list::parse_approx_date;
+use crate::core::date::parse_approx_date;
 use crate::objects::ObjectDirCruft;
 
 /// Turns `prune --expire=<time>` into the cutoff `plan_gc` uses (objects modified at or after

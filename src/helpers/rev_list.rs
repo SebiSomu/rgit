@@ -1,14 +1,18 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
-use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 use regex::{Regex, RegexBuilder};
-use crate::helpers::format_patch::{civil_from_days, parse_commit_object, resolve_commit_rev, split_commit_message, tz_offset_seconds};
+use crate::core::{
+    commit::{parse_commit_object, split_commit_message},
+    date::{civil_from_days, tz_offset_seconds},
+    rev_parse::resolve_commit_rev,
+};
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::merge::find_all_merge_bases;
 use crate::core::object_store::flatten_tree;
 use crate::objects::{CommitSignature, ParsedCommit, RevListFormat, RevListOptions, RevListRoots, RevWalkState, WalkedCommit};
+use crate::core::date::parse_approx_date;
+use crate::core::refs::list_all_refs;
 
 const USAGE: &str = "usage: rgit rev-list [<options>] <commit>... [--] [<path>...]";
 
@@ -203,58 +207,6 @@ fn is_revision_arg(arg: &str) -> bool {
     check(arg.strip_prefix('^').unwrap_or(arg)) && !arg.is_empty()
 }
 
-/// Parses the date forms `--since` / `--until` accept: Unix timestamps (`1700000000` or
-/// `@1700000000`), `YYYY-MM-DD[ HH:MM[:SS]]` with optional `T` separator and `+HHMM`/`Z`
-/// zone (UTC when absent), `now`, `yesterday`, and `<n> <unit>[s] ago` (also dotted, like
-/// `2.weeks.ago`) for seconds through years.
-// Used by `rev-list`.
-pub fn parse_approx_date(text: &str) -> Option<i64> {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    let t = text.trim().to_ascii_lowercase();
-    if let Some(ts) = t.strip_prefix('@').unwrap_or(&t).parse::<i64>().ok().filter(|_| t.starts_with('@') || t.len() >= 9) {
-        return Some(ts);
-    }
-    match t.as_str() {
-        "now" => return Some(now),
-        "yesterday" => return Some(now - 86_400),
-        _ => {}
-    }
-
-    let words: Vec<&str> = t.split(|c: char| c == ' ' || c == '.').filter(|w| !w.is_empty()).collect();
-    if words.len() == 3 && words[2] == "ago" {
-        let n: i64 = words[0].parse().ok()?;
-        let unit = words[1].trim_end_matches('s');
-        let seconds = match unit {
-            "second" => 1,
-            "minute" => 60,
-            "hour" => 3600,
-            "day" => 86_400,
-            "week" => 7 * 86_400,
-            "month" => 30 * 86_400,
-            "year" => 365 * 86_400,
-            _ => return None,
-        };
-        return Some(now - n * seconds);
-    }
-
-    let re = Regex::new(r"^(\d{4})-(\d{2})-(\d{2})(?:[ t](\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*(z|[+-]\d{4})?$").ok()?;
-    let caps = re.captures(&t)?;
-    let num = |i: usize| caps.get(i).map(|m| m.as_str().parse::<i64>().unwrap_or(0)).unwrap_or(0);
-    let (year, month, day) = (num(1), num(2), num(3));
-    let local = days_from_civil(year, month, day) * 86_400 + num(4) * 3600 + num(5) * 60 + num(6);
-    let tz = caps.get(7).map(|m| m.as_str()).filter(|z| *z != "z").unwrap_or("+0000");
-    Some(local - tz_offset_seconds(tz))
-}
-
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let y = if month <= 2 { year - 1 } else { year };
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let mp = (month + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + day - 1;
-    era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468
-}
-
 /// Collects the commit hashes refs point at, as git adds them for `--all` and friends: every
 /// matching ref under `.git/refs` and in `packed-refs` in name order (tags peeled to commits,
 /// refs to other objects skipped), then `HEAD` for `--all`.
@@ -281,49 +233,6 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
         }
     }
     Ok(tips)
-}
-
-/// Lists every ref under `.git/refs` and in `packed-refs` (loose refs win) with the object
-/// it points at, in name order. Symbolic refs (`refs/remotes/origin/HEAD` holding
-/// `ref: refs/remotes/origin/main`) are listed with their target's object.
-// Used by `collect_ref_tips`, `bundle create --all`, `log` decorations, and `tag`.
-pub fn list_all_refs() -> BTreeMap<String, String> {
-    let mut refs: BTreeMap<String, String> = BTreeMap::new();
-    if let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) {
-        for line in packed.lines() {
-            if let Some((hash, name)) = line.split_once(' ') {
-                if hash.len() == 40 && !line.starts_with('#') {
-                    refs.insert(name.to_string(), hash.to_string());
-                }
-            }
-        }
-    }
-    let mut symbolic = Vec::new();
-    collect_loose_refs(&crate::core::repo::path(".git/refs"), "refs", &mut refs, &mut symbolic);
-    for (name, target) in symbolic {
-        if let Some(hash) = refs.get(&target).cloned() {
-            refs.insert(name, hash);
-        }
-    }
-    refs
-}
-
-fn collect_loose_refs(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>, symbolic: &mut Vec<(String, String)>) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
-    for entry in entries.flatten() {
-        let name = format!("{}/{}", prefix, entry.file_name().to_string_lossy());
-        let path = entry.path();
-        if path.is_dir() {
-            collect_loose_refs(&path, &name, out, symbolic);
-        } else if let Ok(content) = fs::read_to_string(&path) {
-            let hash = content.trim();
-            if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
-                out.insert(name, hash.to_string());
-            } else if let Some(target) = hash.strip_prefix("ref: ") {
-                symbolic.push((name, target.trim().to_string()));
-            }
-        }
-    }
 }
 
 /// Resolves revision arguments, in order, into the pending list git builds: `X` is positive,
@@ -795,7 +704,7 @@ pub fn build_commit_filter(opts: &RevListOptions) -> anyhow::Result<impl Fn(&Par
 /// Shortens a hash to the shortest unique prefix of at least 7 characters among loose objects.
 // Used by `rev-list --abbrev-commit` / `--oneline`.
 pub fn abbreviate_hash(hash: &str) -> String {
-    crate::helpers::cherry::abbreviate_hash_min(hash, 7)
+    crate::core::object_store::abbreviate_hash_min(hash, 7)
 }
 
 /// Expands a `--format` template for one commit. Supports `%H %h %T %t %P %p`, author

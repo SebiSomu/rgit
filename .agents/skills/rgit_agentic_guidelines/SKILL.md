@@ -132,6 +132,7 @@ src/
 │   └── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
 ├── helpers.rs                # Root module declaring the helper modules (no re-exports)
 ├── helpers/                  # Lower-level helpers & engines
+│   ├── commit_summary.rs     # `[branch abbrev] subject` summary + diffstat printed after commit / cherry-pick
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
@@ -216,8 +217,10 @@ src/
 ├── core.rs                   # Root module declaring the core modules
 ├── core/                     # Repository fundamentals every domain builds on (no command entry points)
 │   ├── check_ref_format.rs   # Git ref name rules, slash normalization, branch shorthand validation
-│   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
+│   ├── commit.rs             # Commit building, parsing (parse_commit_object, split_commit_message), parent chains, ancestor walks (is_reachable, collect_ancestors)
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
+│   ├── date.rs               # Civil-date math, timezone offsets, approxidate parsing (shared by log, commit, rev-list, mail)
+│   ├── editor.rs             # Editor command resolution (GIT_EDITOR/core.editor/...) and launching
 │   ├── index.rs              # Binary staging index (.git/index) reader and writer
 │   ├── object_store.rs       # Object compression, hashing, tree writing, and refs/replace substitution on read
 │   ├── pack.rs               # Packfile engine: idx parse/write, packed object lookup (read_object fallback), deltas, pack writer

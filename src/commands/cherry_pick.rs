@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::fs;
-use crate::core::commit::{current_signature, print_commit_summary, write_commit_object};
-use crate::helpers::format_patch::parse_commit_object;
+use crate::core::commit::{current_signature, write_commit_object};
+use crate::helpers::commit_summary::print_commit_summary;
+use crate::core::commit::parse_commit_object;
 use crate::helpers::merge::{clear_merge_state, die_if_unmerged, merge_into_worktree, reset_merge_to_tree};
 use crate::helpers::sequencer::{
     append_cherry_picked_from, append_signoff, read_sequence_options, read_todo, remove_sequence, rollback_is_safe,
@@ -303,7 +304,7 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     }
 
     let parents: Vec<String> = head.iter().cloned().collect();
-    let subject_line = crate::helpers::format_patch::split_commit_message(&message).0;
+    let subject_line = crate::core::commit::split_commit_message(&message).0;
     crate::core::reflog::set_reflog_action(&format!("cherry-pick: {}", subject_line));
     let new_commit = write_commit_object(&tree, &parents, &picked.author, &committer, &message)?;
     move_head(&head_state, &new_commit)?;

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::helpers::cherry::abbreviate_hash_min;
+use crate::core::object_store::abbreviate_hash_min;
 use crate::helpers::format_patch::{diff_file_contents, format_diffstat};
 use crate::helpers::index_plumbing::worktree_state;
 use crate::helpers::ls_files::pathspec_wildcard_match;

@@ -73,8 +73,8 @@ pub fn read_sequence_options() -> CherryPickOptions {
 pub fn save_todo(commits: &[String]) -> anyhow::Result<()> {
     let mut text = String::new();
     for commit in commits {
-        let parsed = crate::helpers::format_patch::parse_commit_object(commit)?;
-        let subject = crate::helpers::format_patch::split_commit_message(&parsed.message).0;
+        let parsed = crate::core::commit::parse_commit_object(commit)?;
+        let subject = crate::core::commit::split_commit_message(&parsed.message).0;
         text.push_str(&format!("pick {} {}\n", crate::helpers::rev_list::abbreviate_hash(commit), subject));
     }
     fs::write(seq_path("todo"), text)?;

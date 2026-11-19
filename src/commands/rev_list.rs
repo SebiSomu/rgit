@@ -2,7 +2,7 @@ use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
 use crate::helpers::rev_list::{abbreviate_hash, expand_rev_list_format, parse_rev_list_args, rewrite_rev_list_parents, select_rev_list_commits};
-use crate::helpers::format_patch::split_commit_message;
+use crate::core::commit::split_commit_message;
 use crate::objects::{RevListFormat, RevListOptions, WalkedCommit};
 
 /// `rgit rev-list [<options>] <commit>... [--] [<path>...]`

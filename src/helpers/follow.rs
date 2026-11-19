@@ -5,7 +5,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::core::object_store::flatten_tree;
-use crate::helpers::format_patch::{diff_file_contents, format_diffstat, parse_commit_object};
+use crate::core::commit::parse_commit_object;
+use crate::helpers::format_patch::{diff_file_contents, format_diffstat};
 use crate::helpers::log::binary_patch_as_notice;
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::core::object_store::read_object;

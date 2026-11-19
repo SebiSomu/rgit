@@ -1,10 +1,10 @@
 use std::fs;
 use anyhow::Result;
 
-use crate::helpers::cherry::abbreviate_hash_min;
+use crate::core::object_store::abbreviate_hash_min;
 use crate::core::check_ref_format::check_refname_format;
 use crate::core::commit::{cleanup_commit_message, is_reachable};
-use crate::helpers::format_patch::resolve_commit_rev;
+use crate::core::rev_parse::resolve_commit_rev;
 use crate::helpers::gitignore::glob_match;
 use crate::helpers::rev_list::abbreviate_hash;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
@@ -100,7 +100,7 @@ fn tag_message(opts: &TagOptions, name: &str) -> Result<String> {
         let path = crate::core::repo::path(".git/TAG_EDITMSG");
         let initial = given.clone().unwrap_or_default();
         fs::write(&path, format!("{}\n#\n# Write a message for tag:\n#   {}\n# Lines starting with '#' will be ignored.\n", initial.trim_end(), name))?;
-        crate::helpers::rebase::run_editor(&path, false)?;
+        crate::core::editor::run_editor(&path, false)?;
         cleanup_commit_message(&fs::read_to_string(&path)?, true)
     } else {
         // Unlike commit, git strips `#` lines from every tag message, however it was given.

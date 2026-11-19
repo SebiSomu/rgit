@@ -6,7 +6,6 @@ use crate::helpers::worktree::worktree_using_branch;
 use crate::core::index::read_index;
 use crate::core::refs;
 
-
 /// `rgit branch [<options>] [<args>...]`
 ///
 /// Lists, creates, deletes, renames and copies branches, like git's `branch`:

@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
-use std::process::Command;
 use anyhow::Context;
 use crate::helpers::checkout::{
     build_index_entries_for_tree, check_switch_safety, ensure_working_tree_clean,
@@ -10,13 +8,13 @@ use crate::helpers::checkout::{
 use crate::core::commit::{
     commit_parents, extract_commit_message, resolve_tree_from_source, short_hash,
 };
-use crate::core::config::get_config_value;
 use crate::helpers::merge::merge_into_worktree;
 use crate::core::object_store::{read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::helpers::state_files::read_lines_set;
 use crate::core::index::{read_index, write_index};
 use crate::objects::{Action, ItemResult, TodoItem};
 use crate::core::refs;
+use crate::core::editor::run_editor;
 
 pub const REBASE_TODO_PATH: &str = ".git/REBASE_TODO";
 pub const REBASE_BRANCH_PATH: &str = ".git/REBASE_BRANCH";
@@ -165,49 +163,6 @@ pub fn parse_edited_todo_with_meld(content: &str, candidates: &[TodoItem], allow
     Ok(items)
 }
 
-/// Resolves the command string to invoke the user's configured editor.
-// Used by `rebase`.
-pub fn editor_command(sequence: bool) -> anyhow::Result<String> {
-    let nonempty = |v: Option<String>| v.filter(|s| !s.trim().is_empty());
-
-    if sequence {
-        if let Some(e) = nonempty(std::env::var("RGIT_SEQUENCE_EDITOR").ok()) {
-            return Ok(e);
-        }
-    }
-    if let Some(e) = nonempty(std::env::var("RGIT_EDITOR").ok()) {
-        return Ok(e);
-    }
-    if let Some(e) = nonempty(get_config_value("core.editor")?) {
-        return Ok(e);
-    }
-    for var in ["VISUAL", "EDITOR"] {
-        if let Some(e) = nonempty(std::env::var(var).ok()) {
-            return Ok(e);
-        }
-    }
-    Ok(if cfg!(windows) { "notepad" } else { "vi" }.to_string())
-}
-
-/// Launches the configured editor synchronously on the specified file.
-// Used by `rebase`.
-pub fn run_editor(file: &Path, sequence: bool) -> anyhow::Result<()> {
-    let command = editor_command(sequence)?;
-    let mut parts = command.split_whitespace();
-    let program = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("fatal: empty editor command"))?;
-    let status = Command::new(program)
-        .args(parts)
-        .arg(file)
-        .status()
-        .with_context(|| format!("failed to launch editor '{}'", command))?;
-    if !status.success() {
-        anyhow::bail!("error: editor '{}' exited with {}", command, status);
-    }
-    Ok(())
-}
-
 /// Interactively edits the list of commits to rebase.
 // Used by `rebase`.
 pub fn edit_todo(items: &[TodoItem], base: &str, tip: &str, onto: &str) -> anyhow::Result<Vec<TodoItem>> {
@@ -306,9 +261,9 @@ pub fn select_commits_to_rebase(upstream: &str, head: &str, reapply: bool) -> an
 /// Whether a commit changes nothing against its first parent (or is an empty root).
 // Used by `rebase` (empty commits are kept; commits that become empty are dropped).
 pub fn commit_is_empty(hash: &str) -> anyhow::Result<bool> {
-    let commit = crate::helpers::format_patch::parse_commit_object(hash)?;
+    let commit = crate::core::commit::parse_commit_object(hash)?;
     let parent_tree = match commit.parents.first() {
-        Some(parent) => crate::helpers::format_patch::parse_commit_object(parent)?.tree,
+        Some(parent) => crate::core::commit::parse_commit_object(parent)?.tree,
         None => "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string(),
     };
     Ok(commit.tree == parent_tree)
@@ -665,8 +620,9 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
 /// upstream" line; `rebase -i` says "Skipping"); one that was empty to begin with is kept. With `summary`, prints git's commit summary (concluding a conflicted pick).
 // Used by `rebase`.
 pub fn commit_item(item: &TodoItem, rest: &[TodoItem], current_head: &str, tree_hash: String, summary: bool) -> anyhow::Result<ItemResult> {
-    use crate::core::commit::{current_signature, print_commit_summary, write_commit_object};
-    use crate::helpers::format_patch::parse_commit_object;
+    use crate::core::commit::{current_signature, write_commit_object};
+    use crate::helpers::commit_summary::print_commit_summary;
+    use crate::core::commit::parse_commit_object;
     let (object_type, content) = read_object(&item.hash)?;
     if object_type != "commit" {
         anyhow::bail!("fatal: '{}' does not point to a commit object", item.hash);

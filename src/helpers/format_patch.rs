@@ -4,60 +4,18 @@ use std::io::Write;
 use anyhow::Context;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use crate::helpers::bisect::collect_ancestors;
-use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::commit::collect_ancestors;
 use crate::helpers::diff::myers_diff;
 use crate::core::object_store::{flatten_tree, read_object};
-use crate::objects::{CommitSignature, DiffOp, DiffStatEntry, FileDiff, ParsedCommit};
+use crate::objects::{DiffOp, DiffStatEntry, FileDiff, ParsedCommit};
+use crate::core::commit::parse_commit_object;
+use crate::core::rev_parse::resolve_commit_rev;
+use crate::core::date::civil_from_days;
+use crate::core::date::tz_offset_seconds;
 
 const CONTEXT_LINES: usize = 3;
 pub const NO_EOL_MARK: &str = "\u{0}\\ No newline at end of file";
 const BASE85_ALPHABET: &[u8; 85] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
-
-/// Reads and parses a commit object into tree, parents, author, committer, and message.
-/// Multi-line headers (such as `gpgsig`) are skipped.
-// Used by `format-patch` and `am`.
-pub fn parse_commit_object(hash: &str) -> anyhow::Result<ParsedCommit> {
-    let (object_type, content) = read_object(hash)?;
-    if object_type != "commit" {
-        anyhow::bail!("fatal: {} is not a commit", hash);
-    }
-    let text = String::from_utf8_lossy(&content).into_owned();
-    let (header, message) = text.split_once("\n\n").unwrap_or((text.as_str(), ""));
-
-    let mut commit = ParsedCommit { hash: hash.to_string(), message: message.to_string(), ..Default::default() };
-    for line in header.lines() {
-        if let Some(tree) = line.strip_prefix("tree ") {
-            commit.tree = tree.to_string();
-        } else if let Some(parent) = line.strip_prefix("parent ") {
-            commit.parents.push(parent.to_string());
-        } else if let Some(author) = line.strip_prefix("author ") {
-            commit.author = parse_signature(author);
-        } else if let Some(committer) = line.strip_prefix("committer ") {
-            commit.committer = parse_signature(committer);
-        }
-    }
-    Ok(commit)
-}
-
-fn parse_signature(value: &str) -> CommitSignature {
-    let (name, rest) = value.split_once('<').unwrap_or((value, ""));
-    let (email, tail) = rest.split_once('>').unwrap_or((rest, ""));
-    let mut parts = tail.split_whitespace();
-    CommitSignature {
-        name: name.trim().to_string(),
-        email: email.trim().to_string(),
-        timestamp: parts.next().and_then(|t| t.parse().ok()).unwrap_or(0),
-        tz: parts.next().unwrap_or("+0000").to_string(),
-    }
-}
-
-/// Resolves any revision expression to a commit hash (peeling annotated tags).
-// Used by `format-patch` commit selection.
-pub fn resolve_commit_rev(rev: &str) -> anyhow::Result<String> {
-    let hash = resolve_rev(rev).map_err(|_| anyhow::anyhow!("fatal: ambiguous argument '{}': unknown revision or path not in the working tree.", rev))?;
-    peel_to_type(hash, "commit")
-}
 
 /// Selects the commits `format-patch` turns into patches, oldest first, following git:
 /// `A..B` takes what `B` has and `A` lacks, a single `<since>` means `<since>..HEAD`, `--root`
@@ -120,29 +78,6 @@ pub fn select_patch_commits(revs: &[String], max_count: Option<usize>, root: boo
     Ok(selected)
 }
 
-/// Splits a commit message into its subject (first paragraph, lines joined by spaces) and
-/// body (everything after it, without leading blank lines or trailing whitespace).
-// Used by `format-patch` and `am`.
-pub fn split_commit_message(message: &str) -> (String, String) {
-    let mut lines = message.lines().peekable();
-    while lines.peek().is_some_and(|l| l.trim().is_empty()) {
-        lines.next();
-    }
-    let mut subject_lines = Vec::new();
-    while let Some(line) = lines.peek() {
-        if line.trim().is_empty() {
-            break;
-        }
-        subject_lines.push(line.trim().to_string());
-        lines.next();
-    }
-    while lines.peek().is_some_and(|l| l.trim().is_empty()) {
-        lines.next();
-    }
-    let body: Vec<&str> = lines.collect();
-    (subject_lines.join(" "), body.join("\n").trim_end().to_string())
-}
-
 /// Formats a timestamp in RFC 2822 style for mail headers, in the commit's own timezone
 /// (e.g. `Sat, 3 Oct 2026 09:05:07 +0300`).
 // Used by `format-patch`.
@@ -165,34 +100,6 @@ pub fn format_rfc2822_date(timestamp: i64, tz: &str) -> String {
         secs % 60,
         tz
     )
-}
-
-/// Converts a `+HHMM` / `-HHMM` timezone into an offset in seconds.
-// Used by `format_rfc2822_date` and `am` date parsing.
-pub fn tz_offset_seconds(tz: &str) -> i64 {
-    let sign = if tz.starts_with('-') { -1 } else { 1 };
-    let digits = tz.trim_start_matches(['+', '-']);
-    if digits.len() != 4 {
-        return 0;
-    }
-    let hours: i64 = digits[..2].parse().unwrap_or(0);
-    let minutes: i64 = digits[2..].parse().unwrap_or(0);
-    sign * (hours * 3600 + minutes * 60)
-}
-
-/// Converts days since the Unix epoch into a `(year, month, day)` civil date.
-// Used by `format_rfc2822_date`.
-pub fn civil_from_days(days: i64) -> (i64, i64, i64) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + if month <= 2 { 1 } else { 0 };
-    (year, month, day)
 }
 
 /// Builds the mail header block git emits for a patch: the mbox `From <hash>` line, `From:`

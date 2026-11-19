@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::fs;
 use crate::core::object_store::{read_object, write_object};
-use crate::helpers::rebase::run_editor;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::editor::run_editor;
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::wildmatch::wildmatch;
 use crate::objects::{ReplaceMode, ReplaceOptions};

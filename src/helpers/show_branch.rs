@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use crate::helpers::for_each_ref::versioncmp;
-use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::commit::{parse_commit_object, split_commit_message};
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::helpers::symbolic_ref::resolve_ref_unsafe;
 use crate::core::wildmatch::wildmatch;

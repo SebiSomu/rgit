@@ -90,7 +90,6 @@ pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<
     Ok(bases.into_iter().next())
 }
 
-
 /// Builds and writes a merge commit object containing two parent hashes, authored and
 /// committed by the configured identity (`user.name` / `user.email`).
 // Used by the `merge` command when creating a 3-way merge commit, and by `commit` and `stash`.

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use crate::core::config::get_config_value;
 use crate::helpers::gc::mark_reachable;
 use crate::core::object_store::read_object;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::refs::list_all_refs;
 
 /// Usage text for `repo`, printed for `-h` and after usage errors (exit 129).
 pub const REPO_USAGE: &str = "usage: rgit repo info [--format=(keyvalue|nul) | -z] [--all | <key>...]

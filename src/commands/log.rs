@@ -1,7 +1,7 @@
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
-use crate::helpers::format_patch::parse_commit_object;
+use crate::core::commit::parse_commit_object;
 use std::collections::HashSet;
 
 use crate::helpers::follow::{follow_commit_pairs, render_follow_diff};

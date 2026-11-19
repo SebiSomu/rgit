@@ -10,7 +10,6 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
 
-use crate::helpers::apply::apply_git_delta;
 use crate::core::object_store::{hash_content, read_object};
 use crate::objects::{BuiltPack, PackBuildOptions, PackEntry, PackIndexData, PackedObject, RepoPack};
 
@@ -840,17 +839,73 @@ pub fn index_pack_bytes(pack: Vec<u8>, fix_thin: bool) -> Result<(Vec<u8>, Vec<u
 // Used by `prune-packed` and `repack -d`.
 pub fn prune_packed_objects(dry_run: bool) -> Result<Vec<String>> {
     let mut pruned = Vec::new();
-    for object in crate::helpers::gc::list_loose_objects()? {
+    for object in crate::core::object_store::list_loose_objects()? {
         if !packed_object_exists(&object.hash) {
             continue;
         }
         pruned.push(format!(".git/objects/{}/{}", &object.hash[..2], &object.hash[2..]));
         if !dry_run {
-            crate::helpers::gc::remove_loose_object(&object)?;
+            crate::core::object_store::remove_loose_object(&object)?;
             if let Some(dir) = object.path.parent() {
                 let _ = fs::remove_dir(dir);
             }
         }
     }
     Ok(pruned)
+}
+
+/// Applies a git binary delta (source size, target size, then copy/insert instructions) to
+/// `base`, returning `None` when the delta is malformed or doesn't match the base.
+// Used by `apply` for `GIT binary patch` hunks of type `delta`.
+pub fn apply_git_delta(base: &[u8], delta: &[u8]) -> Option<Vec<u8>> {
+    let mut pos = 0;
+    let read_varint = |pos: &mut usize| -> Option<usize> {
+        let mut value = 0usize;
+        let mut shift = 0;
+        loop {
+            let byte = *delta.get(*pos)?;
+            *pos += 1;
+            value |= ((byte & 0x7f) as usize) << shift;
+            shift += 7;
+            if byte & 0x80 == 0 {
+                return Some(value);
+            }
+        }
+    };
+    let source_size = read_varint(&mut pos)?;
+    let target_size = read_varint(&mut pos)?;
+    if source_size != base.len() {
+        return None;
+    }
+    let mut out = Vec::with_capacity(target_size);
+    while pos < delta.len() {
+        let cmd = delta[pos];
+        pos += 1;
+        if cmd & 0x80 != 0 {
+            let mut offset = 0usize;
+            let mut size = 0usize;
+            for bit in 0..4 {
+                if cmd & (1 << bit) != 0 {
+                    offset |= (*delta.get(pos)? as usize) << (8 * bit);
+                    pos += 1;
+                }
+            }
+            for bit in 0..3 {
+                if cmd & (0x10 << bit) != 0 {
+                    size |= (*delta.get(pos)? as usize) << (8 * bit);
+                    pos += 1;
+                }
+            }
+            if size == 0 {
+                size = 0x10000;
+            }
+            out.extend_from_slice(base.get(offset..offset.checked_add(size)?)?);
+        } else if cmd != 0 {
+            out.extend_from_slice(delta.get(pos..pos + cmd as usize)?);
+            pos += cmd as usize;
+        } else {
+            return None;
+        }
+    }
+    (out.len() == target_size).then_some(out)
 }

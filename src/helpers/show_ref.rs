@@ -4,8 +4,8 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use crate::core::check_ref_format::check_refname_format;
 use crate::core::object_store::read_object;
-use crate::helpers::cherry::abbreviate_hash_min;
-use crate::helpers::rev_list::list_all_refs;
+use crate::core::object_store::abbreviate_hash_min;
+use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::peel_to_type;
 use crate::objects::ShowRefOptions;
 

@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::core::commit::current_signature;
 use crate::core::config::{get_config_value, global_config_path};
-use crate::helpers::rebase::editor_command;
+use crate::core::editor::editor_command;
 
 /// Usage text of `var`, printed for `-h` and usage errors.
 pub const VAR_USAGE: &str = "usage: rgit var (-l | <variable>)\n";

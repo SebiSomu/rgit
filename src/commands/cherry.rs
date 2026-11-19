@@ -2,8 +2,9 @@ use std::collections::HashSet;
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
-use crate::helpers::cherry::{abbreviate_hash_min, commit_patch_id, resolve_cherry_upstream, walk_non_merge_commits};
-use crate::helpers::format_patch::{resolve_commit_rev, split_commit_message};
+use crate::core::object_store::abbreviate_hash_min;
+use crate::helpers::cherry::{commit_patch_id, resolve_cherry_upstream, walk_non_merge_commits};
+use crate::core::{commit::split_commit_message, rev_parse::resolve_commit_rev};
 use crate::objects::CherryOptions;
 
 /// `rgit cherry [-v] [--abbrev[=<n>]] [<upstream> [<head> [<limit>]]]`

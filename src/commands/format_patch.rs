@@ -2,7 +2,8 @@ use std::fs;
 use std::path::Path;
 use anyhow::{Context, Result};
 
-use crate::helpers::format_patch::{diff_commit_against_parent, format_diffstat, format_mail_headers, patch_file_name, select_patch_commits, split_commit_message};
+use crate::core::commit::split_commit_message;
+use crate::helpers::format_patch::{diff_commit_against_parent, format_diffstat, format_mail_headers, patch_file_name, select_patch_commits};
 use crate::objects::FormatPatchOptions;
 
 /// `rgit format-patch [-<n>] [--root] [--stdout | -o <dir>] [-n | -N] [--start-number <n>]

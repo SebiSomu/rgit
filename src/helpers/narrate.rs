@@ -105,9 +105,9 @@ pub fn take_snapshot(worktree: bool) -> RepoSnapshot {
 /// `old` is None).
 // Used by the narration of commit, merge, fetch, push, cherry-pick and switch.
 pub fn commits_between(old: Option<&str>, new: &str) -> usize {
-    let new_set = crate::helpers::bisect::collect_ancestors(new).unwrap_or_default();
+    let new_set = crate::core::commit::collect_ancestors(new).unwrap_or_default();
     let old_set: HashSet<String> = match old {
-        Some(o) => crate::helpers::bisect::collect_ancestors(o).unwrap_or_default(),
+        Some(o) => crate::core::commit::collect_ancestors(o).unwrap_or_default(),
         None => HashSet::new(),
     };
     new_set.difference(&old_set).count()

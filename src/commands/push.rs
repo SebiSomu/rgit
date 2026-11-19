@@ -102,7 +102,6 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
         remote_git_dir.display().to_string()
     };
 
-
     let (src_name, dest_branch) = match refspec {
         Some(spec) => {
             if let Some((src, dest)) = spec.split_once(':') {

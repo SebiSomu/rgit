@@ -12,39 +12,14 @@ use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::index::read_index;
 use crate::objects::WorktreeInfo;
 use crate::core::repo;
-
-/// The directory under the shared `.git` that holds one administrative directory per linked
-/// worktree.
-// Used by `list_worktrees`, `all_worktree_git_dirs`, `create_worktree_admin_dir` and `prune_worktrees`.
-pub fn worktrees_admin_root() -> PathBuf {
-    repo::normalize(&repo::common_dir()).join("worktrees")
-}
+use crate::core::repo::all_worktree_git_dirs;
+use crate::core::repo::worktrees_admin_root;
 
 /// Returns the top directory of the main worktree (the parent of the shared `.git`).
 // Used by `list_worktrees`.
 pub fn main_worktree_path() -> PathBuf {
     let common = repo::normalize(&repo::common_dir());
     common.parent().map(Path::to_path_buf).unwrap_or(common)
-}
-
-/// Returns the `.git`-like directory of every worktree, main first: the shared `.git`, then
-/// each `.git/worktrees/<id>`. Whatever a worktree keeps privately (HEAD, index, merge or rebase
-/// state) lives in one of these.
-// Used by `gc` and `fsck` (roots from every worktree) and `rename_branch` (HEADs elsewhere).
-pub fn all_worktree_git_dirs() -> Result<Vec<PathBuf>> {
-    let mut dirs = vec![repo::normalize(&repo::common_dir())];
-    let root = worktrees_admin_root();
-    if root.is_dir() {
-        let mut linked: Vec<PathBuf> = fs::read_dir(&root)
-            .with_context(|| format!("Failed to read {}", root.display()))?
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.is_dir())
-            .collect();
-        linked.sort();
-        dirs.extend(linked);
-    }
-    Ok(dirs)
 }
 
 /// Reads a worktree's HEAD file into `(commit, branch ref)`: an attached HEAD yields the ref

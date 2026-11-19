@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::fs;
 use anyhow::Result;
 
-use crate::helpers::gc::{collect_lenient_gc_roots, collect_strict_gc_roots, list_loose_objects};
+use crate::core::object_store::list_loose_objects;
+use crate::helpers::gc::{collect_lenient_gc_roots, collect_strict_gc_roots};
 use crate::core::object_store::write_object;
 use crate::core::pack::{build_pack, forget_repo_packs, packed_object_exists, prune_packed_objects, reachable_objects, read_packed_object, repo_packs, store_pack, write_pack_index};
 use crate::objects::PackBuildOptions;

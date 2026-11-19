@@ -1,7 +1,8 @@
 use anyhow::Result;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::helpers::gc::{plan_gc, remove_loose_object};
+use crate::core::object_store::remove_loose_object;
+use crate::helpers::gc::plan_gc;
 use crate::helpers::prune::{list_object_dir_cruft, prune_expiry_cutoff, remove_empty_fanout_dirs};
 use crate::core::object_store::read_object;
 use crate::core::rev_parse::resolve_rev;

@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Write};
 use anyhow::Result;
 
 use crate::helpers::diff_plumbing::{check_path_argument, diff_trees, parse_diff_plumbing_args, render_diff_changes, reverse_changes, DIFF_COMMON_OPTIONS};
-use crate::helpers::format_patch::parse_commit_object;
+use crate::core::commit::parse_commit_object;
 use crate::helpers::log::{format_log_entry, join_entry_and_diff, parse_log_args};
 use crate::helpers::ls_files::normalize_pathspecs;
 use crate::core::object_store::read_object;

@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 use crate::core::commit::{current_signature, write_commit_object};
-use crate::helpers::format_patch::parse_commit_object;
+use crate::core::commit::parse_commit_object;
 use crate::helpers::merge_tree::merge_trees_in_memory;
 use crate::core::object_store::flatten_tree;
-use crate::helpers::rev_list::{list_all_refs, parse_revision_args, select_rev_list_commits};
+use crate::core::refs::list_all_refs;
+use crate::helpers::rev_list::{parse_revision_args, select_rev_list_commits};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::helpers::state_files::build_tree_from_map;
 use crate::objects::ReplayOptions;

@@ -3,12 +3,8 @@ use std::fs;
 use std::path::Path;
 
 use crate::core::commit::{commit_subject_line, short_hash};
-use crate::helpers::worktree::{
-    create_worktree_admin_dir, delete_worktree_admin_dir, find_worktree, format_worktree_list,
-    format_worktree_porcelain, list_worktrees, locked_worktree_message, move_worktree,
-    populate_worktree, prune_worktrees, resolve_commit_ish, unique_worktree_id,
-    worktree_has_local_changes, worktree_using_branch, worktrees_admin_root,
-};
+use crate::core::repo::worktrees_admin_root;
+use crate::helpers::worktree::{create_worktree_admin_dir, delete_worktree_admin_dir, find_worktree, format_worktree_list, format_worktree_porcelain, list_worktrees, locked_worktree_message, move_worktree, populate_worktree, prune_worktrees, resolve_commit_ish, unique_worktree_id, worktree_has_local_changes, worktree_using_branch};
 use crate::objects::{BranchCreation, WorktreeAction};
 use crate::core::{refs, repo};
 

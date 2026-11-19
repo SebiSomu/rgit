@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use base64::Engine;
 use regex::Regex;
-use crate::helpers::format_patch::{split_commit_message, tz_offset_seconds};
+use crate::core::{commit::split_commit_message, date::tz_offset_seconds};
 use crate::core::config::author_identity;
 use crate::core::object_store::{flatten_tree, tree_hash_of_commit, write_object};
 use crate::core::index::IndexEntry;

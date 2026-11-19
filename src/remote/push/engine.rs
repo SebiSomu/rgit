@@ -254,3 +254,4 @@ pub fn set_upstream_branch(local_branch: &str, remote_name: &str, remote_branch:
     crate::core::config::set_in(config_path, &format!("branch.{}.merge", local_branch), &format!("refs/heads/{}", remote_branch))?;
     Ok(())
 }
+

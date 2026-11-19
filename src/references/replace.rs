@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 
 use crate::core::object_store::read_object;
 use crate::references::replace::engine::{create_replace_ref, delete_replace_refs, edit_object_copy, format_replace_list, parse_replace_args, write_grafted_commit, REPLACE_USAGE};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
-use crate::objects::ReplaceMode;
+use crate::references::replace::types::ReplaceMode;
 use crate::core::repo;
 
 /// `rgit replace [-f] <object> <replacement>` / `--graft <commit> [<parent>...]` /

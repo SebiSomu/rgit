@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod core;
-pub mod objects;
 pub mod ui;
 
 // Domains: each holds its commands (`<domain>/<command>.rs`) and their engines.

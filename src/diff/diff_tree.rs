@@ -8,7 +8,8 @@ use crate::history::log::engine::{format_log_entry, join_entry_and_diff, parse_l
 use crate::workspace::ls_files::engine::normalize_pathspecs;
 use crate::core::object_store::read_object;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
-use crate::objects::{DiffPlumbingOptions, LogFormat, LogOptions};
+use crate::diff::plumbing::types::DiffPlumbingOptions;
+use crate::history::log::types::{LogFormat, LogOptions};
 use crate::core::repo;
 
 /// The diff of two trees (either may be absent), rendered per the options. Returns the text

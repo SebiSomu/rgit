@@ -6,7 +6,7 @@ use crate::workspace::index_plumbing::{normalize_index_path, worktree_state, wri
 use crate::core::object_store::read_object;
 use crate::references::update_ref::engine::unquote_c_style;
 use crate::core::index::{build_entry, read_index, write_index, IndexEntry};
-use crate::objects::IndexFileState;
+use crate::workspace::types::IndexFileState;
 use crate::core::repo;
 
 const CHECKOUT_INDEX_USAGE: &str = "usage: rgit checkout-index [<options>] [--] [<file>...]\n\n    -a, --[no-]all        check out all files in the index\n    -f, --[no-]force      force overwrite of existing files\n    -q, --[no-]quiet      no warning for existing files and files not in index\n    -n, --no-create       don't checkout new files\n    --create              opposite of --no-create\n    -u, --[no-]index      update stat information in the index file\n    -z                    paths are separated with NUL character\n    --[no-]stdin          read list of paths from the standard input\n    --[no-]temp           write the content to temporary files\n    --[no-]prefix <string>\n                          when creating files, prepend <string>\n    --stage (1|2|3|all)   copy out the files from named stage\n\n";

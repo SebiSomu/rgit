@@ -5,8 +5,9 @@ use std::path::Path;
 use anyhow::Context;
 use crate::core::object_store::{hash_content, read_object, write_object};
 use crate::core::index::{build_entry, write_index, IndexEntry};
-use crate::objects::{ApplyOptions, BinaryHunk, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine, PlannedChanges};
+use crate::mail::types::PlannedChanges;
 use crate::core::pack::apply_git_delta;
+use crate::mail::apply::types::{ApplyOptions, BinaryHunk, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine};
 
 /// Reads the patch text from the given files, concatenated in order, or from standard input
 /// when no file (or `-`) is given.
@@ -956,3 +957,4 @@ pub fn write_planned_changes(pending: &PlannedChanges, cached: bool, use_index: 
     }
     Ok(())
 }
+

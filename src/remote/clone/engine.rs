@@ -7,7 +7,8 @@ use crate::remote::fetch::engine::read_remote_head;
 use crate::remote::github::{build_github_client, get_github_default_branch, parse_github_remote, resolve_github_token};
 use crate::remote::push::engine::resolve_remote_repo_path;
 use crate::core::commit::resolve_tree_from_source;
-use crate::objects::{CloneSource, GitHubTarget};
+use crate::remote::types::GitHubTarget;
+use crate::remote::clone::types::CloneSource;
 
 /// Classifies the repository argument of `clone` as a local repository or a GitHub
 /// repository. A path that exists on disk is always treated as local (even if it contains
@@ -152,3 +153,4 @@ pub fn checkout_commit_into_empty_worktree(commit_hash: &str) -> Result<()> {
     update_index_from_tree(&target_tree, &empty_head_tree)?;
     Ok(())
 }
+

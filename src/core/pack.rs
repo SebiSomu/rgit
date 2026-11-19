@@ -11,7 +11,7 @@ use flate2::Compression;
 use sha1::{Digest, Sha1};
 
 use crate::core::object_store::{hash_content, read_object};
-use crate::objects::{BuiltPack, PackBuildOptions, PackEntry, PackIndexData, PackedObject, RepoPack};
+use crate::core::types::{BuiltPack, PackBuildOptions, PackedObject, PackEntry, PackIndexData, RepoPack};
 
 /// Parses a pack index file, version 2 (`\377tOc` magic) or the older version 1, checking
 /// its trailing checksum.

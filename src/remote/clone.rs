@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -9,7 +10,7 @@ use crate::remote::clone::engine::{
 };
 use crate::core::config::{set_in, LOCAL_CONFIG_PATH};
 use crate::remote::push::engine::set_upstream_branch;
-use crate::objects::CloneSource;
+use crate::remote::clone::types::CloneSource;
 use crate::core::refs;
 
 /// `rgit clone [-b <branch>] [-o <name>] <repository> [<directory>]`

@@ -5,7 +5,8 @@ use crate::workspace::index_plumbing::{bare_index_entry, worktree_state};
 use crate::core::object_store::flatten_tree;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::index::IndexEntry;
-use crate::objects::{IndexFileState, ReadTreeOptions, ReadTreePlan};
+use crate::workspace::types::IndexFileState;
+use crate::workspace::read_tree::types::{ReadTreeOptions, ReadTreePlan};
 
 /// Usage text of `read-tree`, printed for `-h` and usage errors.
 pub const READ_TREE_USAGE: &str = "usage: rgit read-tree [(-m [--trivial] [--aggressive] | --reset | --prefix=<prefix>)\n                      [-u | -i]] [-n] (--empty | <tree-ish1> [<tree-ish2> [<tree-ish3>]])\n\n    -m                    perform a merge in addition to a read\n    --reset               same as -m, but discard local changes\n    --prefix <subdirectory>/\n                          read the tree into the index under <subdirectory>/\n    -u                    update working tree with merge result\n    -i                    don't check the working tree after merging\n    -n, --dry-run         don't update the index or the work tree\n    --trivial             3-way merge if no file level merging required\n    --aggressive          3-way merge in presence of adds and removes\n    --empty               only empty the index\n\n";
@@ -299,3 +300,4 @@ pub fn plan_read_tree(opts: &ReadTreeOptions, index: &[IndexEntry]) -> Result<Re
     }
     Ok(plan)
 }
+

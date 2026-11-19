@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use crate::storage::multi_pack_index::engine::{midx_path, parse_midx, store_midx, verify_midx, write_midx};
 use crate::core::pack::{forget_repo_packs, repo_packs};
-use crate::objects::RepoPack;
+use crate::core::types::RepoPack;
 use crate::core::repo;
 
 /// `rgit multi-pack-index write [--preferred-pack=<pack>]` / `verify` / `expire`

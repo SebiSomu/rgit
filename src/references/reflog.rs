@@ -1,11 +1,13 @@
+pub mod types;
+
 use anyhow::Result;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::cli::ReflogAction;
 use crate::core::reflog::{
     expire_reflog, format_reflog_output, list_reflog_refs, parse_reflog_spec, read_reflog,
     resolve_reflog_ref_name, write_reflog,
 };
+use crate::references::reflog::types::ReflogAction;
 
 /// `rgit reflog [show [<ref>] [-n <count>] | exists <ref> | delete <ref>@{<n>}... |
 /// expire [--all] [--expire <days>|now|never] [<ref>]]`
@@ -95,3 +97,4 @@ pub fn reflog(action: Option<ReflogAction>) -> Result<()> {
 
     Ok(())
 }
+

@@ -7,8 +7,9 @@ use crate::core::config::{read_all_config_entries, read_entries_from, set_in, un
 use crate::references::for_each_ref::engine::{branch_upstream, collect_ref_items, filter_ref_items, shorten_unambiguous_ref, tracking_counts};
 use crate::core::object_store::read_object;
 use crate::core::wildmatch::wildmatch;
-use crate::objects::{BranchListEntry, BranchOptions, ForEachRefOptions, RefArrayItem};
+use crate::references::for_each_ref::types::{ForEachRefOptions, RefArrayItem};
 use crate::core::refs;
+use crate::workspace::branch::types::{BranchListEntry, BranchOptions};
 
 pub const BRANCH_USAGE: &str = "usage: rgit branch [<options>] [-r | -a] [--merged] [--no-merged]
    or: rgit branch [<options>] [-f] <branch-name> [<start-point>]
@@ -470,3 +471,4 @@ pub fn format_branch_list(opts: &BranchOptions) -> Result<String> {
     }
     Ok(out)
 }
+

@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::io::Write;
 use anyhow::Result;
@@ -8,7 +9,7 @@ use crate::merge::merge_file::engine::parse_merge_file_args;
 use crate::merge::merge_tree::engine::merge_file_lines_with;
 use crate::core::object_store::{read_object, write_object};
 use crate::core::rev_parse::resolve_rev;
-use crate::objects::{MergeConflictStyle, MergeFileOptions};
+use crate::merge::{merge_file::types::MergeFileOptions, types::MergeConflictStyle};
 use crate::core::repo;
 
 /// `rgit merge-file [-p] [-q] [--diff3 | --zdiff3] [--ours | --theirs | --union]

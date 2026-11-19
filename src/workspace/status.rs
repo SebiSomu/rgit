@@ -1,7 +1,9 @@
+pub mod types;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::diff::plumbing::quote_c_path;
-use crate::objects::StatusOptions;
+use crate::workspace::status::types::StatusOptions;
 
 /// Quotes a path for `status --short` like git: C-style quoting (control and non-ASCII bytes,
 /// `"` and `\`), and also wrapping a path with a space in double quotes.
@@ -136,3 +138,4 @@ pub fn format_short_status(
     }
     out
 }
+

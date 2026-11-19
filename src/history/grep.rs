@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::fs;
 use std::path::Path;
@@ -7,7 +8,7 @@ use crate::history::grep::engine::{build_grep_matcher, matches_pathspec, search_
 use crate::core::commit::{resolve_commit_from_source, resolve_tree_from_source};
 use crate::core::object_store::read_object;
 use crate::core::index::read_index;
-use crate::objects::{GrepFileResult, GrepOptions};
+use crate::history::grep::types::{GrepFileResult, GrepOptions};
 
 /// `rgit grep [-i] [-v] [-n] [-c] [-l|-L] [-F] [--cached] [-e <pattern>] [<pattern>] [<rev>...] [-- <path>...]`
 ///

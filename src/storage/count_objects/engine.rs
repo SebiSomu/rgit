@@ -2,8 +2,7 @@ use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use crate::objects::ObjectCountReport;
+use crate::storage::count_objects::types::ObjectCountReport;
 
 /// Checks if a string consists entirely of ASCII hexadecimal digits.
 // Used by: `collect_object_counts`
@@ -267,3 +266,4 @@ pub fn collect_object_counts(verbose: bool) -> Result<ObjectCountReport> {
 #[cfg(test)]
 #[path = "../../../tests/unit/storage/count_objects/engine.rs"]
 mod tests;
+

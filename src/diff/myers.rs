@@ -1,4 +1,4 @@
-use crate::objects::DiffOp;
+use crate::diff::types::DiffOp;
 
 /// Generates an edit script comparing two lists of text lines using the Myers diff algorithm
 // for shortest path in a 2d grid.

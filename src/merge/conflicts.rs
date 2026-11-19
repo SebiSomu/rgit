@@ -1,3 +1,5 @@
+pub mod types;
+
 use crate::ui::narrate::{conflict_kind, file_conflict_hunks, load_conflict_list, operation_in_progress, their_commit};
 
 /// `rgit conflicts [--explain <file>...]`
@@ -107,7 +109,7 @@ fn explain_file(path: &str, mask: Option<u8>, op: &str) {
 }
 
 /// A one-line hint about how the two sides of a conflict relate.
-fn suggestion(h: &crate::objects::ConflictHunk) -> &'static str {
+fn suggestion(h: &crate::merge::conflicts::types::ConflictHunk) -> &'static str {
     let squash = |v: &[String]| v.iter().map(|l| l.split_whitespace().collect::<Vec<_>>().join(" ")).filter(|l| !l.is_empty()).collect::<Vec<_>>();
     let (ours, theirs) = (squash(&h.ours), squash(&h.theirs));
     let contains = |big: &[String], small: &[String]| small.iter().all(|l| big.contains(l));
@@ -131,3 +133,4 @@ fn suggestion(h: &crate::objects::ConflictHunk) -> &'static str {
         "both sides rewrote this part differently: combine them by hand."
     }
 }
+

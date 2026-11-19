@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -11,8 +13,9 @@ use crate::core::commit::{
 };
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::core::index::{read_index, write_index, IndexEntry};
-use crate::objects::ResetMode;
+
 use crate::core::refs;
+use crate::workspace::reset::types::ResetMode;
 
 fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
     let source_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(src) = source {
@@ -207,11 +210,11 @@ fn print_unstaged_after_reset(entries: &[IndexEntry]) {
             continue;
         }
         match crate::workspace::index_plumbing::worktree_state(entry) {
-            crate::objects::IndexFileState::Clean => {}
-            crate::objects::IndexFileState::Modified(_) => changes.push(('M', &entry.path)),
+            crate::workspace::types::IndexFileState::Clean => {}
+            crate::workspace::types::IndexFileState::Modified(_) => changes.push(('M', &entry.path)),
             // A directory where the file was is a type change to git.
-            crate::objects::IndexFileState::Missing if std::path::Path::new(&entry.path).is_dir() => changes.push(('T', &entry.path)),
-            crate::objects::IndexFileState::Missing => changes.push(('D', &entry.path)),
+            crate::workspace::types::IndexFileState::Missing if std::path::Path::new(&entry.path).is_dir() => changes.push(('T', &entry.path)),
+            crate::workspace::types::IndexFileState::Missing => changes.push(('D', &entry.path)),
         }
     }
     if changes.is_empty() {
@@ -222,3 +225,4 @@ fn print_unstaged_after_reset(entries: &[IndexEntry]) {
         println!("{}\t{}", status, path);
     }
 }
+

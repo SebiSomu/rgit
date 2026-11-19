@@ -11,6 +11,8 @@
 //! the default is `normal`, but only when stderr is a terminal, so scripts and parity tests
 //! that pipe rgit's output see no change.
 
+pub mod types;
+
 pub mod narrate;
 
 use std::collections::BTreeSet;
@@ -19,7 +21,7 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::core::commit::commit_parents;
 use crate::ui::narrate::*;
-use crate::objects::{RepoSnapshot, Verbosity};
+use crate::ui::types::{RepoSnapshot, Verbosity};
 
 static LEVEL: OnceLock<Verbosity> = OnceLock::new();
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -1220,3 +1222,4 @@ fn report_clone(args: &[String]) {
     note(&format!("Cloned {} into '{}'; checked out '{}' ({}).", plural(commits, "commit", "commits"), dir, branch, plural(s.index.len(), "file", "files")));
     next(&format!("`cd {}` to start working.", dir));
 }
+

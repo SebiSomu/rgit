@@ -9,7 +9,7 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use sha1::{Digest, Sha1};
 use anyhow::Result;
-use crate::objects::LooseObject;
+use crate::core::types::LooseObject;
 use std::time::UNIX_EPOCH;
 
 /// Hashes content, writes the zlib-compressed object to `.git/objects/`,

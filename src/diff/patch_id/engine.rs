@@ -1,6 +1,6 @@
 use sha1::{Digest, Sha1};
 use crate::core::config::get_config_value;
-use crate::objects::PatchIdOptions;
+use crate::diff::patch_id::types::PatchIdOptions;
 
 /// git's usage text for `patch-id`, printed for `-h` and after option errors (exit 129).
 pub const PATCH_ID_USAGE: &str = "usage: rgit patch-id [--stable | --unstable | --verbatim]
@@ -229,3 +229,4 @@ fn flush_one_hunk(result: &mut [u8; 20], hasher: &mut Sha1) {
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
+

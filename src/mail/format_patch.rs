@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::fs;
 use std::path::Path;
@@ -7,7 +8,7 @@ use anyhow::{Context, Result};
 use crate::core::commit::split_commit_message;
 use crate::diff::hunks::{diff_commit_against_parent, format_diffstat};
 use crate::mail::format_patch::engine::{format_mail_headers, patch_file_name, select_patch_commits};
-use crate::objects::FormatPatchOptions;
+use crate::mail::format_patch::types::FormatPatchOptions;
 
 /// `rgit format-patch [-<n>] [--root] [--stdout | -o <dir>] [-n | -N] [--start-number <n>]
 /// [--subject-prefix <p>] [-k] [--signature <s> | --no-signature] [<since> | <revision-range>]`

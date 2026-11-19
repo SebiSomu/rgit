@@ -10,9 +10,11 @@ use crate::core::{
 use crate::workspace::ls_files::engine::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::merge::merge::engine::find_all_merge_bases;
 use crate::core::object_store::flatten_tree;
-use crate::objects::{CommitSignature, ParsedCommit, RevListFormat, RevListOptions, RevListRoots, RevWalkState, WalkedCommit};
+use crate::core::types::{CommitSignature, ParsedCommit};
+use crate::history::types::WalkedCommit;
 use crate::core::date::parse_approx_date;
 use crate::core::refs::list_all_refs;
+use crate::history::rev_list::types::{RevListFormat, RevListOptions, RevListRoots, RevWalkState};
 
 const USAGE: &str = "usage: rgit rev-list [<options>] <commit>... [--] [<path>...]";
 
@@ -784,3 +786,4 @@ fn format_iso_date(sig: &CommitSignature, strict: bool) -> String {
         format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} {}", y, m, d, h, mi, s, sig.tz)
     }
 }
+

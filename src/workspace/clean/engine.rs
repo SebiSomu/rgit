@@ -3,7 +3,8 @@ use std::fs;
 use std::path::Path;
 use anyhow::Context;
 use crate::workspace::gitignore::{is_path_ignored, normalize_path, parse_gitignore_line};
-use crate::objects::{CleanMode, GitIgnoreRule};
+use crate::workspace::types::GitIgnoreRule;
+use crate::workspace::clean::types::CleanMode;
 
 /// Recursively walks the working tree (skipping `.git`) collecting untracked files
 /// and, when `remove_dirs` is set, whole untracked directories, according to `mode`.
@@ -84,3 +85,4 @@ pub fn collect_clean_candidates(path: &Path, rules: &mut Vec<GitIgnoreRule>, tra
 
     Ok(())
 }
+

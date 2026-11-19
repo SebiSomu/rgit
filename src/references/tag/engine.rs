@@ -148,3 +148,4 @@ pub fn describe_commit_matching(target: &str, all_tags: bool, accept: &dyn Fn(&s
     }
     Ok(best.map(|(depth, _, name)| (name, depth)))
 }
+

@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::BTreeMap;
 use crate::workspace::checkout::{check_switch_safety, ensure_working_tree_clean, sync_working_tree, update_index_from_tree};
@@ -10,7 +11,7 @@ use crate::merge::rebase::engine::{
     rebase_edit_todo, rebase_in_progress, rebase_skip, select_commits_to_rebase, subject_of,
 };
 use crate::core::index::read_index;
-use crate::objects::{Action, RebaseOptions, TodoItem};
+use crate::merge::rebase::types::{Action, RebaseOptions, TodoItem};
 use crate::core::refs;
 
 fn die(code: i32, message: &str) -> ! {

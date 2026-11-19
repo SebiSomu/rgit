@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::io::{self, Read};
 use anyhow::Result;
@@ -6,8 +8,9 @@ use crate::workspace::index_plumbing::{add_cache_entry, bare_index_entry, index_
 use crate::core::object_store::{flatten_tree, tree_hash_of_commit};
 use crate::references::update_ref::engine::unquote_c_style;
 use crate::core::index::{read_index, write_index, IndexEntry};
-use crate::objects::UpdateIndexFlags;
+
 use crate::core::repo;
+use crate::workspace::update_index::types::UpdateIndexFlags;
 
 const UPDATE_INDEX_USAGE: &str = "usage: rgit update-index [<options>] [--] [<file>...]\n\n    -q                    continue refresh even when index needs update\n    --[no-]add            do not ignore new files\n    --[no-]replace        let files replace directories and vice-versa\n    --[no-]remove         notice files missing from worktree\n    --refresh             refresh stat information\n    --really-refresh      like --refresh\n    --cacheinfo <mode>,<object>,<path>\n                          add the specified entry to the index\n    --chmod (+|-)x        override the executable bit of the listed files\n    --[no-]info-only      add to index only; do not add content to object database\n    --[no-]force-remove   remove named paths even if present in worktree\n    -z                    with --stdin: input lines are terminated by null bytes\n    --stdin               read list of paths to be updated from standard input\n    --index-info          add entries from standard input to the index\n    -g, --again           only update entries that differ from HEAD\n    --[no-]ignore-missing ignore files missing from worktree\n    --[no-]verbose        report actions to standard output\n\n";
 
@@ -292,3 +295,4 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
     }
     Ok(())
 }
+

@@ -1,7 +1,10 @@
+pub mod types;
+
 use anyhow::{Context, Result};
 use base64::Engine;
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::objects::{CommitIdentity, GitHubTarget, GitHubTreeEntry, PushStatus};
+use crate::remote::{push::types::PushStatus, types::GitHubTarget};
+use crate::remote::github::types::{CommitIdentity, GitHubTreeEntry};
 
 /// Converts a Unix timestamp in seconds since epoch to an ISO 8601 UTC formatted string.
 // Used by `github`.
@@ -614,7 +617,7 @@ fn days_since_epoch(year: u64, month: u64, day: u64) -> u64 {
 /// Orchestrates fetching all refs and objects from a GitHub repository via the Git Data API,
 /// updating remote-tracking refs and writing FETCH_HEAD.
 // Used by `fetch`.
-pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_display: &str, branch_filter: Option<&str>) -> Result<Vec<crate::objects::FetchRefResult>> {
+pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_display: &str, branch_filter: Option<&str>) -> Result<Vec<crate::remote::fetch::types::FetchRefResult>> {
     let client = build_github_client(&target.token)?;
     let default_branch = get_github_default_branch(&client, target)?;
 
@@ -644,7 +647,7 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
         if local_sha.as_deref() == Some(remote_sha.as_str()) {
             print!(" = [up to date]      {:20} -> {}/{}", branch, remote_name, branch);
             println!();
-            results.push(crate::objects::FetchRefResult::UpToDate { branch: branch.clone() });
+            results.push(crate::remote::fetch::types::FetchRefResult::UpToDate { branch: branch.clone() });
             fetch_head_entries.push((remote_sha.clone(), branch.clone(), remote_display.to_string()));
             continue;
         }
@@ -660,7 +663,7 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
         let result = match &local_sha {
             None => {
                 println!(" * [new branch]      {:20} -> {}/{}", branch, remote_name, branch);
-                crate::objects::FetchRefResult::NewBranch {
+                crate::remote::fetch::types::FetchRefResult::NewBranch {
                     branch: branch.clone(),
                     sha: remote_sha.clone(),
                 }
@@ -672,7 +675,7 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
                     crate::core::commit::short_hash(remote_sha),
                     branch, remote_name, branch
                 );
-                crate::objects::FetchRefResult::Updated {
+                crate::remote::fetch::types::FetchRefResult::Updated {
                     branch: branch.clone(),
                     old_sha: old.clone(),
                     new_sha: remote_sha.clone(),
@@ -907,3 +910,4 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
 #[cfg(test)]
 #[path = "../../tests/unit/remote/github.rs"]
 mod tests;
+

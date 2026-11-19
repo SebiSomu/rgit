@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::BTreeSet;
 use std::fs;
 use anyhow::Context;
 use crate::workspace::clean::engine::collect_clean_candidates;
 use crate::core::index::read_index;
-use crate::objects::{CleanMode, GitIgnoreRule};
+use crate::workspace::{clean::types::CleanMode, types::GitIgnoreRule};
 use std::path::Path;
 
 /// Removes files and directories from the working tree that are not tracked by the

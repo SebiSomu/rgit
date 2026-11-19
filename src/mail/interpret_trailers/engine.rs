@@ -2,9 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use crate::core::config::read_all_config_entries;
-use crate::objects::{
-    InterpretTrailersOptions, NewTrailer, TrailerArg, TrailerConf, TrailerConfig, TrailerIfExists, TrailerIfMissing, TrailerItem, TrailerWhere,
-};
+use crate::mail::interpret_trailers::types::{InterpretTrailersOptions, NewTrailer, TrailerArg, TrailerConf, TrailerConfig, TrailerIfExists, TrailerIfMissing, TrailerItem, TrailerWhere};
 
 /// git's usage text for `interpret-trailers`, printed for `-h` and after option errors (exit 129).
 pub const INTERPRET_TRAILERS_USAGE: &str = "usage: rgit interpret-trailers [--in-place] [--trim-empty]
@@ -773,3 +771,4 @@ pub fn write_trailers_in_place(file: &str, content: &[u8]) -> anyhow::Result<()>
     }
     Ok(())
 }
+

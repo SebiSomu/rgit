@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 // ============================================================================
 // bisect
@@ -22,7 +23,7 @@ use crate::core::commit::resolve_commit_from_source;
 use crate::core::object_store::{flatten_tree, tree_hash_of_commit};
 
 use crate::core::index::read_index;
-use crate::objects::{BisectAction, BisectOutcome};
+use crate::history::bisect::types::{BisectAction, BisectOutcome};
 use crate::core::refs;
 
 pub const BISECT_START_PATH: &str = ".git/BISECT_START";

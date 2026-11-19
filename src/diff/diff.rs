@@ -10,7 +10,7 @@ use crate::core::object_store::flatten_tree;
 use crate::diff::rename::{detect_renames, warn_rename_limit};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::index::read_index;
-use crate::objects::{DiffChange, DiffSide};
+use crate::diff::types::{DiffChange, DiffSide};
 use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;

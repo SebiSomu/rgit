@@ -10,3 +10,4 @@ pub mod myers;
 pub mod patch_id;
 pub mod plumbing;
 pub mod rename;
+pub mod types;

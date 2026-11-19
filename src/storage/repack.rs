@@ -6,7 +6,7 @@ use crate::core::object_store::list_loose_objects;
 use crate::storage::gc::engine::{collect_lenient_gc_roots, collect_strict_gc_roots};
 use crate::core::object_store::write_object;
 use crate::core::pack::{build_pack, forget_repo_packs, packed_object_exists, prune_packed_objects, reachable_objects, read_packed_object, repo_packs, store_pack, write_pack_index};
-use crate::objects::PackBuildOptions;
+use crate::core::types::PackBuildOptions;
 use crate::core::repo;
 
 /// `rgit repack [-a | -A] [-d] [-q] [-f] [-F] [-l] [-n] [--window=<n>] [--depth=<n>]`

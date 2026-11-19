@@ -300,3 +300,4 @@ pub fn write_fetch_head(entries: &[(String, String, String)]) -> Result<()> {
         .context("Failed to write FETCH_HEAD")?;
     Ok(())
 }
+

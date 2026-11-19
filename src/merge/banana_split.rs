@@ -7,7 +7,7 @@ use crate::core::commit::{build_commit, commit_parents, extract_commit_message, 
 use crate::core::object_store::read_object;
 use crate::merge::rebase::engine::{collect_commits_to_replay, rebase_in_progress, replay_onto};
 use crate::workspace::state_files::build_tree_from_map;
-use crate::objects::Tree;
+use crate::core::types::Tree;
 use crate::core::refs;
 
 /// `rgit banana-split [--by-dir] [-n] [<commit>]`

@@ -140,7 +140,7 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn status(opts: crate::objects::StatusOptions) -> anyhow::Result<()> {
+pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::Result<()> {
     let short = opts.short;
     // The long format's header lines; the short format prints none of them.
     macro_rules! say { ($($t:tt)*) => { if !short { println!($($t)*); } } }
@@ -221,7 +221,7 @@ pub fn status(opts: crate::objects::StatusOptions) -> anyhow::Result<()> {
     let mut staged_renamed: Vec<(char, String, String)> = Vec::new();
     let rename_opts = crate::diff::rename::default_rename_options("status.renames");
     if rename_opts.level > 0 && !staged_new.is_empty() {
-        use crate::objects::{DiffChange, DiffSide};
+        use crate::diff::types::{DiffChange, DiffSide};
         let side = |e: &([u8; 20], u32)| DiffSide { mode: e.1, hash: e.0, worktree: false };
         let paths: std::collections::BTreeSet<&String> = head_tree.keys().chain(index_map.keys()).collect();
         let changes: Vec<DiffChange> = paths

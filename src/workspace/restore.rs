@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -6,8 +8,9 @@ use crate::workspace::gitignore::normalize_path;
 use crate::core::commit::resolve_tree_from_source;
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit as tree_of_commit};
 use crate::core::index::{read_index, write_index, IndexEntry};
-use crate::objects::{MergeConflictStyle, MergeFileOptions, WriteoutStage};
+use crate::merge::{merge_file::types::MergeFileOptions, types::MergeConflictStyle};
 use crate::core::refs;
+use crate::workspace::restore::types::WriteoutStage;
 
 /// Turns `--ours` / `--theirs` / `-m` / `--conflict=<style>` into the version to write out.
 /// `--merge` without a style uses `merge.conflictStyle` (default `merge`).
@@ -256,3 +259,4 @@ fn restore_from_tree(paths: &[String], tree: &BTreeMap<String, ([u8; 20], u32)>,
     }
     Ok(())
 }
+

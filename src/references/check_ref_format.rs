@@ -1,7 +1,9 @@
+pub mod types;
+
 use anyhow::Result;
 
 use crate::core::check_ref_format::{check_refname_format, collapse_ref_slashes, is_valid_branch_shorthand};
-use crate::objects::CheckRefFormatOptions;
+use crate::references::check_ref_format::types::CheckRefFormatOptions;
 
 /// `rgit check-ref-format [--normalize] [--[no-]allow-onelevel] [--refspec-pattern] <refname>`
 /// `rgit check-ref-format --branch <branchname>`
@@ -34,3 +36,4 @@ pub fn check_ref_format(opts: CheckRefFormatOptions) -> Result<()> {
 
     Ok(())
 }
+

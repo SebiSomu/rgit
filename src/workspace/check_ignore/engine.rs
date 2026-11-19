@@ -2,7 +2,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 use crate::workspace::gitignore::{ignore_rule_matches, parse_gitignore_line};
-use crate::objects::SourcedIgnoreRule;
+
+use crate::workspace::check_ignore::types::SourcedIgnoreRule;
 
 /// Finds the `.gitignore` rule deciding a path's fate, mirroring git's lookup: leading
 /// directories are checked first (outermost first), and the first one excluded by a
@@ -106,3 +107,4 @@ pub fn is_tracked_or_contains_tracked(path: &str, tracked: &BTreeSet<String>) ->
     let prefix = format!("{}/", path);
     tracked.range(prefix.clone()..).next().is_some_and(|p| p.starts_with(&prefix))
 }
+

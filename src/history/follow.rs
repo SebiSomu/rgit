@@ -2,6 +2,8 @@
 //! commit that created it (`try_to_follow_renames` in git's tree-diff.c, scored like
 //! `diffcore-rename.c` / `diffcore-delta.c`), and rendering of that diff in `log`'s formats.
 
+pub mod types;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::core::object_store::flatten_tree;
@@ -11,7 +13,10 @@ use crate::history::log::engine::binary_patch_as_notice;
 use crate::workspace::ls_files::engine::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::core::object_store::read_object;
 use crate::diff::rename::{estimate_similarity, span_hash, MAX_SCORE};
-use crate::objects::{DiffStatEntry, FollowPair, LogOptions, ParsedCommit};
+use crate::core::types::ParsedCommit;
+use crate::diff::types::DiffStatEntry;
+use crate::history::log::types::LogOptions;
+use crate::history::follow::types::FollowPair;
 
 /// git's default minimum rename score (50%).
 const MIN_SCORE: u64 = 30000;
@@ -227,3 +232,4 @@ pub fn render_follow_diff(pairs: &[FollowPair], opts: &LogOptions, stat_width: u
 #[cfg(test)]
 #[path = "../../tests/unit/history/follow.rs"]
 mod tests;
+

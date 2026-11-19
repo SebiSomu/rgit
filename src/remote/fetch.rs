@@ -1,10 +1,11 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use crate::remote::fetch::engine::*;
 use crate::remote::github::{fetch_from_github, parse_github_remote, resolve_github_token};
 use crate::remote::push::engine::resolve_remote_repo_path;
-use crate::objects::{FetchRefResult, GitHubTarget};
+use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
 
 pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
     let remote_name = match remote {

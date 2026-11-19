@@ -1,9 +1,10 @@
 use crate::diff::myers::myers_diff;
-use crate::objects::DiffOp;
+use crate::diff::types::DiffOp;
 use crate::core::{commit::parse_commit_object, object_store::flatten_tree};
-use crate::objects::{FileDiff, ParsedCommit};
+use crate::core::types::ParsedCommit;
+use crate::diff::types::FileDiff;
 use std::collections::BTreeMap;
-use crate::objects::DiffStatEntry;
+use crate::diff::types::DiffStatEntry;
 use crate::core::object_store::read_object;
 use anyhow::Context;
 use flate2::Compression;

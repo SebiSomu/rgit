@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use crate::core::config::{read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
 use crate::remote::remote::engine::*;
-use crate::objects::RemoteAction;
+use crate::remote::remote::types::RemoteAction;
 
 /// `rgit remote [-v | --verbose]`
 /// `rgit remote add <name> <url>`

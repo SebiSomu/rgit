@@ -7,8 +7,9 @@ use crate::core::object_store::read_object;
 use crate::core::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
 use crate::core::repo::all_worktree_git_dirs;
 use crate::core::index::read_index_from;
-use crate::objects::{GcReport, LooseObject};
+use crate::core::types::LooseObject;
 use crate::core::object_store::list_loose_objects;
+use crate::storage::gc::types::GcReport;
 
 /// State files under `.git/` whose contents name commits that must stay alive: refs HEAD
 /// points at, stashes, and the bookkeeping of merges, cherry-picks, reverts, rebases and
@@ -317,3 +318,4 @@ pub fn format_byte_size(bytes: u64) -> String {
 pub fn loose_object_path(hash: &str) -> PathBuf {
     crate::core::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))
 }
+

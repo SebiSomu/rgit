@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
 use crate::core::commit::collect_ancestors;
-use crate::objects::ParsedCommit;
+use crate::core::types::ParsedCommit;
 use crate::core::commit::parse_commit_object;
 use crate::core::rev_parse::resolve_commit_rev;
 use crate::core::date::format_rfc2822_date;

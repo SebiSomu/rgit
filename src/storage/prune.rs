@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use std::fs;
@@ -8,7 +9,8 @@ use crate::storage::gc::engine::plan_gc;
 use crate::storage::prune::engine::{list_object_dir_cruft, prune_expiry_cutoff, remove_empty_fanout_dirs};
 use crate::core::object_store::read_object;
 use crate::core::rev_parse::resolve_rev;
-use crate::objects::{LooseObject, ObjectDirCruft};
+use crate::core::types::LooseObject;
+use crate::storage::prune::types::ObjectDirCruft;
 use crate::core::repo;
 
 /// One thing `prune` visits: an unreachable loose object or a non-object file.

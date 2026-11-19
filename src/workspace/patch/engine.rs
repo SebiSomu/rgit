@@ -7,7 +7,7 @@
 use std::io::{BufRead, Write};
 
 use crate::diff::hunks::diff_file_contents;
-use crate::objects::{HunkUse, InteractiveFile, InteractiveHunk, PatchModeSpec, PatchTarget};
+use crate::workspace::patch::types::{HunkUse, InteractiveFile, InteractiveHunk, PatchModeSpec, PatchTarget};
 
 const HELP_REMAINDER: &str = "j - leave this hunk undecided, see next undecided hunk\n\
 J - leave this hunk undecided, see next hunk\n\
@@ -950,3 +950,4 @@ fn edit_hunk_manually(mode: &PatchModeSpec, hunk: &InteractiveHunk) -> anyhow::R
 #[cfg(test)]
 #[path = "../../../tests/unit/workspace/patch/engine.rs"]
 mod tests;
+

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use crate::core::date::parse_approx_date;
-use crate::objects::ObjectDirCruft;
+use crate::storage::prune::types::ObjectDirCruft;
 
 /// Turns `prune --expire=<time>` into the cutoff `plan_gc` uses (objects modified at or after
 /// it are kept): `None` for `never`; otherwise git's approximate dates (`now`, `all`,
@@ -89,3 +89,4 @@ pub fn remove_empty_fanout_dirs() {
         }
     }
 }
+

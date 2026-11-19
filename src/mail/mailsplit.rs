@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::fs;
 use std::io::{self, Read};
@@ -6,7 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::mail::mailsplit::engine::{first_maildir_message, list_maildir_files, parse_mailsplit_args, split_mbox_messages, write_split_message, MAILSPLIT_USAGE};
-use crate::objects::MailsplitOptions;
+use crate::mail::mailsplit::types::MailsplitOptions;
 
 /// `rgit mailsplit [-d<prec>] [-f<n>] [-b] [--keep-cr] [--mboxrd] -o<directory> [(<mbox>|<Maildir>)...]`
 ///

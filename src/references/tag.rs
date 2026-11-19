@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::fs;
 use anyhow::Result;
@@ -11,7 +12,7 @@ use crate::workspace::gitignore::glob_match;
 use crate::history::rev_list::engine::abbreviate_hash;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::references::tag::engine::{delete_tag_ref, describe_commit, list_tag_refs, tag_message_lines, write_tag_object};
-use crate::objects::{DescribeOptions, TagOptions};
+use crate::references::tag::types::{DescribeOptions, TagOptions};
 use crate::core::refs;
 
 /// `rgit tag [-l] [-n[<num>]] [--contains <commit>] [--points-at <object>] [<pattern>...]`

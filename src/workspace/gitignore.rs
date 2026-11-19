@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::Context;
-use crate::objects::GitIgnoreRule;
+use crate::workspace::types::GitIgnoreRule;
 
 /// Matches a string against a glob pattern supporting `*`, `?`, and `**`.
 // Used by `.gitignore` pattern matching in `helpers.rs`.

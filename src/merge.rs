@@ -12,3 +12,4 @@ pub mod replay;
 pub mod rerere;
 pub mod revert;
 pub mod sequencer;
+pub mod types;

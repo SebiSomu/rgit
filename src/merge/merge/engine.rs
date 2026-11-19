@@ -197,13 +197,13 @@ pub fn report_needs_merge() -> bool {
 /// names `operation`). Returns the merge result so the caller can print its messages and
 /// decide whether to commit.
 // Used by `merge`, `cherry-pick`, `revert` and `rebase`.
-pub fn merge_into_worktree(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str) -> anyhow::Result<crate::objects::TreeMergeResult> {
-    merge_into_worktree_favoring(base, ours, theirs, our_label, their_label, operation, crate::objects::MergeFavor::None)
+pub fn merge_into_worktree(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str) -> anyhow::Result<crate::merge::types::TreeMergeResult> {
+    merge_into_worktree_favoring(base, ours, theirs, our_label, their_label, operation, crate::merge::merge::types::MergeFavor::None)
 }
 
 /// `merge_into_worktree` that resolves content conflicts in favour of one side (`merge -X`).
 // Used by `merge`.
-pub fn merge_into_worktree_favoring(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str, favor: crate::objects::MergeFavor) -> anyhow::Result<crate::objects::TreeMergeResult> {
+pub fn merge_into_worktree_favoring(base: &TreeMap, ours: &TreeMap, theirs: &TreeMap, our_label: &str, their_label: &str, operation: &str, favor: crate::merge::merge::types::MergeFavor) -> anyhow::Result<crate::merge::types::TreeMergeResult> {
     use crate::workspace::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};
     use crate::merge::merge_tree::engine::merge_trees_favoring;
     let result = merge_trees_favoring(base, ours, theirs, our_label, their_label, 7, favor)?;
@@ -282,3 +282,4 @@ pub fn reset_merge_to_tree(target_tree: &TreeMap) -> anyhow::Result<()> {
     update_index_from_tree(&target, &current)?;
     Ok(())
 }
+

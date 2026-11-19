@@ -7,7 +7,8 @@ use crate::history::rev_list::engine::run_rev_list_walk;
 use crate::core::rev_parse::peel_to_type;
 use crate::references::symbolic_ref::engine::resolve_ref_unsafe;
 use crate::core::wildmatch::{wildmatch, WM_PATHNAME};
-use crate::objects::{FmtMergeMsgOptions, MergeOrigin, MergeSource, RevListOptions, RevListRoots};
+use crate::history::rev_list::types::{RevListOptions, RevListRoots};
+use crate::merge::fmt_merge_msg::types::{FmtMergeMsgOptions, MergeOrigin, MergeSource};
 
 /// git's usage text for `fmt-merge-msg`, printed for `-h` and after option errors (exit 129).
 pub const FMT_MERGE_MSG_USAGE: &str = "usage: rgit fmt-merge-msg [-m <message>] [--log[=<n>] | --no-log] [--file <file>]
@@ -520,3 +521,4 @@ pub fn merge_into_suffix(current_branch: &str) -> String {
         format!(" into {}", current_branch)
     }
 }
+

@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 
 use crate::storage::chunk_file::{assemble_chunk_file, fanout_table, parse_chunk_file, read_oid_chunks};
 use crate::core::pack::find_in_index;
-use crate::objects::RepoPack;
+use crate::core::types::RepoPack;
 
 /// Path of the multi-pack-index file.
 // Used by `multi-pack-index`.

@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::HashSet;
 use std::fs;
@@ -9,7 +10,7 @@ use crate::remote::bundle::engine::{
     enumerate_bundle_objects, format_bundle_header, missing_bundle_prerequisites, parse_bundle_header, read_packfile, resolve_bundle_revs,
     select_bundle_commits, store_loose_objects, write_packfile,
 };
-use crate::objects::{BundleAction, BundleHeader};
+use crate::remote::bundle::types::{BundleAction, BundleHeader};
 use crate::core::repo;
 
 /// `rgit bundle create [-q] [--version=<2|3>] <file> <rev-list-args>...`

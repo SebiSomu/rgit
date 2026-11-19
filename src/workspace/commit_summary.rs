@@ -1,5 +1,5 @@
 use crate::core::{refs, commit::format_commit_date};
-use crate::objects::CommitSignature;
+use crate::core::types::CommitSignature;
 
 /// Prints git's commit summary: `[<branch> <abbrev>] <subject>`, then ` Author:` when the
 /// author is not the committer, ` Date:` when `show_date` (an author taken from another commit,
@@ -24,7 +24,7 @@ pub fn print_commit_summary(head_state: &refs::HeadState, commit_hash: &str, aut
     if commit.parents.len() <= 1 {
         // git's summary: `--shortstat --summary` against the parent, renames detected.
         use crate::diff::plumbing::{diff_trees, render_diff_changes};
-        let opts = crate::objects::DiffPlumbingOptions {
+        let opts = crate::diff::plumbing::types::DiffPlumbingOptions {
             recursive: true,
             shortstat: true,
             summary: true,

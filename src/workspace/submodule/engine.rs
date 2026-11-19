@@ -8,7 +8,7 @@ use anyhow::Result;
 use crate::core::config::{get_from, read_entries_from, LOCAL_CONFIG_PATH};
 use crate::core::object_store::{hash_content, write_object};
 use crate::core::index::{build_entry, read_index, write_index};
-use crate::objects::SubmoduleInfo;
+use crate::workspace::submodule::types::SubmoduleInfo;
 
 /// Usage text of `submodule`.
 pub const SUBMODULE_USAGE: &str = "usage: rgit submodule [--quiet] [--cached]\n   or: rgit submodule add [-b <branch>] [--name <name>] [--] <repository> [<path>]\n   or: rgit submodule status [--cached] [--recursive] [--] [<path>...]\n   or: rgit submodule init [--] [<path>...]\n   or: rgit submodule deinit [-f|--force] (--all| [--] <path>...)\n   or: rgit submodule update [--init] [--recursive] [--] [<path>...]\n   or: rgit submodule set-branch (--default|--branch <branch>) [--] <path>\n   or: rgit submodule set-url [--] <path> <newurl>\n   or: rgit submodule foreach [--recursive] <command>\n   or: rgit submodule sync [--] [<path>...]\n";
@@ -176,3 +176,4 @@ pub fn stage_gitmodules() -> Result<()> {
     entries.push(build_entry(".gitmodules", hash, &fs::metadata(".gitmodules")?));
     write_index(&mut entries)
 }
+

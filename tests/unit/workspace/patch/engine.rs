@@ -3,7 +3,7 @@
 
 use super::{apply_hunks, parse_hunk_header, split_hunk};
 
-fn hunk(header: &str, body: &[&str]) -> crate::objects::InteractiveHunk {
+fn hunk(header: &str, body: &[&str]) -> crate::workspace::patch::types::InteractiveHunk {
     let mut h = parse_hunk_header(format!("{}\n", header).as_bytes()).unwrap();
     h.lines = body.iter().map(|l| format!("{}\n", l).into_bytes()).collect();
     h

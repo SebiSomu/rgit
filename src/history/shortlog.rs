@@ -1,9 +1,10 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 
 use crate::history::shortlog::engine::collect_shortlog;
-use crate::objects::ShortlogOptions;
+use crate::history::shortlog::types::ShortlogOptions;
 
 /// `rgit shortlog [-s|--summary] [-n|--numbered] [-e|--email] [--all] [<rev>]`
 ///

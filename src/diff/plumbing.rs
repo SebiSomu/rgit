@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 
 use crate::core::object_store::abbreviate_hash_min;
@@ -6,7 +8,9 @@ use crate::workspace::index_plumbing::worktree_state;
 use crate::workspace::ls_files::engine::pathspec_wildcard_match;
 use crate::core::object_store::{hash_content, read_object};
 use crate::core::index::IndexEntry;
-use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, DiffStatEntry, FileDiff, IndexFileState};
+use crate::diff::types::{DiffChange, DiffSide, DiffStatEntry, FileDiff};
+use crate::workspace::types::IndexFileState;
+use crate::diff::plumbing::types::DiffPlumbingOptions;
 
 /// The options every raw diff command understands, for the usage text.
 pub const DIFF_COMMON_OPTIONS: &str = "common diff options:\n  -z            output diff-raw with lines terminated with NUL.\n  -p            output patch format.\n  -u            synonym for -p.\n  --raw         output diff-raw (the default).\n  --name-only   show only names of changed files.\n  --name-status show names and status of changed files.\n  --stat        show a diffstat.\n  --shortstat   show only the last line of the diffstat.\n  --numstat     show added and deleted line counts per file.\n  --summary     show creations, deletions and mode changes.\n  -s            no diff output.\n  --abbrev[=<n>] abbreviate object names in diff-raw.\n  -R            swap input file pairs.\n  --exit-code   exit with 1 if there were differences.\n  --quiet       no output, implies --exit-code.\n";
@@ -651,3 +655,4 @@ pub fn check_path_argument(arg: &str) -> Result<(), String> {
     }
     Err(format!("fatal: ambiguous argument '{}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'\n", arg))
 }
+

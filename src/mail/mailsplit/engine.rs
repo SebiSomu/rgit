@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::objects::MailsplitOptions;
+use crate::mail::mailsplit::types::MailsplitOptions;
 
 /// git's usage text for `mailsplit`, printed for `-h` and after argument errors (exit 129).
 pub const MAILSPLIT_USAGE: &str = "usage: rgit mailsplit [-d<prec>] [-f<n>] [-b] [--keep-cr] [--mboxrd] -o<directory> [(<mbox>|<Maildir>)...]\n";
@@ -241,3 +241,4 @@ pub fn write_split_message(directory: &str, precision: usize, number: usize, mes
     file.write_all(message).with_context(|| "fatal: cannot write output".to_string())?;
     Ok(())
 }
+

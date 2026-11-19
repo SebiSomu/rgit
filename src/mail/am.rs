@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -20,7 +21,11 @@ use crate::core::object_store::{
     write_tree_from_index_prefix,
 };
 use crate::core::index::{read_index, write_index, IndexEntry};
-use crate::objects::{AmOptions, ApplyOptions, MailPatch, PlannedChanges};
+use crate::mail::{
+    am::types::{AmOptions, MailPatch},
+    apply::types::ApplyOptions,
+    types::PlannedChanges,
+};
 use crate::core::refs;
 
 /// `rgit am [-k] [<mbox>...]`, `rgit am (--continue | --skip | --abort | --quit | --show-current-patch[=raw|diff])`

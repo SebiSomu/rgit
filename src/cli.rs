@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-pub(crate) use crate::objects::{BisectAction, ReflogAction, RemoteAction, StashAction, WorktreeAction};
+pub(crate) use crate::history::bisect::types::BisectAction;
+pub(crate) use crate::references::reflog::types::ReflogAction;
+pub(crate) use crate::remote::remote::types::RemoteAction;
+pub(crate) use crate::workspace::{stash::types::StashAction, worktree::types::WorktreeAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_subcommand = true)]
@@ -743,7 +746,7 @@ pub enum Commands {
     },
     Bundle {
         #[command(subcommand)]
-        action: crate::objects::BundleAction,
+        action: crate::remote::bundle::types::BundleAction,
     },
     #[command(disable_help_flag = true)]
     PatchId {
@@ -1011,7 +1014,7 @@ fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
 
 pub fn handle_commands() -> Result<()> {
     let cli = Cli::parse();
-    use crate::objects::Verbosity;
+    use crate::ui::types::Verbosity;
     crate::ui::init(if cli.plain { Some(Verbosity::Quiet) } else if cli.teach { Some(Verbosity::Teach) } else if cli.explain { Some(Verbosity::Explain) } else { None });
     crate::ui::begin();
 
@@ -1066,7 +1069,7 @@ pub fn handle_commands() -> Result<()> {
             cleanup,
             quiet,
         } => {
-            let opts = crate::objects::CommitOptions {
+            let opts = crate::workspace::commit::types::CommitOptions {
                 messages,
                 file,
                 reedit: reedit_message.is_some(),
@@ -1098,7 +1101,7 @@ pub fn handle_commands() -> Result<()> {
                 anyhow::bail!("fatal: Invalid untracked files mode '{}'", untracked);
             }
             // `-z` implies the porcelain format, like git.
-            crate::workspace::staging::status(crate::objects::StatusOptions { short: short || porcelain.is_some() || nul, branch, nul, untracked })?;
+            crate::workspace::staging::status(crate::workspace::status::types::StatusOptions { short: short || porcelain.is_some() || nul, branch, nul, untracked })?;
         }
         Commands::Branch { args } => {
             crate::workspace::branch::branch(raw_args_after("branch", args))?;
@@ -1131,7 +1134,7 @@ pub fn handle_commands() -> Result<()> {
             crate::diff::diff::diff(raw_args_after("diff", args))?;
         }
         Commands::Merge { ff: _, no_ff, ff_only, squash, no_squash: _, commit, no_commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, stat: _, quiet, no_edit: _, allow_unrelated, commits } => {
-            use crate::objects::{FastForwardMode, MergeOptions};
+            use crate::merge::merge::types::{FastForwardMode, MergeOptions};
             let ff = if no_ff { FastForwardMode::Never } else if ff_only { FastForwardMode::Only } else { FastForwardMode::Allow };
             let commit = if commit { Some(true) } else if no_commit { Some(false) } else { None };
             crate::merge::merge::merge(MergeOptions { commits, ff, squash, commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, quiet, allow_unrelated })?;
@@ -1155,7 +1158,7 @@ pub fn handle_commands() -> Result<()> {
             crate::workspace::clean::clean(dry_run, force, dirs, ignored, only_ignored)?;
         }
         Commands::CherryPick { commits, no_commit, commit: _, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit } => {
-            crate::merge::cherry_pick::cherry_pick(crate::objects::CherryPickOptions { commits, no_commit, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit })?;
+            crate::merge::cherry_pick::cherry_pick(crate::merge::cherry_pick::types::CherryPickOptions { commits, no_commit, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit })?;
         }
         Commands::BananaSplit { commit, by_dir, dry_run } => {
             crate::merge::banana_split::banana_split(commit, by_dir, dry_run)?;
@@ -1167,7 +1170,7 @@ pub fn handle_commands() -> Result<()> {
             crate::workspace::patch::stash_patch(None, Vec::new())?;
         }
         Commands::Stash { action: None, include_untracked, all, .. } if include_untracked || all => {
-            crate::workspace::stash::stash(Some(crate::objects::StashAction::Push { message: None, patch: false, include_untracked, all, paths: Vec::new() }))?;
+            crate::workspace::stash::stash(Some(crate::workspace::stash::types::StashAction::Push { message: None, patch: false, include_untracked, all, paths: Vec::new() }))?;
         }
         Commands::Stash { action, .. } => {
             crate::workspace::stash::stash(action)?;
@@ -1187,11 +1190,11 @@ pub fn handle_commands() -> Result<()> {
                     1
                 }
             });
-            let opts = crate::objects::TagOptions { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, args };
+            let opts = crate::references::tag::types::TagOptions { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, args };
             crate::references::tag::tag(opts)?;
         }
         Commands::Describe { tags, always, long, abbrev, exact_match, commits } => {
-            let opts = crate::objects::DescribeOptions { tags, always, long, abbrev, exact_match, commits };
+            let opts = crate::references::tag::types::DescribeOptions { tags, always, long, abbrev, exact_match, commits };
             crate::references::tag::describe(opts)?;
         }
         Commands::Mv { source, destination, force} => {
@@ -1202,7 +1205,7 @@ pub fn handle_commands() -> Result<()> {
         }
         Commands::Rebase { upstream, branch, onto, keep_base, reapply_cherry_picks, no_reapply_cherry_picks, interactive, cont, abort, skip, edit_todo } => {
             let reapply_cherry_picks = if reapply_cherry_picks { Some(true) } else if no_reapply_cherry_picks { Some(false) } else { None };
-            crate::merge::rebase::rebase(crate::objects::RebaseOptions { upstream, branch, onto, keep_base, reapply_cherry_picks, interactive, cont, abort, skip, edit_todo })?;
+            crate::merge::rebase::rebase(crate::merge::rebase::types::RebaseOptions { upstream, branch, onto, keep_base, reapply_cherry_picks, interactive, cont, abort, skip, edit_todo })?;
         }
         Commands::Push { remote, refspec, force, set_upstream } => {
             crate::remote::push::push(remote, refspec, force, set_upstream)?;
@@ -1280,7 +1283,7 @@ pub fn handle_commands() -> Result<()> {
                 revisions.extend(remaining_args);
             }
 
-            let options = crate::objects::GrepOptions {
+            let options = crate::history::grep::types::GrepOptions {
                 ignore_case,
                 invert_match,
                 line_number,
@@ -1309,7 +1312,7 @@ pub fn handle_commands() -> Result<()> {
             sq,
             revs,
         } => {
-            let opts = crate::objects::RevParseOptions {
+            let opts = crate::plumbing::rev_parse::types::RevParseOptions {
                 git_dir,
                 show_toplevel,
                 is_inside_work_tree,
@@ -1331,7 +1334,7 @@ pub fn handle_commands() -> Result<()> {
             all,
             rev,
         } => {
-            let opts = crate::objects::ShortlogOptions {
+            let opts = crate::history::shortlog::types::ShortlogOptions {
                 summary,
                 numbered,
                 email,
@@ -1353,7 +1356,7 @@ pub fn handle_commands() -> Result<()> {
             null_terminated,
             pathspecs,
         } => {
-            let opts = crate::objects::LsFilesOptions {
+            let opts = crate::workspace::ls_files::types::LsFilesOptions {
                 cached,
                 deleted,
                 modified,
@@ -1378,7 +1381,7 @@ pub fn handle_commands() -> Result<()> {
             null_terminated,
             paths,
         } => {
-            let opts = crate::objects::CheckIgnoreOptions {
+            let opts = crate::workspace::check_ignore::types::CheckIgnoreOptions {
                 quiet,
                 verbose,
                 non_matching,
@@ -1397,7 +1400,7 @@ pub fn handle_commands() -> Result<()> {
             branch,
             refname,
         } => {
-            let opts = crate::objects::CheckRefFormatOptions {
+            let opts = crate::references::check_ref_format::types::CheckRefFormatOptions {
                 normalize,
                 allow_onelevel,
                 refspec_pattern,
@@ -1419,7 +1422,7 @@ pub fn handle_commands() -> Result<()> {
             strip,
             patches,
         } => {
-            let opts = crate::objects::ApplyOptions {
+            let opts = crate::mail::apply::types::ApplyOptions {
                 check,
                 stat,
                 numstat,
@@ -1448,7 +1451,7 @@ pub fn handle_commands() -> Result<()> {
             no_signature,
             revs,
         } => {
-            let opts = crate::objects::FormatPatchOptions {
+            let opts = crate::mail::format_patch::types::FormatPatchOptions {
                 revs,
                 max_count,
                 root,
@@ -1473,7 +1476,7 @@ pub fn handle_commands() -> Result<()> {
             keep_subject,
             mboxes,
         } => {
-            let opts = crate::objects::AmOptions {
+            let opts = crate::mail::am::types::AmOptions {
                 mboxes,
                 cont,
                 skip,
@@ -1514,7 +1517,7 @@ pub fn handle_commands() -> Result<()> {
             branch1,
             branch2,
         } => {
-            let opts = crate::objects::MergeTreeOptions {
+            let opts = crate::merge::merge_tree::types::MergeTreeOptions {
                 name_only,
                 messages: if messages { Some(true) } else if no_messages { Some(false) } else { None },
                 nul,
@@ -1533,7 +1536,7 @@ pub fn handle_commands() -> Result<()> {
             head,
             limit,
         } => {
-            let opts = crate::objects::CherryOptions {
+            let opts = crate::history::cherry::types::CherryOptions {
                 verbose,
                 abbrev,
                 upstream,

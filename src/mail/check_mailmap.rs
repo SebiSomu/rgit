@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Write};
 use anyhow::Result;
 
 use crate::mail::mailmap::{map_user, parse_check_mailmap_args, read_mailmap, split_contact, CHECK_MAILMAP_USAGE};
-use crate::objects::Mailmap;
+use crate::mail::mailmap::types::Mailmap;
 use crate::core::repo;
 
 /// `rgit check-mailmap [--stdin] [--mailmap-file <file>] [--mailmap-blob <blob>] <contact>...`

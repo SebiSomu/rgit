@@ -10,7 +10,8 @@ use crate::storage::gc::engine::{GC_LENIENT_STATE_FILES, GC_STRICT_STATE_FILES, 
 use crate::core::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
 use crate::core::repo::all_worktree_git_dirs;
 use crate::core::index::{read_index, read_index_from};
-use crate::objects::{FsckIssue, FsckNode, FsckReport, LooseObject};
+use crate::core::types::LooseObject;
+use crate::storage::fsck::types::{FsckIssue, FsckNode, FsckReport};
 
 /// Modes a tree entry may have: regular file, executable, symlink, directory, submodule.
 const VALID_TREE_MODES: &[&str] = &["100644", "100755", "120000", "40000", "160000"];
@@ -541,3 +542,4 @@ pub fn run_fsck_checks(connectivity_only: bool, include_reflogs: bool) -> Result
 
     Ok(FsckReport { objects_checked: loose.len() + packed_checked, issues, dangling, unreachable })
 }
+

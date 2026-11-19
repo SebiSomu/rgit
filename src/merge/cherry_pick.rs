@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::fs;
 use crate::core::commit::{current_signature, write_commit_object};
@@ -10,8 +12,9 @@ use crate::merge::sequencer::{
 };
 use crate::workspace::state_files::build_tree_from_map;
 use crate::core::commit::resolve_tree_from_source;
-use crate::objects::CherryPickOptions;
+
 use crate::core::refs;
+use crate::merge::cherry_pick::types::CherryPickOptions;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -289,7 +292,7 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         let keep = opts.keep_redundant || (originally_empty && opts.allow_empty);
         if !keep {
             fs::write(&pick_head, format!("{}\n", commit))?;
-            crate::workspace::staging::status(crate::objects::StatusOptions { untracked: "normal".to_string(), ..Default::default() })?;
+            crate::workspace::staging::status(crate::workspace::status::types::StatusOptions { untracked: "normal".to_string(), ..Default::default() })?;
             eprintln!("The previous cherry-pick is now empty, possibly due to conflict resolution.");
             eprintln!("If you wish to commit it anyway, use:");
             eprintln!();
@@ -325,7 +328,7 @@ fn move_head(head_state: &refs::HeadState, commit: &str) -> anyhow::Result<()> {
 /// Commits the resolved pick the way git's `continue_single_pick` does: `commit --no-edit
 /// --cleanup=strip` (`MERGE_MSG` without its `# Conflicts:` comment, the picked commit's author).
 fn commit_resolved_pick() -> anyhow::Result<()> {
-    crate::workspace::commit::commit(crate::objects::CommitOptions { no_edit: true, cleanup_strip: true, ..Default::default() })
+    crate::workspace::commit::commit(crate::workspace::commit::types::CommitOptions { no_edit: true, cleanup_strip: true, ..Default::default() })
 }
 
 /// `--continue`.
@@ -426,3 +429,4 @@ fn abort() -> anyhow::Result<Pick> {
     remove_sequence();
     Ok(Pick::Done)
 }
+

@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
 use crate::history::rev_list::engine::{abbreviate_hash, expand_rev_list_format, parse_rev_list_args, rewrite_rev_list_parents, select_rev_list_commits};
 use crate::core::commit::split_commit_message;
-use crate::objects::{RevListFormat, RevListOptions, WalkedCommit};
+use crate::history::{rev_list::types::{RevListFormat, RevListOptions}, types::WalkedCommit};
 
 /// `rgit rev-list [<options>] <commit>... [--] [<path>...]`
 ///

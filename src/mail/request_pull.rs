@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, Write};
 use anyhow::Result;
@@ -15,7 +16,7 @@ use crate::mail::request_pull::engine::{
 };
 use crate::history::rev_list::engine::expand_rev_list_format;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
-use crate::objects::RequestPullOptions;
+use crate::mail::request_pull::types::RequestPullOptions;
 use crate::core::repo;
 
 const SEPARATOR: &str = "----------------------------------------------------------------";

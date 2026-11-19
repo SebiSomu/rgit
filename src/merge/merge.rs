@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -9,7 +10,7 @@ use crate::workspace::state_files::build_tree_from_map;
 use crate::merge::merge::engine::{find_all_merge_bases, find_merge_base};
 use crate::core::commit::{is_reachable, resolve_commit_from_source, resolve_tree_from_source};
 use crate::core::index::read_index;
-use crate::objects::{FastForwardMode, MergeFavor, MergeOptions};
+use crate::merge::merge::types::{FastForwardMode, MergeFavor, MergeOptions};
 use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
@@ -136,7 +137,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     let our_tree = resolve_tree_from_source(&our_commit)?;
     let favor = favor_from_options(&opts.strategy_options);
     let result = if strategy == "ours" {
-        crate::objects::TreeMergeResult { tree: our_tree.clone(), ..Default::default() }
+        crate::merge::types::TreeMergeResult { tree: our_tree.clone(), ..Default::default() }
     } else {
         let (base_tree, _bases) = match merge_base_tree(&our_commit, &their_commit, opts.allow_unrelated) {
             Ok(base) => base,
@@ -256,7 +257,7 @@ fn write_squash_message(ours: &str, theirs: &str) -> anyhow::Result<()> {
     use crate::history::rev_list::engine::{parse_rev_list_args, select_rev_list_commits};
     let rev_opts = parse_rev_list_args(&[theirs.to_string(), format!("^{}", ours)])?;
     let (walked, _) = select_rev_list_commits(&rev_opts)?;
-    let log_opts = crate::objects::LogOptions::default();
+    let log_opts = crate::history::log::types::LogOptions::default();
     let mut text = String::from("Squashed commit of the following:\n");
     for commit in walked.iter().filter(|c| !c.hidden) {
         text.push('\n');
@@ -270,7 +271,7 @@ fn write_squash_message(ours: &str, theirs: &str) -> anyhow::Result<()> {
 /// per `diff.renames`).
 fn print_diffstat(old: &TreeMap, new: &TreeMap) -> anyhow::Result<()> {
     use crate::diff::plumbing::{diff_trees, render_diff_changes};
-    let opts = crate::objects::DiffPlumbingOptions {
+    let opts = crate::diff::plumbing::types::DiffPlumbingOptions {
         recursive: true,
         stat: true,
         summary: true,

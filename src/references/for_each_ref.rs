@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufWriter, Write};
@@ -8,7 +9,7 @@ use crate::references::for_each_ref::engine::{
     collect_ref_items, compare_ref_items, filter_ref_items, format_ref_item, parse_for_each_ref_args, populate_ref_values, prepare_ref_format,
     ref_iteration_prefixes, version_suffixes, want_ref_color, worktree_paths_by_branch,
 };
-use crate::objects::{ForEachRefExit, RefAtomKind};
+use crate::references::for_each_ref::types::{ForEachRefExit, RefAtomKind};
 
 /// `rgit for-each-ref [<options>] [<pattern>...]`
 ///

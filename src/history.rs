@@ -11,3 +11,4 @@ pub mod range_diff;
 pub mod rev_list;
 pub mod shortlog;
 pub mod show_branch;
+pub mod types;

@@ -47,7 +47,7 @@ pub fn verify_pack(args: Vec<String>) -> Result<()> {
     for arg in &packs {
         let (pack_path, index_path) = pack_and_index_paths(arg);
         let shown = pack_path.display().to_string();
-        let checked = (|| -> Result<Vec<crate::objects::PackedObject>> {
+        let checked = (|| -> Result<Vec<crate::core::types::PackedObject>> {
             let pack = fs::read(&pack_path).map_err(|_| anyhow::anyhow!("fatal: Cannot open existing pack file '{}'", arg))?;
             let stored = fs::read(&index_path).map_err(|_| anyhow::anyhow!("fatal: Cannot open existing pack idx file for '{}'", arg))?;
             let stored = parse_pack_index(&stored)?;

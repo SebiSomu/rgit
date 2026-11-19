@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -22,7 +23,7 @@ use crate::core::object_store::{
     write_tree_from_index_prefix,
 };
 use crate::core::index::{read_index, write_index};
-use crate::objects::{InteractiveFile, PatchModeSpec, PatchTarget};
+use crate::workspace::patch::types::{InteractiveFile, PatchModeSpec, PatchTarget};
 use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
@@ -395,7 +396,7 @@ fn run_mode(mode: &PatchModeSpec, pre: Side, post: Side, paths: &[String]) -> an
 /// `apply`'s warning when the target's mode is not the one the patch starts from (the patch
 /// only names modes when its mode-change hunk was chosen).
 fn warn_mode_mismatch(file: &InteractiveFile, mode: &PatchModeSpec, current: &Option<(u32, Vec<u8>)>) {
-    if !(file.mode_change && file.hunks.first().is_some_and(|h| h.use_ == crate::objects::HunkUse::Use)) {
+    if !(file.mode_change && file.hunks.first().is_some_and(|h| h.use_ == crate::workspace::patch::types::HunkUse::Use)) {
         return;
     }
     let expected = if mode.is_reverse { file.new } else { file.old }.map(|e| e.1);
@@ -412,7 +413,7 @@ fn print_selected_hunks(file: &InteractiveFile) {
     for line in &file.header {
         text.extend_from_slice(line);
     }
-    for hunk in file.hunks.iter().filter(|h| h.use_ == crate::objects::HunkUse::Use) {
+    for hunk in file.hunks.iter().filter(|h| h.use_ == crate::workspace::patch::types::HunkUse::Use) {
         text.extend_from_slice(&crate::workspace::patch::engine::render_hunk(hunk));
     }
     use std::io::Write;

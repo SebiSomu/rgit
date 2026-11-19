@@ -9,4 +9,5 @@ pub mod replace;
 pub mod show_ref;
 pub mod symbolic_ref;
 pub mod tag;
+pub mod types;
 pub mod update_ref;

@@ -5,7 +5,8 @@ use anyhow::Context;
 use crate::workspace::gitignore::{is_path_ignored, parse_gitignore_line};
 use crate::core::object_store::hash_content;
 use crate::core::index::IndexEntry;
-use crate::objects::{GitIgnoreRule, UntrackedPath, WorktreeState};
+use crate::workspace::types::GitIgnoreRule;
+use crate::workspace::ls_files::types::{UntrackedPath, WorktreeState};
 
 /// Compares a tracked index entry against its working-tree file: `Deleted` when the file is
 /// missing (or replaced by a directory), `Modified` when its blob hash differs from the index.
@@ -205,3 +206,4 @@ pub fn pathspec_wildcard_match(pattern: &[u8], text: &[u8]) -> bool {
     }
     pattern[p..].iter().all(|&c| c == b'*')
 }
+

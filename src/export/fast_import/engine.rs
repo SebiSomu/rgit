@@ -6,7 +6,7 @@ use crate::plumbing::mktree::engine::write_tree_from_entries;
 use crate::core::object_store::{flatten_tree, read_object, write_object};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::references::update_ref::engine::unquote_c_style;
-use crate::objects::{FastImportInput, FastImportState};
+use crate::export::fast_import::types::{FastImportInput, FastImportState};
 
 /// The next line of the stream without its newline, or `None` at the end of the input.
 // Used by `run_fast_import`, `import_commit`, `line_with` and `read_data`.
@@ -522,3 +522,4 @@ pub fn finish_fast_import(state: &FastImportState) -> Result<bool> {
     }
     Ok(skipped)
 }
+

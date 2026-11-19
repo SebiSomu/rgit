@@ -2,7 +2,9 @@
 //! commit. The drawing is a state machine fed one commit at a time (`graph_update`); every
 //! output line (commit row, message line, diff line, separator) asks it for the next prefix.
 
-use crate::objects::{GitGraph, GraphState};
+pub mod types;
+
+use crate::history::graph::types::{GitGraph, GraphState};
 
 /// Creates an empty graph drawing, ready for its first `graph_update`.
 // Used by `log --graph`.
@@ -554,3 +556,4 @@ pub fn graph_prefix_lines(g: &mut GitGraph, text: &str) -> String {
     }
     out
 }
+

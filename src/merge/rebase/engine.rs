@@ -12,9 +12,10 @@ use crate::merge::merge::engine::merge_into_worktree;
 use crate::core::object_store::{read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::workspace::state_files::read_lines_set;
 use crate::core::index::{read_index, write_index};
-use crate::objects::{Action, ItemResult, TodoItem};
+
 use crate::core::refs;
 use crate::core::editor::run_editor;
+use crate::merge::rebase::types::{Action, ItemResult, TodoItem};
 
 pub const REBASE_TODO_PATH: &str = ".git/REBASE_TODO";
 pub const REBASE_BRANCH_PATH: &str = ".git/REBASE_BRANCH";
@@ -238,7 +239,7 @@ pub fn select_commits_to_rebase(upstream: &str, head: &str, reapply: bool) -> an
     use crate::history::rev_list::engine::{parse_rev_list_args, select_rev_list_commits};
     let args = vec![head.to_string(), format!("^{}", upstream), "--no-merges".to_string(), "--topo-order".to_string()];
     let (walked, _) = select_rev_list_commits(&parse_rev_list_args(&args)?)?;
-    let mut ours: Vec<crate::objects::ParsedCommit> = walked.into_iter().filter(|w| !w.hidden).map(|w| w.commit).collect();
+    let mut ours: Vec<crate::core::types::ParsedCommit> = walked.into_iter().filter(|w| !w.hidden).map(|w| w.commit).collect();
     ours.reverse();
     let mut upstream_ids = std::collections::HashSet::new();
     if !reapply {
@@ -805,3 +806,4 @@ pub fn collect_commits_to_replay(tip: &str, base: &str) -> anyhow::Result<Vec<St
 #[cfg(test)]
 #[path = "../../../tests/unit/merge/rebase/engine.rs"]
 mod tests;
+

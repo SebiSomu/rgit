@@ -8,8 +8,9 @@ use crate::core::{commit::split_commit_message, date::tz_offset_seconds};
 use crate::core::config::author_identity;
 use crate::core::object_store::{flatten_tree, tree_hash_of_commit, write_object};
 use crate::core::index::IndexEntry;
-use crate::objects::{CommitSignature, MailPatch};
+use crate::core::types::CommitSignature;
 use crate::core::refs;
+use crate::mail::am::types::MailPatch;
 
 /// Directory holding an in-progress `am` session (same layout as git: `next`, `last`,
 /// `0001`... raw mails, and `orig-head`).
@@ -409,3 +410,4 @@ pub fn clear_am_state() -> anyhow::Result<()> {
     }
     Ok(())
 }
+

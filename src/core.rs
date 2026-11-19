@@ -10,4 +10,5 @@ pub mod reflog;
 pub mod refs;
 pub mod repo;
 pub mod rev_parse;
+pub mod types;
 pub mod wildmatch;

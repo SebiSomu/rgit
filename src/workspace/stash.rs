@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -32,6 +34,7 @@ use crate::core::object_store::{
 };
 use crate::core::index::{read_index, write_index};
 use crate::core::refs;
+use crate::workspace::stash::types::StashAction;
 
 /// `rgit stash` / `rgit stash push [-m <message>]`
 ///
@@ -254,8 +257,7 @@ pub fn stash_clear() -> anyhow::Result<()> {
 
 /// Top-level dispatcher for `rgit stash [<action>]`. A bare `rgit stash`
 /// (no subcommand) behaves like `rgit stash push`.
-pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> {
-    use crate::objects::StashAction;
+pub fn stash(action: Option<crate::workspace::stash::types::StashAction>) -> anyhow::Result<()> {
 
     // Saving a stash needs a fully merged index: git just lists what needs merging.
     if matches!(action, None | Some(StashAction::Push { .. })) && crate::merge::merge::engine::report_needs_merge() {
@@ -276,3 +278,4 @@ pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> 
         Some(StashAction::Clear) => stash_clear(),
     }
 }
+

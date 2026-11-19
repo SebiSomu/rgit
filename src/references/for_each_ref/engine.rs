@@ -11,10 +11,7 @@ use crate::core::object_store::read_object;
 use crate::core::rev_parse::resolve_rev;
 use crate::references::tag::engine::describe_commit_matching;
 use crate::core::wildmatch::{wildmatch, WM_CASEFOLD, WM_PATHNAME};
-use crate::objects::{
-    ForEachRefExit, ForEachRefOptions, RefAlign, RefArrayItem, RefAtomArg, RefAtomKind, RefAtomValue, RefContentsPart, RefDateKind,
-    RefDateMode, RefFilterAtom, RefFormatPiece, RefQuoteStyle, RefnameShow, RemoteRefShow, TrailerFormatOptions,
-};
+use crate::references::for_each_ref::types::{ForEachRefExit, ForEachRefOptions, RefAlign, RefArrayItem, RefAtomArg, RefAtomKind, RefAtomValue, RefContentsPart, RefDateKind, RefDateMode, RefFilterAtom, RefFormatPiece, RefnameShow, RefQuoteStyle, RemoteRefShow, TrailerFormatOptions};
 
 /// git's `--format` default for `for-each-ref`.
 pub const FOR_EACH_REF_DEFAULT_FORMAT: &str = "%(objectname) %(objecttype)\t%(refname)";
@@ -3112,3 +3109,4 @@ pub fn compare_ref_items(
     }
     if ignore_case { strcasecmp(a.0.refname.as_bytes(), b.0.refname.as_bytes()) } else { a.0.refname.cmp(&b.0.refname) }
 }
+

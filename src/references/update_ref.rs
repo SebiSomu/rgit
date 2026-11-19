@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 
@@ -7,7 +8,7 @@ use crate::references::update_ref::engine::{
     commit_ref_transaction, get_object_id, parse_update_ref_args, prepare_ref_transaction, queue_ref_update,
     run_update_ref_stdin, UPDATE_REF_USAGE,
 };
-use crate::objects::{RefUpdate, UpdateRefOptions};
+use crate::references::update_ref::types::{RefUpdate, UpdateRefOptions};
 use crate::core::repo;
 
 /// `rgit update-ref [-m <reason>] [--no-deref] [--create-reflog] <ref> <new-oid> [<old-oid>]`

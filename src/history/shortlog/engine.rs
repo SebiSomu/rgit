@@ -2,8 +2,9 @@ use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::core::object_store::read_object;
-use crate::objects::ShortlogOptions;
+
 use crate::core::refs;
+use crate::history::shortlog::types::ShortlogOptions;
 
 /// A single author entry produced by `collect_shortlog`: the display name/email
 /// together with the subject lines of every commit attributed to that author.
@@ -209,3 +210,4 @@ pub fn collect_shortlog(opts: &ShortlogOptions) -> Result<Vec<AuthorEntry>> {
 #[cfg(test)]
 #[path = "../../../tests/unit/history/shortlog/engine.rs"]
 mod tests;
+

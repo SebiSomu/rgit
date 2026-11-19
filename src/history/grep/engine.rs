@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use regex::{Regex, RegexBuilder};
-use crate::objects::{GrepFileResult, GrepOptions};
+use crate::history::grep::types::{GrepFileResult, GrepOptions};
 
 /// Builds a compiled `Regex` for the pattern, taking case-insensitivity and fixed-strings flags into account.
 // Used by the `grep` command.
@@ -91,3 +91,4 @@ pub fn search_content(
 #[cfg(test)]
 #[path = "../../../tests/unit/history/grep/engine.rs"]
 mod tests;
+

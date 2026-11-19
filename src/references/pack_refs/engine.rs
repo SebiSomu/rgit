@@ -7,9 +7,10 @@ use crate::core::check_ref_format::check_refname_format;
 use crate::core::object_store::read_object;
 use crate::core::rev_parse::peel_to_type;
 use crate::core::wildmatch::wildmatch;
-use crate::objects::{PackRefsOptions, PackedRefEntry};
+
 use crate::core::refs::prune_empty_ref_dirs;
 use crate::core::repo;
+use crate::references::pack_refs::types::{PackedRefEntry, PackRefsOptions};
 
 /// git's usage text for `pack-refs`, printed for `-h` and after option errors (exit 129).
 pub const PACK_REFS_USAGE: &str = "usage: rgit pack-refs [--all] [--no-prune] [--include <pattern>] [--exclude <pattern>]
@@ -240,3 +241,4 @@ pub fn pack_refs_matching(opts: &PackRefsOptions) -> anyhow::Result<()> {
     }
     Ok(())
 }
+

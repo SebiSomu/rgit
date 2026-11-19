@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::BTreeMap;
 use crate::workspace::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};
@@ -146,7 +147,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
 
 /// `branch -d/-D [-r] <name>...`: deletes each branch (or remote-tracking branch), refusing
 /// unmerged ones without `-D`, and reports every failure before exiting 1.
-fn delete_branches(opts: &crate::objects::BranchOptions) -> anyhow::Result<()> {
+fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> anyhow::Result<()> {
     use crate::workspace::branch::engine::*;
     if opts.args.is_empty() {
         die("branch name required");
@@ -226,7 +227,7 @@ fn delete_branches(opts: &crate::objects::BranchOptions) -> anyhow::Result<()> {
 
 /// `branch -m/-M/-c/-C [<old>] <new>`: renames or copies a branch (the current one when only
 /// `<new>` is given) together with its `branch.<name>.*` config.
-fn rename_or_copy(opts: &crate::objects::BranchOptions, current: Option<&str>) -> anyhow::Result<()> {
+fn rename_or_copy(opts: &crate::workspace::branch::types::BranchOptions, current: Option<&str>) -> anyhow::Result<()> {
     use crate::workspace::branch::engine::*;
     let verb = if opts.copy { "copy" } else { "rename" };
     let (old, new) = match opts.args.as_slice() {

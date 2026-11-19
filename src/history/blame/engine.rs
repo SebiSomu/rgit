@@ -7,7 +7,8 @@ use crate::remote::github::format_unix_timestamp_iso8601;
 use crate::diff::myers::myers_diff;
 use crate::core::commit::commit_parents;
 use crate::core::object_store::{read_object, tree_hash_of_commit};
-use crate::objects::{BlameLine, DiffOp};
+use crate::diff::types::DiffOp;
+use crate::history::blame::types::BlameLine;
 
 /// The commit hash recorded for lines that exist only in the working copy.
 const UNCOMMITTED_HASH: &str = "0000000000000000000000000000000000000000";
@@ -414,3 +415,4 @@ pub fn format_blame_output(lines: &[BlameLine]) -> String {
     }
     out
 }
+

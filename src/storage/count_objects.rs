@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use crate::storage::count_objects::engine::{collect_object_counts, format_human_readable_size};

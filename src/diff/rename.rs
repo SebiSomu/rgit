@@ -3,12 +3,15 @@
 //! Exact renames come first, then (renames only) files with the same unique base name at 75%,
 //! then the similarity table: renames before copies, the best four candidates per destination.
 
+pub mod types;
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::core::config::get_config_value;
 use crate::core::object_store::{hash_content, read_object};
-use crate::objects::{DiffChange, DiffSide, RenameOptions};
+use crate::diff::types::{DiffChange, DiffSide};
+use crate::diff::rename::types::RenameOptions;
 
 static RENAME_LIMIT_NEEDED: AtomicUsize = AtomicUsize::new(0);
 static RENAME_DEGRADED: AtomicBool = AtomicBool::new(false);
@@ -483,3 +486,4 @@ pub fn detect_renames(changes: Vec<DiffChange>, opts: &RenameOptions, unmodified
     }
     output
 }
+

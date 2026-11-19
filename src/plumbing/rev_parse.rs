@@ -1,10 +1,12 @@
+pub mod types;
+
 use anyhow::Result;
 
 use crate::core::rev_parse::{
     abbrev_ref_symbolic, find_work_tree_root, is_inside_work_tree, resolve_rev,
     symbolic_full_name_symbolic,
 };
-use crate::objects::RevParseOptions;
+use crate::plumbing::rev_parse::types::RevParseOptions;
 
 /// `rgit rev-parse [--git-dir|--show-toplevel|--is-inside-work-tree|--is-bare-repository]`
 /// `rgit rev-parse [--abbrev-ref|--symbolic-full-name] [<rev>...]`
@@ -155,3 +157,4 @@ pub fn rev_parse(opts: RevParseOptions) -> Result<()> {
 
     Ok(())
 }
+

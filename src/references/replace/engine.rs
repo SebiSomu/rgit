@@ -5,8 +5,9 @@ use crate::core::editor::run_editor;
 use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::wildmatch::wildmatch;
-use crate::objects::{ReplaceMode, ReplaceOptions};
+
 use crate::core::refs::{remove_packed_ref, write_ref};
+use crate::references::replace::types::{ReplaceMode, ReplaceOptions};
 
 /// git's usage text for `replace`, printed for `-h` and after usage errors (exit 129).
 pub const REPLACE_USAGE: &str = "usage: rgit replace [-f] <object> <replacement>
@@ -289,3 +290,4 @@ fn listing_as_tree(listing: &[u8]) -> anyhow::Result<Vec<u8>> {
     }
     Ok(out)
 }
+

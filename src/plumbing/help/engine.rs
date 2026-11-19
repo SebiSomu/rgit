@@ -1,7 +1,7 @@
 use clap::CommandFactory;
 
 use crate::cli::Cli;
-use crate::objects::CommandHelp;
+use crate::plumbing::help::types::CommandHelp;
 
 /// Names of every rgit command, including synonyms such as `stage`, sorted alphabetically.
 // Used by `help` and `help -a`.
@@ -32,3 +32,4 @@ pub fn command_help(name: &str) -> Option<CommandHelp> {
         Some(CommandHelp::Clap(sub.render_long_help().to_string()))
     }
 }
+

@@ -8,7 +8,7 @@ use crate::core::config::get_config_value;
 use crate::workspace::index_plumbing::{worktree_state, write_entry_to_worktree};
 use crate::core::wildmatch::{wildmatch, WM_PATHNAME};
 use crate::core::index::{build_entry, read_index, write_index, IndexEntry};
-use crate::objects::IndexFileState;
+use crate::workspace::types::IndexFileState;
 
 /// Usage text of `sparse-checkout`.
 pub const SPARSE_CHECKOUT_USAGE: &str = "usage: rgit sparse-checkout (init | list | set | add | reapply | disable | check-rules) [<options>]\n\n   init [--cone | --no-cone]\n   set [--cone | --no-cone] [--stdin | <patterns>...]\n   add [--stdin | <patterns>...]\n   list\n   reapply [--cone | --no-cone]\n   disable\n   check-rules [-z] [--cone | --no-cone] [--rules-file <file>]\n";

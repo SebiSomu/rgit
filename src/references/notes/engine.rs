@@ -8,8 +8,9 @@ use crate::core::object_store::{flatten_tree, read_object, write_object};
 use crate::core::editor::run_editor;
 use crate::core::rev_parse::resolve_rev;
 use crate::workspace::state_files::build_tree_from_map;
-use crate::objects::{NotesMergeStrategy, NotesTree};
+
 use crate::core::refs::{read_ref, write_ref};
+use crate::references::notes::types::{NotesMergeStrategy, NotesTree};
 
 /// Usage text for `notes`, printed for `-h` and after usage errors (exit 129).
 pub const NOTES_USAGE: &str = "usage: rgit notes [--ref <notes-ref>] [list [<object>]]
@@ -300,3 +301,4 @@ pub fn merge_notes(local: &mut NotesTree, remote_ref: &str, strategy: NotesMerge
     commit_notes_tree(local, &format!("Merged notes from {} into {}", remote_ref, local.notes_ref), Some(vec![local_commit, remote_commit]))?;
     Ok(messages)
 }
+

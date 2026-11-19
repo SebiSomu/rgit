@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::core::config::author_identity;
-use crate::objects::ReflogEntry;
+use crate::core::types::ReflogEntry;
 
 /// The hash a reflog line uses for "no commit": the old value of a ref that was just created,
 /// or the new value of one that was deleted.

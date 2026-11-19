@@ -3,7 +3,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use crate::core::config::{read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
-use crate::objects::RemoteInfo;
+
+use crate::remote::remote::types::RemoteInfo;
 
 /// Validates whether a given string is an acceptable remote name.
 // Used by `add_remote` and `rename_remote`.
@@ -232,3 +233,4 @@ fn collect_remote_branches(dir: &Path, prefix: &str, out: &mut Vec<String>) -> R
     }
     Ok(())
 }
+

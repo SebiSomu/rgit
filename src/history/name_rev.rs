@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, BufRead, Write};
 use anyhow::Result;

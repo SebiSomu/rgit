@@ -7,9 +7,10 @@ use crate::core::commit::{commit_subject_line, is_reachable, resolve_commit_from
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::workspace::state_files::{append_line, read_lines_set};
 use crate::core::index::read_index;
-use crate::objects::BisectOutcome;
+
 use crate::core::refs;
 use crate::core::commit::collect_ancestors;
+use crate::history::bisect::types::BisectOutcome;
 
 /// BFS from `start` over the *entire* ancestor graph (so it can walk through
 /// non-candidate commits to reach further candidates), collecting only the
@@ -254,3 +255,4 @@ pub fn mark_skip(revs: Vec<String>) -> Result<BisectOutcome> {
 
     bisect_recompute()
 }
+

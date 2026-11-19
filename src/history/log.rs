@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
@@ -12,7 +13,7 @@ use crate::history::log::engine::{collect_decorations, commit_diff_output, commi
 use crate::core::object_store::read_object;
 use crate::history::rev_list::engine::{rewrite_rev_list_parents, select_rev_list_commits};
 use crate::core::rev_parse::resolve_rev;
-use crate::objects::{LogFormat, LogOptions, WalkedCommit};
+use crate::history::{log::types::{LogFormat, LogOptions}, types::WalkedCommit};
 use crate::core::refs;
 
 /// `rgit log [<options>] [<revision-range>] [[--] <path>...]`

@@ -10,7 +10,8 @@ use zip::ZipWriter;
 use crate::core::commit::resolve_commit_from_source;
 use crate::remote::github::format_unix_timestamp_iso8601;
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
-use crate::objects::ArchiveFormat;
+
+use crate::export::archive::types::ArchiveFormat;
 
 /// Returns the slice of supported archive format names.
 // Used by the `archive` command.
@@ -271,3 +272,4 @@ pub fn archive_commit_id(tree_ish: &str) -> Option<String> {
     let commit = crate::core::rev_parse::peel_to_type(hash, "commit").ok()?;
     matches!(read_object(&commit), Ok((ref object_type, _)) if object_type == "commit").then_some(commit)
 }
+

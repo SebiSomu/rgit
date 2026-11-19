@@ -1,6 +1,5 @@
 use std::io::IsTerminal;
-
-use crate::objects::{ColumnEnable, ColumnLayout, ColumnOptions};
+use crate::plumbing::column::types::{ColumnEnable, ColumnLayout, ColumnOptions};
 
 /// Usage text of `column`, printed for `-h` and usage errors.
 pub const COLUMN_USAGE: &str = "usage: rgit column [<options>]\n\n    --[no-]command <name> lookup config vars\n    --[no-]mode[=<style>] layout to use\n    --[no-]raw-mode <n>   layout to use\n    --[no-]width <n>      maximum width\n    --[no-]indent <string>\n                          padding space on left border\n    --[no-]nl <string>    padding space on right border\n    --[no-]padding <n>    padding space between columns\n\n";
@@ -257,3 +256,4 @@ pub fn render_columns(items: &[String], opts: &ColumnOptions) -> String {
     }
     out
 }
+

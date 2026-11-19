@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::{BTreeMap, HashSet};
 use std::io::{self, BufWriter, Write};
@@ -10,7 +11,7 @@ use crate::merge::merge_tree::engine::{merge_base_tree, merge_trees_in_memory};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::workspace::state_files::build_tree_from_map;
 use crate::core::object_store::flatten_tree;
-use crate::objects::{MergePathOutcome, MergeTreeOptions, TreeMergeResult};
+use crate::merge::{merge_tree::types::{MergePathOutcome, MergeTreeOptions}, types::TreeMergeResult};
 
 const PREVIEW_LINES: usize = 6;
 
@@ -183,7 +184,7 @@ fn write_explanation(out: &mut impl Write, opts: &MergeTreeOptions, ours: &str, 
                             format!(": {}{}", plural(f.conflicts.len(), "conflicting region"), extra)
                         }
                         ("modify/delete", _) => {
-                            let kept = if report.ours == crate::objects::SideChange::Deleted { l2 } else { l1 };
+                            let kept = if report.ours == crate::merge::merge_tree::types::SideChange::Deleted { l2 } else { l1 };
                             format!(": {}'s modified version left in tree", kept)
                         }
                         ("binary", _) => format!(": can't merge binary content, kept {}'s version", l1),

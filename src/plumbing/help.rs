@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::io::Write;
 use std::process::Command;
@@ -6,7 +7,7 @@ use anyhow::Result;
 
 use crate::plumbing::column::engine::{default_column_options, render_columns};
 use crate::plumbing::help::engine::{all_command_names, command_help};
-use crate::objects::{ColumnEnable, CommandHelp};
+use crate::plumbing::{column::types::ColumnEnable, help::types::CommandHelp};
 
 /// `rgit help [-a | --all] [<command>]`
 ///

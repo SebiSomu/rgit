@@ -1,8 +1,9 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use crate::storage::fsck::engine::run_fsck_checks;
-use crate::objects::FsckSeverity;
+use crate::storage::fsck::types::FsckSeverity;
 
 /// `rgit fsck [--connectivity-only] [--no-dangling] [--unreachable] [--no-reflogs]`
 ///

@@ -10,10 +10,11 @@ use crate::core::commit::short_hash;
 use crate::core::reflog::{record_ref_update, NULL_HASH};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::core::index::read_index;
-use crate::objects::WorktreeInfo;
+
 use crate::core::repo;
 use crate::core::repo::all_worktree_git_dirs;
 use crate::core::repo::worktrees_admin_root;
+use crate::workspace::worktree::types::WorktreeInfo;
 
 /// Returns the top directory of the main worktree (the parent of the shared `.git`).
 // Used by `list_worktrees`.
@@ -367,3 +368,4 @@ pub fn format_worktree_porcelain(worktrees: &[WorktreeInfo]) -> String {
 #[cfg(test)]
 #[path = "../../../tests/unit/workspace/worktree/engine.rs"]
 mod tests;
+

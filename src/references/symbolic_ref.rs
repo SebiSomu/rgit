@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 
@@ -7,7 +8,7 @@ use crate::references::for_each_ref::engine::shorten_unambiguous_ref_with;
 use crate::references::symbolic_ref::engine::{
     delete_symbolic_ref, parse_symbolic_ref_args, resolve_ref_unsafe, write_symbolic_ref, SYMBOLIC_REF_USAGE,
 };
-use crate::objects::SymbolicRefOptions;
+use crate::references::symbolic_ref::types::SymbolicRefOptions;
 use crate::core::repo;
 
 /// `rgit symbolic-ref [-m <reason>] <name> <ref>`

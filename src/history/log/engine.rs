@@ -13,8 +13,10 @@ use crate::workspace::ls_files::engine::{matches_ls_files_pathspec, normalize_pa
 use crate::core::refs::list_all_refs;
 use crate::history::rev_list::engine::{abbreviate_hash, expand_rev_list_format, parse_revision_args};
 use crate::core::rev_parse::peel_to_type;
-use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, CommitSignature, LogDateMode, LogDecorate, LogFormat, LogOptions, ParsedCommit};
+use crate::core::types::{CommitSignature, ParsedCommit};
+use crate::diff::{plumbing::types::DiffPlumbingOptions, types::{DiffChange, DiffSide}};
 use crate::core::refs;
+use crate::history::log::types::{LogDateMode, LogDecorate, LogFormat, LogOptions};
 
 /// Parses `log` / `show` arguments. Display options (`--pretty`, `--format`, `--oneline`,
 /// `--date`, `--decorate`, `-p`, `--stat`, `--shortstat`, `--name-only`, `--name-status`,
@@ -530,3 +532,4 @@ pub fn join_entry_and_diff(entry: &str, diff: &str, opts: &LogOptions) -> String
         _ => format!("{}{}\n{}", entry, if dashes { "---" } else { "" }, diff),
     }
 }
+

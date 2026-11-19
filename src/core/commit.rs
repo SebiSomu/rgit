@@ -4,8 +4,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::core::config::author_identity;
 use crate::core::object_store::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object};
 use crate::core::index::{build_entry, read_index, write_index};
-use crate::objects::CommitSignature;
-use crate::objects::ParsedCommit;
+use crate::core::types::CommitSignature;
+use crate::core::types::ParsedCommit;
 use anyhow::Result;
 use std::collections::{HashSet, VecDeque};
 

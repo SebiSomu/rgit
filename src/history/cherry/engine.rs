@@ -5,7 +5,8 @@ use crate::core::commit::parse_commit_object;
 use crate::diff::hunks::{split_diff_lines, unified_hunks_with};
 use crate::history::rev_list::engine::run_rev_list_walk;
 use crate::core::object_store::{flatten_tree, read_object};
-use crate::objects::{ParsedCommit, RevListOptions, RevListRoots};
+use crate::core::types::ParsedCommit;
+use crate::history::rev_list::types::{RevListOptions, RevListRoots};
 
 /// Finds the upstream of the current branch from `branch.<name>.remote` and
 /// `branch.<name>.merge`: `refs/heads/<merge>` for a remote of `.`, otherwise the

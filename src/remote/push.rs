@@ -1,10 +1,11 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use crate::remote::github::*;
 use crate::remote::push::engine::*;
 use crate::core::commit::{is_reachable, resolve_commit_from_source, short_hash};
-use crate::objects::{GitHubTarget, PushStatus};
+use crate::remote::{push::types::PushStatus, types::GitHubTarget};
 use crate::core::refs::{self, HeadState};
 
 pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_upstream: bool) -> Result<()> {

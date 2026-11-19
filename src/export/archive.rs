@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use std::io::Write;
 use std::path::PathBuf;
 use anyhow::Context;
 
 use crate::export::archive::engine::{archive_commit_id, create_archive, list_archive_formats, resolve_tree_ish};
-use crate::objects::ArchiveFormat;
+use crate::export::archive::types::ArchiveFormat;
 
 /// Entry point for `rgit archive`.
 ///

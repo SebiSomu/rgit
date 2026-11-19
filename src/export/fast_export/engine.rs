@@ -8,8 +8,9 @@ use crate::core::object_store::{flatten_tree, read_object};
 use crate::core::refs::list_all_refs;
 use crate::history::rev_list::engine::{parse_rev_list_args, select_rev_list_commits};
 use crate::core::rev_parse::resolve_rev;
-use crate::objects::{DiffChange, DiffSide, FastExportOptions};
+use crate::diff::types::{DiffChange, DiffSide};
 use crate::core::refs::read_ref;
+use crate::export::fast_export::types::FastExportOptions;
 
 /// Usage text of `fast-export`.
 pub const FAST_EXPORT_USAGE: &str = "usage: rgit fast-export [<rev-list-opts>]\n\n    --signed-tags <when>  select handling of signed tags\n    --tag-of-filtered-object <when>\n                          select handling of tags that tag filtered objects\n    --export-marks <file> dump marks to this file\n    --import-marks <file> import marks from this file\n    --import-marks-if-exists <file>\n                          import marks from this file if it exists\n    --use-done-feature    use the done feature to terminate the stream\n    --no-data             skip output of blob data\n    --full-tree           output full tree for each commit\n    --mark-tags           label tags with mark ids\n    --reference-excluded-parents\n                          reference parents which are not in fast-export stream by object id\n    --show-original-ids   show original object ids of blobs/commits\n\n";
@@ -222,7 +223,7 @@ pub fn run_fast_export(opts: &FastExportOptions, out: &mut impl Write) -> Result
     let rev_opts = parse_rev_list_args(&rev_args)?;
     let (walked, _) = select_rev_list_commits(&rev_opts)?;
     let included: HashSet<&str> = walked.iter().map(|w| w.commit.hash.as_str()).collect();
-    let by_hash: HashMap<&str, &crate::objects::ParsedCommit> = walked.iter().map(|w| (w.commit.hash.as_str(), &w.commit)).collect();
+    let by_hash: HashMap<&str, &crate::core::types::ParsedCommit> = walked.iter().map(|w| (w.commit.hash.as_str(), &w.commit)).collect();
 
     // Spread the ref names from the tips to their ancestors the way git's walk does: commits
     // are taken newest first, and a parent inherits the name of the first child that reaches it.
@@ -466,3 +467,4 @@ pub fn run_fast_export(opts: &FastExportOptions, out: &mut impl Write) -> Result
     }
     Ok(())
 }
+

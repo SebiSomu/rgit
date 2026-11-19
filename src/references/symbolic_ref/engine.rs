@@ -3,9 +3,10 @@ use std::path::Path;
 use anyhow::Context;
 use crate::core::check_ref_format::check_refname_format;
 use crate::core::reflog::{delete_reflog, record_symref_update};
-use crate::objects::{RawRefValue, ResolvedRef, SymbolicRefOptions};
+use crate::references::types::RawRefValue;
 use crate::core::refs::read_packed_ref;
 use crate::core::repo;
+use crate::references::symbolic_ref::types::{ResolvedRef, SymbolicRefOptions};
 
 /// Longest chain of symbolic refs followed before giving up (git's `SYMREF_MAXDEPTH`).
 const SYMREF_MAX_DEPTH: usize = 5;
@@ -248,3 +249,4 @@ pub fn delete_symbolic_ref(name: &str) -> anyhow::Result<()> {
     crate::core::refs::prune_empty_ref_dirs(&path);
     Ok(())
 }
+

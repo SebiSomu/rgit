@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
 use crate::core::refs::list_all_refs;
 use crate::references::show_ref::engine::{matches_show_ref_pattern, parse_show_ref_args, resolve_show_ref, show_ref_exclude_existing, show_ref_exists, show_ref_line};
-use crate::objects::ShowRefOptions;
+use crate::references::show_ref::types::ShowRefOptions;
 
 /// `rgit show-ref [--head] [-d] [-s|--hash[=<n>]] [--abbrev[=<n>]] [--heads] [--tags] [--] [<pattern>...]`
 /// `rgit show-ref --verify [-q] [-d] [-s|--hash[=<n>]] [--abbrev[=<n>]] [--] <ref>...`

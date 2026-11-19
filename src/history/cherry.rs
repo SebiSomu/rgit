@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::HashSet;
 use std::io::{self, BufWriter, Write};
@@ -7,7 +8,7 @@ use anyhow::Result;
 use crate::core::object_store::abbreviate_hash_min;
 use crate::history::cherry::engine::{commit_patch_id, resolve_cherry_upstream, walk_non_merge_commits};
 use crate::core::{commit::split_commit_message, rev_parse::resolve_commit_rev};
-use crate::objects::CherryOptions;
+use crate::history::cherry::types::CherryOptions;
 
 /// `rgit cherry [-v] [--abbrev[=<n>]] [<upstream> [<head> [<limit>]]]`
 ///

@@ -13,7 +13,11 @@ use crate::core::refs::list_all_refs;
 use crate::history::rev_list::engine::run_rev_list_walk;
 use crate::core::rev_parse::resolve_rev;
 use crate::references::symbolic_ref::engine::resolve_ref_unsafe;
-use crate::objects::{FileDiff, GitHubTarget, Mailmap, RequestPullOptions, RevListOptions, RevListRoots};
+use crate::diff::types::FileDiff;
+use crate::history::rev_list::types::{RevListOptions, RevListRoots};
+use crate::mail::mailmap::types::Mailmap;
+use crate::remote::types::GitHubTarget;
+use crate::mail::request_pull::types::RequestPullOptions;
 
 /// git's usage text for `request-pull`, printed for `-h` and when `<start>` or `<url>` is missing.
 pub const REQUEST_PULL_USAGE: &str = "usage: rgit request-pull [options] start url [end]
@@ -282,3 +286,4 @@ pub fn tag_message_for_pull(object: &str) -> Option<String> {
     }
     Some(out)
 }
+

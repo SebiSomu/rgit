@@ -1,11 +1,12 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::mail::apply::engine::{check_file_patch, format_apply_numstat, format_apply_stat, format_apply_summary, parse_patch, read_patch_input, write_planned_changes};
 use crate::core::index::{read_index, IndexEntry};
-use crate::objects::{ApplyOptions, FilePatch, PlannedChanges};
+use crate::mail::{apply::types::{ApplyOptions, FilePatch}, types::PlannedChanges};
 
 /// `rgit apply [--check] [--stat] [--numstat] [--summary] [--apply] [--cached | --index] [-R] [-v] [-p<n>] [<patch>...]`
 ///

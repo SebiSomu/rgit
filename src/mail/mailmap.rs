@@ -1,9 +1,11 @@
+pub mod types;
+
 use std::fs;
 use std::path::Path;
 use crate::core::config::get_config_value;
 use crate::core::object_store::read_object;
 use crate::core::rev_parse::resolve_rev;
-use crate::objects::{CheckMailmapOptions, Mailmap, MailmapEntry, MailmapInfo};
+use crate::mail::mailmap::types::{CheckMailmapOptions, Mailmap, MailmapEntry, MailmapInfo};
 
 /// git's usage text for `check-mailmap`, printed for `-h` and after option errors (exit 129).
 pub const CHECK_MAILMAP_USAGE: &str = "usage: rgit check-mailmap [<options>] <contact>...
@@ -192,3 +194,4 @@ pub fn split_contact(contact: &str) -> Option<(String, String)> {
     let name = contact[..open].trim_end_matches(|c: char| matches!(c, ' ' | '\t' | '\n' | '\r'));
     Some((name.to_string(), contact[open + 1..close].to_string()))
 }
+

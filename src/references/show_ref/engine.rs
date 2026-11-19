@@ -7,7 +7,7 @@ use crate::core::object_store::read_object;
 use crate::core::object_store::abbreviate_hash_min;
 use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::peel_to_type;
-use crate::objects::ShowRefOptions;
+use crate::references::show_ref::types::ShowRefOptions;
 
 /// git's usage text for `show-ref`, printed after option errors (exit 129).
 pub const SHOW_REF_USAGE: &str = "usage: rgit show-ref [--head] [-d | --dereference]
@@ -199,3 +199,4 @@ pub fn show_ref_exclude_existing(pattern: &str) -> anyhow::Result<()> {
     }
     Ok(())
 }
+

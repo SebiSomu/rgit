@@ -5,7 +5,8 @@ use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::references::symbolic_ref::engine::resolve_ref_unsafe;
 use crate::core::wildmatch::wildmatch;
-use crate::objects::{ParsedCommit, ShowBranchOptions};
+use crate::core::types::ParsedCommit;
+use crate::history::show_branch::types::ShowBranchOptions;
 
 /// git's usage text for `show-branch`, printed for `-h` and after usage errors (exit 129).
 pub const SHOW_BRANCH_USAGE: &str = "usage: rgit show-branch [-a | --all] [-r | --remotes] [--topo-order | --date-order]
@@ -549,3 +550,4 @@ pub fn show_branch_output(opts: &ShowBranchOptions, names: &[String], head: Opti
     }
     Ok((out, 0))
 }
+

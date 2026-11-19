@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -7,8 +9,9 @@ use crate::workspace::checkout::{build_index_entries_for_tree, ensure_working_tr
 use crate::core::commit::commit_parents;
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::core::index::{write_index, IndexEntry};
-use crate::objects::StashEntry;
+
 use crate::core::refs;
+use crate::workspace::state_files::types::StashEntry;
 
 pub const STASH_LIST_PATH: &str = ".git/STASH_LIST";
 
@@ -333,7 +336,7 @@ pub fn collect_untracked_files(tracked: &std::collections::BTreeSet<String>, inc
             tracked_dirs.insert(prefix.clone());
         }
     }
-    let mode = if include_ignored { crate::objects::CleanMode::IncludeIgnored } else { crate::objects::CleanMode::Normal };
+    let mode = if include_ignored { crate::workspace::clean::types::CleanMode::IncludeIgnored } else { crate::workspace::clean::types::CleanMode::Normal };
     let (mut files, mut dirs, mut rules) = (Vec::new(), Vec::new(), Vec::new());
     crate::workspace::clean::engine::collect_clean_candidates(Path::new("."), &mut rules, tracked, &tracked_dirs, &mode, false, &mut files, &mut dirs)?;
     files.sort();
@@ -386,3 +389,4 @@ fn restore_untracked_files(untracked_commit: &str) -> anyhow::Result<()> {
     }
     Ok(())
 }
+

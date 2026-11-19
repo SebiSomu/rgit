@@ -15,7 +15,8 @@ use crate::merge::merge::engine::find_all_merge_bases;
 use crate::core::refs::list_all_refs;
 use crate::core::rev_parse::peel_to_type;
 use crate::core::object_store::{read_object, write_object};
-use crate::objects::BundleHeader;
+
+use crate::remote::bundle::types::BundleHeader;
 
 /// One positive revision given to `bundle create`: the ref it names (if it names one), the
 /// object that ref points at (a tag object for annotated tags), and the commit it peels to.
@@ -473,3 +474,4 @@ pub fn store_loose_objects(objects: &[(String, Vec<u8>)]) -> anyhow::Result<usiz
     }
     Ok(objects.len())
 }
+

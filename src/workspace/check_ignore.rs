@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::{BTreeSet, HashMap};
 use std::io::{self, BufRead, BufWriter, Write};
@@ -6,7 +7,7 @@ use anyhow::Result;
 
 use crate::workspace::check_ignore::engine::{find_ignore_match, is_tracked_or_contains_tracked, normalize_check_ignore_path};
 use crate::core::index::read_index;
-use crate::objects::{CheckIgnoreOptions, SourcedIgnoreRule};
+use crate::workspace::check_ignore::types::{CheckIgnoreOptions, SourcedIgnoreRule};
 
 /// `rgit check-ignore [-q] [-v [-n]] [--no-index] [--stdin [-z] | <pathname>...]`
 ///

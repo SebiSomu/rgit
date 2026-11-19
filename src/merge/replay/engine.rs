@@ -7,7 +7,7 @@ use crate::core::refs::list_all_refs;
 use crate::history::rev_list::engine::{parse_revision_args, select_rev_list_commits};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::workspace::state_files::build_tree_from_map;
-use crate::objects::ReplayOptions;
+use crate::merge::replay::types::ReplayOptions;
 
 /// git's usage text for `replay`, printed for `-h` and after usage errors (exit 129).
 pub const REPLAY_USAGE: &str = "usage: rgit replay ([--contained] --onto <newbase> | --advance <branch>) <revision-range>...
@@ -138,3 +138,4 @@ pub fn replay_commits(opts: &ReplayOptions) -> anyhow::Result<Option<Vec<String>
     }
     Ok(Some(updates))
 }
+

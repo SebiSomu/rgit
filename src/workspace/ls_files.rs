@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use std::collections::{BTreeSet, HashMap};
 use std::io::{self, BufWriter, Write};
@@ -6,7 +7,7 @@ use anyhow::Result;
 
 use crate::workspace::ls_files::engine::{collect_untracked_paths, is_tracked_path_ignored, matches_ls_files_pathspec, normalize_pathspecs, worktree_state};
 use crate::core::index::{read_index, IndexEntry};
-use crate::objects::{LsFilesOptions, WorktreeState};
+use crate::workspace::ls_files::types::{LsFilesOptions, WorktreeState};
 
 /// `rgit ls-files [-c] [-d] [-m] [-o] [-i] [--exclude-standard] [-s] [-u] [-t] [-z] [<pathspec>...]`
 ///

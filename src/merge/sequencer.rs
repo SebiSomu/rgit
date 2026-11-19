@@ -2,7 +2,7 @@
 //! abort-safety,opts}`, plus the commit-message trailers `-x` and `-s` add.
 
 use std::fs;
-use crate::objects::CherryPickOptions;
+use crate::merge::cherry_pick::types::CherryPickOptions;
 
 fn seq_path(name: &str) -> std::path::PathBuf {
     crate::core::repo::path(format!(".git/sequencer/{}", name))
@@ -169,7 +169,7 @@ pub fn append_cherry_picked_from(message: &str, commit: &str) -> String {
 
 /// Appends `Signed-off-by: <committer>` (`-s`) the same way, unless it is already the last line.
 // Used by `cherry-pick -s`.
-pub fn append_signoff(message: &str, signer: &crate::objects::CommitSignature) -> String {
+pub fn append_signoff(message: &str, signer: &crate::core::types::CommitSignature) -> String {
     let trailer = format!("Signed-off-by: {} <{}>", signer.name, signer.email);
     let mut text = message.trim_end_matches('\n').to_string();
     if text.lines().last() == Some(trailer.as_str()) {

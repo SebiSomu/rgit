@@ -1,10 +1,11 @@
 pub mod engine;
+pub mod types;
 
 use std::io::{self, Read};
 use anyhow::Result;
 
 use crate::export::fast_import::engine::{finish_fast_import, import_marks, run_fast_import, set_date_format};
-use crate::objects::FastImportState;
+use crate::export::fast_import::types::FastImportState;
 use crate::core::repo;
 
 /// `rgit fast-import [--force] [--quiet] [--stats] [--done] [--date-format=<format>]

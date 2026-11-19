@@ -4,8 +4,9 @@ use anyhow::Result;
 use crate::core::object_store::read_object;
 use crate::core::refs::list_all_refs;
 use crate::core::wildmatch::wildmatch;
-use crate::objects::{NameRevOptions, NameRevTip, RevName, RevNames};
+
 use crate::core::refs::read_ref;
+use crate::history::name_rev::types::{NameRevOptions, NameRevTip, RevName, RevNames};
 
 /// Usage text of `name-rev`, printed for `-h` and usage errors.
 pub const NAME_REV_USAGE: &str = "usage: rgit name-rev [<options>] <commit>...\n   or: rgit name-rev [<options>] --all\n   or: rgit name-rev [<options>] --annotate-stdin\n\n    --[no-]name-only      print only ref-based names (no object names)\n    --[no-]tags           only use tags to name the commits\n    --[no-]refs <pattern> only use refs matching <pattern>\n    --[no-]exclude <pattern>\n                          ignore refs matching <pattern>\n\n    --[no-]all            list all commits reachable from all refs\n    --[no-]annotate-stdin annotate text from stdin\n    --[no-]undefined      allow to print `undefined` names (default)\n    --[no-]always         show abbreviated commit object as fallback\n\n";
@@ -351,3 +352,4 @@ pub fn annotate_line(names: &RevNames, line: &str, name_only: bool) -> String {
     out.push_str(&line[copied..]);
     out
 }
+

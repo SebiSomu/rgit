@@ -4,7 +4,8 @@ use std::path::Path;
 
 use crate::core::commit::commit_parents;
 use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
-use crate::objects::{ConflictHunk, RepoSnapshot};
+use crate::merge::conflicts::types::ConflictHunk;
+use crate::ui::types::RepoSnapshot;
 use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;

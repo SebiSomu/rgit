@@ -3,7 +3,8 @@ use crate::core::commit::parse_commit_object;
 use crate::workspace::ls_files::engine::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::core::object_store::flatten_tree;
 use crate::history::rev_list::engine::{parse_revision_args, select_rev_list_commits};
-use crate::objects::LastModifiedOptions;
+
+use crate::history::last_modified::types::LastModifiedOptions;
 
 /// Usage text for `last-modified`, printed for `-h` and after option errors (exit 129).
 pub const LAST_MODIFIED_USAGE: &str = "usage: rgit last-modified [--recursive] [--show-trees] [-z] [<revision-range>] [[--] <path>...]
@@ -103,3 +104,4 @@ pub fn last_modified_paths(opts: &LastModifiedOptions) -> anyhow::Result<Vec<(St
     }
     Ok(out)
 }
+

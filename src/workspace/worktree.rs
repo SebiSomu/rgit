@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod types;
 
 use anyhow::Result;
 use std::fs;
@@ -7,7 +8,7 @@ use std::path::Path;
 use crate::core::commit::{commit_subject_line, short_hash};
 use crate::core::repo::worktrees_admin_root;
 use crate::workspace::worktree::engine::{create_worktree_admin_dir, delete_worktree_admin_dir, find_worktree, format_worktree_list, format_worktree_porcelain, list_worktrees, locked_worktree_message, move_worktree, populate_worktree, prune_worktrees, resolve_commit_ish, unique_worktree_id, worktree_has_local_changes, worktree_using_branch};
-use crate::objects::{BranchCreation, WorktreeAction};
+use crate::workspace::worktree::types::{BranchCreation, WorktreeAction};
 use crate::core::{refs, repo};
 
 /// `rgit worktree add [-b|-B <new-branch>] [-d] [-f] [--lock [--reason <r>]] [-q] <path> [<commit-ish>]`

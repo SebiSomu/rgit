@@ -3,7 +3,12 @@ use crate::diff::hunks::compacted_changes;
 use crate::merge::merge::engine::find_all_merge_bases;
 use crate::core::commit::resolve_tree_from_source;
 use crate::core::object_store::{read_object, write_object};
-use crate::objects::{ConflictRegion, FileMergeResult, MergeConflictStyle, MergeFavor, MergeFileOptions, MergeMessage, MergePathOutcome, MergePathReport, SideChange, TreeMergeResult};
+use crate::merge::{
+    merge::types::MergeFavor,
+    merge_file::types::MergeFileOptions,
+    types::{MergeConflictStyle, TreeMergeResult},
+};
+use crate::merge::merge_tree::types::{ConflictRegion, FileMergeResult, MergeMessage, MergePathOutcome, MergePathReport, SideChange};
 
 type Entry = ([u8; 20], u32);
 

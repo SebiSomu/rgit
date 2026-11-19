@@ -7,3 +7,4 @@ pub mod mailinfo;
 pub mod mailmap;
 pub mod mailsplit;
 pub mod request_pull;
+pub mod types;

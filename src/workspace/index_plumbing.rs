@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::core::object_store::{hash_content, write_object};
 use crate::core::index::{build_entry, IndexEntry};
-use crate::objects::{UpdateIndexFlags, IndexFileState};
+use crate::workspace::{types::IndexFileState, update_index::types::UpdateIndexFlags};
 
 /// The index mode a file on disk would get: `100755` when executable (Unix only), else
 /// `100644`; on systems without an executable bit the entry's current mode is kept.

@@ -1,4 +1,5 @@
-use crate::objects::{MergeConflictStyle, MergeFavor, MergeFileArgs};
+use crate::merge::{merge::types::MergeFavor, types::MergeConflictStyle};
+use crate::merge::merge_file::types::MergeFileArgs;
 
 /// Usage text of `merge-file`, printed for `-h` and usage errors.
 pub const MERGE_FILE_USAGE: &str = "usage: rgit merge-file [<options>] [-L <name1> [-L <orig> [-L <name2>]]] <file1> <orig-file> <file2>\n\n    -p, --[no-]stdout     send results to standard output\n    --[no-]object-id      use object IDs instead of filenames\n    --[no-]diff3          use a diff3 based merge\n    --[no-]zdiff3         use a zealous diff3 based merge\n    --[no-]ours           for conflicts, use our version\n    --[no-]theirs         for conflicts, use their version\n    --[no-]union          for conflicts, use a union version\n    --[no-]marker-size <n>\n                          for conflicts, use this marker size\n    -q, --[no-]quiet      do not warn about conflicts\n    -L <name>             set labels for file1/orig-file/file2\n\n";
@@ -75,3 +76,4 @@ pub fn parse_merge_file_args(args: &[String], style: MergeConflictStyle) -> Resu
     }
     Ok(opts)
 }
+

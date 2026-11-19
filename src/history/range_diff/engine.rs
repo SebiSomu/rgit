@@ -3,7 +3,7 @@ use crate::core::commit::split_commit_message;
 use crate::diff::hunks::{compacted_changes, diff_commit_against_parent};
 use crate::history::rev_list::engine::{parse_revision_args, select_rev_list_commits};
 use crate::core::rev_parse::{peel_to_type, resolve_rev};
-use crate::objects::{RangeDiffOptions, RangePatch};
+use crate::history::range_diff::types::{RangeDiffOptions, RangePatch};
 
 /// git's usage text for `range-diff`, printed for `-h` and after usage errors (exit 129).
 pub const RANGE_DIFF_USAGE: &str = "usage: rgit range-diff [<options>] <old-base>..<old-tip> <new-base>..<new-tip>
@@ -568,3 +568,4 @@ pub fn format_range_diff(a: &mut [RangePatch], b: &[RangePatch], opts: &RangeDif
     }
     out
 }
+

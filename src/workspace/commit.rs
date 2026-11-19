@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
@@ -13,8 +15,9 @@ use crate::core::reflog::set_reflog_action;
 use crate::core::commit::build_commit;
 use crate::core::object_store::{flatten_tree, write_tree_from_index_prefix};
 use crate::core::index::read_index;
-use crate::objects::CommitOptions;
+
 use crate::core::refs;
+use crate::workspace::commit::types::CommitOptions;
 
 pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: String) -> anyhow::Result<()> {
     println!("{}", build_commit(tree_hash, parent_hash, &message)?);
@@ -227,3 +230,4 @@ fn editor_status(head_state: &refs::HeadState, tree: &str, base_tree: Option<&st
     text.push_str("#\n");
     Ok(text)
 }
+

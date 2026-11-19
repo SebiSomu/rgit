@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{hash_content, is_path_ignored, parse_gitignore_line};
+use crate::helpers::{gitignore::{is_path_ignored, parse_gitignore_line}, objects::hash_content};
 use crate::index::IndexEntry;
 use crate::objects::{GitIgnoreRule, UntrackedPath, WorktreeState};
 

@@ -5,7 +5,7 @@ use crate::helpers::commit::current_signature;
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::rev_list::list_all_refs;
 use crate::helpers::rev_parse::peel_to_type;
-use crate::helpers::{read_object, write_object};
+use crate::helpers::{objects::{read_object, write_object}};
 
 /// Lists every tag (loose and packed) as `name -> object` (a tag object for annotated tags,
 /// otherwise what the tag points at), in name order.

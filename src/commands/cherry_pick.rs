@@ -7,7 +7,7 @@ use crate::helpers::sequencer::{
     append_cherry_picked_from, append_signoff, read_sequence_options, read_todo, remove_sequence, rollback_is_safe,
     save_todo, sequence_head, sequencer_active, start_sequence, update_abort_safety,
 };
-use crate::helpers::{build_tree_from_map, resolve_tree_from_source};
+use crate::helpers::{commit::resolve_tree_from_source, state_files::build_tree_from_map};
 use crate::objects::CherryPickOptions;
 use crate::refs;
 
@@ -94,7 +94,7 @@ fn start(opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     } else {
         let mut commits: Vec<String> = Vec::new();
         for rev in &opts.commits {
-            match crate::helpers::resolve_commit_from_source(rev) {
+            match crate::helpers::commit::resolve_commit_from_source(rev) {
                 Ok(hash) if !commits.contains(&hash) => commits.push(hash),
                 Ok(_) => {}
                 Err(_) => {
@@ -198,19 +198,19 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     if opts.ff && !opts.no_commit && parent.as_deref() == head.as_deref() {
         let target = resolve_tree_from_source(commit)?;
         let index_map: BTreeMap<String, [u8; 20]> = head_map.iter().map(|(p, (h, _))| (p.clone(), *h)).collect();
-        if let Err(e) = crate::helpers::check_switch_safety(&target, &head_map, &index_map) {
+        if let Err(e) = crate::helpers::checkout::check_switch_safety(&target, &head_map, &index_map) {
             return Ok(fail(&e.to_string()));
         }
-        crate::helpers::sync_working_tree(&target, &head_map, &index_map)?;
-        crate::helpers::update_index_from_tree(&target, &head_map)?;
+        crate::helpers::checkout::sync_working_tree(&target, &head_map, &index_map)?;
+        crate::helpers::checkout::update_index_from_tree(&target, &head_map)?;
         crate::helpers::reflog::set_reflog_action(&format!("cherry-pick: fast-forward"));
         move_head(&head_state, commit)?;
         update_abort_safety(commit)?;
         return Ok(Pick::Done);
     }
 
-    let raw = String::from_utf8_lossy(&crate::helpers::read_object(commit)?.1).to_string();
-    let mut message = crate::helpers::extract_commit_message(&raw);
+    let raw = String::from_utf8_lossy(&crate::helpers::objects::read_object(commit)?.1).to_string();
+    let mut message = crate::helpers::commit::extract_commit_message(&raw);
     if !message.ends_with('\n') {
         message.push('\n');
     }
@@ -287,7 +287,7 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         let keep = opts.keep_redundant || (originally_empty && opts.allow_empty);
         if !keep {
             fs::write(&pick_head, format!("{}\n", commit))?;
-            crate::commands::status(crate::objects::StatusOptions { untracked: "normal".to_string(), ..Default::default() })?;
+            crate::commands::staging::status(crate::objects::StatusOptions { untracked: "normal".to_string(), ..Default::default() })?;
             eprintln!("The previous cherry-pick is now empty, possibly due to conflict resolution.");
             eprintln!("If you wish to commit it anyway, use:");
             eprintln!();
@@ -323,7 +323,7 @@ fn move_head(head_state: &refs::HeadState, commit: &str) -> anyhow::Result<()> {
 /// Commits the resolved pick the way git's `continue_single_pick` does: `commit --no-edit
 /// --cleanup=strip` (`MERGE_MSG` without its `# Conflicts:` comment, the picked commit's author).
 fn commit_resolved_pick() -> anyhow::Result<()> {
-    crate::commands::commit(crate::objects::CommitOptions { no_edit: true, cleanup_strip: true, ..Default::default() })
+    crate::commands::commit::commit(crate::objects::CommitOptions { no_edit: true, cleanup_strip: true, ..Default::default() })
 }
 
 /// `--continue`.

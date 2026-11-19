@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crate::helpers::github::*;
 use crate::helpers::push::*;
-use crate::helpers::{is_reachable, resolve_commit_from_source, short_hash};
+use crate::helpers::{commit::{is_reachable, resolve_commit_from_source, short_hash}};
 use crate::objects::{GitHubTarget, PushStatus};
 use crate::refs::{self, HeadState};
 

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{is_path_ignored, normalize_path, parse_gitignore_line};
+use crate::helpers::{gitignore::{is_path_ignored, normalize_path, parse_gitignore_line}};
 use crate::objects::{CleanMode, GitIgnoreRule};
 
 /// Recursively walks the working tree (skipping `.git`) collecting untracked files

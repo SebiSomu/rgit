@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use crate::helpers::commit::is_reachable;
 use crate::helpers::config::{author_identity, get_config_value, read_all_config_entries};
-use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
+use crate::helpers::format_patch::split_commit_message;
 use crate::helpers::objects::read_object;
 use crate::helpers::rev_list::run_rev_list_walk;
 use crate::helpers::rev_parse::peel_to_type;

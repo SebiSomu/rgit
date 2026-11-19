@@ -64,7 +64,7 @@ pub fn tag(opts: TagOptions) -> Result<()> {
     let annotated = opts.annotate || !opts.messages.is_empty() || opts.file.is_some();
     let value = if annotated {
         let message = tag_message(&opts, name)?;
-        if crate::helpers::read_object(&object).is_ok_and(|(kind, _)| kind == "tag") {
+        if crate::helpers::objects::read_object(&object).is_ok_and(|(kind, _)| kind == "tag") {
             eprintln!(
                 "hint: You have created a nested tag. The object referred to by your new tag is\nhint: already a tag. If you meant to tag the object that it points to, use:\nhint:\nhint: \trgit tag -f {} {}^{{}}\nhint: Disable this message with \"rgit config advice.nestedTag false\"",
                 name, object_name
@@ -177,7 +177,7 @@ pub fn describe(opts: DescribeOptions) -> Result<()> {
                 // git's quirk: an exact `--long` match shows the object the tag points at
                 // directly (for a tag of a tag, that inner tag), not the commit.
                 let object = list_tag_refs().get(&tag).cloned().unwrap_or_else(|| target.clone());
-                let shown = match crate::helpers::read_object(&object) {
+                let shown = match crate::helpers::objects::read_object(&object) {
                     Ok((kind, content)) if kind == "tag" => String::from_utf8_lossy(&content)
                         .lines()
                         .find_map(|l| l.strip_prefix("object ").map(str::to_string))

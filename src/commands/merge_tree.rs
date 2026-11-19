@@ -6,7 +6,7 @@ use crate::helpers::bisect::collect_ancestors;
 use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
 use crate::helpers::merge_tree::{merge_base_tree, merge_trees_in_memory};
 use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::helpers::{build_tree_from_map, flatten_tree};
+use crate::helpers::{objects::flatten_tree, state_files::build_tree_from_map};
 use crate::objects::{MergePathOutcome, MergeTreeOptions, TreeMergeResult};
 
 const PREVIEW_LINES: usize = 6;

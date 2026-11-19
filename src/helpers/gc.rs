@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use crate::helpers::fetch::local_has_object;
-use crate::helpers::read_object;
+use crate::helpers::objects::read_object;
 use crate::helpers::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
 use crate::helpers::worktree::all_worktree_git_dirs;
 use crate::index::read_index_from;

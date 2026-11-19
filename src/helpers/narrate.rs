@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::Path;
 
-use crate::helpers::{commit_parents, flatten_tree, hash_content, read_object, tree_hash_of_commit};
+use crate::helpers::{
+    commit::commit_parents,
+    objects::{flatten_tree, read_object, tree_hash_of_commit},
+};
 use crate::objects::{ConflictHunk, RepoSnapshot};
 use crate::refs;
 
@@ -93,7 +96,7 @@ pub fn take_snapshot(worktree: bool) -> RepoSnapshot {
         index,
         unmerged,
         staged,
-        stash_count: crate::helpers::read_stash_list().map(|l| l.len()).unwrap_or(0),
+        stash_count: crate::helpers::state_files::read_stash_list().map(|l| l.len()).unwrap_or(0),
         operation: operation_in_progress(),
         worktree_changes,
         untracked,
@@ -115,7 +118,7 @@ pub fn commits_between(old: Option<&str>, new: &str) -> usize {
 /// Whether `ancestor` is reachable from `descendant` (a commit counts as its own ancestor).
 // Used by the narration (fast-forward / already-up-to-date / force-push checks).
 pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
-    ancestor == descendant || crate::helpers::is_reachable(descendant, ancestor).unwrap_or(false)
+    ancestor == descendant || crate::helpers::commit::is_reachable(descendant, ancestor).unwrap_or(false)
 }
 
 /// What changed between two commits' trees: (added, modified, deleted) paths and the

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use anyhow::Context;
 use sha1::{Digest, Sha1};
-use crate::helpers::{read_object, write_object, write_tree_from_index_prefix};
+use crate::helpers::{objects::{read_object, write_object, write_tree_from_index_prefix}};
 use crate::index::read_index;
 
 pub fn init() -> anyhow::Result<()> {

@@ -45,10 +45,10 @@ pub fn pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
         }
     };
 
-    crate::commands::fetch(Some(remote_name.clone()), Some(merge_branch.clone()))?;
+    crate::commands::fetch::fetch(Some(remote_name.clone()), Some(merge_branch.clone()))?;
 
     let tracking_ref = format!("{}/{}", remote_name, merge_branch);
-    crate::commands::merge(crate::objects::MergeOptions { commits: vec![tracking_ref], ..Default::default() })?;
+    crate::commands::merge::merge(crate::objects::MergeOptions { commits: vec![tracking_ref], ..Default::default() })?;
 
     Ok(())
 }

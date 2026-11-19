@@ -3,9 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::helpers::{
-    build_index_entries_for_tree, commit_subject_line, flatten_tree, hard_reset_working_tree,
-    normalize_path, read_object, resolve_commit_from_source, resolve_tree_from_source,
-    tree_hash_of_commit,
+    checkout::{build_index_entries_for_tree, hard_reset_working_tree},
+    commit::{commit_subject_line, resolve_commit_from_source, resolve_tree_from_source},
+    gitignore::normalize_path,
+    objects::{flatten_tree, read_object, tree_hash_of_commit},
 };
 use crate::index::{read_index, write_index, IndexEntry};
 use crate::objects::ResetMode;

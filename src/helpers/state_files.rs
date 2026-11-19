@@ -267,7 +267,7 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
 /// Clean result: the changes are left unstaged, new files staged. Conflicts: cleanly merged
 /// files stay staged, conflicted ones get stages 1-3, the entry is kept and the exit code is 1.
 fn apply_stash_by_merge(base: &str, head_tree: &BTreeMap<String, ([u8; 20], u32)>, w_tree: &BTreeMap<String, ([u8; 20], u32)>, idx: usize, list: Vec<StashEntry>, drop_after: bool) -> anyhow::Result<()> {
-    let base_tree = crate::helpers::resolve_tree_from_source(base)?;
+    let base_tree = crate::helpers::commit::resolve_tree_from_source(base)?;
     let result = crate::helpers::merge::merge_into_worktree(&base_tree, head_tree, w_tree, "Updated upstream", "Stashed changes", "apply stash")?;
     for m in &result.messages {
         println!("{}", m.text);

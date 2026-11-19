@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::collections::{HashSet, VecDeque};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Walks a remote repository's `refs/heads/` directory (and its `packed-refs`) and returns
 /// all branch names paired with their commit SHA strings.

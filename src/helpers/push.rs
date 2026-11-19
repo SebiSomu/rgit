@@ -61,7 +61,7 @@ pub fn collect_tree_objects(tree_hash: &str, remote_git_dir: &Path, to_copy: &mu
     }
     to_copy.insert(tree_hash.to_string());
 
-    let (object_type, content) = crate::helpers::read_object(tree_hash)?;
+    let (object_type, content) = crate::helpers::objects::read_object(tree_hash)?;
     if object_type != "tree" {
         anyhow::bail!("{} is not a tree object", tree_hash);
     }
@@ -126,7 +126,7 @@ pub fn collect_missing_objects(local_tip: &str, stop_hash: Option<&str>, remote_
 
         to_copy.insert(commit_hash.clone());
 
-        let (object_type, content) = crate::helpers::read_object(&commit_hash)?;
+        let (object_type, content) = crate::helpers::objects::read_object(&commit_hash)?;
         if object_type != "commit" {
             anyhow::bail!("{} is not a commit object", commit_hash);
         }

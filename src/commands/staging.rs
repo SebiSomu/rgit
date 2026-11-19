@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::Context;
-use crate::helpers::{collect_files, flatten_tree, hash_content, normalize_path, tree_hash_of_commit, write_object};
+use crate::helpers::{
+    gitignore::{collect_files, normalize_path},
+    objects::{flatten_tree, hash_content, tree_hash_of_commit, write_object},
+};
 use crate::index::{build_entry, read_index, write_index};
 use crate::refs;
 

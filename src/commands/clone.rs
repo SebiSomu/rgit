@@ -52,7 +52,7 @@ fn clone_into(target_dir: &Path, source: &CloneSource, remote_name: &str, reques
     create_repository_skeleton()?;
     set_in(&crate::repo::path(LOCAL_CONFIG_PATH), &format!("remote.{}.url", remote_name), &source.url())?;
 
-    crate::commands::fetch(Some(remote_name.to_string()), None)?;
+    crate::commands::fetch::fetch(Some(remote_name.to_string()), None)?;
 
     let available = refs::list_remote_tracking_branches(remote_name)?;
     match choose_checkout_branch(requested, remote_default, &available, remote_name)? {

@@ -11,7 +11,9 @@ use crate::helpers::apply::{check_file_patch, parse_patch, read_patch_input, rem
 use crate::helpers::checkout::{build_index_entries_for_tree, hard_reset_working_tree};
 use crate::helpers::rebase::rebase_in_progress;
 use crate::helpers::reflog::set_reflog_action;
-use crate::helpers::{flatten_tree, read_object, tree_hash_of_commit, write_tree_from_index_prefix};
+use crate::helpers::{
+    objects::{flatten_tree, read_object, tree_hash_of_commit, write_tree_from_index_prefix},
+};
 use crate::index::{read_index, write_index, IndexEntry};
 use crate::objects::{AmOptions, ApplyOptions, MailPatch, PlannedChanges};
 use crate::refs;

@@ -1,7 +1,11 @@
 use std::fs;
 use std::path::Path;
 use anyhow::Result;
-use crate::helpers::{build_grep_matcher, matches_pathspec, read_object, resolve_commit_from_source, resolve_tree_from_source, search_content};
+use crate::helpers::{
+    commit::{resolve_commit_from_source, resolve_tree_from_source},
+    grep::{build_grep_matcher, matches_pathspec, search_content},
+    objects::read_object,
+};
 use crate::index::read_index;
 use crate::objects::{GrepFileResult, GrepOptions};
 

@@ -3,12 +3,12 @@ use std::io::IsTerminal;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::commit::format_commit_date;
 use crate::helpers::config::get_config_value;
-use crate::helpers::flatten_tree;
-use crate::helpers::format_patch::{civil_from_days, diff_commit_against_parent, format_diffstat, format_rfc2822_date, parse_commit_object, split_commit_message, tz_offset_seconds};
+use crate::helpers::objects::flatten_tree;
+use crate::helpers::format_patch::{civil_from_days, format_rfc2822_date, parse_commit_object, split_commit_message, tz_offset_seconds};
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::rev_list::{abbreviate_hash, expand_rev_list_format, list_all_refs, parse_revision_args};
 use crate::helpers::rev_parse::peel_to_type;
-use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, CommitSignature, DiffStatEntry, LogDateMode, LogDecorate, LogFormat, LogOptions, ParsedCommit};
+use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, CommitSignature, LogDateMode, LogDecorate, LogFormat, LogOptions, ParsedCommit};
 use crate::refs;
 
 /// Parses `log` / `show` arguments. Display options (`--pretty`, `--format`, `--oneline`,

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use crate::helpers::objects::{read_object, write_object};
 
 /// Finds all best common ancestors (merge bases) between two commits.
@@ -234,7 +234,7 @@ pub fn clear_merge_state() {
 // Used by `merge --abort`.
 pub fn abort_merge_to_head() -> anyhow::Result<()> {
     let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
-        Some(commit) => crate::helpers::resolve_tree_from_source(&commit)?,
+        Some(commit) => crate::helpers::commit::resolve_tree_from_source(&commit)?,
         None => TreeMap::new(),
     };
     reset_merge_to_tree(&head_tree)?;
@@ -249,7 +249,7 @@ pub fn abort_merge_to_head() -> anyhow::Result<()> {
 pub fn reset_merge_to_tree(target_tree: &TreeMap) -> anyhow::Result<()> {
     use crate::helpers::checkout::{sync_working_tree, update_index_from_tree};
     let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
-        Some(commit) => crate::helpers::resolve_tree_from_source(&commit)?,
+        Some(commit) => crate::helpers::commit::resolve_tree_from_source(&commit)?,
         None => TreeMap::new(),
     };
     let entries = crate::index::read_index().unwrap_or_default();

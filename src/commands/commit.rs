@@ -7,7 +7,7 @@ use crate::helpers::commit::{
 };
 use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
 use crate::helpers::reflog::set_reflog_action;
-use crate::helpers::{build_commit, flatten_tree, write_tree_from_index_prefix};
+use crate::helpers::{commit::build_commit, objects::{flatten_tree, write_tree_from_index_prefix}};
 use crate::index::read_index;
 use crate::objects::CommitOptions;
 use crate::refs;

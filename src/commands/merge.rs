@@ -2,7 +2,12 @@ use std::collections::BTreeMap;
 use std::fs;
 use crate::helpers::merge_tree::merge_base_tree;
 use crate::helpers::merge::{abort_merge_to_head, clear_merge_state, die_if_unmerged, merge_into_worktree_favoring};
-use crate::helpers::{build_tree_from_map, check_switch_safety, find_all_merge_bases, find_merge_base, is_reachable, resolve_commit_from_source, resolve_tree_from_source, sync_working_tree, update_index_from_tree};
+use crate::helpers::{
+    checkout::{check_switch_safety, sync_working_tree, update_index_from_tree},
+    commit::{is_reachable, resolve_commit_from_source, resolve_tree_from_source},
+    merge::{find_all_merge_bases, find_merge_base},
+    state_files::build_tree_from_map,
+};
 use crate::index::read_index;
 use crate::objects::{FastForwardMode, MergeFavor, MergeOptions};
 use crate::refs;
@@ -53,7 +58,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         if opts.abort {
             return abort_merge_to_head();
         }
-        return crate::commands::commit(Default::default());
+        return crate::commands::commit::commit(Default::default());
     }
 
     die_if_unmerged("Merging", "Exiting because of an unresolved conflict.")?;

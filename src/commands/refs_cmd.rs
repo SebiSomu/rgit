@@ -33,8 +33,8 @@ pub fn refs(args: Vec<String>) -> Result<()> {
             print!("{}", REFS_USAGE);
             crate::ui::exit(129);
         }
-        "list" => crate::commands::for_each_ref(rest),
-        "optimize" => crate::commands::pack_refs(rest),
+        "list" => crate::commands::for_each_ref::for_each_ref(rest),
+        "optimize" => crate::commands::pack_refs::pack_refs(rest),
         "exists" => {
             if rest.iter().any(|a| a == "-h") {
                 println!("usage: rgit refs exists <ref>");
@@ -46,7 +46,7 @@ pub fn refs(args: Vec<String>) -> Result<()> {
             }
             let mut forwarded = vec!["--exists".to_string()];
             forwarded.extend(rest);
-            crate::commands::show_ref(forwarded)
+            crate::commands::show_ref::show_ref(forwarded)
         }
         "verify" => {
             let mut strict = false;

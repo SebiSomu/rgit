@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::Path;
 use crate::helpers::blame::{blame_file, format_annotate_output, format_blame_output};
-use crate::helpers::{normalize_path, resolve_commit_from_source};
+use crate::helpers::{commit::resolve_commit_from_source, gitignore::normalize_path};
 
 /// `rgit blame [-L <start>,<end>] [<rev>] [--] <file>`
 ///

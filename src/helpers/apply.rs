@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{hash_content, read_object, write_object};
+use crate::helpers::{objects::{hash_content, read_object, write_object}};
 use crate::index::{build_entry, write_index, IndexEntry};
 use crate::objects::{ApplyOptions, BinaryHunk, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine, PlannedChanges};
 

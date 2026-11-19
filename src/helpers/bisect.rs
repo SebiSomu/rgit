@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::fs;
-use std::path::Path;
 use anyhow::{Context, Result};
 
 use crate::helpers::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};

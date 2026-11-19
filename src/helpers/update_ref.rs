@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 use anyhow::Context;
 use crate::helpers::check_ref_format::check_refname_format;
-use crate::helpers::read_object;
+use crate::helpers::objects::read_object;
 use crate::helpers::reflog::{delete_reflog, record_ref_change, NULL_HASH};
 use crate::helpers::rev_parse::resolve_rev;
 use crate::helpers::symbolic_ref::{check_ref_creation_conflicts, is_refname_safe, read_raw_ref_value, resolve_ref_unsafe};

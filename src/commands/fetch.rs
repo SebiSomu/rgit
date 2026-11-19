@@ -114,8 +114,8 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
             Some(old) => {
                 println!(
                     "   {}..{}  {:16} -> {}/{}",
-                    crate::helpers::short_hash(old),
-                    crate::helpers::short_hash(remote_sha),
+                    crate::helpers::commit::short_hash(old),
+                    crate::helpers::commit::short_hash(remote_sha),
                     branch_name, remote_name, branch_name
                 );
                 FetchRefResult::Updated {

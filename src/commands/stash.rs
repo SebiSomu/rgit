@@ -4,11 +4,12 @@ use std::path::Path;
 use anyhow::Context;
 
 use crate::helpers::{
-    append_stash_entry, build_commit, build_index_entries_for_tree, build_merge_commit, build_tree_from_map,
-    commit_parents, commit_subject_line, current_branch_label, flatten_tree, format_diff_output,
-    hard_reset_working_tree, hash_content, parse_stash_index, read_object, read_stash_list,
-    resolve_tree_from_source, stash_apply_or_pop, tree_hash_of_commit, write_object, write_stash_list,
-    write_tree_from_index_prefix, STASH_LIST_PATH,
+    checkout::{build_index_entries_for_tree, hard_reset_working_tree},
+    commit::{build_commit, commit_parents, commit_subject_line, resolve_tree_from_source},
+    diff::format_diff_output,
+    merge::build_merge_commit,
+    objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object, write_tree_from_index_prefix},
+    state_files::{append_stash_entry, build_tree_from_map, current_branch_label, parse_stash_index, read_stash_list, stash_apply_or_pop, STASH_LIST_PATH, write_stash_list},
 };
 use crate::index::{read_index, write_index};
 use crate::refs;
@@ -243,7 +244,7 @@ pub fn stash(action: Option<crate::objects::StashAction>) -> anyhow::Result<()> 
     }
     match action {
         None => stash_push(None, None),
-        Some(StashAction::Push { message, patch: true, paths, .. }) => crate::commands::stash_patch(message, paths),
+        Some(StashAction::Push { message, patch: true, paths, .. }) => crate::commands::patch::stash_patch(message, paths),
         Some(StashAction::Push { message, include_untracked, all, .. }) => {
             let untracked = if all { Some(true) } else if include_untracked { Some(false) } else { None };
             stash_push(message, untracked)

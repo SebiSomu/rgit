@@ -7,7 +7,7 @@ use crate::helpers::check_ref_format::check_refname_format;
 use crate::helpers::cherry::abbreviate_hash_min;
 use crate::helpers::config::{get_config_value, global_config_path, normalize_key, read_entries_from, LOCAL_CONFIG_PATH};
 use crate::helpers::format_patch::civil_from_days;
-use crate::helpers::read_object;
+use crate::helpers::objects::read_object;
 use crate::helpers::rev_parse::resolve_rev;
 use crate::helpers::tag::describe_commit_matching;
 use crate::helpers::wildmatch::{wildmatch, WM_CASEFOLD, WM_PATHNAME};

@@ -92,7 +92,7 @@ pub fn read_todo() -> anyhow::Result<Vec<String>> {
         if command != "pick" && command != "p" {
             anyhow::bail!("error: invalid line: {}", line);
         }
-        commits.push(crate::helpers::resolve_commit_from_source(rev).map_err(|_| anyhow::anyhow!("error: could not parse '{}'", rev))?);
+        commits.push(crate::helpers::commit::resolve_commit_from_source(rev).map_err(|_| anyhow::anyhow!("error: could not parse '{}'", rev))?);
     }
     Ok(commits)
 }

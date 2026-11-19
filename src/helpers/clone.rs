@@ -6,7 +6,7 @@ use crate::helpers::checkout::{sync_working_tree, update_index_from_tree};
 use crate::helpers::fetch::read_remote_head;
 use crate::helpers::github::{build_github_client, get_github_default_branch, parse_github_remote, resolve_github_token};
 use crate::helpers::push::resolve_remote_repo_path;
-use crate::helpers::resolve_tree_from_source;
+use crate::helpers::commit::resolve_tree_from_source;
 use crate::objects::{CloneSource, GitHubTarget};
 
 /// Classifies the repository argument of `clone` as a local repository or a GitHub

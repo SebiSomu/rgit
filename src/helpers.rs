@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 pub mod objects;
 pub mod diff;
 pub mod gitignore;
@@ -93,49 +91,4 @@ pub mod add_patch;
 pub mod rename;
 pub mod combine_diff;
 
-pub use objects::*;
-pub use diff::*;
-pub use gitignore::*;
-pub use merge::*;
-pub use commit::*;
-pub use checkout::*;
-pub use bisect::*;
-pub use state_files::*;
-pub use config::*;
-pub use clean::*;
-pub use banana_split::*;
-pub use rebase::*;
-pub use push::*;
-pub use github::*;
-pub use fetch::*;
-pub use clone::*;
-pub use remote::*;
-pub use blame::*;
-pub use archive::*;
-pub use fsck::*;
-pub use gc::*;
-pub use reflog::*;
-pub use grep::*;
-pub use count_objects::*;
-pub use rev_parse::*;
-pub use shortlog::*;
-pub use ls_files::*;
-pub use check_ignore::*;
-pub use check_ref_format::*;
-pub use apply::*;
-pub use format_patch::*;
-pub use am::*;
-pub use rev_list::*;
-pub use show_ref::*;
-pub use symbolic_ref::*;
-pub use update_ref::*;
-pub use pack_refs::*;
-pub use for_each_ref::*;
-pub use wildmatch::*;
-pub use cherry::*;
-pub use merge_tree::*;
-pub use bundle::*;
-pub use prune::*;
-pub use log::*;
-pub use tag::*;
 

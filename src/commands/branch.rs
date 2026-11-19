@@ -1,5 +1,9 @@
 use std::collections::BTreeMap;
-use crate::helpers::{check_switch_safety, flatten_tree, is_reachable, read_object, sync_working_tree, tree_hash_of_commit, update_index_from_tree};
+use crate::helpers::{
+    checkout::{check_switch_safety, sync_working_tree, update_index_from_tree},
+    commit::is_reachable,
+    objects::{flatten_tree, read_object, tree_hash_of_commit},
+};
 use crate::helpers::worktree::worktree_using_branch;
 use crate::index::read_index;
 use crate::refs;

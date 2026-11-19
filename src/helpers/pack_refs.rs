@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use anyhow::Context;
 use crate::helpers::check_ref_format::check_refname_format;
-use crate::helpers::read_object;
+use crate::helpers::objects::read_object;
 use crate::helpers::rev_parse::peel_to_type;
 use crate::helpers::wildmatch::wildmatch;
 use crate::objects::{PackRefsOptions, PackedRefEntry};

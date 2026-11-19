@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use base64::Engine;
 use regex::Regex;
 use crate::helpers::format_patch::{split_commit_message, tz_offset_seconds};
-use crate::helpers::{author_identity, flatten_tree, tree_hash_of_commit, write_object};
+use crate::helpers::{
+    config::author_identity,
+    objects::{flatten_tree, tree_hash_of_commit, write_object},
+};
 use crate::index::IndexEntry;
 use crate::objects::{CommitSignature, MailPatch};
 use crate::refs;

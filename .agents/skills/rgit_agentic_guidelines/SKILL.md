@@ -32,7 +32,7 @@ This document defines the constraints, protocols, and architectural patterns tha
 src/
 ├── main.rs                   # Entry point calling cli::handle_commands()
 ├── cli.rs                    # Parses CLI arguments with clap and routes to commands
-├── commands.rs               # Root module declaring and re-exporting subcommands
+├── commands.rs               # Root module declaring the command modules (no re-exports)
 ├── commands/                 # High-level CLI command entry points
 │   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
 │   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
@@ -130,7 +130,7 @@ src/
 │   ├── fast_import.rs        # fast-import (--force, --stats, --done, marks)
 │   ├── sparse_checkout.rs    # sparse-checkout (init, set, add, list, reapply, disable, check-rules)
 │   └── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
-├── helpers.rs                # Root module declaring and re-exporting helper utilities
+├── helpers.rs                # Root module declaring the helper modules (no re-exports)
 ├── helpers/                  # Lower-level helpers & engines
 │   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
 │   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
@@ -246,7 +246,8 @@ src/
 
 - **Error Handling**: Use `anyhow::Result` and add context with `.context()` or `.with_context()` to help debug file system issues.
 - **Branch Validation**: All branch creation and renaming must pass through `refs::is_valid_branch_name` to prevent formatting conflicts (following `git-check-ref-format`).
-- **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `helpers.rs` rather than assuming linear history (handles branched or merged histories).
+- **Explicit Imports**: Import items from the module that defines them (`use crate::helpers::objects::read_object;`, `crate::commands::merge::merge(...)`). Never add `pub use x::*` re-exports to `helpers.rs` or `commands.rs`, and never `#![allow(unused_imports)]` to hide them.
+- **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `helpers/commit.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
 

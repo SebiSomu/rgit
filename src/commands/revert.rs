@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use anyhow::Context;
 use crate::helpers::{
-    build_commit, build_index_entries_for_tree, build_tree_from_map, commit_parents, commit_subject_line,
-    hard_reset_working_tree, read_object, resolve_commit_from_source, resolve_tree_from_source,
-    tree_hash_of_commit, write_tree_from_index_prefix,
+    checkout::{build_index_entries_for_tree, hard_reset_working_tree},
+    commit::{build_commit, commit_parents, commit_subject_line, resolve_commit_from_source, resolve_tree_from_source},
+    objects::{read_object, tree_hash_of_commit, write_tree_from_index_prefix},
+    state_files::build_tree_from_map,
 };
 use crate::helpers::merge::{die_if_unmerged, die_if_unmerged_for_commit, merge_into_worktree};
 use crate::index::{read_index, write_index};

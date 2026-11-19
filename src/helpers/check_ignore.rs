@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
-use crate::helpers::{ignore_rule_matches, parse_gitignore_line};
+use crate::helpers::{gitignore::{ignore_rule_matches, parse_gitignore_line}};
 use crate::objects::SourcedIgnoreRule;
 
 /// Finds the `.gitignore` rule deciding a path's fate, mirroring git's lookup: leading

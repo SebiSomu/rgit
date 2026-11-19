@@ -1,14 +1,13 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use regex::{Regex, RegexBuilder};
-use crate::helpers::bisect::collect_ancestors;
 use crate::helpers::format_patch::{civil_from_days, parse_commit_object, resolve_commit_rev, split_commit_message, tz_offset_seconds};
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::merge::find_all_merge_bases;
-use crate::helpers::flatten_tree;
+use crate::helpers::objects::flatten_tree;
 use crate::objects::{CommitSignature, ParsedCommit, RevListFormat, RevListOptions, RevListRoots, RevWalkState, WalkedCommit};
 
 const USAGE: &str = "usage: rgit rev-list [<options>] <commit>... [--] [<path>...]";

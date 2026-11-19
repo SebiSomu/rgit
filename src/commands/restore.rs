@@ -2,7 +2,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
-use crate::helpers::{flatten_tree, normalize_path, read_object, resolve_tree_from_source, tree_hash_of_commit as tree_of_commit};
+use crate::helpers::{
+    commit::resolve_tree_from_source,
+    gitignore::normalize_path,
+    objects::{flatten_tree, read_object, tree_hash_of_commit as tree_of_commit},
+};
 use crate::index::{read_index, write_index, IndexEntry};
 use crate::objects::{MergeConflictStyle, MergeFileOptions, WriteoutStage};
 use crate::refs;

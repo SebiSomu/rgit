@@ -8,13 +8,13 @@ use crate::helpers::checkout::{
     hard_reset_working_tree, sync_working_tree, update_index_from_tree,
 };
 use crate::helpers::commit::{
-    build_commit, commit_parents, extract_commit_message, resolve_tree_from_source, short_hash,
+    commit_parents, extract_commit_message, resolve_tree_from_source, short_hash,
 };
 use crate::helpers::config::get_config_value;
 use crate::helpers::merge::merge_into_worktree;
 use crate::helpers::objects::{read_object, tree_hash_of_commit, write_tree_from_index_prefix};
 use crate::helpers::state_files::read_lines_set;
-use crate::index::{build_entry, read_index, write_index};
+use crate::index::{read_index, write_index};
 use crate::objects::{Action, ItemResult, TodoItem};
 use crate::refs;
 
@@ -650,7 +650,7 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
             crate::ui::exit(1);
         }
 
-        let tree_hash = crate::helpers::build_tree_from_map(&result.tree)?;
+        let tree_hash = crate::helpers::state_files::build_tree_from_map(&result.tree)?;
 
         match commit_item(&item, &rest, &current_head, tree_hash, false)? {
             ItemResult::Done => continue,

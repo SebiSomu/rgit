@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use crate::helpers::config::{read_all_config_entries, read_entries_from, set_in, unset_in, write_entries_to, LOCAL_CONFIG_PATH};
 use crate::helpers::for_each_ref::{branch_upstream, collect_ref_items, filter_ref_items, shorten_unambiguous_ref, tracking_counts};
-use crate::helpers::read_object;
+use crate::helpers::objects::read_object;
 use crate::helpers::wildmatch::wildmatch;
 use crate::objects::{BranchListEntry, BranchOptions, ForEachRefOptions, RefArrayItem};
 use crate::refs;

@@ -11,7 +11,7 @@ use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, spli
 use crate::helpers::merge::find_all_merge_bases;
 use crate::helpers::rev_list::list_all_refs;
 use crate::helpers::rev_parse::peel_to_type;
-use crate::helpers::{read_object, write_object};
+use crate::helpers::{objects::{read_object, write_object}};
 use crate::objects::BundleHeader;
 
 /// One positive revision given to `bundle create`: the ref it names (if it names one), the
@@ -400,7 +400,7 @@ pub fn read_packfile(pack: &[u8]) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
 
     let mut resolved: Vec<Option<(String, Vec<u8>)>> = vec![None; entries.len()];
     let mut by_hash: HashMap<String, usize> = HashMap::new();
-    let object_hash = |kind: &str, content: &[u8]| hex::encode(crate::helpers::hash_content(kind, content));
+    let object_hash = |kind: &str, content: &[u8]| hex::encode(crate::helpers::objects::hash_content(kind, content));
     loop {
         let mut progress = false;
         for i in 0..entries.len() {

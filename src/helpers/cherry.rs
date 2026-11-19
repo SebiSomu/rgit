@@ -4,7 +4,7 @@ use sha1::{Digest, Sha1};
 use crate::helpers::config::get_config_value;
 use crate::helpers::format_patch::{parse_commit_object, split_diff_lines, unified_hunks_with};
 use crate::helpers::rev_list::run_rev_list_walk;
-use crate::helpers::{flatten_tree, read_object};
+use crate::helpers::{objects::{flatten_tree, read_object}};
 use crate::objects::{ParsedCommit, RevListOptions, RevListRoots};
 
 /// Finds the upstream of the current branch from `branch.<name>.remote` and

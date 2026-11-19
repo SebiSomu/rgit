@@ -5,14 +5,26 @@ use anyhow::Context;
 
 use crate::helpers::{
     checkout::{build_index_entries_for_tree, hard_reset_working_tree},
-    commit::{build_commit, commit_parents, commit_subject_line, resolve_tree_from_source},
     diff::format_diff_output,
     merge::build_merge_commit,
-    objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object, write_tree_from_index_prefix},
     state_files::{append_stash_entry, build_tree_from_map, current_branch_label, parse_stash_index, read_stash_list, stash_apply_or_pop, STASH_LIST_PATH, write_stash_list},
 };
-use crate::index::{read_index, write_index};
-use crate::refs;
+use crate::core::commit::{
+    build_commit,
+    commit_parents,
+    commit_subject_line,
+    resolve_tree_from_source,
+};
+use crate::core::object_store::{
+    flatten_tree,
+    hash_content,
+    read_object,
+    tree_hash_of_commit,
+    write_object,
+    write_tree_from_index_prefix,
+};
+use crate::core::index::{read_index, write_index};
+use crate::core::refs;
 
 /// `rgit stash` / `rgit stash push [-m <message>]`
 ///
@@ -227,8 +239,8 @@ pub fn stash_show(stash_ref: Option<String>) -> anyhow::Result<()> {
 
 /// `rgit stash clear`
 pub fn stash_clear() -> anyhow::Result<()> {
-    if crate::repo::path(STASH_LIST_PATH).exists() {
-        fs::remove_file(crate::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
+    if crate::core::repo::path(STASH_LIST_PATH).exists() {
+        fs::remove_file(crate::core::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
     }
     Ok(())
 }

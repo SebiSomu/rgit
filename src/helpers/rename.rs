@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use crate::helpers::config::get_config_value;
-use crate::helpers::objects::{hash_content, read_object};
+use crate::core::config::get_config_value;
+use crate::core::object_store::{hash_content, read_object};
 use crate::objects::{DiffChange, DiffSide, RenameOptions};
 
 static RENAME_LIMIT_NEEDED: AtomicUsize = AtomicUsize::new(0);

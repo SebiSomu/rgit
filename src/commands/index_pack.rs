@@ -3,8 +3,8 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use anyhow::Result;
 
-use crate::helpers::pack::{index_pack_bytes, store_pack};
-use crate::repo;
+use crate::core::pack::{index_pack_bytes, store_pack};
+use crate::core::repo;
 
 /// `rgit index-pack [-v] [-o <index-file>] [--verify] <pack-file>` /
 /// `rgit index-pack --stdin [--fix-thin] [--keep[=<msg>]]`

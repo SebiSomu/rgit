@@ -2,7 +2,7 @@ use clap::Subcommand;
 use std::path::{Path, PathBuf};
 
 /// Represents an uncompressed Git database object holding its decoded payload.
-// Used by: src/helpers/objects.rs
+// Used by: src/core/object_store.rs
 // Used by command/helper: Object serialization and decoding helpers
 #[derive(Debug)]
 pub enum GitObject {
@@ -12,7 +12,7 @@ pub enum GitObject {
 }
 
 /// Represents a single file or directory record stored within a parsed Git tree object.
-// Used by: src/helpers/objects.rs
+// Used by: src/core/object_store.rs
 // Used by command/helper: Tree parsing and traversal helpers
 #[derive(Debug)]
 pub struct TreeEntry {
@@ -22,7 +22,7 @@ pub struct TreeEntry {
 }
 
 /// Represents the deserialized header fields and message body of a commit object.
-// Used by: src/helpers/commit.rs
+// Used by: src/core/commit.rs
 // Used by command/helper: Commit parsing and resolution helpers
 #[derive(Debug)]
 pub struct CommitData {
@@ -167,7 +167,7 @@ pub enum ResetMode {
 }
 
 /// An in-memory flattened map of relative file paths to their 20-byte object hash and mode.
-// Used by: src/helpers/objects.rs, src/helpers/commit.rs, src/helpers/checkout.rs, src/helpers/state_files.rs, src/helpers/banana_split.rs, src/commands/banana_split.rs
+// Used by: src/core/object_store.rs, src/core/commit.rs, src/helpers/checkout.rs, src/helpers/state_files.rs, src/helpers/banana_split.rs, src/commands/banana_split.rs
 // Used by command/helper: `flatten_tree`, `resolve_tree_from_source`, `build_tree_from_map`, and the `banana_split` command
 pub type Tree = std::collections::BTreeMap<String, ([u8; 20], u32)>;
 
@@ -464,7 +464,7 @@ impl ArchiveFormat {
 /// One line of a reflog: a ref moving from one commit to another, who did it, when, and why.
 /// Stored one per line in `.git/logs/<ref>` in git's own format:
 /// `<old> <new> <name> <<email>> <timestamp> <tz>\t<message>`.
-// Used by: src/helpers/reflog.rs, src/commands/reflog.rs
+// Used by: src/core/reflog.rs, src/commands/reflog.rs
 // Used by command/helper: `append_reflog_entry`, `read_reflog`, `write_reflog`, `expire_reflog`, `format_reflog_output`, and the `reflog` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReflogEntry {
@@ -672,7 +672,7 @@ pub struct ObjectCountReport {
 
 /// Parsed options for the `rev-parse` command, covering both revision-resolution
 /// mode and repository-property query mode.
-// Used by: src/helpers/rev_parse.rs, src/commands/rev_parse.rs
+// Used by: src/core/rev_parse.rs, src/commands/rev_parse.rs
 // Used by command/helper: `resolve_rev`, `run_rev_parse`, and the `rev_parse` command
 #[derive(Debug, Clone, Default)]
 pub struct RevParseOptions {
@@ -1345,7 +1345,7 @@ impl WorktreeInfo {
 
     /// The path the way git prints it: forward slashes on every platform.
     pub fn display_path(&self) -> String {
-        crate::repo::to_git_path_string(&self.path)
+        crate::core::repo::to_git_path_string(&self.path)
     }
 }
 
@@ -1363,7 +1363,7 @@ pub enum BranchCreation {
 
 /// Options for the `check-ref-format` command, which validates a proposed ref name against
 /// git's ref naming rules (and, with `--branch`, against the rules for a branch name).
-// Used by: src/cli.rs, src/commands/check_ref_format.rs, src/helpers/check_ref_format.rs
+// Used by: src/cli.rs, src/commands/check_ref_format.rs, src/core/check_ref_format.rs
 // Used by command/helper: the `check_ref_format` command and `check_refname_format`
 #[derive(Debug, Clone, Default)]
 pub struct CheckRefFormatOptions {
@@ -3212,7 +3212,7 @@ pub struct ReadTreeOptions {
 #[derive(Debug, Clone, Default)]
 pub struct ReadTreePlan {
     /// The index entries after the operation.
-    pub entries: Vec<crate::index::IndexEntry>,
+    pub entries: Vec<crate::core::index::IndexEntry>,
     /// Paths whose file must be (re)written from the new entry.
     pub write: Vec<String>,
     /// Paths whose file must be removed.
@@ -3341,7 +3341,7 @@ pub struct DiffPlumbingOptions {
 
 /// A parsed pack index (`.idx`, version 1 or 2): the object names it lists in sorted order
 /// with each object's offset in the pack and, for version 2, the CRC-32 of its packed bytes.
-// Used by: src/helpers/pack.rs, src/helpers/midx.rs, src/commands/show_index.rs, src/commands/verify_pack.rs
+// Used by: src/core/pack.rs, src/helpers/midx.rs, src/commands/show_index.rs, src/commands/verify_pack.rs
 // Used by command/helper: `parse_pack_index`, `repo_packs`, `read_packed_object`, and the `show_index` / `verify_pack` / `index_pack` / `multi_pack_index` commands
 #[derive(Debug, Clone, Default)]
 pub struct PackIndexData {
@@ -3358,7 +3358,7 @@ pub struct PackIndexData {
 }
 
 /// One pack of the repository: its files, its index and (once needed) its bytes.
-// Used by: src/helpers/pack.rs, src/helpers/midx.rs, src/helpers/commit_graph.rs
+// Used by: src/core/pack.rs, src/helpers/midx.rs, src/helpers/commit_graph.rs
 // Used by command/helper: `repo_packs`, `read_packed_object`, `packed_object_names`, and the `repack` / `prune_packed` / `multi_pack_index` / `commit_graph` commands
 #[derive(Debug)]
 pub struct RepoPack {
@@ -3374,7 +3374,7 @@ pub struct RepoPack {
 
 /// One entry of a pack as it is stored: where it is, what its header says, what it is a
 /// delta against (if anything), and its inflated data (object content, or delta instructions).
-// Used by: src/helpers/pack.rs
+// Used by: src/core/pack.rs
 // Used by command/helper: `scan_pack`, `resolve_pack_entries`, and the `index_pack` / `verify_pack` / `unpack_objects` commands
 #[derive(Debug, Clone)]
 pub struct PackEntry {
@@ -3395,7 +3395,7 @@ pub struct PackEntry {
 }
 
 /// A pack entry after delta resolution: the object it stands for.
-// Used by: src/helpers/pack.rs
+// Used by: src/core/pack.rs
 // Used by command/helper: `resolve_pack_entries`, `write_pack_index`, and the `index_pack` / `verify_pack` / `unpack_objects` commands
 #[derive(Debug, Clone)]
 pub struct PackedObject {
@@ -3420,7 +3420,7 @@ pub struct PackedObject {
 }
 
 /// Settings for building a pack.
-// Used by: src/helpers/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by: src/core/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
 // Used by command/helper: `build_pack`, and the `pack_objects` / `repack` commands
 #[derive(Debug, Clone)]
 pub struct PackBuildOptions {
@@ -3431,7 +3431,7 @@ pub struct PackBuildOptions {
 }
 
 /// A pack that was just built: its bytes and, per object, name, offset and CRC-32.
-// Used by: src/helpers/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by: src/core/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
 // Used by command/helper: `build_pack`, `store_pack`, and the `pack_objects` / `repack` commands
 #[derive(Debug, Clone, Default)]
 pub struct BuiltPack {

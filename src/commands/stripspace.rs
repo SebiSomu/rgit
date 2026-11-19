@@ -1,7 +1,7 @@
 use std::io::{self, Read, Write};
 use anyhow::Result;
 
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::stripspace::{comment_lines, strip_space, STRIPSPACE_USAGE};
 
 /// `rgit stripspace [-s | --strip-comments]` / `rgit stripspace [-c | --comment-lines]`

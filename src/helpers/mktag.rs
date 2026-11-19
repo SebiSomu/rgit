@@ -1,4 +1,4 @@
-use crate::helpers::check_ref_format::check_refname_format;
+use crate::core::check_ref_format::check_refname_format;
 
 /// Checks one `tagger` value like git's `fsck_ident`: `Name <email> <time> <+HHMM>`.
 // Used by `check_tag_text`.

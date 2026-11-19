@@ -1,4 +1,4 @@
-//! Unit tests for `src/helpers/rev_parse.rs`, kept outside `src/` and compiled into that module via
+//! Unit tests for `src/core/rev_parse.rs`, kept outside `src/` and compiled into that module via
 //! `#[path]` (so they can reach its private items through `super::`).
 
 use super::*;
@@ -36,7 +36,7 @@ fn test_rev_parse_peel_and_prefix() {
 
     // Write a blob object
     let blob_data = b"hello test rev parse";
-    let blob_hash = crate::helpers::objects::write_object("blob", blob_data).unwrap();
+    let blob_hash = crate::core::object_store::write_object("blob", blob_data).unwrap();
 
     // Write a tree containing the blob
     let mut tree_content = Vec::new();
@@ -44,14 +44,14 @@ fn test_rev_parse_peel_and_prefix() {
     tree_content.extend_from_slice(mode_and_name.as_bytes());
     let raw_hash = hex::decode(&blob_hash).unwrap();
     tree_content.extend_from_slice(&raw_hash);
-    let tree_hash = crate::helpers::objects::write_object("tree", &tree_content).unwrap();
+    let tree_hash = crate::core::object_store::write_object("tree", &tree_content).unwrap();
 
     // Write a commit pointing to that tree
     let commit_data = format!(
         "tree {}\nauthor Test <test@example.com> 1234567890 +0000\ncommitter Test <test@example.com> 1234567890 +0000\n\ntest commit\n",
         tree_hash
     );
-    let commit_hash = crate::helpers::objects::write_object("commit", commit_data.as_bytes()).unwrap();
+    let commit_hash = crate::core::object_store::write_object("commit", commit_data.as_bytes()).unwrap();
 
     // Test resolving full hash
     assert_eq!(resolve_rev(&commit_hash).unwrap(), commit_hash);

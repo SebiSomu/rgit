@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::helpers::apply::{check_file_patch, format_apply_numstat, format_apply_stat, format_apply_summary, parse_patch, read_patch_input, write_planned_changes};
-use crate::index::{read_index, IndexEntry};
+use crate::core::index::{read_index, IndexEntry};
 use crate::objects::{ApplyOptions, FilePatch, PlannedChanges};
 
 /// `rgit apply [--check] [--stat] [--numstat] [--summary] [--apply] [--cached | --index] [-R] [-v] [-p<n>] [<patch>...]`

@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::helpers::show_branch::{collect_show_branch_names, parse_show_branch_args, show_branch_output, SHOW_BRANCH_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit show-branch [-a | --all] [-r | --remotes] [--current] [--topo-order | --date-order]
 /// [--more=<n> | --list | --independent | --merge-base] [--no-name | --sha1-name]

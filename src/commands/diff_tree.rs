@@ -6,10 +6,10 @@ use crate::helpers::diff_plumbing::{check_path_argument, diff_trees, parse_diff_
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::log::{format_log_entry, join_entry_and_diff, parse_log_args};
 use crate::helpers::ls_files::normalize_pathspecs;
-use crate::helpers::objects::read_object;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::object_store::read_object;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::objects::{DiffPlumbingOptions, LogFormat, LogOptions};
-use crate::repo;
+use crate::core::repo;
 
 /// The diff of two trees (either may be absent), rendered per the options. Returns the text
 /// and whether anything differs.
@@ -27,7 +27,7 @@ fn tree_diff_text(old: Option<&str>, new: Option<&str>, opts: &DiffPlumbingOptio
         let mut start = std::collections::BTreeMap::new();
         if opts.renames.find_copies_harder {
             if let Some(tree) = if opts.reverse { new } else { old } {
-                crate::helpers::objects::flatten_tree(tree, "", &mut start)?;
+                crate::core::object_store::flatten_tree(tree, "", &mut start)?;
             }
             start.retain(|p, _| crate::helpers::diff_plumbing::diff_path_selected(p, false, specs));
         }

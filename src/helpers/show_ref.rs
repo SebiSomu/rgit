@@ -2,11 +2,11 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::Path;
-use crate::helpers::check_ref_format::check_refname_format;
-use crate::helpers::objects::read_object;
+use crate::core::check_ref_format::check_refname_format;
+use crate::core::object_store::read_object;
 use crate::helpers::cherry::abbreviate_hash_min;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::peel_to_type;
+use crate::core::rev_parse::peel_to_type;
 use crate::objects::ShowRefOptions;
 
 /// git's usage text for `show-ref`, printed after option errors (exit 129).
@@ -106,7 +106,7 @@ pub fn matches_show_ref_pattern(refname: &str, patterns: &[String]) -> bool {
 pub fn resolve_show_ref(name: &str) -> Option<String> {
     let mut current = name.to_string();
     for _ in 0..5 {
-        let path = crate::repo::path(format!(".git/{}", current));
+        let path = crate::core::repo::path(format!(".git/{}", current));
         if Path::new(&path).is_file() {
             let content = fs::read_to_string(&path).ok()?;
             let value = content.trim();
@@ -128,7 +128,7 @@ pub fn resolve_show_ref(name: &str) -> Option<String> {
 /// `refs/heads` (git reports "Is a directory" and exits 1 rather than 2).
 // Used by `show-ref --exists`.
 pub fn show_ref_exists(name: &str) -> Result<bool, String> {
-    let path = crate::repo::path(format!(".git/{}", name));
+    let path = crate::core::repo::path(format!(".git/{}", name));
     if Path::new(&path).is_file() || packed_ref(name).is_some() {
         Ok(true)
     } else if Path::new(&path).is_dir() {
@@ -139,7 +139,7 @@ pub fn show_ref_exists(name: &str) -> Result<bool, String> {
 }
 
 fn packed_ref(name: &str) -> Option<String> {
-    let packed = fs::read_to_string(crate::repo::path(".git/packed-refs")).ok()?;
+    let packed = fs::read_to_string(crate::core::repo::path(".git/packed-refs")).ok()?;
     packed.lines().find_map(|line| match line.split_once(' ') {
         Some((hash, refname)) if refname == name && hash.len() == 40 && !line.starts_with('#') => Some(hash.to_string()),
         _ => None,

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use crate::helpers::config::{read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
+use crate::core::config::{read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
 use crate::objects::RemoteInfo;
 
 /// Validates whether a given string is an acceptable remote name.
@@ -22,7 +22,7 @@ pub fn is_valid_remote_name(name: &str) -> bool {
 /// Checks if a remote with the specified name is configured in `.git/config`.
 // Used by `remote` command and remote helpers.
 pub fn remote_exists(name: &str) -> Result<bool> {
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let entries = read_entries_from(config_path)?;
     let prefix = format!("remote.{}.", name);
     Ok(entries.iter().any(|(k, _)| k.starts_with(&prefix)))
@@ -31,7 +31,7 @@ pub fn remote_exists(name: &str) -> Result<bool> {
 /// Returns a sorted list of all unique remote names defined in the repository's `.git/config`.
 // Used by `remote` list and verbose commands.
 pub fn list_remote_names() -> Result<Vec<String>> {
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let entries = read_entries_from(config_path)?;
     let mut names = BTreeSet::new();
 
@@ -52,7 +52,7 @@ pub fn list_remote_names() -> Result<Vec<String>> {
 /// Retrieves the configured fetch URL and push URL for a specified remote name.
 // Used by `remote` verbose listing and `remote show`.
 pub fn get_remote_urls(name: &str) -> Result<(Option<String>, Option<String>)> {
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let entries = read_entries_from(config_path)?;
     let url_key = format!("remote.{}.url", name);
     let push_key = format!("remote.{}.pushurl", name);
@@ -85,7 +85,7 @@ pub fn add_remote(name: &str, url: &str) -> Result<()> {
         anyhow::bail!("fatal: remote {} already exists.", name);
     }
 
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let mut entries = read_entries_from(config_path)?;
 
     entries.push((format!("remote.{}.url", name), url.to_string()));
@@ -105,7 +105,7 @@ pub fn remove_remote(name: &str) -> Result<()> {
         anyhow::bail!("fatal: No such remote: '{}'", name);
     }
 
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let mut entries = read_entries_from(config_path)?;
 
     let remote_prefix = format!("remote.{}.", name);
@@ -130,7 +130,7 @@ pub fn remove_remote(name: &str) -> Result<()> {
 
     write_entries_to(config_path, &entries)?;
 
-    let remotes_path = crate::repo::path(format!(".git/refs/remotes/{}", name));
+    let remotes_path = crate::core::repo::path(format!(".git/refs/remotes/{}", name));
     if remotes_path.exists() {
         fs::remove_dir_all(&remotes_path)
             .with_context(|| format!("Failed to remove remote refs directory: {}", remotes_path.display()))?;
@@ -152,7 +152,7 @@ pub fn rename_remote(old_name: &str, new_name: &str) -> Result<()> {
         anyhow::bail!("fatal: remote {} already exists.", new_name);
     }
 
-    let config_path = &crate::repo::path(LOCAL_CONFIG_PATH);
+    let config_path = &crate::core::repo::path(LOCAL_CONFIG_PATH);
     let mut entries = read_entries_from(config_path)?;
 
     let old_prefix = format!("remote.{}.", old_name);
@@ -175,8 +175,8 @@ pub fn rename_remote(old_name: &str, new_name: &str) -> Result<()> {
 
     write_entries_to(config_path, &entries)?;
 
-    let old_path = crate::repo::path(format!(".git/refs/remotes/{}", old_name));
-    let new_path = crate::repo::path(format!(".git/refs/remotes/{}", new_name));
+    let old_path = crate::core::repo::path(format!(".git/refs/remotes/{}", old_name));
+    let new_path = crate::core::repo::path(format!(".git/refs/remotes/{}", new_name));
     if Path::new(&old_path).exists() {
         if let Some(parent) = Path::new(&new_path).parent() {
             fs::create_dir_all(parent)?;
@@ -198,7 +198,7 @@ pub fn get_remote_info(name: &str) -> Result<RemoteInfo> {
     let (fetch_url, push_url) = get_remote_urls(name)?;
     let mut tracking_branches = Vec::new();
 
-    let remotes_dir = crate::repo::path(format!(".git/refs/remotes/{}", name));
+    let remotes_dir = crate::core::repo::path(format!(".git/refs/remotes/{}", name));
     if Path::new(&remotes_dir).exists() {
         collect_remote_branches(Path::new(&remotes_dir), "", &mut tracking_branches)?;
         tracking_branches.sort();

@@ -2,14 +2,12 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
-use crate::helpers::{
-    commit::resolve_tree_from_source,
-    gitignore::normalize_path,
-    objects::{flatten_tree, read_object, tree_hash_of_commit as tree_of_commit},
-};
-use crate::index::{read_index, write_index, IndexEntry};
+use crate::helpers::gitignore::normalize_path;
+use crate::core::commit::resolve_tree_from_source;
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit as tree_of_commit};
+use crate::core::index::{read_index, write_index, IndexEntry};
 use crate::objects::{MergeConflictStyle, MergeFileOptions, WriteoutStage};
-use crate::refs;
+use crate::core::refs;
 
 /// Turns `--ours` / `--theirs` / `-m` / `--conflict=<style>` into the version to write out.
 /// `--merge` without a style uses `merge.conflictStyle` (default `merge`).
@@ -22,7 +20,7 @@ pub fn writeout_stage(ours: bool, theirs: bool, merge: bool, conflict: Option<St
     if merging {
         let style = match conflict {
             Some(style) => style,
-            None => crate::helpers::config::get_config_value("merge.conflictstyle").ok().flatten().unwrap_or_else(|| "merge".into()),
+            None => crate::core::config::get_config_value("merge.conflictstyle").ok().flatten().unwrap_or_else(|| "merge".into()),
         };
         return Ok(WriteoutStage::Merge(match style.as_str() {
             "merge" => MergeConflictStyle::Merge,
@@ -234,7 +232,7 @@ fn restore_from_tree(paths: &[String], tree: &BTreeMap<String, ([u8; 20], u32)>,
                 if do_staged {
                     index_entries.retain(|e| &e.path != path);
                     let mut entry = if do_worktree {
-                        crate::index::build_entry(path, hash, &fs::metadata(path)?)
+                        crate::core::index::build_entry(path, hash, &fs::metadata(path)?)
                     } else {
                         IndexEntry::unmerged(path, hash, mode, 0)
                     };

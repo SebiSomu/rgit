@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 
 /// git's usage text for `hook`, printed for `-h` and after usage errors (exit 129).
 pub const HOOK_USAGE: &str = "usage: rgit hook run [--ignore-missing] [--to-stdin=<path>] <hook-name> [-- <hook-args>]
@@ -17,7 +17,7 @@ pub const HOOK_USAGE: &str = "usage: rgit hook run [--ignore-missing] [--to-stdi
 pub fn find_hook(name: &str) -> Option<PathBuf> {
     let dir = match get_config_value("core.hookspath").ok().flatten().filter(|v| !v.is_empty()) {
         Some(dir) => PathBuf::from(dir),
-        None => crate::repo::path(".git/hooks"),
+        None => crate::core::repo::path(".git/hooks"),
     };
     let path = dir.join(name);
     let meta = fs::metadata(&path).ok().filter(|meta| meta.is_file())?;

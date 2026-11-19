@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::helpers::pack::prune_packed_objects;
-use crate::repo;
+use crate::core::pack::prune_packed_objects;
+use crate::core::repo;
 
 /// `rgit prune-packed [-n | --dry-run] [-q | --quiet]`
 ///

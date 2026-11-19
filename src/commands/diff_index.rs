@@ -4,10 +4,10 @@ use anyhow::Result;
 
 use crate::helpers::diff_plumbing::{check_path_argument, diff_index_changes, parse_diff_plumbing_args, render_diff_changes, reverse_changes, DIFF_COMMON_OPTIONS};
 use crate::helpers::ls_files::normalize_pathspecs;
-use crate::helpers::objects::flatten_tree;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::index::read_index;
-use crate::repo;
+use crate::core::object_store::flatten_tree;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::index::read_index;
+use crate::core::repo;
 
 /// `rgit diff-index [-m] [--cached] [<common diff options>] <tree-ish> [<path>...]`
 ///

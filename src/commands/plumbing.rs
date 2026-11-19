@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 use anyhow::Context;
 use sha1::{Digest, Sha1};
-use crate::helpers::{objects::{read_object, write_object, write_tree_from_index_prefix}};
-use crate::index::read_index;
+use crate::core::object_store::{read_object, write_object, write_tree_from_index_prefix};
+use crate::core::index::read_index;
 
 pub fn init() -> anyhow::Result<()> {
     fs::create_dir_all(".git/objects")?;
@@ -30,8 +30,8 @@ pub fn hash_object(write: bool, file: PathBuf) -> anyhow::Result<()> {
 
 pub fn cat_file(pretty_print: bool, object_hash: String) -> anyhow::Result<()> {
     // An object with a `refs/replace/` entry shows its replacement, as in git.
-    let object_hash = crate::helpers::objects::replacement_object(&object_hash).unwrap_or(object_hash);
-    let (_, content) = crate::helpers::objects::read_object(&object_hash).context("Failed to read object file")?;
+    let object_hash = crate::core::object_store::replacement_object(&object_hash).unwrap_or(object_hash);
+    let (_, content) = crate::core::object_store::read_object(&object_hash).context("Failed to read object file")?;
 
     if pretty_print {
         let text = String::from_utf8_lossy(&content);

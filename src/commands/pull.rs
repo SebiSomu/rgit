@@ -17,9 +17,9 @@ use anyhow::Result;
 ///    performing fast-forward updates or 3-way merges as appropriate.
 // Used by CLI command dispatch (`cli.rs`).
 pub fn pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
-    let current_branch = match crate::refs::resolve_head()? {
-        crate::refs::HeadState::Branch(b) => b,
-        crate::refs::HeadState::Detached(_) => {
+    let current_branch = match crate::core::refs::resolve_head()? {
+        crate::core::refs::HeadState::Branch(b) => b,
+        crate::core::refs::HeadState::Detached(_) => {
             anyhow::bail!("fatal: You are not currently on a branch. Please specify which branch you want to merge with.");
         }
     };
@@ -27,7 +27,7 @@ pub fn pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
     let remote_name = match remote {
         Some(r) => r,
         None => {
-            crate::helpers::config::get_config_value(&format!("branch.{}.remote", current_branch))?
+            crate::core::config::get_config_value(&format!("branch.{}.remote", current_branch))?
                 .unwrap_or_else(|| "origin".to_string())
         }
     };
@@ -36,7 +36,7 @@ pub fn pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
         Some(b) => b,
         None => {
             let configured_merge =
-                crate::helpers::config::get_config_value(&format!("branch.{}.merge", current_branch))?;
+                crate::core::config::get_config_value(&format!("branch.{}.merge", current_branch))?;
             if let Some(m) = configured_merge {
                 m.strip_prefix("refs/heads/").unwrap_or(&m).to_string()
             } else {

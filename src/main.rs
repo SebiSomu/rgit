@@ -2,10 +2,8 @@ pub mod cli;
 pub mod objects;
 pub mod commands;
 mod helpers;
-mod index;
-pub mod refs;
-pub mod repo;
 pub mod ui;
+pub mod core;
 
 use anyhow::Result;
 

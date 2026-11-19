@@ -11,9 +11,9 @@ use crate::helpers::request_pull::{
     tag_message_for_pull, REQUEST_PULL_USAGE,
 };
 use crate::helpers::rev_list::expand_rev_list_format;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::objects::RequestPullOptions;
-use crate::repo;
+use crate::core::repo;
 
 const SEPARATOR: &str = "----------------------------------------------------------------";
 

@@ -2,10 +2,10 @@ use std::fs;
 use anyhow::Result;
 
 use crate::helpers::notes::{commit_notes_tree, default_notes_ref, edit_note_text, expand_notes_ref, load_notes_tree, merge_notes, read_note_text, stripspace, NOTES_USAGE};
-use crate::helpers::objects::{read_object, write_object};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::object_store::{read_object, write_object};
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{NotesMergeStrategy, NotesTree};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit notes [--ref <notes-ref>] <subcommand>`
 ///

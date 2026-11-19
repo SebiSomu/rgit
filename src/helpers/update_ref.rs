@@ -2,14 +2,14 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use anyhow::Context;
-use crate::helpers::check_ref_format::check_refname_format;
-use crate::helpers::objects::read_object;
-use crate::helpers::reflog::{delete_reflog, record_ref_change, NULL_HASH};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::check_ref_format::check_refname_format;
+use crate::core::object_store::read_object;
+use crate::core::reflog::{delete_reflog, record_ref_change, NULL_HASH};
+use crate::core::rev_parse::resolve_rev;
 use crate::helpers::symbolic_ref::{check_ref_creation_conflicts, is_refname_safe, read_raw_ref_value, resolve_ref_unsafe};
 use crate::objects::{PreparedRefUpdate, RawRefValue, RefUpdate, UpdateRefOptions, UpdateRefsState};
-use crate::refs::{prune_empty_ref_dirs, remove_packed_ref};
-use crate::repo;
+use crate::core::refs::{prune_empty_ref_dirs, remove_packed_ref};
+use crate::core::repo;
 
 /// git's usage text for `update-ref`, printed for `-h` and after option errors (exit 129).
 pub const UPDATE_REF_USAGE: &str = "usage: rgit update-ref [<options>] -d <refname> [<old-val>]

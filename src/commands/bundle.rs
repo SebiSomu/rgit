@@ -8,7 +8,7 @@ use crate::helpers::bundle::{
     select_bundle_commits, store_loose_objects, write_packfile,
 };
 use crate::objects::{BundleAction, BundleHeader};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit bundle create [-q] [--version=<2|3>] <file> <rev-list-args>...`
 /// `rgit bundle verify [-q] <file>`

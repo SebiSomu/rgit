@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::helpers::objects::{read_object, write_object};
+use crate::core::object_store::{read_object, write_object};
 
 /// Finds all best common ancestors (merge bases) between two commits.
 // Used by `merge_base`.
@@ -70,7 +70,7 @@ pub fn find_all_merge_bases(commit_a: &str, commit_b: &str) -> anyhow::Result<Ve
     for (i, c1) in candidates.iter().enumerate() {
         let mut dominated = false;
         for (j, c2) in candidates.iter().enumerate() {
-            if i != j && crate::helpers::commit::is_reachable(c2, c1)? {
+            if i != j && crate::core::commit::is_reachable(c2, c1)? {
                 dominated = true;
                 break;
             }
@@ -102,7 +102,7 @@ pub fn build_merge_commit(tree_hash: String, parent1: &str, parent2: &str, messa
     content.push_str(&format!("parent {}\n", parent2));
 
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let author = crate::helpers::config::author_identity()?;
+    let author = crate::core::config::author_identity()?;
 
     content.push_str(&format!("author {} {} +0000\n", author, timestamp));
     content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
@@ -117,7 +117,7 @@ type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 /// path (a modify/delete conflict has no stage 2 or 3; an add/add one no stage 1).
 // Used by `merge`, `cherry-pick`, `revert` and `rebase` after a conflicted merge.
 pub fn write_conflict_stages(conflicted: &BTreeMap<String, [Option<([u8; 20], u32)>; 3]>) -> anyhow::Result<()> {
-    use crate::index::{read_index, write_index, IndexEntry};
+    use crate::core::index::{read_index, write_index, IndexEntry};
     if conflicted.is_empty() {
         return Ok(());
     }
@@ -135,7 +135,7 @@ pub fn write_conflict_stages(conflicted: &BTreeMap<String, [Option<([u8; 20], u3
 
 /// Paths that have unmerged (stage 1-3) entries in the index, in index order.
 // Used by every command that must refuse to run on an unresolved conflict, and by `status`.
-pub fn unmerged_paths(entries: &[crate::index::IndexEntry]) -> Vec<String> {
+pub fn unmerged_paths(entries: &[crate::core::index::IndexEntry]) -> Vec<String> {
     let mut paths: Vec<String> = Vec::new();
     for entry in entries.iter().filter(|e| e.stage != 0) {
         if paths.last() != Some(&entry.path) {
@@ -162,7 +162,7 @@ pub fn die_if_unmerged_for_commit() -> anyhow::Result<()> {
 }
 
 fn resolve_conflict_or_die(verb: &str, fatal: &str, list_paths: bool) -> anyhow::Result<()> {
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     let paths = unmerged_paths(&entries);
     if paths.is_empty() {
         return Ok(());
@@ -183,7 +183,7 @@ fn resolve_conflict_or_die(verb: &str, fatal: &str, list_paths: bool) -> anyhow:
 /// returns whether there were any.
 // Used by `switch`/`checkout <branch>`, `reset --soft` and the sequencer before they refuse.
 pub fn report_needs_merge() -> bool {
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     let paths = unmerged_paths(&entries);
     for path in &paths {
         println!("{}: needs merge", path);
@@ -208,7 +208,7 @@ pub fn merge_into_worktree_favoring(base: &TreeMap, ours: &TreeMap, theirs: &Tre
     use crate::helpers::checkout::{check_switch_safety, sync_working_tree, update_index_from_tree};
     use crate::helpers::merge_tree::merge_trees_favoring;
     let result = merge_trees_favoring(base, ours, theirs, our_label, their_label, 7, favor)?;
-    let index_entries = crate::index::read_index().unwrap_or_default();
+    let index_entries = crate::core::index::read_index().unwrap_or_default();
     let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().filter(|e| e.stage == 0).map(|e| (e.path.clone(), e.hash)).collect();
     check_switch_safety(&result.tree, ours, &index_map).map_err(|e| {
         anyhow::anyhow!("{}", e.to_string().replace("by switch", &format!("by {}", operation)).replace("before you switch branches", &format!("before you {}", operation)))
@@ -224,7 +224,7 @@ pub fn merge_into_worktree_favoring(base: &TreeMap, ours: &TreeMap, theirs: &Tre
 // Used by `merge`, `commit` and `reset`.
 pub fn clear_merge_state() {
     for name in ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG", "AUTO_MERGE"] {
-        let _ = std::fs::remove_file(crate::repo::path(format!(".git/{}", name)));
+        let _ = std::fs::remove_file(crate::core::repo::path(format!(".git/{}", name)));
     }
 }
 
@@ -233,8 +233,8 @@ pub fn clear_merge_state() {
 /// alone. A path counts as touched when its index entry differs from `HEAD` or is unmerged.
 // Used by `merge --abort`.
 pub fn abort_merge_to_head() -> anyhow::Result<()> {
-    let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
-        Some(commit) => crate::helpers::commit::resolve_tree_from_source(&commit)?,
+    let head_tree: TreeMap = match crate::core::refs::resolve_head_commit()? {
+        Some(commit) => crate::core::commit::resolve_tree_from_source(&commit)?,
         None => TreeMap::new(),
     };
     reset_merge_to_tree(&head_tree)?;
@@ -248,11 +248,11 @@ pub fn abort_merge_to_head() -> anyhow::Result<()> {
 // Used by `merge --abort` and `cherry-pick --abort` / `--skip`.
 pub fn reset_merge_to_tree(target_tree: &TreeMap) -> anyhow::Result<()> {
     use crate::helpers::checkout::{sync_working_tree, update_index_from_tree};
-    let head_tree: TreeMap = match crate::refs::resolve_head_commit()? {
-        Some(commit) => crate::helpers::commit::resolve_tree_from_source(&commit)?,
+    let head_tree: TreeMap = match crate::core::refs::resolve_head_commit()? {
+        Some(commit) => crate::core::commit::resolve_tree_from_source(&commit)?,
         None => TreeMap::new(),
     };
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     // Where the work tree is now (unmerged paths hold marker content: never equal to a blob)
     // and where it should end up.
     let mut current: TreeMap = TreeMap::new();

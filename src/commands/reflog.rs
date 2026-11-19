@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::cli::ReflogAction;
-use crate::helpers::reflog::{
+use crate::core::reflog::{
     expire_reflog, format_reflog_output, list_reflog_refs, parse_reflog_spec, read_reflog,
     resolve_reflog_ref_name, write_reflog,
 };

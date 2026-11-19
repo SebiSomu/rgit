@@ -53,7 +53,7 @@ impl IndexEntry {
 }
 
 pub fn read_index() -> Result<Vec<IndexEntry>> {
-    read_index_from(&crate::repo::path(INDEX_PATH))
+    read_index_from(&crate::core::repo::path(INDEX_PATH))
 }
 
 /// Reads an index file at an explicit location, such as another worktree's
@@ -194,7 +194,7 @@ pub fn write_index(entries: &mut Vec<IndexEntry>) -> Result<()> {
     hasher.update(&buf);
     buf.extend_from_slice(&hasher.finalize());
 
-    fs::write(crate::repo::path(INDEX_PATH), &buf).context("Failed to write .git/index")?;
+    fs::write(crate::core::repo::path(INDEX_PATH), &buf).context("Failed to write .git/index")?;
 
     Ok(())
 }

@@ -6,12 +6,12 @@ use crate::helpers::diff_plumbing::{
 };
 use crate::helpers::ls_files::normalize_pathspecs;
 use crate::helpers::merge::find_merge_base;
-use crate::helpers::objects::flatten_tree;
+use crate::core::object_store::flatten_tree;
 use crate::helpers::rename::{detect_renames, warn_rename_limit};
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::index::read_index;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::index::read_index;
 use crate::objects::{DiffChange, DiffSide};
-use crate::refs;
+use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 

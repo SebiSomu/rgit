@@ -3,11 +3,11 @@ use std::path::Path;
 use std::process::Command;
 use anyhow::Result;
 
-use crate::helpers::config::{set_in, unset_in, read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
+use crate::core::config::{set_in, unset_in, read_entries_from, write_entries_to, LOCAL_CONFIG_PATH};
 use crate::helpers::index_plumbing::bare_index_entry;
 use crate::helpers::submodule::{describe_submodule_commit, read_gitmodules, selected_submodules, stage_gitmodules, registered_url, resolve_submodule_url, run_rgit_in, submodule_git_dir, submodule_head, SUBMODULE_USAGE};
-use crate::index::{read_index, write_index};
-use crate::repo;
+use crate::core::index::{read_index, write_index};
+use crate::core::repo;
 
 /// Prints a message and exits.
 fn die(message: &str, code: i32) -> ! {

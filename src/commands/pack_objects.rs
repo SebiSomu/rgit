@@ -3,11 +3,11 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use anyhow::Result;
 
-use crate::helpers::pack::{build_pack, packed_object_exists, reachable_objects, store_pack, write_pack_index};
+use crate::core::pack::{build_pack, packed_object_exists, reachable_objects, store_pack, write_pack_index};
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::PackBuildOptions;
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit pack-objects [--revs] [--all] [--unpacked | --incremental] [--non-empty] [-q]
 /// [--progress] [--window=<n>] [--depth=<n>] (--stdout | <base-name>)`
@@ -75,7 +75,7 @@ pub fn pack_objects(args: Vec<String>) -> Result<()> {
         let (mut wanted, mut unwanted): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
         if all {
             wanted.extend(list_all_refs().into_values());
-            if let Some(head) = crate::refs::resolve_head_commit()? {
+            if let Some(head) = crate::core::refs::resolve_head_commit()? {
                 wanted.push(head);
             }
         }

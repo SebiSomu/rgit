@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
-use crate::helpers::objects::flatten_tree;
+use crate::core::object_store::flatten_tree;
 use crate::helpers::rev_list::{parse_revision_args, select_rev_list_commits};
 use crate::objects::LastModifiedOptions;
 
@@ -80,7 +80,7 @@ pub fn last_modified_paths(opts: &LastModifiedOptions) -> anyhow::Result<Vec<(St
 
     // The boundary of a range such as A..B is A: the commit paths untouched by the range are reported against.
     let boundary = opts.revs.revs.iter().find_map(|rev| rev.strip_prefix('^').map(str::to_string).or_else(|| rev.split_once("..").map(|(a, _)| a.to_string()).filter(|a| !a.is_empty())));
-    let boundary = boundary.and_then(|rev| crate::helpers::rev_parse::resolve_rev(&rev).ok()).and_then(|hash| crate::helpers::rev_parse::peel_to_type(hash, "commit").ok());
+    let boundary = boundary.and_then(|rev| crate::core::rev_parse::resolve_rev(&rev).ok()).and_then(|hash| crate::core::rev_parse::peel_to_type(hash, "commit").ok());
 
     let mut out = Vec::new();
     for path in targets {

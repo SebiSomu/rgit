@@ -56,10 +56,10 @@ pub fn collapse_untracked(untracked: &[String], tracked: &BTreeSet<String>) -> V
 /// git's `## ` branch line for `status -sb`: `## main...origin/main [ahead 1, behind 2]`,
 /// `## No commits yet on main`, or `## HEAD (no branch)`.
 // Used by `status --short --branch`.
-pub fn status_branch_header(head: &crate::refs::HeadState, unborn: bool) -> String {
+pub fn status_branch_header(head: &crate::core::refs::HeadState, unborn: bool) -> String {
     let branch = match head {
-        crate::refs::HeadState::Detached(_) => return "## HEAD (no branch)".to_string(),
-        crate::refs::HeadState::Branch(b) => b,
+        crate::core::refs::HeadState::Detached(_) => return "## HEAD (no branch)".to_string(),
+        crate::core::refs::HeadState::Branch(b) => b,
     };
     if unborn {
         return format!("## No commits yet on {}", branch);

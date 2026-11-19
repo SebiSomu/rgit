@@ -244,7 +244,7 @@ pub fn get_from(path: &Path, key: &str) -> Result<Option<String>> {
 }
 
 pub fn get_config_value(key: &str) -> Result<Option<String>> {
-    if let Some(v) = get_from(&crate::repo::path(LOCAL_CONFIG_PATH), key)? {
+    if let Some(v) = get_from(&crate::core::repo::path(LOCAL_CONFIG_PATH), key)? {
         return Ok(Some(v));
     }
     match global_config_path() {
@@ -262,7 +262,7 @@ pub fn read_all_config_entries() -> Vec<(String, String)> {
     if let Some(global) = global_config_path() {
         entries.extend(read_entries_from(&global).unwrap_or_default());
     }
-    entries.extend(read_entries_from(&crate::repo::path(LOCAL_CONFIG_PATH)).unwrap_or_default());
+    entries.extend(read_entries_from(&crate::core::repo::path(LOCAL_CONFIG_PATH)).unwrap_or_default());
     entries
 }
 

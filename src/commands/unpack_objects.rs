@@ -1,9 +1,9 @@
 use std::io::{self, Read};
 use anyhow::Result;
 
-use crate::helpers::objects::write_object;
-use crate::helpers::pack::{resolve_pack_entries, scan_pack};
-use crate::repo;
+use crate::core::object_store::write_object;
+use crate::core::pack::{resolve_pack_entries, scan_pack};
+use crate::core::repo;
 
 /// `rgit unpack-objects [-n] [-q] [-r] [--strict]`
 ///

@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::helpers::check_ref_format::check_refname_format;
+use crate::core::check_ref_format::check_refname_format;
 use crate::helpers::for_each_ref::shorten_unambiguous_ref_with;
 use crate::helpers::symbolic_ref::{
     delete_symbolic_ref, parse_symbolic_ref_args, resolve_ref_unsafe, write_symbolic_ref, SYMBOLIC_REF_USAGE,
 };
 use crate::objects::SymbolicRefOptions;
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit symbolic-ref [-m <reason>] <name> <ref>`
 /// `rgit symbolic-ref [-q] [--short] [--no-recurse] <name>`

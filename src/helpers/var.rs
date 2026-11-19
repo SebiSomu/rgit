@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::helpers::commit::current_signature;
-use crate::helpers::config::{get_config_value, global_config_path};
+use crate::core::commit::current_signature;
+use crate::core::config::{get_config_value, global_config_path};
 use crate::helpers::rebase::editor_command;
 
 /// Usage text of `var`, printed for `-h` and usage errors.

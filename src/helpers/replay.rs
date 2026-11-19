@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
-use crate::helpers::commit::{current_signature, write_commit_object};
+use crate::core::commit::{current_signature, write_commit_object};
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::merge_tree::merge_trees_in_memory;
-use crate::helpers::objects::flatten_tree;
+use crate::core::object_store::flatten_tree;
 use crate::helpers::rev_list::{list_all_refs, parse_revision_args, select_rev_list_commits};
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::helpers::state_files::build_tree_from_map;
 use crate::objects::ReplayOptions;
 
@@ -119,7 +119,7 @@ pub fn replay_commits(opts: &ReplayOptions) -> anyhow::Result<Option<Vec<String>
         if !merged.conflicted.is_empty() {
             return Ok(None);
         }
-        let tree = if merged.tree.is_empty() { crate::helpers::objects::write_object("tree", b"")? } else { build_tree_from_map(&merged.tree)? };
+        let tree = if merged.tree.is_empty() { crate::core::object_store::write_object("tree", b"")? } else { build_tree_from_map(&merged.tree)? };
         let new_commit = write_commit_object(&tree, &[new_parent], &commit.author, &committer, &commit.message)?;
         replayed.insert(commit.hash.clone(), new_commit.clone());
         last = new_commit.clone();

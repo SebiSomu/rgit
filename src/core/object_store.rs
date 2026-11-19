@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::index::IndexEntry;
+use crate::core::index::IndexEntry;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -24,7 +24,7 @@ pub fn write_object(object_type: &str, content: &[u8]) -> anyhow::Result<String>
     let hash = hasher.finalize();
     let hash_hex = hex::encode(hash);
 
-    let dir = crate::repo::path(format!(".git/objects/{}", &hash_hex[..2]));
+    let dir = crate::core::repo::path(format!(".git/objects/{}", &hash_hex[..2]));
     let path = dir.join(&hash_hex[2..]);
 
     fs::create_dir_all(&dir)?;
@@ -63,7 +63,7 @@ pub fn replacement_object(hash: &str) -> Option<String> {
     }
     let map = REPLACE_MAP.get_or_init(|| {
         let mut map = std::collections::HashMap::new();
-        if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
+        if let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) {
             for line in packed.lines() {
                 if let Some((target, name)) = line.split_once(' ') {
                     if let Some(original) = name.strip_prefix("refs/replace/").filter(|_| target.len() == 40) {
@@ -72,7 +72,7 @@ pub fn replacement_object(hash: &str) -> Option<String> {
                 }
             }
         }
-        if let Ok(entries) = fs::read_dir(crate::repo::path(".git/refs/replace")) {
+        if let Ok(entries) = fs::read_dir(crate::core::repo::path(".git/refs/replace")) {
             for entry in entries.flatten() {
                 if let Ok(target) = fs::read_to_string(entry.path()) {
                     let target = target.trim();
@@ -110,13 +110,13 @@ pub fn read_object(hash: &str) -> anyhow::Result<(String, Vec<u8>)> {
 
     let dir = &hash[0..2];
     let file_name = &hash[2..];
-    let path = crate::repo::path(format!(".git/objects/{}/{}", dir, file_name));
+    let path = crate::core::repo::path(format!(".git/objects/{}/{}", dir, file_name));
     let compressed_data = match fs::read(&path) {
         Ok(data) => data,
         // Not a loose object: it may live in a packfile.
         Err(_) => {
             if hash.len() == 40 {
-                if let Some(object) = crate::helpers::pack::read_packed_object(hash) {
+                if let Some(object) = crate::core::pack::read_packed_object(hash) {
                     return Ok(object);
                 }
             }

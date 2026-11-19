@@ -8,13 +8,13 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
     let remote_name = match remote {
         Some(r) => r,
         None => {
-            if let Ok(Some(b)) = crate::refs::resolve_head()
+            if let Ok(Some(b)) = crate::core::refs::resolve_head()
                 .map(|h| match h {
-                    crate::refs::HeadState::Branch(b) => Some(b),
+                    crate::core::refs::HeadState::Branch(b) => Some(b),
                     _ => None,
                 })
             {
-                crate::helpers::config::get_config_value(&format!("branch.{}.remote", b))?
+                crate::core::config::get_config_value(&format!("branch.{}.remote", b))?
                     .unwrap_or_else(|| "origin".to_string())
             } else {
                 "origin".to_string()
@@ -23,7 +23,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
     };
 
     let configured_url =
-        crate::helpers::config::get_config_value(&format!("remote.{}.url", remote_name))?;
+        crate::core::config::get_config_value(&format!("remote.{}.url", remote_name))?;
 
     let github_info = configured_url
         .as_deref()
@@ -114,8 +114,8 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
             Some(old) => {
                 println!(
                     "   {}..{}  {:16} -> {}/{}",
-                    crate::helpers::commit::short_hash(old),
-                    crate::helpers::commit::short_hash(remote_sha),
+                    crate::core::commit::short_hash(old),
+                    crate::core::commit::short_hash(remote_sha),
                     branch_name, remote_name, branch_name
                 );
                 FetchRefResult::Updated {
@@ -137,7 +137,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
 
     if let Ok(Some(default_branch)) = read_remote_head(&remote_git_dir) {
         if let Some((_, sha)) = filtered_refs.iter().find(|(b, _)| b == &default_branch) {
-            let _ = crate::refs::write_ref(
+            let _ = crate::core::refs::write_ref(
                 &format!("refs/remotes/{}/HEAD", remote_name),
                 sha,
             );

@@ -1,7 +1,7 @@
 use std::io::{self, Read, Write};
 use anyhow::Result;
 
-use crate::helpers::pack::parse_pack_index;
+use crate::core::pack::parse_pack_index;
 
 /// `rgit show-index`
 ///

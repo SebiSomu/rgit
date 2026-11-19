@@ -16,12 +16,12 @@ use crate::helpers::bisect::{
 };
 use crate::helpers::state_files::{append_line, read_lines_set};
 use crate::helpers::checkout::{check_switch_safety, ensure_working_tree_clean, sync_working_tree, update_index_from_tree};
-use crate::helpers::commit::resolve_commit_from_source;
-use crate::helpers::objects::{flatten_tree, tree_hash_of_commit};
+use crate::core::commit::resolve_commit_from_source;
+use crate::core::object_store::{flatten_tree, tree_hash_of_commit};
 
-use crate::index::read_index;
+use crate::core::index::read_index;
 use crate::objects::{BisectAction, BisectOutcome};
-use crate::refs;
+use crate::core::refs;
 
 pub const BISECT_START_PATH: &str = ".git/BISECT_START";
 pub const BISECT_LOG_PATH: &str = ".git/BISECT_LOG";
@@ -31,7 +31,7 @@ pub const BISECT_SKIP_PATH: &str = ".git/BISECT_SKIP";
 
 /// `rgit bisect start [<bad> [<good>...]]`
 pub fn bisect_start(bad: Option<String>, good: Vec<String>) -> anyhow::Result<()> {
-    if crate::repo::path(BISECT_START_PATH).exists() {
+    if crate::core::repo::path(BISECT_START_PATH).exists() {
         anyhow::bail!(
             "fatal: a bisect session is already in progress\n\
              hint: use 'rgit bisect reset' to start over"
@@ -42,14 +42,14 @@ pub fn bisect_start(bad: Option<String>, good: Vec<String>) -> anyhow::Result<()
         .ok_or_else(|| anyhow::anyhow!("fatal: bad HEAD - I need a HEAD commit to bisect"))?;
     ensure_working_tree_clean("start a bisect")?;
 
-    let head_content = fs::read_to_string(crate::repo::path(".git/HEAD")).context("Failed to read .git/HEAD")?;
-    fs::write(crate::repo::path(BISECT_START_PATH), &head_content).context("Failed to write .git/BISECT_START")?;
+    let head_content = fs::read_to_string(crate::core::repo::path(".git/HEAD")).context("Failed to read .git/HEAD")?;
+    fs::write(crate::core::repo::path(BISECT_START_PATH), &head_content).context("Failed to write .git/BISECT_START")?;
 
-    let _ = fs::remove_file(crate::repo::path(BISECT_BAD_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_GOOD_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_SKIP_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_LOG_PATH));
-    append_line(crate::repo::path(BISECT_LOG_PATH), "git bisect start")?;
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_BAD_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_GOOD_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_SKIP_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_LOG_PATH));
+    append_line(crate::core::repo::path(BISECT_LOG_PATH), "git bisect start")?;
 
     let mut last_outcome = None;
     if let Some(bad_rev) = bad {
@@ -86,7 +86,7 @@ pub fn bisect_skip(revs: Vec<String>) -> anyhow::Result<()> {
 
 /// `rgit bisect reset [<commit>]`
 pub fn bisect_reset(commit: Option<String>) -> anyhow::Result<()> {
-    if !crate::repo::path(BISECT_START_PATH).exists() {
+    if !crate::core::repo::path(BISECT_START_PATH).exists() {
         anyhow::bail!("fatal: We are not bisecting.");
     }
 
@@ -95,7 +95,7 @@ pub fn bisect_reset(commit: Option<String>) -> anyhow::Result<()> {
         checkout_bisect_commit(&hash)?;
         println!("HEAD is now at {} (detached)", &hash[..hash.len().min(7)]);
     } else {
-        let saved = fs::read_to_string(crate::repo::path(BISECT_START_PATH)).context("Failed to read .git/BISECT_START")?;
+        let saved = fs::read_to_string(crate::core::repo::path(BISECT_START_PATH)).context("Failed to read .git/BISECT_START")?;
         let trimmed = saved.trim();
 
         if let Some(branch_ref) = trimmed.strip_prefix("ref: ") {
@@ -129,11 +129,11 @@ pub fn bisect_reset(commit: Option<String>) -> anyhow::Result<()> {
         }
     }
 
-    let _ = fs::remove_file(crate::repo::path(BISECT_START_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_LOG_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_BAD_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_GOOD_PATH));
-    let _ = fs::remove_file(crate::repo::path(BISECT_SKIP_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_START_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_LOG_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_BAD_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_GOOD_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(BISECT_SKIP_PATH));
 
     println!("Bisect session ended.");
 
@@ -142,10 +142,10 @@ pub fn bisect_reset(commit: Option<String>) -> anyhow::Result<()> {
 
 /// `rgit bisect log`
 pub fn bisect_log() -> anyhow::Result<()> {
-    if !crate::repo::path(BISECT_LOG_PATH).exists() {
+    if !crate::core::repo::path(BISECT_LOG_PATH).exists() {
         anyhow::bail!("fatal: We are not bisecting.");
     }
-    let content = fs::read_to_string(crate::repo::path(BISECT_LOG_PATH)).context("Failed to read .git/BISECT_LOG")?;
+    let content = fs::read_to_string(crate::core::repo::path(BISECT_LOG_PATH)).context("Failed to read .git/BISECT_LOG")?;
     print!("{}", content);
     Ok(())
 }
@@ -160,10 +160,10 @@ pub fn bisect_run(command: Vec<String>) -> anyhow::Result<()> {
     if command.is_empty() {
         anyhow::bail!("fatal: 'rgit bisect run' requires a command to run");
     }
-    if !crate::repo::path(BISECT_START_PATH).exists() {
+    if !crate::core::repo::path(BISECT_START_PATH).exists() {
         anyhow::bail!("fatal: You need to start by \"rgit bisect start\"");
     }
-    if !crate::repo::path(BISECT_BAD_PATH).exists() || read_lines_set(crate::repo::path(BISECT_GOOD_PATH))?.is_empty() {
+    if !crate::core::repo::path(BISECT_BAD_PATH).exists() || read_lines_set(crate::core::repo::path(BISECT_GOOD_PATH))?.is_empty() {
         anyhow::bail!("fatal: bisect run requires both a bad and at least one good commit to be marked first");
     }
 

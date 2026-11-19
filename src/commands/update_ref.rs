@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::helpers::reflog::NULL_HASH;
+use crate::core::reflog::NULL_HASH;
 use crate::helpers::update_ref::{
     commit_ref_transaction, get_object_id, parse_update_ref_args, prepare_ref_transaction, queue_ref_update,
     run_update_ref_stdin, UPDATE_REF_USAGE,
 };
 use crate::objects::{RefUpdate, UpdateRefOptions};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit update-ref [-m <reason>] [--no-deref] [--create-reflog] <ref> <new-oid> [<old-oid>]`
 /// `rgit update-ref [-m <reason>] [--no-deref] -d <ref> [<old-oid>]`

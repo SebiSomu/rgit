@@ -3,14 +3,14 @@ use std::fs;
 use std::io::IsTerminal;
 use std::path::Path;
 use crate::helpers::bisect::collect_ancestors;
-use crate::helpers::check_ref_format::check_refname_format;
+use crate::core::check_ref_format::check_refname_format;
 use crate::helpers::cherry::abbreviate_hash_min;
-use crate::helpers::config::{get_config_value, global_config_path, normalize_key, read_entries_from, LOCAL_CONFIG_PATH};
+use crate::core::config::{get_config_value, global_config_path, normalize_key, read_entries_from, LOCAL_CONFIG_PATH};
 use crate::helpers::format_patch::civil_from_days;
-use crate::helpers::objects::read_object;
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::object_store::read_object;
+use crate::core::rev_parse::resolve_rev;
 use crate::helpers::tag::describe_commit_matching;
-use crate::helpers::wildmatch::{wildmatch, WM_CASEFOLD, WM_PATHNAME};
+use crate::core::wildmatch::{wildmatch, WM_CASEFOLD, WM_PATHNAME};
 use crate::objects::{
     ForEachRefExit, ForEachRefOptions, RefAlign, RefArrayItem, RefAtomArg, RefAtomKind, RefAtomValue, RefContentsPart, RefDateKind,
     RefDateMode, RefFilterAtom, RefFormatPiece, RefQuoteStyle, RefnameShow, RemoteRefShow, TrailerFormatOptions,
@@ -1130,7 +1130,7 @@ fn resolve_head_ref() -> Option<String> {
 /// `ref: ` symref, along with whether it came from `packed-refs`. `None` if it doesn't exist or
 /// is unreadable.
 fn read_raw_ref(name: &str) -> Option<(Result<String, String>, bool)> {
-    let path = crate::repo::path(format!(".git/{}", name));
+    let path = crate::core::repo::path(format!(".git/{}", name));
     if Path::new(&path).is_file() {
         let content = fs::read_to_string(&path).ok()?;
         return parse_loose_ref(&content).map(|v| (v, false));
@@ -1152,7 +1152,7 @@ fn parse_loose_ref(content: &str) -> Option<Result<String, String>> {
 
 fn packed_refs() -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
-    if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
+    if let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) {
         for line in packed.lines() {
             if line.starts_with('#') || line.starts_with('^') {
                 continue;
@@ -1197,12 +1197,12 @@ fn ref_exists(name: &str) -> bool {
 /// contents are skipped with git's warnings, dangling symbolic refs silently.
 // Used by `for-each-ref`.
 pub fn collect_ref_items(prefixes: Option<&[String]>) -> Vec<RefArrayItem> {
-    let linked = crate::repo::is_linked_worktree();
+    let linked = crate::core::repo::is_linked_worktree();
     let mut loose: BTreeMap<String, String> = BTreeMap::new();
-    walk_loose_refs(&crate::repo::path(".git/refs"), "refs", linked, &mut loose);
+    walk_loose_refs(&crate::core::repo::path(".git/refs"), "refs", linked, &mut loose);
     if linked {
         for prefix in PER_WORKTREE_REFS {
-            walk_loose_refs(&crate::repo::path(format!(".git/{}", prefix)), prefix, false, &mut loose);
+            walk_loose_refs(&crate::core::repo::path(format!(".git/{}", prefix)), prefix, false, &mut loose);
         }
     }
     let mut names: BTreeMap<String, bool> = BTreeMap::new();
@@ -1370,7 +1370,7 @@ pub fn worktree_paths_by_branch() -> HashMap<String, String> {
     if let Ok(worktrees) = crate::helpers::worktree::list_worktrees() {
         for wt in worktrees {
             if let Some(branch) = wt.branch {
-                out.entry(branch).or_insert_with(|| crate::repo::to_git_path_string(&wt.path));
+                out.entry(branch).or_insert_with(|| crate::core::repo::to_git_path_string(&wt.path));
             }
         }
     }
@@ -1454,7 +1454,7 @@ fn config_values(key: &str) -> Vec<String> {
     if let Some(global) = global_config_path() {
         paths.push(global);
     }
-    paths.push(crate::repo::path(LOCAL_CONFIG_PATH));
+    paths.push(crate::core::repo::path(LOCAL_CONFIG_PATH));
     for path in paths {
         for (k, v) in read_entries_from(&path).unwrap_or_default() {
             if k == key {
@@ -1777,7 +1777,7 @@ fn grab_values(values: &mut [Option<RefAtomValue>], atoms: &[RefFilterAtom], der
             K::ObjectType => set(values, i, kind.as_bytes().to_vec(), 0),
             K::ObjectSize => {
                 let size = if atom.arg == (RefAtomArg::ObjectSize { disk: true }) {
-                    fs::metadata(crate::repo::path(format!(".git/objects/{}/{}", &oid[..2], &oid[2..]))).map(|m| m.len()).unwrap_or(0)
+                    fs::metadata(crate::core::repo::path(format!(".git/objects/{}/{}", &oid[..2], &oid[2..]))).map(|m| m.len()).unwrap_or(0)
                 } else {
                     content.len() as u64
                 };

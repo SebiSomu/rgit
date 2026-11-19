@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use sha1::{Digest, Sha1};
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::format_patch::{parse_commit_object, split_diff_lines, unified_hunks_with};
 use crate::helpers::rev_list::run_rev_list_walk;
-use crate::helpers::{objects::{flatten_tree, read_object}};
+use crate::core::object_store::{flatten_tree, read_object};
 use crate::objects::{ParsedCommit, RevListOptions, RevListRoots};
 
 /// Finds the upstream of the current branch from `branch.<name>.remote` and
@@ -13,9 +13,9 @@ use crate::objects::{ParsedCommit, RevListOptions, RevListRoots};
 /// or the branch has no upstream configured.
 // Used by `cherry` when no `<upstream>` is given.
 pub fn resolve_cherry_upstream() -> anyhow::Result<Option<String>> {
-    let branch = match crate::refs::resolve_head()? {
-        crate::refs::HeadState::Branch(b) => b,
-        crate::refs::HeadState::Detached(_) => return Ok(None),
+    let branch = match crate::core::refs::resolve_head()? {
+        crate::core::refs::HeadState::Branch(b) => b,
+        crate::core::refs::HeadState::Detached(_) => return Ok(None),
     };
     let (Some(remote), Some(merge)) = (
         get_config_value(&format!("branch.{}.remote", branch))?,
@@ -129,10 +129,10 @@ fn strip_whitespace(text: &str) -> String {
 // Used by `cherry --abbrev`, `tag`/`describe --abbrev`, `rev-list --abbrev-commit`, `show-ref --hash=<n>` / `--abbrev`,
 // and `for-each-ref` (`%(objectname:short)`).
 pub fn abbreviate_hash_min(hash: &str, min_len: usize) -> String {
-    let mut others: Vec<String> = fs::read_dir(crate::repo::path(format!(".git/objects/{}", &hash[..2])))
+    let mut others: Vec<String> = fs::read_dir(crate::core::repo::path(format!(".git/objects/{}", &hash[..2])))
         .map(|entries| entries.flatten().map(|e| format!("{}{}", &hash[..2], e.file_name().to_string_lossy())).filter(|h| h != hash).collect())
         .unwrap_or_default();
-    others.extend(crate::helpers::pack::packed_object_names(&hash[..min_len.clamp(4, hash.len())]).into_iter().filter(|h| h != hash));
+    others.extend(crate::core::pack::packed_object_names(&hash[..min_len.clamp(4, hash.len())]).into_iter().filter(|h| h != hash));
     let mut len = min_len.clamp(4, hash.len());
     while len < hash.len() && others.iter().any(|o| o.starts_with(&hash[..len])) {
         len += 1;

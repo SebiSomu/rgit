@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-use crate::helpers::objects::{read_object, tree_hash_of_commit};
-use crate::refs::{
+use crate::core::object_store::{read_object, tree_hash_of_commit};
+use crate::core::refs::{
     list_branches, list_remote_tracking_branches, list_tags, read_ref, resolve_head,
     resolve_head_commit,
 };
@@ -238,7 +238,7 @@ fn read_ref_following_symref(ref_name: &str) -> Result<Option<String>> {
     let mut current = ref_name.to_string();
     for _ in 0..5 {
         // A name such as `feat` can be a directory of refs (`refs/heads/feat/a`), not a ref.
-        if crate::repo::path(format!(".git/{}", current)).is_dir() {
+        if crate::core::repo::path(format!(".git/{}", current)).is_dir() {
             return Ok(None);
         }
         match read_ref(&current)? {
@@ -256,7 +256,7 @@ fn read_ref_following_symref(ref_name: &str) -> Result<Option<String>> {
 // Used by `resolve_rev`.
 fn resolve_base_name(name: &str) -> Result<String> {
     // Reflog spec (e.g. HEAD@{1}, main@{0}, @{1})
-    if let Some(hash) = crate::helpers::reflog::resolve_reflog_revision(name)? {
+    if let Some(hash) = crate::core::reflog::resolve_reflog_revision(name)? {
         return Ok(hash);
     }
 
@@ -310,8 +310,8 @@ fn resolve_base_name(name: &str) -> Result<String> {
         } else {
             // Candidates: loose objects in `objects/<xx>/` and the names in the pack indexes.
             let prefix = name.to_ascii_lowercase();
-            let mut matches = crate::helpers::pack::packed_object_names(&prefix);
-            let prefix_dir = crate::repo::path(format!(".git/objects/{}", &prefix[..2]));
+            let mut matches = crate::core::pack::packed_object_names(&prefix);
+            let prefix_dir = crate::core::repo::path(format!(".git/objects/{}", &prefix[..2]));
             if let Ok(entries) = std::fs::read_dir(prefix_dir) {
                 let rest = &prefix[2..];
                 for entry in entries.flatten() {
@@ -343,14 +343,14 @@ fn resolve_base_name(name: &str) -> Result<String> {
 // Used by the `rev_parse` command for `--abbrev-ref`.
 pub fn abbrev_ref_for(hash: &str) -> Result<String> {
     match resolve_head()? {
-        crate::refs::HeadState::Branch(branch) => {
+        crate::core::refs::HeadState::Branch(branch) => {
             if let Some(tip) = read_ref(&format!("refs/heads/{}", branch))? {
                 if tip == hash {
                     return Ok(branch);
                 }
             }
         }
-        crate::refs::HeadState::Detached(h) if h == hash => {
+        crate::core::refs::HeadState::Detached(h) if h == hash => {
             return Ok("HEAD".to_string());
         }
         _ => {}
@@ -370,7 +370,7 @@ pub fn abbrev_ref_for(hash: &str) -> Result<String> {
             }
         }
     }
-    let remotes_dir = &crate::repo::path(".git/refs/remotes");
+    let remotes_dir = &crate::core::repo::path(".git/refs/remotes");
     if remotes_dir.is_dir() {
         for entry in std::fs::read_dir(remotes_dir)
             .with_context(|| "Failed to read .git/refs/remotes")?
@@ -395,14 +395,14 @@ pub fn abbrev_ref_for(hash: &str) -> Result<String> {
 // Used by the `rev_parse` command for `--symbolic-full-name`.
 pub fn symbolic_full_name_for(hash: &str) -> Result<String> {
     match resolve_head()? {
-        crate::refs::HeadState::Branch(branch) => {
+        crate::core::refs::HeadState::Branch(branch) => {
             if let Some(tip) = read_ref(&format!("refs/heads/{}", branch))? {
                 if tip == hash {
                     return Ok(format!("refs/heads/{}", branch));
                 }
             }
         }
-        crate::refs::HeadState::Detached(h) if h == hash => {
+        crate::core::refs::HeadState::Detached(h) if h == hash => {
             return Ok("HEAD".to_string());
         }
         _ => {}
@@ -422,7 +422,7 @@ pub fn symbolic_full_name_for(hash: &str) -> Result<String> {
             }
         }
     }
-    let remotes_dir = &crate::repo::path(".git/refs/remotes");
+    let remotes_dir = &crate::core::repo::path(".git/refs/remotes");
     if remotes_dir.is_dir() {
         for entry in std::fs::read_dir(remotes_dir)
             .with_context(|| "Failed to read .git/refs/remotes")?
@@ -449,8 +449,8 @@ pub fn symbolic_full_name_for(hash: &str) -> Result<String> {
 pub fn abbrev_ref_symbolic(rev: &str) -> Result<String> {
     if rev.eq_ignore_ascii_case("head") {
         return match resolve_head()? {
-            crate::refs::HeadState::Branch(b) => Ok(b),
-            crate::refs::HeadState::Detached(_) => Ok("HEAD".to_string()),
+            crate::core::refs::HeadState::Branch(b) => Ok(b),
+            crate::core::refs::HeadState::Detached(_) => Ok("HEAD".to_string()),
         };
     }
     let hash = resolve_rev(rev)?;
@@ -462,8 +462,8 @@ pub fn abbrev_ref_symbolic(rev: &str) -> Result<String> {
 pub fn symbolic_full_name_symbolic(rev: &str) -> Result<String> {
     if rev.eq_ignore_ascii_case("head") {
         return match resolve_head()? {
-            crate::refs::HeadState::Branch(b) => Ok(format!("refs/heads/{}", b)),
-            crate::refs::HeadState::Detached(_) => Ok("HEAD".to_string()),
+            crate::core::refs::HeadState::Branch(b) => Ok(format!("refs/heads/{}", b)),
+            crate::core::refs::HeadState::Detached(_) => Ok("HEAD".to_string()),
         };
     }
     let hash = resolve_rev(rev)?;
@@ -471,5 +471,5 @@ pub fn symbolic_full_name_symbolic(rev: &str) -> Result<String> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/helpers/rev_parse.rs"]
+#[path = "../../tests/unit/core/rev_parse.rs"]
 mod tests;

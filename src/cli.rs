@@ -1020,7 +1020,7 @@ pub fn handle_commands() -> Result<()> {
         *cli.command,
         Commands::Fsck { .. } | Commands::Gc { .. } | Commands::Prune { .. } | Commands::CountObjects { .. } | Commands::Bundle { .. } | Commands::Push { .. } | Commands::Fetch { .. } | Commands::Clone { .. } | Commands::Pull { .. } | Commands::Replace { .. }
     ) {
-        crate::helpers::objects::disable_replace_objects();
+        crate::core::object_store::disable_replace_objects();
     }
 
     match *cli.command {
@@ -1270,7 +1270,7 @@ pub fn handle_commands() -> Result<()> {
 
             if final_path_specs.is_empty() {
                 for arg in remaining_args {
-                    if crate::helpers::commit::resolve_commit_from_source(&arg).is_ok() {
+                    if crate::core::commit::resolve_commit_from_source(&arg).is_ok() {
                         revisions.push(arg);
                     } else {
                         final_path_specs.push(arg);

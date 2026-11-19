@@ -9,8 +9,8 @@
 use crate::helpers::cherry::abbreviate_hash_min;
 use crate::helpers::diff_plumbing::{diff_path_selected, quote_c_path};
 use crate::helpers::format_patch::{compacted_changes, split_diff_lines};
-use crate::helpers::objects::read_object;
-use crate::index::IndexEntry;
+use crate::core::object_store::read_object;
+use crate::core::index::IndexEntry;
 
 const CONTEXT: usize = 3;
 const NUM_PARENT: usize = 2;

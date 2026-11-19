@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::index_plumbing::{worktree_state, write_entry_to_worktree};
-use crate::helpers::wildmatch::{wildmatch, WM_PATHNAME};
-use crate::index::{build_entry, read_index, write_index, IndexEntry};
+use crate::core::wildmatch::{wildmatch, WM_PATHNAME};
+use crate::core::index::{build_entry, read_index, write_index, IndexEntry};
 use crate::objects::IndexFileState;
 
 /// Usage text of `sparse-checkout`.
@@ -16,7 +16,7 @@ pub const SPARSE_CHECKOUT_USAGE: &str = "usage: rgit sparse-checkout (init | lis
 /// Path of the sparse-checkout pattern file (per worktree).
 // Used by `sparse-checkout` and `reapply_sparse_checkout`.
 pub fn sparse_patterns_path() -> PathBuf {
-    crate::repo::git_dir().join("info").join("sparse-checkout")
+    crate::core::repo::git_dir().join("info").join("sparse-checkout")
 }
 
 /// Whether `core.sparseCheckout` is on.
@@ -234,7 +234,7 @@ const WORKTREE_COMMANDS: [&str; 22] = [
 // Used by `main` after every successful command.
 pub fn reapply_after_command() -> Result<()> {
     let command = std::env::args().nth(1).unwrap_or_default();
-    if !WORKTREE_COMMANDS.contains(&command.as_str()) || !crate::repo::exists() || !sparse_checkout_enabled() {
+    if !WORKTREE_COMMANDS.contains(&command.as_str()) || !crate::core::repo::exists() || !sparse_checkout_enabled() {
         return Ok(());
     }
     reapply_sparse_checkout(Some(&read_sparse_patterns()))?;

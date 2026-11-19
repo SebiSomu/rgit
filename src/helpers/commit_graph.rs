@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 
 use crate::helpers::chunk_file::{assemble_chunk_file, fanout_table, parse_chunk_file, read_oid_chunks};
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 
 /// "No parent" marker in the commit data chunk.
 const NO_PARENT: u32 = 0x7000_0000;
@@ -15,7 +15,7 @@ const EXTRA_EDGES: u32 = 0x8000_0000;
 /// Path of the commit-graph file.
 // Used by `commit-graph write` / `verify`.
 pub fn commit_graph_path() -> PathBuf {
-    crate::repo::path(".git/objects/info/commit-graph")
+    crate::core::repo::path(".git/objects/info/commit-graph")
 }
 
 /// The fields of a commit the graph stores: tree, parents and committer time. `None` when

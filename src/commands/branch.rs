@@ -1,12 +1,10 @@
 use std::collections::BTreeMap;
-use crate::helpers::{
-    checkout::{check_switch_safety, sync_working_tree, update_index_from_tree},
-    commit::is_reachable,
-    objects::{flatten_tree, read_object, tree_hash_of_commit},
-};
+use crate::helpers::{checkout::{check_switch_safety, sync_working_tree, update_index_from_tree}};
+use crate::core::commit::is_reachable;
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::helpers::worktree::worktree_using_branch;
-use crate::index::read_index;
-use crate::refs;
+use crate::core::index::read_index;
+use crate::core::refs;
 
 
 /// `rgit branch [<options>] [<args>...]`
@@ -107,7 +105,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     }
     let name = &opts.args[0];
     let start = opts.args.get(1).cloned().unwrap_or_else(|| "HEAD".to_string());
-    let commit = match crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", start)) {
+    let commit = match crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", start)) {
         Ok(c) => c,
         Err(_) if opts.args.len() == 1 => die(&format!("not a valid object name: '{}'", current.as_deref().unwrap_or("HEAD"))),
         Err(_) => die(&format!("not a valid object name: '{}'", start)),
@@ -274,7 +272,7 @@ fn rename_or_copy(opts: &crate::objects::BranchOptions, current: Option<&str>) -
 /// as git's does (`checkout` doesn't check this).
 // Used by the `switch` command.
 pub fn die_if_operation_in_progress() -> anyhow::Result<()> {
-    let state = |p: &str| crate::repo::path(p).exists();
+    let state = |p: &str| crate::core::repo::path(p).exists();
     let (doing, quit) = if state(".git/MERGE_HEAD") {
         ("merging", "rgit reset --hard\" (which discards the merge)")
     } else if crate::helpers::rebase::rebase_in_progress() {

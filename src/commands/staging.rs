@@ -2,12 +2,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::Context;
-use crate::helpers::{
-    gitignore::{collect_files, normalize_path},
-    objects::{flatten_tree, hash_content, tree_hash_of_commit, write_object},
-};
-use crate::index::{build_entry, read_index, write_index};
-use crate::refs;
+use crate::helpers::{gitignore::{collect_files, normalize_path}};
+use crate::core::object_store::{flatten_tree, hash_content, tree_hash_of_commit, write_object};
+use crate::core::index::{build_entry, read_index, write_index};
+use crate::core::refs;
 
 pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     let mut entries = read_index().unwrap_or_default();
@@ -184,11 +182,11 @@ pub fn status(opts: crate::objects::StatusOptions) -> anyhow::Result<()> {
 
     // The in-progress operation, as git reports it (with status hints off).
     let mut state_lines: Vec<String> = Vec::new();
-    if crate::repo::path(".git/MERGE_HEAD").exists() {
+    if crate::core::repo::path(".git/MERGE_HEAD").exists() {
         state_lines.push(if unmerged.is_empty() { "All conflicts fixed but you are still merging.".into() } else { "You have unmerged paths.".into() });
-    } else if let Ok(pick) = fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD")) {
+    } else if let Ok(pick) = fs::read_to_string(crate::core::repo::path(".git/CHERRY_PICK_HEAD")) {
         state_lines.push(format!("You are currently cherry-picking commit {}.", pick.trim().get(..7).unwrap_or(pick.trim())));
-    } else if let Ok(revert) = fs::read_to_string(crate::repo::path(".git/REVERT_HEAD")) {
+    } else if let Ok(revert) = fs::read_to_string(crate::core::repo::path(".git/REVERT_HEAD")) {
         state_lines.push(format!("You are currently reverting commit {}.", revert.trim().get(..7).unwrap_or(revert.trim())));
     }
     for line in &state_lines {

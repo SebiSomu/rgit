@@ -1,15 +1,16 @@
 use std::collections::BTreeMap;
 use std::fs;
-use crate::helpers::commit::{current_signature, print_commit_summary, write_commit_object};
+use crate::core::commit::{current_signature, print_commit_summary, write_commit_object};
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::merge::{clear_merge_state, die_if_unmerged, merge_into_worktree, reset_merge_to_tree};
 use crate::helpers::sequencer::{
     append_cherry_picked_from, append_signoff, read_sequence_options, read_todo, remove_sequence, rollback_is_safe,
     save_todo, sequence_head, sequencer_active, start_sequence, update_abort_safety,
 };
-use crate::helpers::{commit::resolve_tree_from_source, state_files::build_tree_from_map};
+use crate::helpers::state_files::build_tree_from_map;
+use crate::core::commit::resolve_tree_from_source;
 use crate::objects::CherryPickOptions;
-use crate::refs;
+use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -53,7 +54,7 @@ pub fn cherry_pick(opts: CherryPickOptions) -> anyhow::Result<()> {
     }
     let outcome = if opts.quit {
         remove_sequence();
-        let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_HEAD"));
+        let _ = fs::remove_file(crate::core::repo::path(".git/CHERRY_PICK_HEAD"));
         clear_merge_state();
         Pick::Done
     } else if opts.abort {
@@ -94,7 +95,7 @@ fn start(opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     } else {
         let mut commits: Vec<String> = Vec::new();
         for rev in &opts.commits {
-            match crate::helpers::commit::resolve_commit_from_source(rev) {
+            match crate::core::commit::resolve_commit_from_source(rev) {
                 Ok(hash) if !commits.contains(&hash) => commits.push(hash),
                 Ok(_) => {}
                 Err(_) => {
@@ -115,7 +116,7 @@ fn start(opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     }
     if sequencer_active() {
         eprintln!("error: cherry-pick is already in progress");
-        let skip = if crate::repo::path(".git/CHERRY_PICK_HEAD").exists() { "--skip | " } else { "" };
+        let skip = if crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() { "--skip | " } else { "" };
         eprintln!("hint: try \"rgit cherry-pick (--continue | {}--abort | --quit)\"", skip);
         eprintln!("fatal: cherry-pick failed");
         return Ok(Pick::Stop(128));
@@ -152,7 +153,7 @@ fn head_tree() -> anyhow::Result<(Option<String>, TreeMap)> {
 
 /// The index as a tree map, or `None` when it has unmerged entries.
 fn index_tree() -> Option<TreeMap> {
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     if entries.iter().any(|e| e.stage != 0) {
         return None;
     }
@@ -203,14 +204,14 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         }
         crate::helpers::checkout::sync_working_tree(&target, &head_map, &index_map)?;
         crate::helpers::checkout::update_index_from_tree(&target, &head_map)?;
-        crate::helpers::reflog::set_reflog_action(&format!("cherry-pick: fast-forward"));
+        crate::core::reflog::set_reflog_action(&format!("cherry-pick: fast-forward"));
         move_head(&head_state, commit)?;
         update_abort_safety(commit)?;
         return Ok(Pick::Done);
     }
 
-    let raw = String::from_utf8_lossy(&crate::helpers::objects::read_object(commit)?.1).to_string();
-    let mut message = crate::helpers::commit::extract_commit_message(&raw);
+    let raw = String::from_utf8_lossy(&crate::core::object_store::read_object(commit)?.1).to_string();
+    let mut message = crate::core::commit::extract_commit_message(&raw);
     if !message.ends_with('\n') {
         message.push('\n');
     }
@@ -238,9 +239,9 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         println!("{}", line.text);
     }
     // git's sequencer records every merge result, clean or not, and leaves it behind.
-    fs::write(crate::repo::path(".git/AUTO_MERGE"), format!("{}\n", build_tree_from_map(&result.tree)?))?;
-    let merge_msg = crate::repo::path(".git/MERGE_MSG");
-    let pick_head = crate::repo::path(".git/CHERRY_PICK_HEAD");
+    fs::write(crate::core::repo::path(".git/AUTO_MERGE"), format!("{}\n", build_tree_from_map(&result.tree)?))?;
+    let merge_msg = crate::core::repo::path(".git/MERGE_MSG");
+    let pick_head = crate::core::repo::path(".git/CHERRY_PICK_HEAD");
 
     if !result.conflicted.is_empty() {
         let mut text = format!("{}\n# Conflicts:\n", message);
@@ -303,7 +304,7 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
 
     let parents: Vec<String> = head.iter().cloned().collect();
     let subject_line = crate::helpers::format_patch::split_commit_message(&message).0;
-    crate::helpers::reflog::set_reflog_action(&format!("cherry-pick: {}", subject_line));
+    crate::core::reflog::set_reflog_action(&format!("cherry-pick: {}", subject_line));
     let new_commit = write_commit_object(&tree, &parents, &picked.author, &committer, &message)?;
     move_head(&head_state, &new_commit)?;
     let _ = fs::remove_file(&merge_msg);
@@ -328,7 +329,7 @@ fn commit_resolved_pick() -> anyhow::Result<()> {
 
 /// `--continue`.
 fn resume() -> anyhow::Result<Pick> {
-    let pick_head = crate::repo::path(".git/CHERRY_PICK_HEAD");
+    let pick_head = crate::core::repo::path(".git/CHERRY_PICK_HEAD");
     if !sequencer_active() {
         if !pick_head.exists() {
             return Ok(fail("error: no cherry-pick or revert in progress"));
@@ -363,9 +364,9 @@ fn continue_sequence(todo: &[String], opts: &CherryPickOptions) -> anyhow::Resul
 fn reset_merge(target: &str) -> anyhow::Result<()> {
     let head_state = refs::resolve_head()?;
     if let Some(head) = refs::resolve_head_commit()? {
-        fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", head))?;
+        fs::write(crate::core::repo::path(".git/ORIG_HEAD"), format!("{}\n", head))?;
         if head != target {
-            crate::helpers::reflog::set_reflog_action(&format!("reset: moving to {}", target));
+            crate::core::reflog::set_reflog_action(&format!("reset: moving to {}", target));
         }
     }
     let target_tree = if target.is_empty() { TreeMap::new() } else { resolve_tree_from_source(target)? };
@@ -374,7 +375,7 @@ fn reset_merge(target: &str) -> anyhow::Result<()> {
         move_head(&head_state, target)?;
     }
     clear_merge_state();
-    let _ = fs::remove_file(crate::repo::path(".git/CHERRY_PICK_HEAD"));
+    let _ = fs::remove_file(crate::core::repo::path(".git/CHERRY_PICK_HEAD"));
     Ok(())
 }
 
@@ -383,7 +384,7 @@ fn skip() -> anyhow::Result<Pick> {
     // Without CHERRY_PICK_HEAD there is something to skip only mid-sequence, and only while
     // HEAD has not moved (otherwise the pick was committed by hand).
     let head = refs::resolve_head_commit()?.unwrap_or_default();
-    if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
+    if !crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         if !sequencer_active() {
             return Ok(fail("error: no cherry-pick in progress"));
         }
@@ -407,7 +408,7 @@ fn skip() -> anyhow::Result<Pick> {
 /// `--abort`.
 fn abort() -> anyhow::Result<Pick> {
     if !sequencer_active() {
-        if !crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
+        if !crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() {
             return Ok(fail("error: no cherry-pick or revert in progress"));
         }
         let head = refs::resolve_head_commit()?.unwrap_or_default();

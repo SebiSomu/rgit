@@ -132,8 +132,6 @@ src/
 │   └── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
 ├── helpers.rs                # Root module declaring the helper modules (no re-exports)
 ├── helpers/                  # Lower-level helpers & engines
-│   ├── objects.rs            # Object compression, hashing, tree writing, and refs/replace substitution on read
-│   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
 │   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
 │   ├── diff.rs               # Myers diff algorithm & unified diff formatting
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
@@ -143,7 +141,6 @@ src/
 │   ├── narrate.rs            # Narration support: repo snapshots, tree/line counts, last change per path, conflict hunks, risk scan, suggestions
 │   ├── branch.rs             # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
 │   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
-│   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
 │   ├── banana_split.rs       # Path grouping helpers for banana-split
 │   ├── rebase.rs             # Rebase engine: git's commit selection, up-to-date check, todo editor, replay runner
@@ -154,24 +151,20 @@ src/
 │   ├── remote.rs             # Remote config queries, name validation, ref directory manipulation, tracking branch collection
 │   ├── blame.rs              # Line attribution algorithm, diff-mapping, tree lookups, date formatting
 │   ├── archive.rs            # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
-│   ├── reflog.rs             # Reflog append/parse, <ref>@{n} resolution, entry deletion and expiry
 │   ├── gc.rs                 # Reachability roots, unreachable loose object detection, pruning
 │   ├── prune.rs              # --expire parsing, stale temp/stray file discovery in .git/objects, empty fan-out cleanup
 │   ├── fsck.rs               # Object integrity checks, connectivity walks, dangling object reports
 │   ├── grep.rs               # Matcher construction, pathspec filtering, content search
 │   ├── count_objects.rs      # Loose/packed object statistics, human-readable sizes
-│   ├── rev_parse.rs          # Revision syntax resolution, worktree root discovery, property queries
 │   ├── shortlog.rs           # Author grouping of reachable commits
 │   ├── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
 │   ├── check_ignore.rs       # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
-│   ├── check_ref_format.rs   # Git ref name rules, slash normalization, branch shorthand validation
 │   ├── apply.rs              # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
 │   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
 │   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
 │   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
 │   ├── show_ref.rs           # show-ref option parsing, pattern matching, ref resolution/existence, output, --exclude-existing
 │   ├── for_each_ref.rs       # for-each-ref: ref-filter port (option/atom parsing, ref collection, filters, values, if/align stack, quoting, versioncmp)
-│   ├── wildmatch.rs          # git wildmatch() port (WM_PATHNAME, WM_CASEFOLD)
 │   ├── log.rs                # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
 │   ├── tag.rs                # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
 │   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
@@ -207,7 +200,6 @@ src/
 │   ├── merge_file.rs         # merge-file argument parsing
 │   ├── mktree.rs             # ls-tree line parsing and checks, tree serialization
 │   ├── mktag.rs              # Standalone tag fsck (headers, ident) with git's message ids
-│   ├── pack.rs               # Packfile engine: idx parse/write, packed object lookup (read_object fallback), deltas, pack writer
 │   ├── chunk_file.rs         # Chunk file format shared by commit-graph and multi-pack-index
 │   ├── commit_graph.rs       # Commit-graph writer and verifier
 │   ├── midx.rs               # Multi-pack-index writer, parser and verifier
@@ -221,10 +213,21 @@ src/
 │   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │
 ├── ui.rs                     # Narration layer (C.1/C.10): verbosity levels, before/after snapshot + exit hook, ALL narration wording (stderr only)
+├── core.rs                   # Root module declaring the core modules
+├── core/                     # Repository fundamentals every domain builds on (no command entry points)
+│   ├── check_ref_format.rs   # Git ref name rules, slash normalization, branch shorthand validation
+│   ├── commit.rs             # Commit building, parsing, parent chains, ancestor walks (is_reachable)
+│   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
+│   ├── index.rs              # Binary staging index (.git/index) reader and writer
+│   ├── object_store.rs       # Object compression, hashing, tree writing, and refs/replace substitution on read
+│   ├── pack.rs               # Packfile engine: idx parse/write, packed object lookup (read_object fallback), deltas, pack writer
+│   ├── reflog.rs             # Reflog append/parse, <ref>@{n} resolution, entry deletion and expiry
+│   ├── refs.rs               # Reference resolution, branch refs, and HEAD state transitions
+│   ├── repo.rs               # Repository path resolution (`repo::path(".git/...")`), main vs linked worktree
+│   ├── rev_parse.rs          # Revision syntax resolution, worktree root discovery, property queries
+│   └── wildmatch.rs          # git wildmatch() port (WM_PATHNAME, WM_CASEFOLD)
+│
 ├── objects.rs                # Special types, enums, structs, and type aliases
-├── refs.rs                   # Reference resolution, branch refs, and HEAD state transitions
-├── repo.rs                   # Repository path resolution (`repo::path(".git/...")`), main vs linked worktree
-├── index.rs                  # Binary staging index (.git/index) reader and writer
 └── bin/
     └── rtest.rs              # Isolated test runner executing rgit within test-sandbox/
 ```
@@ -235,9 +238,9 @@ src/
 2. **[commands/](file:///c:/rgit-main/src/commands)**: Contains *only* high-level command entry points. Functions here orchestrate workflows between `helpers`, `refs`, and `index`, and must return `anyhow::Result<()>`. They do not contain low-level helper logic.
 3. **[helpers/](file:///c:/rgit-main/src/helpers)**: Standalone operational functions that read/write compressed objects, execute file I/O, spawn editors, walk commit graphs, manage state files, and resolve merge conflicts.
 4. **[objects.rs](file:///c:/rgit-main/src/objects.rs)**: Single source of truth for all domain structures, enums, AST items, and shared type aliases used across commands and helpers.
-5. **[refs.rs](file:///c:/rgit-main/src/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
-6. **[index.rs](file:///c:/rgit-main/src/index.rs)**: Reads and writes the staging index (`.git/index`).
-7. **[repo.rs](file:///c:/rgit-main/src/repo.rs)**: Resolves every path inside `.git`. **Never open `.git/...` paths directly**: wrap them in `crate::repo::path(".git/...")`, which returns them unchanged in a main worktree and routes them to the shared `.git` (objects, refs, config, logs/refs, STASH_LIST) or to `.git/worktrees/<id>/` (HEAD, index, MERGE_*/REBASE_*/BISECT_* state) inside a linked worktree.
+5. **[core/refs.rs](file:///c:/rgit-main/src/core/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
+6. **[core/index.rs](file:///c:/rgit-main/src/core/index.rs)**: Reads and writes the staging index (`.git/index`).
+7. **[core/repo.rs](file:///c:/rgit-main/src/core/repo.rs)**: Resolves every path inside `.git`. **Never open `.git/...` paths directly**: wrap them in `crate::core::repo::path(".git/...")`, which returns them unchanged in a main worktree and routes them to the shared `.git` (objects, refs, config, logs/refs, STASH_LIST) or to `.git/worktrees/<id>/` (HEAD, index, MERGE_*/REBASE_*/BISECT_* state) inside a linked worktree.
 7. **[bin/rtest.rs](file:///c:/rgit-main/src/bin/rtest.rs)**: Test harness that cleans and targets `test-sandbox/` for all manual or agentic testing.
 
 ---
@@ -246,8 +249,9 @@ src/
 
 - **Error Handling**: Use `anyhow::Result` and add context with `.context()` or `.with_context()` to help debug file system issues.
 - **Branch Validation**: All branch creation and renaming must pass through `refs::is_valid_branch_name` to prevent formatting conflicts (following `git-check-ref-format`).
-- **Explicit Imports**: Import items from the module that defines them (`use crate::helpers::objects::read_object;`, `crate::commands::merge::merge(...)`). Never add `pub use x::*` re-exports to `helpers.rs` or `commands.rs`, and never `#![allow(unused_imports)]` to hide them.
-- **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `helpers/commit.rs` rather than assuming linear history (handles branched or merged histories).
+- **Core vs. Helpers**: `core/` holds the repository fundamentals (object store, packs, index, refs, repo paths, config, reflog, commits, revision parsing, ref-name rules, wildmatch). Code in `core/` must not depend on `commands/` or feature helpers; when a feature helper grows something every domain needs, move it into `core/`.
+- **Explicit Imports**: Import items from the module that defines them (`use crate::core::object_store::read_object;`, `crate::commands::merge::merge(...)`). Never add `pub use x::*` re-exports to `helpers.rs` or `commands.rs`, and never `#![allow(unused_imports)]` to hide them.
+- **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `core/commit.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
 

@@ -11,7 +11,7 @@ use flate2::Compression;
 use sha1::{Digest, Sha1};
 
 use crate::helpers::apply::apply_git_delta;
-use crate::helpers::objects::{hash_content, read_object};
+use crate::core::object_store::{hash_content, read_object};
 use crate::objects::{BuiltPack, PackBuildOptions, PackEntry, PackIndexData, PackedObject, RepoPack};
 
 /// Parses a pack index file, version 2 (`\377tOc` magic) or the older version 1, checking
@@ -76,7 +76,7 @@ pub fn repo_packs() -> Arc<Vec<RepoPack>> {
     if let Some(packs) = REPO_PACKS.read().ok().and_then(|guard| guard.clone()) {
         return packs;
     }
-    let packs = packs_in_dir(&crate::repo::path(".git/objects/pack"));
+    let packs = packs_in_dir(&crate::core::repo::path(".git/objects/pack"));
     let packs = Arc::new(packs);
     if let Ok(mut guard) = REPO_PACKS.write() {
         *guard = Some(packs.clone());

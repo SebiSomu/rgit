@@ -9,9 +9,9 @@ use crate::helpers::gc::{
     hashes_in_file, list_loose_objects, GC_LENIENT_STATE_FILES,
     GC_STRICT_STATE_FILES,
 };
-use crate::helpers::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
+use crate::core::reflog::{list_reflog_refs, read_reflog, NULL_HASH};
 use crate::helpers::worktree::all_worktree_git_dirs;
-use crate::index::{read_index, read_index_from};
+use crate::core::index::{read_index, read_index_from};
 use crate::objects::{FsckIssue, FsckNode, FsckReport, LooseObject};
 
 /// Modes a tree entry may have: regular file, executable, symlink, directory, submodule.
@@ -275,7 +275,7 @@ pub fn check_refs(graph: &HashMap<String, FsckNode>, issues: &mut Vec<FsckIssue>
             refs.push((format!("{}HEAD", label), head.trim().to_string()));
         }
     }
-    read_ref_files(&crate::repo::path(".git/refs"), "refs", &mut refs)?;
+    read_ref_files(&crate::core::repo::path(".git/refs"), "refs", &mut refs)?;
 
     for (name, content) in refs {
         if content.starts_with("ref: ") {
@@ -369,7 +369,7 @@ pub fn collect_labeled_roots(include_reflogs: bool) -> Result<Vec<(String, Strin
     }
 
     let mut ref_files = Vec::new();
-    read_ref_files(&crate::repo::path(".git/refs"), "refs", &mut ref_files)?;
+    read_ref_files(&crate::core::repo::path(".git/refs"), "refs", &mut ref_files)?;
     for (name, content) in ref_files {
         if is_object_hash(&content) {
             roots.push((content, name, true));
@@ -463,12 +463,12 @@ pub fn mark_reachable_in_graph(roots: &[(String, String, bool)], graph: &HashMap
 /// type. Returns its node for the connectivity graph.
 // Used by `run_fsck_checks`.
 pub fn verify_packed_object(hash: &str, check_hash: bool, issues: &mut Vec<FsckIssue>) -> FsckNode {
-    let Some((kind, body)) = crate::helpers::pack::read_packed_object(hash) else {
+    let Some((kind, body)) = crate::core::pack::read_packed_object(hash) else {
         issues.push(FsckIssue::error(format!("object {}: cannot be read from its packfile", hash)));
         return FsckNode { kind: "unknown".to_string(), links: Vec::new() };
     };
     if check_hash {
-        let actual = hex::encode(crate::helpers::objects::hash_content(&kind, &body));
+        let actual = hex::encode(crate::core::object_store::hash_content(&kind, &body));
         if actual != hash {
             issues.push(FsckIssue::error(format!("object {}: hash mismatch (its contents hash to {})", hash, actual)));
         }
@@ -499,9 +499,9 @@ pub fn run_fsck_checks(connectivity_only: bool, include_reflogs: bool) -> Result
     }
     // Objects that only live in packfiles are part of the graph too.
     let mut packed_checked = 0;
-    for pack in crate::helpers::pack::repo_packs().iter() {
+    for pack in crate::core::pack::repo_packs().iter() {
         if !connectivity_only {
-            let bytes = crate::helpers::pack::pack_bytes(pack);
+            let bytes = crate::core::pack::pack_bytes(pack);
             if bytes.len() < 32 || Sha1::digest(&bytes[..bytes.len() - 20]).as_slice() != &bytes[bytes.len() - 20..] {
                 issues.push(FsckIssue::error(format!("pack {}: checksum mismatch (the packfile is corrupt)", pack.name)));
             }

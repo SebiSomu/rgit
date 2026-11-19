@@ -2,8 +2,9 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{gitignore::{is_path_ignored, parse_gitignore_line}, objects::hash_content};
-use crate::index::IndexEntry;
+use crate::helpers::{gitignore::{is_path_ignored, parse_gitignore_line}};
+use crate::core::object_store::hash_content;
+use crate::core::index::IndexEntry;
 use crate::objects::{GitIgnoreRule, UntrackedPath, WorktreeState};
 
 /// Compares a tracked index entry against its working-tree file: `Deleted` when the file is

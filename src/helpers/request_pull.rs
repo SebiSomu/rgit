@@ -1,15 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::fetch::read_object_from_path;
 use crate::helpers::format_patch::{diff_tree_file, parse_commit_object, split_commit_message};
 use crate::helpers::github::{build_github_client, get_github_default_branch, list_github_refs, parse_github_remote, resolve_github_token};
 use crate::helpers::mailmap::map_user;
-use crate::helpers::objects::{flatten_tree, read_object};
+use crate::core::object_store::{flatten_tree, read_object};
 use crate::helpers::push::resolve_remote_repo_path;
 use crate::helpers::rev_list::{list_all_refs, run_rev_list_walk};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::rev_parse::resolve_rev;
 use crate::helpers::symbolic_ref::resolve_ref_unsafe;
 use crate::objects::{FileDiff, GitHubTarget, Mailmap, RequestPullOptions, RevListOptions, RevListRoots};
 

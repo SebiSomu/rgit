@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 
 use crate::helpers::chunk_file::{assemble_chunk_file, fanout_table, parse_chunk_file, read_oid_chunks};
-use crate::helpers::pack::find_in_index;
+use crate::core::pack::find_in_index;
 use crate::objects::RepoPack;
 
 /// Path of the multi-pack-index file.
 // Used by `multi-pack-index`.
 pub fn midx_path() -> PathBuf {
-    crate::repo::path(".git/objects/pack/multi-pack-index")
+    crate::core::repo::path(".git/objects/pack/multi-pack-index")
 }
 
 /// Builds a multi-pack-index (version 1, SHA-1) over the given packs: one sorted list of

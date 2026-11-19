@@ -3,11 +3,11 @@ use std::io::{self, BufRead};
 use anyhow::Result;
 
 use crate::helpers::commit_graph::{commit_graph_commits, commit_graph_path, verify_commit_graph, write_commit_graph};
-use crate::helpers::objects::read_object;
-use crate::helpers::pack::repo_packs;
+use crate::core::object_store::read_object;
+use crate::core::pack::repo_packs;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::repo;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::repo;
 
 /// `rgit commit-graph write [--reachable | --stdin-commits | --stdin-packs] [--append]` /
 /// `rgit commit-graph verify`
@@ -80,7 +80,7 @@ pub fn commit_graph(args: Vec<String>) -> Result<()> {
                 starts.push(commit);
             }
         }
-        if let Some(head) = crate::refs::resolve_head_commit()? {
+        if let Some(head) = crate::core::refs::resolve_head_commit()? {
             starts.push(head);
         }
     } else if stdin_commits {

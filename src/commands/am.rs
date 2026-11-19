@@ -10,13 +10,16 @@ use crate::helpers::am::{
 use crate::helpers::apply::{check_file_patch, parse_patch, read_patch_input, remove_worktree_file, write_planned_changes, write_worktree_file};
 use crate::helpers::checkout::{build_index_entries_for_tree, hard_reset_working_tree};
 use crate::helpers::rebase::rebase_in_progress;
-use crate::helpers::reflog::set_reflog_action;
-use crate::helpers::{
-    objects::{flatten_tree, read_object, tree_hash_of_commit, write_tree_from_index_prefix},
+use crate::core::reflog::set_reflog_action;
+use crate::core::object_store::{
+    flatten_tree,
+    read_object,
+    tree_hash_of_commit,
+    write_tree_from_index_prefix,
 };
-use crate::index::{read_index, write_index, IndexEntry};
+use crate::core::index::{read_index, write_index, IndexEntry};
 use crate::objects::{AmOptions, ApplyOptions, MailPatch, PlannedChanges};
-use crate::refs;
+use crate::core::refs;
 
 /// `rgit am [-k] [<mbox>...]`, `rgit am (--continue | --skip | --abort | --quit | --show-current-patch[=raw|diff])`
 ///
@@ -199,7 +202,7 @@ fn abort_session() -> Result<()> {
         Some(orig) => advance_head(orig)?,
         None => {
             if let Ok(branch_ref) = refs::current_branch_ref() {
-                let path = crate::repo::path(format!(".git/{}", branch_ref));
+                let path = crate::core::repo::path(format!(".git/{}", branch_ref));
                 if Path::new(&path).exists() {
                     fs::remove_file(path)?;
                 }

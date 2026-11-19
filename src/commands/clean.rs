@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use anyhow::Context;
 use crate::helpers::clean::collect_clean_candidates;
-use crate::index::read_index;
+use crate::core::index::read_index;
 use crate::objects::{CleanMode, GitIgnoreRule};
 use std::path::Path;
 

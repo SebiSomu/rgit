@@ -52,7 +52,7 @@ fn is_hex(text: &str, len: usize) -> bool {
 /// the loose objects (`<xx><rest of name>` inside a fan-out directory).
 // Used by the `prune` command.
 pub fn list_object_dir_cruft() -> Result<Vec<(String, ObjectDirCruft)>> {
-    let root = crate::repo::path(".git/objects");
+    let root = crate::core::repo::path(".git/objects");
     let mut cruft = Vec::new();
     for (name, dir) in sorted_entries(&root) {
         if !is_hex(&name, 2) || !dir.is_dir() {
@@ -83,7 +83,7 @@ pub fn list_object_dir_cruft() -> Result<Vec<(String, ObjectDirCruft)>> {
 /// Removes every empty fan-out directory (`.git/objects/xx/`).
 // Used by the `prune` command.
 pub fn remove_empty_fanout_dirs() {
-    for (name, dir) in sorted_entries(&crate::repo::path(".git/objects")) {
+    for (name, dir) in sorted_entries(&crate::core::repo::path(".git/objects")) {
         if is_hex(&name, 2) {
             let _ = fs::remove_dir(dir);
         }

@@ -9,14 +9,21 @@ use crate::helpers::add_patch::{
 use crate::helpers::index_plumbing::{bare_index_entry, worktree_file_mode};
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::{
-    commit::{build_commit, commit_subject_line, resolve_tree_from_source},
     merge::build_merge_commit,
-    objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object, write_tree_from_index_prefix},
     state_files::{append_stash_entry, build_tree_from_map, current_branch_label},
 };
-use crate::index::{read_index, write_index};
+use crate::core::commit::{build_commit, commit_subject_line, resolve_tree_from_source};
+use crate::core::object_store::{
+    flatten_tree,
+    hash_content,
+    read_object,
+    tree_hash_of_commit,
+    write_object,
+    write_tree_from_index_prefix,
+};
+use crate::core::index::{read_index, write_index};
 use crate::objects::{InteractiveFile, PatchModeSpec, PatchTarget};
-use crate::refs;
+use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 

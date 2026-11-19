@@ -2,7 +2,7 @@ use std::io::{self, Read, Write};
 use anyhow::Result;
 
 use crate::helpers::column::{apply_column_mode, column_command_name, default_column_options, parse_column_args, render_columns};
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 
 /// `rgit column [--command=<name>] [--mode[=<style>]] [--raw-mode=<n>] [--width=<n>]
 /// [--indent=<string>] [--nl=<string>] [--padding=<n>]`

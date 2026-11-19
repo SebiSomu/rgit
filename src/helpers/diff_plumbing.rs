@@ -4,8 +4,8 @@ use crate::helpers::cherry::abbreviate_hash_min;
 use crate::helpers::format_patch::{diff_file_contents, format_diffstat};
 use crate::helpers::index_plumbing::worktree_state;
 use crate::helpers::ls_files::pathspec_wildcard_match;
-use crate::helpers::objects::{hash_content, read_object};
-use crate::index::IndexEntry;
+use crate::core::object_store::{hash_content, read_object};
+use crate::core::index::IndexEntry;
 use crate::objects::{DiffChange, DiffPlumbingOptions, DiffSide, DiffStatEntry, FileDiff, IndexFileState};
 
 /// The options every raw diff command understands, for the usage text.

@@ -3,9 +3,9 @@ use std::fs;
 use std::path::Path;
 use anyhow::Context;
 use crate::helpers::gitignore::{collect_files, normalize_path};
-use crate::helpers::objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit};
-use crate::index::{build_entry, read_index, write_index, IndexEntry};
-use crate::refs;
+use crate::core::object_store::{flatten_tree, hash_content, read_object, tree_hash_of_commit};
+use crate::core::index::{build_entry, read_index, write_index, IndexEntry};
+use crate::core::refs;
 
 /// Checks whether switching branches would overwrite untracked or modified files in the working directory.
 // Used by `switch` and `checkout` commands to prevent data loss.

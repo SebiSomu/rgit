@@ -177,5 +177,5 @@ pub fn to_git_path_string(path: &Path) -> String {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/repo.rs"]
+#[path = "../../tests/unit/core/repo.rs"]
 mod tests;

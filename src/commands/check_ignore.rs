@@ -3,7 +3,7 @@ use std::io::{self, BufRead, BufWriter, Write};
 use anyhow::Result;
 
 use crate::helpers::check_ignore::{find_ignore_match, is_tracked_or_contains_tracked, normalize_check_ignore_path};
-use crate::index::read_index;
+use crate::core::index::read_index;
 use crate::objects::{CheckIgnoreOptions, SourcedIgnoreRule};
 
 /// `rgit check-ignore [-q] [-v [-n]] [--no-index] [--stdin [-z] | <pathname>...]`

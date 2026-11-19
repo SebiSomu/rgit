@@ -4,11 +4,11 @@ use std::io::Write;
 use anyhow::{bail, Result};
 
 use crate::helpers::diff_plumbing::quote_c_path;
-use crate::helpers::objects::{flatten_tree, read_object};
+use crate::core::object_store::{flatten_tree, read_object};
 use crate::helpers::rev_list::{list_all_refs, parse_rev_list_args, select_rev_list_commits};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{DiffChange, DiffSide, FastExportOptions};
-use crate::refs::read_ref;
+use crate::core::refs::read_ref;
 
 /// Usage text of `fast-export`.
 pub const FAST_EXPORT_USAGE: &str = "usage: rgit fast-export [<rev-list-opts>]\n\n    --signed-tags <when>  select handling of signed tags\n    --tag-of-filtered-object <when>\n                          select handling of tags that tag filtered objects\n    --export-marks <file> dump marks to this file\n    --import-marks <file> import marks from this file\n    --import-marks-if-exists <file>\n                          import marks from this file if it exists\n    --use-done-feature    use the done feature to terminate the stream\n    --no-data             skip output of blob data\n    --full-tree           output full tree for each commit\n    --mark-tags           label tags with mark ids\n    --reference-excluded-parents\n                          reference parents which are not in fast-export stream by object id\n    --show-original-ids   show original object ids of blobs/commits\n\n";
@@ -102,7 +102,7 @@ fn full_ref_name(name: &str) -> Option<String> {
     for prefix in ["refs/", "refs/tags/", "refs/heads/", "refs/remotes/"] {
         candidates.push(format!("{}{}", prefix, name));
     }
-    candidates.into_iter().find(|candidate| !crate::repo::path(format!(".git/{}", candidate)).is_dir() && read_ref(candidate).ok().flatten().is_some())
+    candidates.into_iter().find(|candidate| !crate::core::repo::path(format!(".git/{}", candidate)).is_dir() && read_ref(candidate).ok().flatten().is_some())
 }
 
 /// Writes a `git fast-import` stream for the selected history to `out`: every commit in an

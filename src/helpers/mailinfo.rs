@@ -1,4 +1,4 @@
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::objects::{MailTransferEncoding, MailinfoOptions, MailinfoOutput, MailinfoState, QuotedCrAction};
 
 /// git's usage text for `mailinfo`, printed for `-h` and after argument errors (exit 129).

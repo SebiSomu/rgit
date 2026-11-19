@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::fs;
-use crate::helpers::objects::{read_object, write_object};
+use crate::core::object_store::{read_object, write_object};
 use crate::helpers::rebase::run_editor;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::helpers::wildmatch::wildmatch;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::wildmatch::wildmatch;
 use crate::objects::{ReplaceMode, ReplaceOptions};
-use crate::refs::{remove_packed_ref, write_ref};
+use crate::core::refs::{remove_packed_ref, write_ref};
 
 /// git's usage text for `replace`, printed for `-h` and after usage errors (exit 129).
 pub const REPLACE_USAGE: &str = "usage: rgit replace [-f] <object> <replacement>
@@ -137,7 +137,7 @@ pub fn delete_replace_refs(names: &[String]) -> (Vec<String>, bool) {
             continue;
         }
         let ref_name = format!("refs/replace/{}", hash);
-        let _ = fs::remove_file(crate::repo::path(format!(".git/{}", ref_name)));
+        let _ = fs::remove_file(crate::core::repo::path(format!(".git/{}", ref_name)));
         let _ = remove_packed_ref(&ref_name);
         messages.push(format!("Deleted replace ref '{}'", hash));
     }
@@ -223,7 +223,7 @@ pub fn edit_object_copy(object: &str, raw: bool) -> anyhow::Result<String> {
     let pretty_tree = kind == "tree" && !raw;
     let text = if pretty_tree { tree_as_listing(&content) } else { content.clone() };
 
-    let path = crate::repo::path(".git/REPLACE_EDITOBJ");
+    let path = crate::core::repo::path(".git/REPLACE_EDITOBJ");
     fs::write(&path, &text)?;
     let edited = run_editor(&path, false).map_err(|_| anyhow::anyhow!("error: editing object file failed")).and_then(|_| Ok(fs::read(&path)?));
     let _ = fs::remove_file(&path);

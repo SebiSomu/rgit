@@ -4,13 +4,13 @@ use crate::helpers::merge_tree::merge_base_tree;
 use crate::helpers::merge::{abort_merge_to_head, clear_merge_state, die_if_unmerged, merge_into_worktree_favoring};
 use crate::helpers::{
     checkout::{check_switch_safety, sync_working_tree, update_index_from_tree},
-    commit::{is_reachable, resolve_commit_from_source, resolve_tree_from_source},
     merge::{find_all_merge_bases, find_merge_base},
     state_files::build_tree_from_map,
 };
-use crate::index::read_index;
+use crate::core::commit::{is_reachable, resolve_commit_from_source, resolve_tree_from_source};
+use crate::core::index::read_index;
 use crate::objects::{FastForwardMode, MergeFavor, MergeOptions};
-use crate::refs;
+use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -42,7 +42,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
             die(1, &format!("fatal: merge strategy '{}' is not supported by rgit (use ort, recursive or ours)", strategy));
         }
     }
-    let merge_head = crate::repo::path(".git/MERGE_HEAD");
+    let merge_head = crate::core::repo::path(".git/MERGE_HEAD");
     if opts.abort || opts.quit || opts.cont {
         let flag = if opts.abort { "--abort" } else if opts.quit { "--quit" } else { "--continue" };
         if !opts.commits.is_empty() {
@@ -65,7 +65,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     if merge_head.exists() {
         die(128, "fatal: You have not concluded your merge (MERGE_HEAD exists).\nPlease, commit your changes before you merge.");
     }
-    if crate::repo::path(".git/CHERRY_PICK_HEAD").exists() {
+    if crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() {
         die(128, "fatal: You have not concluded your cherry-pick (CHERRY_PICK_HEAD exists).\nPlease, commit your changes before you merge.");
     }
     if opts.squash {
@@ -92,7 +92,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         Err(_) => die(1, &format!("merge: {} - not something we can merge", name)),
     };
     let message = merge_commit_message(&opts, name, &head_state)?;
-    fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", our_commit))?;
+    fs::write(crate::core::repo::path(".git/ORIG_HEAD"), format!("{}\n", our_commit))?;
 
     if our_commit == their_commit || is_reachable(&our_commit, &their_commit)? {
         println!("{}", if opts.squash { "Already up to date. (nothing to squash)" } else { "Already up to date." });
@@ -120,7 +120,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
             println!("Squash commit -- not updating HEAD");
             write_squash_message(&our_commit, &their_commit)?;
         } else {
-            crate::helpers::reflog::set_reflog_action(&format!("merge {}: Fast-forward", name));
+            crate::core::reflog::set_reflog_action(&format!("merge {}: Fast-forward", name));
             move_head(&head_state, &their_commit)?;
         }
         if show_stat {
@@ -161,7 +161,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     if conflicted || opts.squash || opts.commit == Some(false) {
         // Only ort records its result tree.
         if strategy == "ort" {
-            fs::write(crate::repo::path(".git/AUTO_MERGE"), format!("{}\n", auto_merge))?;
+            fs::write(crate::core::repo::path(".git/AUTO_MERGE"), format!("{}\n", auto_merge))?;
         }
         let mut msg = if opts.squash { String::new() } else { message.clone() };
         if conflicted {
@@ -172,10 +172,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         }
         if !opts.squash {
             fs::write(&merge_head, format!("{}\n", their_commit))?;
-            fs::write(crate::repo::path(".git/MERGE_MODE"), if opts.ff == FastForwardMode::Never || strategy == "ours" { "no-ff" } else { "" })?;
+            fs::write(crate::core::repo::path(".git/MERGE_MODE"), if opts.ff == FastForwardMode::Never || strategy == "ours" { "no-ff" } else { "" })?;
         }
         if conflicted || !opts.squash {
-            fs::write(crate::repo::path(".git/MERGE_MSG"), msg)?;
+            fs::write(crate::core::repo::path(".git/MERGE_MSG"), msg)?;
         }
         if conflicted {
             println!("Automatic merge failed; fix conflicts and then commit the result.");
@@ -185,10 +185,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let signature = crate::helpers::commit::current_signature()?;
-    let commit_hash = crate::helpers::commit::write_commit_object(&auto_merge, &[our_commit.clone(), their_commit.clone()], &signature, &signature, &message)?;
+    let signature = crate::core::commit::current_signature()?;
+    let commit_hash = crate::core::commit::write_commit_object(&auto_merge, &[our_commit.clone(), their_commit.clone()], &signature, &signature, &message)?;
     let made_by = format!("Merge made by the '{}' strategy.", strategy);
-    crate::helpers::reflog::set_reflog_action(&format!("merge {}: {}", name, made_by));
+    crate::core::reflog::set_reflog_action(&format!("merge {}: {}", name, made_by));
     move_head(&head_state, &commit_hash)?;
     if !opts.quiet {
         println!("{}", made_by);
@@ -233,7 +233,7 @@ fn merge_commit_message(opts: &MergeOptions, name: &str, head_state: &refs::Head
         };
         format!("{}{}", merge_message(name), crate::helpers::fmt_merge_msg::merge_into_suffix(current))
     };
-    let cleaned = crate::helpers::commit::cleanup_commit_message(&text, false);
+    let cleaned = crate::core::commit::cleanup_commit_message(&text, false);
     Ok(if cleaned.ends_with('\n') { cleaned } else { format!("{}\n", cleaned) })
 }
 
@@ -262,7 +262,7 @@ fn write_squash_message(ours: &str, theirs: &str) -> anyhow::Result<()> {
         text.push('\n');
         text.push_str(&crate::helpers::log::format_log_entry(&commit.commit, &log_opts, &Default::default()));
     }
-    fs::write(crate::repo::path(".git/SQUASH_MSG"), text)?;
+    fs::write(crate::core::repo::path(".git/SQUASH_MSG"), text)?;
     Ok(())
 }
 

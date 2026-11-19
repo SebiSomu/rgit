@@ -1,13 +1,13 @@
 use std::io::Write;
 use anyhow::Result;
 
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::merge_file::parse_merge_file_args;
 use crate::helpers::merge_tree::merge_file_lines_with;
-use crate::helpers::objects::{read_object, write_object};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::object_store::{read_object, write_object};
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{MergeConflictStyle, MergeFileOptions};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit merge-file [-p] [-q] [--diff3 | --zdiff3] [--ours | --theirs | --union]
 /// [--marker-size=<n>] [--object-id] [-L <label>]... <current> <base> <other>`

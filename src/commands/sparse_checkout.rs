@@ -2,10 +2,10 @@ use std::fs;
 use std::io::{self, Read};
 use anyhow::Result;
 
-use crate::helpers::config::{set_in, LOCAL_CONFIG_PATH};
+use crate::core::config::{set_in, LOCAL_CONFIG_PATH};
 use crate::helpers::sparse::{cone_directories, cone_patterns, is_cone_pattern_file, path_in_sparse_checkout, read_sparse_patterns, reapply_sparse_checkout, sparse_checkout_enabled, sparse_cone_mode, sparse_patterns_path, SPARSE_CHECKOUT_USAGE};
-use crate::index::read_index;
-use crate::repo;
+use crate::core::index::read_index;
+use crate::core::repo;
 
 /// `rgit sparse-checkout (init | set | add | list | reapply | disable | check-rules)`
 ///

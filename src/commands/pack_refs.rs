@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::helpers::pack_refs::{pack_refs_matching, parse_pack_refs_args, PACK_REFS_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit pack-refs [--all] [--no-prune] [--include <pattern>] [--exclude <pattern>]`
 ///

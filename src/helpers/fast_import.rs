@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, HashSet};
 use anyhow::{anyhow, bail, Result};
 
 use crate::helpers::mktree::write_tree_from_entries;
-use crate::helpers::objects::{flatten_tree, read_object, write_object};
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::object_store::{flatten_tree, read_object, write_object};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::helpers::update_ref::unquote_c_style;
 use crate::objects::{FastImportInput, FastImportState};
 
@@ -501,7 +501,7 @@ pub fn finish_fast_import(state: &FastImportState) -> Result<bool> {
     let mut skipped = false;
     for (name, tip) in &state.refs {
         let Some(tip) = tip else { continue };
-        let old = crate::refs::read_ref(name).ok().flatten();
+        let old = crate::core::refs::read_ref(name).ok().flatten();
         if let Some(old) = old.filter(|old| old != tip) {
             let is_branch = !name.starts_with("refs/tags/");
             if !state.force && is_branch && !is_ancestor(&old, tip) {
@@ -510,11 +510,11 @@ pub fn finish_fast_import(state: &FastImportState) -> Result<bool> {
                 continue;
             }
         }
-        crate::refs::write_ref(name, tip)?;
+        crate::core::refs::write_ref(name, tip)?;
     }
     for name in &state.deleted {
-        let _ = std::fs::remove_file(crate::repo::path(format!(".git/{}", name)));
-        let _ = crate::refs::remove_packed_ref(name);
+        let _ = std::fs::remove_file(crate::core::repo::path(format!(".git/{}", name)));
+        let _ = crate::core::refs::remove_packed_ref(name);
     }
     if let Some(file) = &state.export_marks {
         let text: String = state.marks.iter().map(|(mark, hash)| format!(":{} {}\n", mark, hash)).collect();

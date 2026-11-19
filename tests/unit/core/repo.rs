@@ -1,4 +1,4 @@
-//! Unit tests for `src/repo.rs`, kept outside `src/` and compiled into that module via
+//! Unit tests for `src/core/repo.rs`, kept outside `src/` and compiled into that module via
 //! `#[path]` (so they can reach its private items through `super::`).
 
 use super::is_shared;

@@ -1,10 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use crate::helpers::format_patch::compacted_changes;
-use crate::helpers::{
-    commit::resolve_tree_from_source,
-    merge::find_all_merge_bases,
-    objects::{read_object, write_object},
-};
+use crate::helpers::merge::find_all_merge_bases;
+use crate::core::commit::resolve_tree_from_source;
+use crate::core::object_store::{read_object, write_object};
 use crate::objects::{ConflictRegion, FileMergeResult, MergeConflictStyle, MergeFavor, MergeFileOptions, MergeMessage, MergePathOutcome, MergePathReport, SideChange, TreeMergeResult};
 
 type Entry = ([u8; 20], u32);

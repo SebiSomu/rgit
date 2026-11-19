@@ -27,7 +27,7 @@ pub fn rerere(args: Vec<String>) -> Result<()> {
     if args.iter().any(|a| a.as_str() == "-h") {
         usage();
     }
-    if !crate::repo::exists() {
+    if !crate::core::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
         crate::ui::exit(128);
     }

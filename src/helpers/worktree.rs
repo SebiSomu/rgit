@@ -6,12 +6,12 @@ use std::path::{Path, PathBuf};
 use crate::helpers::checkout::ensure_working_tree_clean;
 use crate::helpers::clone::checkout_commit_into_empty_worktree;
 use crate::helpers::ls_files::collect_untracked_paths;
-use crate::helpers::commit::short_hash;
-use crate::helpers::reflog::{record_ref_update, NULL_HASH};
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::index::read_index;
+use crate::core::commit::short_hash;
+use crate::core::reflog::{record_ref_update, NULL_HASH};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::index::read_index;
 use crate::objects::WorktreeInfo;
-use crate::repo;
+use crate::core::repo;
 
 /// The directory under the shared `.git` that holds one administrative directory per linked
 /// worktree.

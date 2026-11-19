@@ -3,8 +3,8 @@ use anyhow::Result;
 
 use crate::helpers::diff_plumbing::{diff_files_changes, parse_diff_plumbing_args, render_diff_changes, reverse_changes, DIFF_COMMON_OPTIONS};
 use crate::helpers::ls_files::normalize_pathspecs;
-use crate::index::read_index;
-use crate::repo;
+use crate::core::index::read_index;
+use crate::core::repo;
 
 /// `rgit diff-files [-q] [<common diff options>] [<path>...]`
 ///

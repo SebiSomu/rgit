@@ -4,13 +4,17 @@ use std::path::PathBuf;
 
 use crate::helpers::{
     checkout::{build_index_entries_for_tree, hard_reset_working_tree},
-    commit::{commit_subject_line, resolve_commit_from_source, resolve_tree_from_source},
     gitignore::normalize_path,
-    objects::{flatten_tree, read_object, tree_hash_of_commit},
 };
-use crate::index::{read_index, write_index, IndexEntry};
+use crate::core::commit::{
+    commit_subject_line,
+    resolve_commit_from_source,
+    resolve_tree_from_source,
+};
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
+use crate::core::index::{read_index, write_index, IndexEntry};
 use crate::objects::ResetMode;
-use crate::refs;
+use crate::core::refs;
 
 fn reset_paths(source: Option<&str>, paths: &[PathBuf]) -> anyhow::Result<()> {
     let source_tree: BTreeMap<String, ([u8; 20], u32)> = if let Some(src) = source {
@@ -112,7 +116,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     } else {
         ResetMode::Mixed
     };
-    if soft && (crate::repo::path(".git/MERGE_HEAD").exists() || read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
+    if soft && (crate::core::repo::path(".git/MERGE_HEAD").exists() || read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
         eprintln!("fatal: Cannot do a soft reset in the middle of a merge.");
         crate::ui::exit(128);
     }
@@ -124,7 +128,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     let old_head_commit = refs::resolve_head_commit()?;
     // Every reset without paths records where HEAD was.
     if let Some(old) = &old_head_commit {
-        fs::write(crate::repo::path(".git/ORIG_HEAD"), format!("{}\n", old))?;
+        fs::write(crate::core::repo::path(".git/ORIG_HEAD"), format!("{}\n", old))?;
     }
 
     match &head_state {
@@ -142,7 +146,7 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
     // sequence whose last pick that was).
     crate::helpers::sequencer::post_commit_cleanup();
     for state in [".git/CHERRY_PICK_HEAD", ".git/CHERRY_PICK_MSG", ".git/REVERT_HEAD", ".git/REVERT_MSG"] {
-        let _ = fs::remove_file(crate::repo::path(state));
+        let _ = fs::remove_file(crate::core::repo::path(state));
     }
 
     if let ResetMode::Soft = mode {

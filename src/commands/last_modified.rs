@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 
 use crate::helpers::last_modified::{last_modified_paths, parse_last_modified_args, LAST_MODIFIED_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit last-modified [-r | --recursive] [-t | --show-trees] [-z] [<revision-range>] [[--] <path>...]`
 ///

@@ -2,7 +2,7 @@ use std::io::{self, Read};
 use anyhow::Result;
 
 use crate::helpers::mktree::{parse_mktree_line, write_tree_from_entries, MKTREE_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit mktree [-z] [--missing] [--batch]`
 ///

@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 
 use crate::helpers::fast_export::{parse_fast_export_args, run_fast_export, FAST_EXPORT_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit fast-export [--all | <rev>...] [--signed-tags=<mode>] [--no-data] [--full-tree]
 /// [--export-marks=<file>] [--import-marks=<file>] [--use-done-feature] [--mark-tags]

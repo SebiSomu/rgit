@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 use crate::helpers::checkout::{check_switch_safety, ensure_working_tree_clean, sync_working_tree, update_index_from_tree};
-use crate::helpers::commit::resolve_commit_from_source;
+use crate::core::commit::resolve_commit_from_source;
 use crate::helpers::merge::find_all_merge_bases;
-use crate::helpers::commit::resolve_tree_from_source;
+use crate::core::commit::resolve_tree_from_source;
 use crate::helpers::rebase::{
     begin_replay, can_fast_forward, cleanup_rebase_state, edit_todo, rebase_abort, rebase_continue,
     rebase_edit_todo, rebase_in_progress, rebase_skip, select_commits_to_rebase, subject_of,
 };
-use crate::index::read_index;
+use crate::core::index::read_index;
 use crate::objects::{Action, RebaseOptions, TodoItem};
-use crate::refs;
+use crate::core::refs;
 
 fn die(code: i32, message: &str) -> ! {
     eprintln!("{}", message);

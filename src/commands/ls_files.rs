@@ -3,7 +3,7 @@ use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 
 use crate::helpers::ls_files::{collect_untracked_paths, is_tracked_path_ignored, matches_ls_files_pathspec, normalize_pathspecs, worktree_state};
-use crate::index::{read_index, IndexEntry};
+use crate::core::index::{read_index, IndexEntry};
 use crate::objects::{LsFilesOptions, WorktreeState};
 
 /// `rgit ls-files [-c] [-d] [-m] [-o] [-i] [--exclude-standard] [-s] [-u] [-t] [-z] [<pathspec>...]`

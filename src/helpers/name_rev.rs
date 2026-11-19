@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use anyhow::Result;
 
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::wildmatch::wildmatch;
+use crate::core::wildmatch::wildmatch;
 use crate::objects::{NameRevOptions, NameRevTip, RevName, RevNames};
-use crate::refs::read_ref;
+use crate::core::refs::read_ref;
 
 /// Usage text of `name-rev`, printed for `-h` and usage errors.
 pub const NAME_REV_USAGE: &str = "usage: rgit name-rev [<options>] <commit>...\n   or: rgit name-rev [<options>] --all\n   or: rgit name-rev [<options>] --annotate-stdin\n\n    --[no-]name-only      print only ref-based names (no object names)\n    --[no-]tags           only use tags to name the commits\n    --[no-]refs <pattern> only use refs matching <pattern>\n    --[no-]exclude <pattern>\n                          ignore refs matching <pattern>\n\n    --[no-]all            list all commits reachable from all refs\n    --[no-]annotate-stdin annotate text from stdin\n    --[no-]undefined      allow to print `undefined` names (default)\n    --[no-]always         show abbreviated commit object as fallback\n\n";
@@ -142,7 +142,7 @@ fn subpath_match(path: &str, pattern: &str) -> Option<usize> {
 // Used by `ref_display_name`.
 fn shorten_unambiguous_ref(refname: &str) -> String {
     const RULES: [(&str, &str); 6] = [("", ""), ("refs/", ""), ("refs/tags/", ""), ("refs/heads/", ""), ("refs/remotes/", ""), ("refs/remotes/", "/HEAD")];
-    let exists = |name: String| crate::repo::path(format!(".git/{}", name)).is_file() || read_ref(&name).ok().flatten().is_some();
+    let exists = |name: String| crate::core::repo::path(format!(".git/{}", name)).is_file() || read_ref(&name).ok().flatten().is_some();
     for i in (1..RULES.len()).rev() {
         let (prefix, suffix) = RULES[i];
         let Some(short) = refname.strip_prefix(prefix).and_then(|rest| rest.strip_suffix(suffix)) else { continue };

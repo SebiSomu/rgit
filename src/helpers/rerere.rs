@@ -3,10 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use sha1::{Digest, Sha1};
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::format_patch::{split_diff_lines, unified_hunks};
 use crate::helpers::merge_tree::merge_file_lines;
-use crate::index::read_index;
+use crate::core::index::read_index;
 
 /// git's usage text for `rerere`, printed for `-h` and after usage errors (exit 129).
 pub const RERERE_USAGE: &str = "usage: rgit rerere [clear | forget <pathspec>... | diff | status | remaining | gc]\n";
@@ -24,7 +24,7 @@ pub fn rerere_enabled() -> bool {
 /// `.git/rr-cache`, where recorded conflicts (`preimage`) and their resolutions (`postimage`) live.
 // Used by `rerere` (internal to this file's helpers).
 fn rr_cache_dir() -> PathBuf {
-    crate::repo::path(".git/rr-cache")
+    crate::core::repo::path(".git/rr-cache")
 }
 
 /// The file of one recorded conflict: `.git/rr-cache/<id>/<name>`.
@@ -101,7 +101,7 @@ pub fn normalize_conflicts(content: &[u8]) -> Option<(Vec<u8>, String, usize)> {
 /// stored as `<id>\t<path>\0`.
 // Used by `rerere` (every subcommand).
 pub fn read_merge_rr() -> Vec<(String, String)> {
-    let Ok(data) = fs::read(crate::repo::path(".git/MERGE_RR")) else { return Vec::new() };
+    let Ok(data) = fs::read(crate::core::repo::path(".git/MERGE_RR")) else { return Vec::new() };
     data.split(|&b| b == 0)
         .filter_map(|entry| {
             let text = String::from_utf8_lossy(entry);
@@ -114,7 +114,7 @@ pub fn read_merge_rr() -> Vec<(String, String)> {
 /// Writes `.git/MERGE_RR` (removing it when nothing is tracked any more).
 // Used by `rerere` (recording, `forget`, `clear`).
 pub fn write_merge_rr(entries: &[(String, String)]) -> anyhow::Result<()> {
-    let path = crate::repo::path(".git/MERGE_RR");
+    let path = crate::core::repo::path(".git/MERGE_RR");
     let mut data = Vec::new();
     for (id, file) in entries {
         data.extend_from_slice(format!("{}\t{}", id, file).as_bytes());
@@ -253,7 +253,7 @@ pub fn rerere_clear() {
             let _ = fs::remove_dir_all(rr_cache_dir().join(&id));
         }
     }
-    let _ = fs::remove_file(crate::repo::path(".git/MERGE_RR"));
+    let _ = fs::remove_file(crate::core::repo::path(".git/MERGE_RR"));
 }
 
 /// `rerere gc`: prunes old recordings: unresolved ones after `gc.rerereUnresolved` days

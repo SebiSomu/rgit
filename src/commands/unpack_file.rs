@@ -1,9 +1,9 @@
 use anyhow::Result;
 
 use crate::helpers::index_plumbing::write_merge_temp_file;
-use crate::helpers::objects::read_object;
-use crate::helpers::rev_parse::resolve_rev;
-use crate::repo;
+use crate::core::object_store::read_object;
+use crate::core::rev_parse::resolve_rev;
+use crate::core::repo;
 
 /// `rgit unpack-file <blob>`
 ///

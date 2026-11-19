@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use anyhow::Result;
 
-use crate::helpers::pack::{index_pack_bytes, pack_and_index_paths, parse_pack_index};
+use crate::core::pack::{index_pack_bytes, pack_and_index_paths, parse_pack_index};
 
 /// `rgit verify-pack [-v | --verbose] [-s | --stat-only] <pack>.idx...`
 ///

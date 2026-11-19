@@ -1,9 +1,9 @@
 use anyhow::Result;
 use crate::helpers::github::*;
 use crate::helpers::push::*;
-use crate::helpers::{commit::{is_reachable, resolve_commit_from_source, short_hash}};
+use crate::core::commit::{is_reachable, resolve_commit_from_source, short_hash};
 use crate::objects::{GitHubTarget, PushStatus};
-use crate::refs::{self, HeadState};
+use crate::core::refs::{self, HeadState};
 
 pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_upstream: bool) -> Result<()> {
     let head_state = refs::resolve_head()?;
@@ -16,7 +16,7 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
         Some(r) => r,
         None => {
             if let Some(ref b) = current_branch_opt {
-                if let Some(r) = crate::helpers::config::get_config_value(&format!("branch.{}.remote", b))? {
+                if let Some(r) = crate::core::config::get_config_value(&format!("branch.{}.remote", b))? {
                     r
                 } else {
                     "origin".to_string()
@@ -27,7 +27,7 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
         }
     };
 
-    let configured_url = crate::helpers::config::get_config_value(&format!("remote.{}.url", remote_name))?;
+    let configured_url = crate::core::config::get_config_value(&format!("remote.{}.url", remote_name))?;
 
     // Check if the target remote points to a GitHub repository
     let github_info = configured_url

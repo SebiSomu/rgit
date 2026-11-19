@@ -3,11 +3,11 @@ use std::io::{self, Read};
 use anyhow::Result;
 
 use crate::helpers::index_plumbing::{add_cache_entry, bare_index_entry, index_mode_from, normalize_index_path, refresh_index, update_index_path};
-use crate::helpers::objects::{flatten_tree, tree_hash_of_commit};
+use crate::core::object_store::{flatten_tree, tree_hash_of_commit};
 use crate::helpers::update_ref::unquote_c_style;
-use crate::index::{read_index, write_index, IndexEntry};
+use crate::core::index::{read_index, write_index, IndexEntry};
 use crate::objects::UpdateIndexFlags;
-use crate::repo;
+use crate::core::repo;
 
 const UPDATE_INDEX_USAGE: &str = "usage: rgit update-index [<options>] [--] [<file>...]\n\n    -q                    continue refresh even when index needs update\n    --[no-]add            do not ignore new files\n    --[no-]replace        let files replace directories and vice-versa\n    --[no-]remove         notice files missing from worktree\n    --refresh             refresh stat information\n    --really-refresh      like --refresh\n    --cacheinfo <mode>,<object>,<path>\n                          add the specified entry to the index\n    --chmod (+|-)x        override the executable bit of the listed files\n    --[no-]info-only      add to index only; do not add content to object database\n    --[no-]force-remove   remove named paths even if present in worktree\n    -z                    with --stdin: input lines are terminated by null bytes\n    --stdin               read list of paths to be updated from standard input\n    --index-info          add entries from standard input to the index\n    -g, --again           only update entries that differ from HEAD\n    --[no-]ignore-missing ignore files missing from worktree\n    --[no-]verbose        report actions to standard output\n\n";
 
@@ -194,7 +194,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
             }
             "-g" | "--again" => {
                 let mut head_tree = BTreeMap::new();
-                if let Some(head) = crate::refs::resolve_head_commit()? {
+                if let Some(head) = crate::core::refs::resolve_head_commit()? {
                     flatten_tree(&tree_hash_of_commit(&head)?, "", &mut head_tree)?;
                 }
                 let differing: Vec<String> = entries.iter().filter(|e| head_tree.get(&e.path) != Some(&(e.hash, e.mode))).map(|e| e.path.clone()).collect();

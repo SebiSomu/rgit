@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use crate::helpers::config::read_all_config_entries;
+use crate::core::config::read_all_config_entries;
 use crate::objects::{
     InterpretTrailersOptions, NewTrailer, TrailerArg, TrailerConf, TrailerConfig, TrailerIfExists, TrailerIfMissing, TrailerItem, TrailerWhere,
 };

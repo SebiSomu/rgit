@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::helpers::config::{get_config_value, global_config_path, read_all_config_entries, read_entries_from, write_entries_to};
+use crate::core::config::{get_config_value, global_config_path, read_all_config_entries, read_entries_from, write_entries_to};
 
 /// Usage text for `for-each-repo`, printed for `-h` and after usage errors (exit 129).
 pub const FOR_EACH_REPO_USAGE: &str = "usage: rgit for-each-repo --config=<config> [--keep-going] [--] <arguments>
@@ -55,7 +55,7 @@ pub fn run_rgit_in(repo: &Path, args: &[String]) -> i32 {
 /// Counts the loose objects in `.git/objects` (files in the two-character fan-out directories).
 // Used by `maintenance run --auto`.
 fn count_loose_objects() -> usize {
-    let Ok(dirs) = fs::read_dir(crate::repo::path(".git/objects")) else { return 0 };
+    let Ok(dirs) = fs::read_dir(crate::core::repo::path(".git/objects")) else { return 0 };
     dirs.flatten().filter(|d| d.file_name().len() == 2).filter_map(|d| fs::read_dir(d.path()).ok()).map(|files| files.count()).sum()
 }
 

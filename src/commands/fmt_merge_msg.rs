@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 use anyhow::Result;
 
 use crate::helpers::fmt_merge_msg::{format_merge_message, parse_fmt_merge_msg_args, FMT_MERGE_MSG_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit fmt-merge-msg [-m <message>] [--into-name <branch>] [--log[=<n>] | --no-log] [-F <file>]`
 ///

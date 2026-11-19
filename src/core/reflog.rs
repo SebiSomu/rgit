@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::helpers::config::author_identity;
+use crate::core::config::author_identity;
 use crate::objects::ReflogEntry;
 
 /// The hash a reflog line uses for "no commit": the old value of a ref that was just created,
@@ -57,7 +57,7 @@ fn current_reflog_action() -> String {
 /// Returns the path of the reflog file for a ref (`HEAD`, `refs/heads/main`, ...).
 // Used by every function in this file that reads or writes a reflog.
 fn reflog_file(ref_name: &str) -> String {
-    crate::repo::path(format!("{}/{}", LOGS_DIR, ref_name)).to_string_lossy().into_owned()
+    crate::core::repo::path(format!("{}/{}", LOGS_DIR, ref_name)).to_string_lossy().into_owned()
 }
 
 /// Says whether updates to `ref_name` get a reflog: `HEAD`, branches and remote-tracking
@@ -192,7 +192,7 @@ pub fn write_reflog(ref_name: &str, entries: &[ReflogEntry]) -> Result<()> {
 /// so deleting `feature/login`'s log doesn't leave an empty `feature/` folder.
 // Used by `delete_reflog` and `rename_reflog`.
 fn prune_empty_log_dirs(file_path: &str) {
-    let root = crate::repo::path(LOGS_DIR);
+    let root = crate::core::repo::path(LOGS_DIR);
     let mut parent = Path::new(file_path).parent();
     while let Some(dir) = parent {
         if dir == root || !dir.starts_with(&root) {
@@ -256,7 +256,7 @@ pub fn list_reflog_refs() -> Result<Vec<String>> {
     if Path::new(&reflog_file("HEAD")).is_file() {
         refs.push("HEAD".to_string());
     }
-    let refs_root = crate::repo::path(format!("{}/refs", LOGS_DIR));
+    let refs_root = crate::core::repo::path(format!("{}/refs", LOGS_DIR));
     if refs_root.is_dir() {
         walk(&refs_root, "refs", &mut refs)?;
     }

@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use crate::helpers::bisect::collect_ancestors;
-use crate::helpers::commit::current_signature;
+use crate::core::commit::current_signature;
 use crate::helpers::format_patch::parse_commit_object;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::peel_to_type;
-use crate::helpers::{objects::{read_object, write_object}};
+use crate::core::rev_parse::peel_to_type;
+use crate::core::object_store::{read_object, write_object};
 
 /// Lists every tag (loose and packed) as `name -> object` (a tag object for annotated tags,
 /// otherwise what the tag points at), in name order.
@@ -49,10 +49,10 @@ pub fn tag_message_lines(object: &str) -> Vec<String> {
 // Used by `tag -d`.
 pub fn delete_tag_ref(name: &str) -> anyhow::Result<()> {
     let refname = format!("refs/tags/{}", name);
-    let loose = crate::repo::path(format!(".git/{}", refname));
+    let loose = crate::core::repo::path(format!(".git/{}", refname));
     if loose.exists() {
         fs::remove_file(&loose)?;
-        let tags_root = crate::repo::path(".git/refs/tags");
+        let tags_root = crate::core::repo::path(".git/refs/tags");
         let mut dir = loose.parent();
         while let Some(d) = dir {
             if d == tags_root || fs::remove_dir(d).is_err() {
@@ -61,7 +61,7 @@ pub fn delete_tag_ref(name: &str) -> anyhow::Result<()> {
             dir = d.parent();
         }
     }
-    let packed_path = crate::repo::path(".git/packed-refs");
+    let packed_path = crate::core::repo::path(".git/packed-refs");
     if let Ok(packed) = fs::read_to_string(&packed_path) {
         let mut kept = Vec::new();
         let mut skipping = false;

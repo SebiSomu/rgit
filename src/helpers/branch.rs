@@ -3,12 +3,12 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::helpers::config::{read_all_config_entries, read_entries_from, set_in, unset_in, write_entries_to, LOCAL_CONFIG_PATH};
+use crate::core::config::{read_all_config_entries, read_entries_from, set_in, unset_in, write_entries_to, LOCAL_CONFIG_PATH};
 use crate::helpers::for_each_ref::{branch_upstream, collect_ref_items, filter_ref_items, shorten_unambiguous_ref, tracking_counts};
-use crate::helpers::objects::read_object;
-use crate::helpers::wildmatch::wildmatch;
+use crate::core::object_store::read_object;
+use crate::core::wildmatch::wildmatch;
 use crate::objects::{BranchListEntry, BranchOptions, ForEachRefOptions, RefArrayItem};
-use crate::refs;
+use crate::core::refs;
 
 pub const BRANCH_USAGE: &str = "usage: rgit branch [<options>] [-r | -a] [--merged] [--no-merged]
    or: rgit branch [<options>] [-f] <branch-name> [<start-point>]
@@ -56,7 +56,7 @@ fn usage_error(message: &str) -> ! {
 /// "malformed object name" when it names nothing (or nothing that peels to a commit).
 // Used by `parse_branch_args`.
 fn resolve_filter_commit(rev: &str) -> String {
-    match crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", rev)) {
+    match crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", rev)) {
         Ok(hash) => hash,
         Err(_) => {
             eprintln!("fatal: malformed object name {}", rev);
@@ -118,7 +118,7 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
                 "show-current" => opts.show_current = true,
                 "points-at" => {
                     let v = take_value(&mut i);
-                    match crate::helpers::rev_parse::resolve_rev(&v) {
+                    match crate::core::rev_parse::resolve_rev(&v) {
                         Ok(hash) => opts.points_at.push(hash),
                         Err(_) => {
                             eprintln!("error: malformed object name '{}'", v);
@@ -273,7 +273,7 @@ pub fn upstream_for(start: &str) -> Option<(String, String, String)> {
 /// Writes `branch.<branch>.remote` / `.merge` to the repository config.
 // Used by `branch -u`, `branch --track` and branches created from a remote-tracking branch.
 pub fn set_branch_upstream(branch: &str, remote: &str, merge: &str) -> Result<()> {
-    let config = crate::repo::path(LOCAL_CONFIG_PATH);
+    let config = crate::core::repo::path(LOCAL_CONFIG_PATH);
     set_in(&config, &format!("branch.{}.remote", branch), remote)?;
     set_in(&config, &format!("branch.{}.merge", branch), merge)?;
     Ok(())
@@ -282,7 +282,7 @@ pub fn set_branch_upstream(branch: &str, remote: &str, merge: &str) -> Result<()
 /// Removes `branch.<branch>.remote` / `.merge`; returns false when neither was set.
 // Used by `branch --unset-upstream`.
 pub fn unset_branch_upstream(branch: &str) -> Result<bool> {
-    let config = crate::repo::path(LOCAL_CONFIG_PATH);
+    let config = crate::core::repo::path(LOCAL_CONFIG_PATH);
     let a = unset_in(&config, &format!("branch.{}.remote", branch))?;
     let b = unset_in(&config, &format!("branch.{}.merge", branch))?;
     Ok(a || b)
@@ -292,7 +292,7 @@ pub fn unset_branch_upstream(branch: &str) -> Result<bool> {
 /// with `new` = None the section is deleted.
 // Used by `branch -m/-M`, `branch -c/-C` and `branch -d/-D`.
 pub fn move_branch_config(old: &str, new: Option<&str>, copy: bool) -> Result<()> {
-    let config = crate::repo::path(LOCAL_CONFIG_PATH);
+    let config = crate::core::repo::path(LOCAL_CONFIG_PATH);
     let entries = read_entries_from(&config)?;
     let old_prefix = format!("branch.{}.", old);
     if !entries.iter().any(|(k, _)| k.starts_with(&old_prefix)) {
@@ -326,20 +326,20 @@ pub fn move_branch_config(old: &str, new: Option<&str>, copy: bool) -> Result<()
 // Used by `branch -d -r`.
 pub fn delete_remote_tracking_ref(name: &str) -> Result<()> {
     let refname = format!("refs/remotes/{}", name);
-    let path = crate::repo::path(format!(".git/{}", refname));
+    let path = crate::core::repo::path(format!(".git/{}", refname));
     if Path::new(&path).is_file() {
         fs::remove_file(&path)?;
         refs::prune_empty_ref_dirs(Path::new(&path));
     }
     refs::remove_packed_ref(&refname)?;
-    crate::helpers::reflog::delete_reflog(&refname);
+    crate::core::reflog::delete_reflog(&refname);
     Ok(())
 }
 
 /// The target of a symbolic ref (`ref: refs/remotes/origin/main`), if `refname` is one.
 // Used by `format_branch_list` (`origin/HEAD -> origin/main`) and `branch -d -r`.
 pub fn symref_target(refname: &str) -> Option<String> {
-    let content = fs::read_to_string(crate::repo::path(format!(".git/{}", refname))).ok()?;
+    let content = fs::read_to_string(crate::core::repo::path(format!(".git/{}", refname))).ok()?;
     content.trim().strip_prefix("ref: ").map(|s| s.to_string())
 }
 

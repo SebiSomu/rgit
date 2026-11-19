@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 use std::io::IsTerminal;
 use std::sync::{Mutex, OnceLock};
 
-use crate::helpers::commit::commit_parents;
+use crate::core::commit::commit_parents;
 use crate::helpers::narrate::*;
 use crate::objects::{RepoSnapshot, Verbosity};
 
@@ -48,7 +48,7 @@ fn parse_level(value: &str) -> Option<Verbosity> {
 pub fn init(flag: Option<Verbosity>) {
     let explicit = flag
         .or_else(|| std::env::var("RGIT_VERBOSITY").ok().and_then(|v| parse_level(&v)))
-        .or_else(|| crate::helpers::config::get_config_value("rgit.verbosity").ok().flatten().and_then(|v| parse_level(&v)));
+        .or_else(|| crate::core::config::get_config_value("rgit.verbosity").ok().flatten().and_then(|v| parse_level(&v)));
     let level = explicit.unwrap_or_else(|| {
         if std::io::stderr().is_terminal() && std::env::var_os("RGIT_NESTED").is_none() {
             Verbosity::Normal
@@ -217,7 +217,7 @@ pub fn set_outcome(ok: bool) {
 /// Starts narrating the current command: takes the "before" snapshot, prints warnings that
 /// must come before the command acts, and registers the exit hook that reports afterwards.
 pub fn begin() {
-    if level() == Verbosity::Quiet || !crate::repo::exists() && split_args().0 != "clone" {
+    if level() == Verbosity::Quiet || !crate::core::repo::exists() && split_args().0 != "clone" {
         return;
     }
     let (command, args) = split_args();
@@ -261,7 +261,7 @@ fn before_command(command: &str, args: &[String], b: &RepoSnapshot) {
         "push" => {
             let Some(branch) = &b.head_branch else { return };
             let pos = positionals(args, &[]);
-            let remote = pos.first().cloned().unwrap_or_else(|| crate::helpers::config::get_config_value(&format!("branch.{}.remote", branch)).ok().flatten().unwrap_or_else(|| "origin".into()));
+            let remote = pos.first().cloned().unwrap_or_else(|| crate::core::config::get_config_value(&format!("branch.{}.remote", branch)).ok().flatten().unwrap_or_else(|| "origin".into()));
             let tracking = format!("refs/remotes/{}/{}", remote, branch);
             if has(args, &["-f", "--force"]) {
                 if let (Some(theirs), Some(ours)) = (b.refs.get(&tracking), &b.head) {
@@ -371,9 +371,9 @@ fn index_diff(b: &RepoSnapshot, a: &RepoSnapshot) -> Vec<String> {
 /// `refs/remotes/<branch.<b>.remote or origin>/<b>` when that exists.
 fn upstream_of(branch: &str) -> Option<String> {
     crate::helpers::for_each_ref::branch_upstream(branch).or_else(|| {
-        let remote = crate::helpers::config::get_config_value(&format!("branch.{}.remote", branch)).ok().flatten().unwrap_or_else(|| "origin".into());
+        let remote = crate::core::config::get_config_value(&format!("branch.{}.remote", branch)).ok().flatten().unwrap_or_else(|| "origin".into());
         let candidate = format!("refs/remotes/{}/{}", remote, branch);
-        crate::refs::read_ref(&candidate).ok().flatten().map(|_| candidate)
+        crate::core::refs::read_ref(&candidate).ok().flatten().map(|_| candidate)
     })
 }
 
@@ -530,7 +530,7 @@ fn report_commit(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot) {
             (true, false) => "message changed, same files".to_string(),
             (true, true) => "same files and message (only author/date details changed)".to_string(),
             (false, _) => {
-                let parent = crate::helpers::objects::read_object(&new).ok().and_then(|(_, c)| commit_parents(&String::from_utf8_lossy(&c)).into_iter().next());
+                let parent = crate::core::object_store::read_object(&new).ok().and_then(|(_, c)| commit_parents(&String::from_utf8_lossy(&c)).into_iter().next());
                 let (summary, ..) = file_summary(parent.as_deref(), Some(&new));
                 format!("{}it now changes {}", if same_message { "same message; " } else { "new message; " }, summary)
             }
@@ -545,7 +545,7 @@ fn report_commit(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot) {
         }
         detail("The old commit isn't gone: `rgit reflog` lists it (HEAD@{1}) if you need it back.");
     } else {
-        let parent = crate::helpers::objects::read_object(&new).ok().and_then(|(_, c)| commit_parents(&String::from_utf8_lossy(&c)).into_iter().next());
+        let parent = crate::core::object_store::read_object(&new).ok().and_then(|(_, c)| commit_parents(&String::from_utf8_lossy(&c)).into_iter().next());
         let (summary, added, modified, deleted) = file_summary(parent.as_deref(), Some(&new));
         let pushed = not_pushed_line(a).map(|s| format!("; {}", s)).unwrap_or_default();
         note(&format!("Recorded {} on {}: {}{}.", short(&new), branch_label, summary, pushed));
@@ -594,11 +594,11 @@ fn report_merge(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok: Option<
                 next("`rgit commit` finishes it.");
             }
             next("`rgit merge --abort` undoes it.");
-        } else if crate::repo::path(".git/SQUASH_MSG").exists() && !index_diff(b, a).is_empty() {
+        } else if crate::core::repo::path(".git/SQUASH_MSG").exists() && !index_diff(b, a).is_empty() {
             note(&format!("Squashed {} into your index; nothing is committed yet.", target.as_deref().unwrap_or("the branch")));
             next("`rgit commit` records it as one commit.");
         } else if let (Some(t), Some(head)) = (&target, &a.head) {
-            if let Ok(hash) = crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", t)) {
+            if let Ok(hash) = crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", t)) {
                 if is_ancestor(&hash, head) && !quiet_noop && ok != Some(false) {
                     note(&format!("Already up to date: '{}' is already part of '{}', nothing to merge.", t, current));
                 }
@@ -607,7 +607,7 @@ fn report_merge(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok: Option<
         return;
     }
     let (Some(old), Some(new)) = (b.head.clone(), a.head.clone()) else { return };
-    let parents = crate::helpers::objects::read_object(&new).ok().map(|(_, c)| commit_parents(&String::from_utf8_lossy(&c))).unwrap_or_default();
+    let parents = crate::core::object_store::read_object(&new).ok().map(|(_, c)| commit_parents(&String::from_utf8_lossy(&c))).unwrap_or_default();
     let (summary, added, modified, deleted) = file_summary(Some(&old), Some(&new));
     let name = target.or_else(|| commit_info(&new).and_then(|(subject, ..)| subject.split('\'').nth(1).map(String::from))).unwrap_or_else(|| "the other branch".into());
     if parents.len() >= 2 && parents[0] == old {
@@ -821,8 +821,8 @@ fn report_conflicts(a: &RepoSnapshot, b: &RepoSnapshot) {
     let operation = a.operation.clone().unwrap_or_else(|| "merge".into());
     let title = match operation.as_str() {
         "rebase" => {
-            let total: usize = std::fs::read_to_string(crate::repo::path(crate::helpers::rebase::REBASE_TOTAL_PATH)).ok().and_then(|t| t.trim().parse().ok()).unwrap_or(0);
-            let left = std::fs::read_to_string(crate::repo::path(crate::helpers::rebase::REBASE_TODO_PATH)).map(|t| t.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count()).unwrap_or(0);
+            let total: usize = std::fs::read_to_string(crate::core::repo::path(crate::helpers::rebase::REBASE_TOTAL_PATH)).ok().and_then(|t| t.trim().parse().ok()).unwrap_or(0);
+            let left = std::fs::read_to_string(crate::core::repo::path(crate::helpers::rebase::REBASE_TODO_PATH)).map(|t| t.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count()).unwrap_or(0);
             let current = (total.saturating_sub(left) + 1).min(total);
             if total > 0 { format!("Rebase stopped at commit {} of {}", current, total) } else { "Rebase stopped".to_string() }
         }
@@ -1157,12 +1157,12 @@ fn report_tag(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot) {
     let refname = format!("refs/tags/{}", name);
     match (b.refs.get(&refname), a.refs.get(&refname)) {
         (Some(old), Some(new)) if old == new => {
-            let target = crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", name)).unwrap_or_else(|_| old.clone());
+            let target = crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", name)).unwrap_or_else(|_| old.clone());
             note(&format!("Tag '{}' already exists (points to {}); `rgit tag -f {}` moves it.", name, short(&target), name));
         }
         (old, Some(new)) => {
-            let annotated = crate::helpers::objects::read_object(new).map(|(k, _)| k == "tag").unwrap_or(false);
-            let target = crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", name)).unwrap_or_else(|_| new.clone());
+            let annotated = crate::core::object_store::read_object(new).map(|(k, _)| k == "tag").unwrap_or(false);
+            let target = crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", name)).unwrap_or_else(|_| new.clone());
             let (kind, gloss) = if annotated { ("annotated tag", "it records author, date and message") } else { ("lightweight tag", "just a name for a commit") };
             let verb = if old.is_some() { "Moved" } else { "Created" };
             note(&format!("{} {} '{}' on {} ({}).", verb, kind, name, short(&target), gloss));

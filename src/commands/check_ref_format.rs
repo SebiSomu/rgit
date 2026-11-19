@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::helpers::check_ref_format::{check_refname_format, collapse_ref_slashes, is_valid_branch_shorthand};
+use crate::core::check_ref_format::{check_refname_format, collapse_ref_slashes, is_valid_branch_shorthand};
 use crate::objects::CheckRefFormatOptions;
 
 /// `rgit check-ref-format [--normalize] [--[no-]allow-onelevel] [--refspec-pattern] <refname>`

@@ -5,8 +5,9 @@ use anyhow::Context;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use crate::helpers::bisect::collect_ancestors;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::helpers::{diff::myers_diff, objects::{flatten_tree, read_object}};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::helpers::diff::myers_diff;
+use crate::core::object_store::{flatten_tree, read_object};
 use crate::objects::{CommitSignature, DiffOp, DiffStatEntry, FileDiff, ParsedCommit};
 
 const CONTEXT_LINES: usize = 3;

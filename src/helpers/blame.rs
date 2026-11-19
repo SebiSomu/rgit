@@ -4,11 +4,9 @@ use std::fs;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::github::format_unix_timestamp_iso8601;
-use crate::helpers::{
-    commit::commit_parents,
-    diff::myers_diff,
-    objects::{read_object, tree_hash_of_commit},
-};
+use crate::helpers::diff::myers_diff;
+use crate::core::commit::commit_parents;
+use crate::core::object_store::{read_object, tree_hash_of_commit};
 use crate::objects::{BlameLine, DiffOp};
 
 /// The commit hash recorded for lines that exist only in the working copy.

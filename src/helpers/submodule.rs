@@ -5,9 +5,9 @@ use std::process::Command;
 
 use anyhow::Result;
 
-use crate::helpers::config::{get_from, read_entries_from, LOCAL_CONFIG_PATH};
-use crate::helpers::objects::{hash_content, write_object};
-use crate::index::{build_entry, read_index, write_index};
+use crate::core::config::{get_from, read_entries_from, LOCAL_CONFIG_PATH};
+use crate::core::object_store::{hash_content, write_object};
+use crate::core::index::{build_entry, read_index, write_index};
 use crate::objects::SubmoduleInfo;
 
 /// Usage text of `submodule`.
@@ -74,7 +74,7 @@ pub fn read_gitmodules() -> Result<Vec<SubmoduleInfo>> {
 /// The URL a submodule is registered with in `.git/config` (set by `submodule init`), if any.
 // Used by the `submodule` command.
 pub fn registered_url(name: &str) -> Option<String> {
-    get_from(&crate::repo::path(LOCAL_CONFIG_PATH), &format!("submodule.{}.url", name)).ok().flatten()
+    get_from(&crate::core::repo::path(LOCAL_CONFIG_PATH), &format!("submodule.{}.url", name)).ok().flatten()
 }
 
 /// Turns a submodule URL into something that can be cloned from here: a relative path
@@ -85,12 +85,12 @@ pub fn resolve_submodule_url(url: &str) -> String {
     if !(url.starts_with("./") || url.starts_with("../")) {
         return url.to_string();
     }
-    let origin = get_from(&crate::repo::path(LOCAL_CONFIG_PATH), "remote.origin.url").ok().flatten();
+    let origin = get_from(&crate::core::repo::path(LOCAL_CONFIG_PATH), "remote.origin.url").ok().flatten();
     let base = match origin {
         Some(origin) if !origin.contains("://") && !origin.contains('@') => PathBuf::from(origin),
         _ => std::env::current_dir().unwrap_or_default(),
     };
-    crate::repo::normalize(&base.join(url)).to_string_lossy().replace('\\', "/")
+    crate::core::repo::normalize(&base.join(url)).to_string_lossy().replace('\\', "/")
 }
 
 /// Runs rgit itself inside another directory (a submodule's working tree). Returns whether

@@ -3,7 +3,7 @@ use anyhow::Result;
 
 use crate::helpers::fast_import::{finish_fast_import, import_marks, run_fast_import, set_date_format};
 use crate::objects::FastImportState;
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit fast-import [--force] [--quiet] [--stats] [--done] [--date-format=<format>]
 /// [--export-marks=<file>] [--import-marks=<file>] [--import-marks-if-exists=<file>]`

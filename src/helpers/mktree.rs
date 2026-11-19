@@ -1,4 +1,4 @@
-use crate::helpers::objects::{read_object, write_object};
+use crate::core::object_store::{read_object, write_object};
 use crate::helpers::update_ref::unquote_c_style;
 
 /// Usage text of `mktree`, printed for `-h` and usage errors.

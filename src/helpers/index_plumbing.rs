@@ -1,7 +1,7 @@
 use std::fs;
 
-use crate::helpers::objects::{hash_content, write_object};
-use crate::index::{build_entry, IndexEntry};
+use crate::core::object_store::{hash_content, write_object};
+use crate::core::index::{build_entry, IndexEntry};
 use crate::objects::{UpdateIndexFlags, IndexFileState};
 
 /// The index mode a file on disk would get: `100755` when executable (Unix only), else
@@ -219,7 +219,7 @@ pub fn write_merge_temp_file(content: &[u8]) -> std::io::Result<String> {
 /// are errors, worded like git's.
 // Used by `checkout-index` and `read-tree -u`.
 pub fn write_entry_to_worktree(entry: &IndexEntry, target: &std::path::Path, force: bool) -> Result<(), String> {
-    let (_, content) = crate::helpers::objects::read_object(&hex::encode(entry.hash)).map_err(|_| format!("error: unable to read sha1 file of {} ({})", entry.path, hex::encode(entry.hash)))?;
+    let (_, content) = crate::core::object_store::read_object(&hex::encode(entry.hash)).map_err(|_| format!("error: unable to read sha1 file of {} ({})", entry.path, hex::encode(entry.hash)))?;
     // Every leading directory must be a directory.
     let mut ancestors: Vec<&std::path::Path> = target.ancestors().skip(1).filter(|p| !p.as_os_str().is_empty()).collect();
     ancestors.reverse();

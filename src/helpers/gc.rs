@@ -4,10 +4,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use crate::helpers::fetch::local_has_object;
-use crate::helpers::objects::read_object;
-use crate::helpers::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
+use crate::core::object_store::read_object;
+use crate::core::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
 use crate::helpers::worktree::all_worktree_git_dirs;
-use crate::index::read_index_from;
+use crate::core::index::read_index_from;
 use crate::objects::{GcReport, LooseObject};
 
 /// State files under `.git/` whose contents name commits that must stay alive: refs HEAD
@@ -112,7 +112,7 @@ pub fn collect_strict_gc_roots() -> Result<Vec<String>> {
             }
         }
     }
-    hashes_in_refs_dir(&crate::repo::path(".git/refs"), &mut roots)?;
+    hashes_in_refs_dir(&crate::core::repo::path(".git/refs"), &mut roots)?;
 
     Ok(roots)
 }
@@ -234,7 +234,7 @@ pub fn mark_reachable(roots: &[String], visited: &mut HashSet<String>, strict: b
 /// files are ignored.
 // Used by `plan_gc`.
 pub fn list_loose_objects() -> Result<Vec<LooseObject>> {
-    let root = &crate::repo::path(".git/objects");
+    let root = &crate::core::repo::path(".git/objects");
     if !root.is_dir() {
         anyhow::bail!("fatal: not an rgit repository (no .git/objects)");
     }
@@ -386,5 +386,5 @@ pub fn format_byte_size(bytes: u64) -> String {
 // Used by the `gc` command's tests and diagnostics.
 #[allow(dead_code)]
 pub fn loose_object_path(hash: &str) -> PathBuf {
-    crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))
+    crate::core::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))
 }

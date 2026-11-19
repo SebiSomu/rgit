@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::helpers::config::read_all_config_entries;
+use crate::core::config::read_all_config_entries;
 use crate::helpers::var::{var_value, VAR_NAMES, VAR_USAGE};
 
 /// `rgit var (-l | <variable>)`

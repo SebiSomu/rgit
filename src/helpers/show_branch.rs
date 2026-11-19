@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet};
 use crate::helpers::for_each_ref::versioncmp;
 use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::helpers::symbolic_ref::resolve_ref_unsafe;
-use crate::helpers::wildmatch::wildmatch;
+use crate::core::wildmatch::wildmatch;
 use crate::objects::{ParsedCommit, ShowBranchOptions};
 
 /// git's usage text for `show-branch`, printed for `-h` and after usage errors (exit 129).
@@ -29,7 +29,7 @@ const MAX_REVS: usize = 26;
 pub fn parse_show_branch_args(args: &[String]) -> anyhow::Result<ShowBranchOptions> {
     let defaults: Vec<String>;
     let args = if args.is_empty() {
-        defaults = crate::helpers::config::read_all_config_entries().into_iter().filter(|(key, _)| key == "showbranch.default").map(|(_, value)| value).collect();
+        defaults = crate::core::config::read_all_config_entries().into_iter().filter(|(key, _)| key == "showbranch.default").map(|(_, value)| value).collect();
         &defaults[..]
     } else {
         args

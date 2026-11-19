@@ -3,10 +3,10 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::helpers::gc::{plan_gc, remove_loose_object};
 use crate::helpers::prune::{list_object_dir_cruft, prune_expiry_cutoff, remove_empty_fanout_dirs};
-use crate::helpers::objects::read_object;
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::object_store::read_object;
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{LooseObject, ObjectDirCruft};
-use crate::repo;
+use crate::core::repo;
 
 /// One thing `prune` visits: an unreachable loose object or a non-object file.
 enum PruneItem<'a> {

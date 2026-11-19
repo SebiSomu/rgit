@@ -5,13 +5,11 @@ use anyhow::Context;
 use base64::Engine;
 use regex::Regex;
 use crate::helpers::format_patch::{split_commit_message, tz_offset_seconds};
-use crate::helpers::{
-    config::author_identity,
-    objects::{flatten_tree, tree_hash_of_commit, write_object},
-};
-use crate::index::IndexEntry;
+use crate::core::config::author_identity;
+use crate::core::object_store::{flatten_tree, tree_hash_of_commit, write_object};
+use crate::core::index::IndexEntry;
 use crate::objects::{CommitSignature, MailPatch};
-use crate::refs;
+use crate::core::refs;
 
 /// Directory holding an in-progress `am` session (same layout as git: `next`, `last`,
 /// `0001`... raw mails, and `orig-head`).
@@ -351,14 +349,14 @@ pub fn index_differences(index: &[IndexEntry], head: &BTreeMap<String, ([u8; 20]
 /// Resolves a file inside the `am` session directory (`next`, `last`, `orig-head`, `0001`, ...).
 // Used by the `am` session-state helpers in this file.
 fn am_state_file(name: &str) -> std::path::PathBuf {
-    crate::repo::path(format!("{}/{}", AM_STATE_DIR, name))
+    crate::core::repo::path(format!("{}/{}", AM_STATE_DIR, name))
 }
 
 /// Starts an `am` session: writes each raw mail as `NNNN`, plus `next`, `last`, and
 /// `orig-head` (empty for an unborn branch) under `.git/rebase-apply/`.
 // Used by `am`.
 pub fn write_am_state(messages: &[String], orig_head: Option<&str>) -> anyhow::Result<()> {
-    fs::create_dir_all(crate::repo::path(AM_STATE_DIR)).context("Failed to create .git/rebase-apply")?;
+    fs::create_dir_all(crate::core::repo::path(AM_STATE_DIR)).context("Failed to create .git/rebase-apply")?;
     for (i, message) in messages.iter().enumerate() {
         fs::write(am_state_file(&format!("{:04}", i + 1)), message)?;
     }
@@ -399,13 +397,13 @@ pub fn read_am_orig_head() -> anyhow::Result<Option<String>> {
 /// Reports whether an `am` session is in progress.
 // Used by `am`.
 pub fn am_in_progress() -> bool {
-    crate::repo::path(AM_STATE_DIR).is_dir()
+    crate::core::repo::path(AM_STATE_DIR).is_dir()
 }
 
 /// Deletes the `am` session directory.
 // Used by `am` when a session finishes, and by `--abort` / `--quit`.
 pub fn clear_am_state() -> anyhow::Result<()> {
-    let dir = crate::repo::path(AM_STATE_DIR);
+    let dir = crate::core::repo::path(AM_STATE_DIR);
     if dir.exists() {
         fs::remove_dir_all(&dir).context("Failed to remove .git/rebase-apply")?;
     }

@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::check_ref_format::check_refname_format;
-use crate::helpers::reflog::{delete_reflog, record_symref_update};
+use crate::core::check_ref_format::check_refname_format;
+use crate::core::reflog::{delete_reflog, record_symref_update};
 use crate::objects::{RawRefValue, ResolvedRef, SymbolicRefOptions};
-use crate::refs::read_packed_ref;
-use crate::repo;
+use crate::core::refs::read_packed_ref;
+use crate::core::repo;
 
 /// Longest chain of symbolic refs followed before giving up (git's `SYMREF_MAXDEPTH`).
 const SYMREF_MAX_DEPTH: usize = 5;
@@ -245,6 +245,6 @@ pub fn delete_symbolic_ref(name: &str) -> anyhow::Result<()> {
     let path = repo::path(format!(".git/{}", name));
     fs::remove_file(&path).with_context(|| format!("error: unable to delete ref '{}'", name))?;
     delete_reflog(name);
-    crate::refs::prune_empty_ref_dirs(&path);
+    crate::core::refs::prune_empty_ref_dirs(&path);
     Ok(())
 }

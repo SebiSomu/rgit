@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::helpers::range_diff::{format_range_diff, match_range_patches, parse_range_diff_args, read_range_patches, RANGE_DIFF_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit range-diff [--creation-factor=<n>] [--left-only | --right-only] [-s | --no-patch]
 /// (<range1> <range2> | <rev1>...<rev2> | <base> <rev1> <rev2>)`

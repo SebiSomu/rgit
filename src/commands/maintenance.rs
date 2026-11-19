@@ -96,7 +96,7 @@ pub fn maintenance(args: Vec<String>) -> Result<()> {
     if subcommand == "-h" || rest.iter().any(|a| a == "-h") {
         usage("");
     }
-    if !crate::repo::exists() {
+    if !crate::core::repo::exists() {
         fatal("fatal: not a git repository (or any of the parent directories): .git".to_string());
     }
 

@@ -5,20 +5,20 @@ use std::fs;
 use crate::objects::CherryPickOptions;
 
 fn seq_path(name: &str) -> std::path::PathBuf {
-    crate::repo::path(format!(".git/sequencer/{}", name))
+    crate::core::repo::path(format!(".git/sequencer/{}", name))
 }
 
 /// Whether a multi-commit sequence is in progress (`.git/sequencer` exists).
 // Used by `cherry-pick`.
 pub fn sequencer_active() -> bool {
-    crate::repo::path(".git/sequencer").is_dir()
+    crate::core::repo::path(".git/sequencer").is_dir()
 }
 
 /// Creates `.git/sequencer` and records the starting `HEAD` (`head` and `abort-safety`) and
 /// the options (`opts`, git's config format and key order).
 // Used by `cherry-pick` when picking more than one commit.
 pub fn start_sequence(head: &str, opts: &CherryPickOptions) -> anyhow::Result<()> {
-    fs::create_dir_all(crate::repo::path(".git/sequencer"))?;
+    fs::create_dir_all(crate::core::repo::path(".git/sequencer"))?;
     fs::write(seq_path("head"), format!("{}\n", head))?;
     update_abort_safety(head)?;
     // Like git, `opts` exists only when some option is set.
@@ -92,7 +92,7 @@ pub fn read_todo() -> anyhow::Result<Vec<String>> {
         if command != "pick" && command != "p" {
             anyhow::bail!("error: invalid line: {}", line);
         }
-        commits.push(crate::helpers::commit::resolve_commit_from_source(rev).map_err(|_| anyhow::anyhow!("error: could not parse '{}'", rev))?);
+        commits.push(crate::core::commit::resolve_commit_from_source(rev).map_err(|_| anyhow::anyhow!("error: could not parse '{}'", rev))?);
     }
     Ok(commits)
 }
@@ -124,14 +124,14 @@ pub fn rollback_is_safe(head: &str) -> bool {
 /// Removes `.git/sequencer`.
 // Used by `cherry-pick`, `commit` and `reset`.
 pub fn remove_sequence() {
-    let _ = fs::remove_dir_all(crate::repo::path(".git/sequencer"));
+    let _ = fs::remove_dir_all(crate::core::repo::path(".git/sequencer"));
 }
 
 /// git's `sequencer_post_commit_cleanup`: once a commit (or reset) concludes a conflicted
 /// pick, `CHERRY_PICK_HEAD` goes, and so does the sequence when that pick was its last one.
 // Used by `commit` and `reset`.
 pub fn post_commit_cleanup() {
-    let pick_head = crate::repo::path(".git/CHERRY_PICK_HEAD");
+    let pick_head = crate::core::repo::path(".git/CHERRY_PICK_HEAD");
     if !pick_head.exists() {
         return;
     }

@@ -2,8 +2,8 @@ use std::io::{self, Read};
 use anyhow::Result;
 
 use crate::helpers::mktag::check_tag_text;
-use crate::helpers::objects::{read_object, write_object};
-use crate::repo;
+use crate::core::object_store::{read_object, write_object};
+use crate::core::repo;
 
 /// `rgit mktag [--no-strict]`
 ///

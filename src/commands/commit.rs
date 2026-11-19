@@ -1,16 +1,17 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
-use crate::helpers::commit::{
+use crate::core::commit::{
     add_signoff, cleanup_commit_message, current_author_signature, current_signature, edit_commit_message, parse_author_option, parse_commit_date,
     stage_tracked_changes, tracked_worktree_changes, write_commit_object,
 };
 use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
-use crate::helpers::reflog::set_reflog_action;
-use crate::helpers::{commit::build_commit, objects::{flatten_tree, write_tree_from_index_prefix}};
-use crate::index::read_index;
+use crate::core::reflog::set_reflog_action;
+use crate::core::commit::build_commit;
+use crate::core::object_store::{flatten_tree, write_tree_from_index_prefix};
+use crate::core::index::read_index;
 use crate::objects::CommitOptions;
-use crate::refs;
+use crate::core::refs;
 
 pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: String) -> anyhow::Result<()> {
     println!("{}", build_commit(tree_hash, parent_hash, &message)?);
@@ -30,7 +31,7 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 /// index has unmerged paths. Prints git's summary: `[branch hash] subject` plus a
 /// diffstat line and create/delete modes.
 pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
-    let merging = crate::repo::path(".git/MERGE_HEAD").exists();
+    let merging = crate::core::repo::path(".git/MERGE_HEAD").exists();
     if merging && opts.amend {
         fail(128, "fatal: You are in the middle of a merge -- cannot amend.");
     }
@@ -52,7 +53,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     } else {
         let mut parents: Vec<String> = head.iter().cloned().collect();
         if merging {
-            parents.push(fs::read_to_string(crate::repo::path(".git/MERGE_HEAD"))?.trim().to_string());
+            parents.push(fs::read_to_string(crate::core::repo::path(".git/MERGE_HEAD"))?.trim().to_string());
         }
         parents
     };
@@ -75,7 +76,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     // git takes the author from the commit being reused, amended or cherry-picked; its date
     // is then "interesting" and shown in the summary.
     let picked = if reused.is_none() && !opts.amend {
-        fs::read_to_string(crate::repo::path(".git/CHERRY_PICK_HEAD")).ok().and_then(|h| parse_commit_object(h.trim()).ok())
+        fs::read_to_string(crate::core::repo::path(".git/CHERRY_PICK_HEAD")).ok().and_then(|h| parse_commit_object(h.trim()).ok())
     } else {
         None
     };
@@ -116,7 +117,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
         // git's order: MERGE_MSG (after SQUASH_MSG when a squash merge conflicted), else
         // SQUASH_MSG.
         _ => {
-            let read = |name: &str| fs::read_to_string(crate::repo::path(format!(".git/{}", name))).ok();
+            let read = |name: &str| fs::read_to_string(crate::core::repo::path(format!(".git/{}", name))).ok();
             match (read("MERGE_MSG"), read("SQUASH_MSG")) {
                 (Some(merge_msg), squash) => format!("{}{}", squash.unwrap_or_default(), merge_msg),
                 (None, Some(squash)) => squash,
@@ -137,7 +138,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     if message.trim().is_empty() && !opts.allow_empty_message {
         fail(1, "Aborting commit due to empty commit message.");
     }
-    fs::write(crate::repo::path(".git/COMMIT_EDITMSG"), &message)?;
+    fs::write(crate::core::repo::path(".git/COMMIT_EDITMSG"), &message)?;
 
     let subject = split_commit_message(&message).0;
     set_reflog_action(&match () {
@@ -156,7 +157,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     crate::helpers::sequencer::post_commit_cleanup();
 
     if !opts.quiet {
-        crate::helpers::commit::print_commit_summary(&head_state, &commit_hash, &author, &committer, show_date)?;
+        crate::core::commit::print_commit_summary(&head_state, &commit_hash, &author, &committer, show_date)?;
     }
     Ok(())
 }

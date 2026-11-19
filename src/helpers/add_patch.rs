@@ -903,7 +903,7 @@ fn edit_hunk_manually(mode: &PatchModeSpec, hunk: &InteractiveHunk) -> anyhow::R
     for line in comment.lines() {
         text.extend_from_slice(if line.is_empty() { b"#\n".to_vec() } else { format!("# {}\n", line).into_bytes() }.as_slice());
     }
-    let path = crate::repo::path(".git/addp-hunk-edit.diff");
+    let path = crate::core::repo::path(".git/addp-hunk-edit.diff");
     std::fs::write(&path, &text)?;
     crate::helpers::rebase::run_editor(&path, false)?;
     let edited = std::fs::read(&path)?;

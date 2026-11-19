@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::helpers::check_ref_format::check_refname_format;
+use crate::core::check_ref_format::check_refname_format;
 
 /// Usage text of `refs`, printed for `-h` and usage errors.
 pub const REFS_USAGE: &str = "usage: rgit refs list [<for-each-ref options>] [<pattern>...]\n   or: rgit refs exists <ref>\n   or: rgit refs verify [--strict] [--verbose]\n   or: rgit refs optimize [<pack-refs options>]\n\n";
@@ -79,7 +79,7 @@ fn verify_loose_refs(dir: &Path, prefix: &str, checked: &mut Vec<String>, found:
 /// one, or the `#` header) with a well-formed name, and names must be sorted and unique.
 // Used by `verify_refs`.
 fn verify_packed_refs(checked: &mut Vec<String>, found: &mut Vec<(bool, String)>) {
-    let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) else { return };
+    let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) else { return };
     checked.push("packed-refs".to_string());
     let mut previous: Option<String> = None;
     for (index, line) in packed.lines().enumerate() {
@@ -119,7 +119,7 @@ fn verify_packed_refs(checked: &mut Vec<String>, found: &mut Vec<(bool, String)>
 pub fn verify_refs(strict: bool) -> (Vec<String>, Vec<(bool, String)>) {
     let mut checked = Vec::new();
     let mut found = Vec::new();
-    verify_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut checked, &mut found);
+    verify_loose_refs(&crate::core::repo::path(".git/refs"), "refs", &mut checked, &mut found);
     verify_packed_refs(&mut checked, &mut found);
     if strict {
         for problem in &mut found {

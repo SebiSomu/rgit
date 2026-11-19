@@ -1,7 +1,7 @@
 use std::collections::HashSet;
-use crate::helpers::config::get_config_value;
+use crate::core::config::get_config_value;
 use crate::helpers::gc::mark_reachable;
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 use crate::helpers::rev_list::list_all_refs;
 
 /// Usage text for `repo`, printed for `-h` and after usage errors (exit 129).
@@ -19,7 +19,7 @@ pub const REPO_INFO_KEYS: [&str; 4] = ["layout.bare", "layout.shallow", "object.
 pub fn repo_info_value(key: &str) -> Option<String> {
     match key {
         "layout.bare" => Some(get_config_value("core.bare").ok().flatten().is_some_and(|v| v.eq_ignore_ascii_case("true")).to_string()),
-        "layout.shallow" => Some(crate::repo::path(".git/shallow").exists().to_string()),
+        "layout.shallow" => Some(crate::core::repo::path(".git/shallow").exists().to_string()),
         "object.format" => Some("sha1".to_string()),
         "references.format" => Some("files".to_string()),
         _ => None,

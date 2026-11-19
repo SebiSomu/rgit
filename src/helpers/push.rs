@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 /// into the remote repository's `.git/` (or bare) directory.
 // Used by `push`.
 pub fn resolve_remote_repo_path(remote_spec: &str) -> Result<PathBuf> {
-    let resolved_path = if let Some(url) = crate::helpers::config::get_config_value(&format!("remote.{}.url", remote_spec))? {
+    let resolved_path = if let Some(url) = crate::core::config::get_config_value(&format!("remote.{}.url", remote_spec))? {
         PathBuf::from(url)
     } else {
         let p = PathBuf::from(remote_spec);
@@ -46,7 +46,7 @@ pub fn remote_has_object(remote_git_dir: &Path, hash: &str) -> bool {
     }
     // Loose there, or in one of the remote's packs.
     remote_git_dir.join("objects").join(&hash[..2]).join(&hash[2..]).exists()
-        || crate::helpers::pack::read_object_in_objects_dir(&remote_git_dir.join("objects"), hash).is_some()
+        || crate::core::pack::read_object_in_objects_dir(&remote_git_dir.join("objects"), hash).is_some()
 }
 
 /// Recursively inspects a tree object and collects all reachable tree and blob hashes
@@ -61,7 +61,7 @@ pub fn collect_tree_objects(tree_hash: &str, remote_git_dir: &Path, to_copy: &mu
     }
     to_copy.insert(tree_hash.to_string());
 
-    let (object_type, content) = crate::helpers::objects::read_object(tree_hash)?;
+    let (object_type, content) = crate::core::object_store::read_object(tree_hash)?;
     if object_type != "tree" {
         anyhow::bail!("{} is not a tree object", tree_hash);
     }
@@ -126,7 +126,7 @@ pub fn collect_missing_objects(local_tip: &str, stop_hash: Option<&str>, remote_
 
         to_copy.insert(commit_hash.clone());
 
-        let (object_type, content) = crate::helpers::objects::read_object(&commit_hash)?;
+        let (object_type, content) = crate::core::object_store::read_object(&commit_hash)?;
         if object_type != "commit" {
             anyhow::bail!("{} is not a commit object", commit_hash);
         }
@@ -155,7 +155,7 @@ pub fn copy_object_to_remote(hash: &str, remote_git_dir: &Path) -> Result<()> {
     if hash.len() < 3 {
         anyhow::bail!("Invalid object hash: {}", hash);
     }
-    let local_path = crate::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]));
+    let local_path = crate::core::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]));
     let remote_dir = remote_git_dir.join("objects").join(&hash[..2]);
     let remote_path = remote_dir.join(&hash[2..]);
 
@@ -166,8 +166,8 @@ pub fn copy_object_to_remote(hash: &str, remote_git_dir: &Path) -> Result<()> {
                 .with_context(|| format!("Failed to copy object {} to remote", hash))?;
         } else {
             // Packed here: read it and store it loose in the remote.
-            let (kind, content) = crate::helpers::objects::read_object(hash).with_context(|| format!("Failed to copy object {} to remote", hash))?;
-            crate::helpers::pack::write_loose_object_in(&remote_git_dir.join("objects"), &kind, &content)?;
+            let (kind, content) = crate::core::object_store::read_object(hash).with_context(|| format!("Failed to copy object {} to remote", hash))?;
+            crate::core::pack::write_loose_object_in(&remote_git_dir.join("objects"), &kind, &content)?;
         }
     }
     Ok(())
@@ -231,7 +231,7 @@ pub fn delete_remote_ref(remote_git_dir: &Path, branch_name: &str) -> Result<()>
 // Used by `push`.
 pub fn write_remote_tracking_ref(remote_name: &str, branch_name: &str, hash: &str) -> Result<()> {
     let ref_name = format!("refs/remotes/{}/{}", remote_name, branch_name);
-    crate::refs::write_ref(&ref_name, hash)?;
+    crate::core::refs::write_ref(&ref_name, hash)?;
     Ok(())
 }
 
@@ -239,7 +239,7 @@ pub fn write_remote_tracking_ref(remote_name: &str, branch_name: &str, hash: &st
 // Used by `push`.
 pub fn delete_remote_tracking_ref(remote_name: &str, branch_name: &str) -> Result<()> {
     let ref_name = format!("refs/remotes/{}/{}", remote_name, branch_name);
-    let path = crate::repo::path(format!(".git/{}", ref_name));
+    let path = crate::core::repo::path(format!(".git/{}", ref_name));
     if Path::new(&path).exists() {
         fs::remove_file(&path)?;
     }
@@ -249,8 +249,8 @@ pub fn delete_remote_tracking_ref(remote_name: &str, branch_name: &str) -> Resul
 /// Configures upstream tracking for a local branch in `.git/config`.
 // Used by `push`.
 pub fn set_upstream_branch(local_branch: &str, remote_name: &str, remote_branch: &str) -> Result<()> {
-    let config_path = &crate::repo::path(crate::helpers::config::LOCAL_CONFIG_PATH);
-    crate::helpers::config::set_in(config_path, &format!("branch.{}.remote", local_branch), remote_name)?;
-    crate::helpers::config::set_in(config_path, &format!("branch.{}.merge", local_branch), &format!("refs/heads/{}", remote_branch))?;
+    let config_path = &crate::core::repo::path(crate::core::config::LOCAL_CONFIG_PATH);
+    crate::core::config::set_in(config_path, &format!("branch.{}.remote", local_branch), remote_name)?;
+    crate::core::config::set_in(config_path, &format!("branch.{}.merge", local_branch), &format!("refs/heads/{}", remote_branch))?;
     Ok(())
 }

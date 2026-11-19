@@ -3,8 +3,8 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use anyhow::Context;
-use crate::helpers::{objects::{hash_content, read_object, write_object}};
-use crate::index::{build_entry, write_index, IndexEntry};
+use crate::core::object_store::{hash_content, read_object, write_object};
+use crate::core::index::{build_entry, write_index, IndexEntry};
 use crate::objects::{ApplyOptions, BinaryHunk, FilePatch, HunkFailure, HunkLine, HunkLineKind, PatchHunk, PatchImageLine, PlannedChanges};
 
 /// Reads the patch text from the given files, concatenated in order, or from standard input

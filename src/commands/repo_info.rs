@@ -24,7 +24,7 @@ pub fn repo(args: Vec<String>) -> Result<()> {
         print!("{}", REPO_USAGE);
         crate::ui::exit(129);
     }
-    if !crate::repo::exists() {
+    if !crate::core::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
         crate::ui::exit(128);
     }

@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
-use crate::helpers::config::get_config_value;
-use crate::helpers::objects::read_object;
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::config::get_config_value;
+use crate::core::object_store::read_object;
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{CheckMailmapOptions, Mailmap, MailmapEntry, MailmapInfo};
 
 /// git's usage text for `check-mailmap`, printed for `-h` and after option errors (exit 129).

@@ -8,7 +8,7 @@ use crate::helpers::narrate::{conflict_kind, file_conflict_hunks, load_conflict_
 /// `--explain <file>` prints every conflict of a file as YOURS / ORIGINAL / THEIRS blocks
 /// with a one-line suggestion each.
 pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     let mut unmerged: std::collections::BTreeMap<String, u8> = std::collections::BTreeMap::new();
     for e in entries.iter().filter(|e| e.stage != 0) {
         *unmerged.entry(e.path.clone()).or_default() |= 1 << (e.stage - 1);
@@ -47,7 +47,7 @@ pub fn conflicts(args: Vec<String>) -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    let head = crate::refs::resolve_head_commit()?;
+    let head = crate::core::refs::resolve_head_commit()?;
     let title = match operation.as_deref() {
         Some(o) if o != "bisect" => format!("{} in progress", o),
         _ => "Unresolved conflicts".into(),

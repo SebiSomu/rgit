@@ -21,7 +21,7 @@ pub fn hook(args: Vec<String>) -> Result<()> {
     if args.first().map(String::as_str) != Some("run") || args.iter().take_while(|a| a.as_str() != "--").any(|a| a == "-h") {
         usage("");
     }
-    if !crate::repo::exists() {
+    if !crate::core::repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
         crate::ui::exit(128);
     }

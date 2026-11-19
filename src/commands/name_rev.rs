@@ -3,8 +3,8 @@ use anyhow::Result;
 
 use crate::helpers::name_rev::{annotate_line, build_rev_names, commit_parents_and_date, object_name, parse_name_rev_args, peel_ref_tip, CUTOFF_DATE_SLOP, NAME_REV_USAGE};
 use crate::helpers::rev_list::abbreviate_hash;
-use crate::helpers::rev_parse::resolve_rev;
-use crate::repo;
+use crate::core::rev_parse::resolve_rev;
+use crate::core::repo;
 
 /// `rgit name-rev [--name-only] [--tags] [--refs=<pattern>]... [--exclude=<pattern>]...
 /// [--no-undefined] [--always] (<commit>... | --all | --annotate-stdin)`
@@ -52,7 +52,7 @@ pub fn name_rev(args: Vec<String>) -> Result<()> {
             eprintln!("Could not get object for {}. Skipping.", rev);
             continue;
         };
-        let is_commit = crate::helpers::objects::read_object(&hash).map(|(t, _)| t == "commit").unwrap_or(false);
+        let is_commit = crate::core::object_store::read_object(&hash).map(|(t, _)| t == "commit").unwrap_or(false);
         if object_type == "commit" {
             if let Some((_, date)) = commit_parents_and_date(&peeled) {
                 cutoff = cutoff.min(date);

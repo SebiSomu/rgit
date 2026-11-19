@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::helpers::config::author_identity;
-use crate::helpers::objects::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object};
-use crate::index::{build_entry, read_index, write_index};
+use crate::core::config::author_identity;
+use crate::core::object_store::{flatten_tree, hash_content, read_object, tree_hash_of_commit, write_object};
+use crate::core::index::{build_entry, read_index, write_index};
 use crate::objects::CommitSignature;
-use crate::refs;
+use crate::core::refs;
 
 /// Resolves a commit's parent hashes from its raw object content, in order.
 // Used by `cherry_pick`.
@@ -38,13 +38,13 @@ pub fn extract_commit_message(commit_text: &str) -> String {
 /// annotated tags.
 // Used by `merge`, `diff`, `restore`, and tree resolution helpers.
 pub fn resolve_commit_from_source(source: &str) -> anyhow::Result<String> {
-    let hash = match crate::helpers::rev_parse::resolve_rev(source) {
+    let hash = match crate::core::rev_parse::resolve_rev(source) {
         Ok(hash) => hash,
         // Keep precise failures ("commit ... has no parent"); an unknown name is an invalid reference.
         Err(e) if e.to_string().starts_with("error:") => return Err(e),
         Err(_) => anyhow::bail!("error: invalid reference: '{}'", source),
     };
-    match crate::helpers::rev_parse::peel_to_type(hash.clone(), "commit") {
+    match crate::core::rev_parse::peel_to_type(hash.clone(), "commit") {
         Ok(commit) => Ok(commit),
         Err(_) => {
             let (obj_type, _) = read_object(&hash)?;
@@ -397,7 +397,7 @@ pub fn format_commit_date(timestamp: i64, tz: &str) -> String {
 /// commented help block, and returns what was saved (uncleaned).
 // Used by `commit` when no message is given, or with `-e` / `--amend` / a merge in progress.
 pub fn edit_commit_message(initial: &str, comments: &str) -> anyhow::Result<String> {
-    let path = crate::repo::path(".git/COMMIT_EDITMSG");
+    let path = crate::core::repo::path(".git/COMMIT_EDITMSG");
     let initial = initial.trim_end_matches('\n');
     let mut text = if initial.is_empty() { String::new() } else { format!("{}\n", initial) };
     text.push_str("\n# Please enter the commit message for your changes. Lines starting\n# with '#' will be ignored, and an empty message aborts the commit.\n#\n");

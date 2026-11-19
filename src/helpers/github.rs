@@ -96,13 +96,13 @@ pub fn resolve_github_token(remote_name: &str) -> Result<String> {
         }
     }
 
-    if let Some(tok) = crate::helpers::config::get_config_value(&format!("remote.{}.token", remote_name))? {
+    if let Some(tok) = crate::core::config::get_config_value(&format!("remote.{}.token", remote_name))? {
         if !tok.trim().is_empty() {
             return Ok(tok.trim().to_string());
         }
     }
 
-    if let Some(tok) = crate::helpers::config::get_config_value("github.token")? {
+    if let Some(tok) = crate::core::config::get_config_value("github.token")? {
         if !tok.trim().is_empty() {
             return Ok(tok.trim().to_string());
         }
@@ -175,7 +175,7 @@ pub fn get_github_branch_commit(client: &reqwest::blocking::Client, target: &Git
 /// Uploads an uncompressed Git blob object to GitHub via the Git Data API.
 // Used by `push`.
 pub fn upload_blob_to_github(client: &reqwest::blocking::Client, target: &GitHubTarget, blob_hash: &str) -> Result<String> {
-    let (obj_type, content) = crate::helpers::objects::read_object(blob_hash)?;
+    let (obj_type, content) = crate::core::object_store::read_object(blob_hash)?;
     if obj_type != "blob" {
         anyhow::bail!("Expected blob object for hash {}, found {}", blob_hash, obj_type);
     }
@@ -206,7 +206,7 @@ pub fn upload_tree_to_github(client: &reqwest::blocking::Client, target: &GitHub
         return Ok(cached_sha.clone());
     }
 
-    let (obj_type, content) = crate::helpers::objects::read_object(tree_hash)?;
+    let (obj_type, content) = crate::core::object_store::read_object(tree_hash)?;
     if obj_type != "tree" {
         anyhow::bail!("Expected tree object for hash {}, found {}", tree_hash, obj_type);
     }
@@ -450,7 +450,7 @@ pub fn fetch_github_blob(client: &reqwest::blocking::Client, target: &GitHubTarg
         content_clean.into_bytes()
     };
 
-    crate::helpers::objects::write_object("blob", &content)?;
+    crate::core::object_store::write_object("blob", &content)?;
     Ok(())
 }
 
@@ -514,7 +514,7 @@ pub fn fetch_github_tree(client: &reqwest::blocking::Client, target: &GitHubTarg
         tree_content.extend_from_slice(&sha_bytes);
     }
 
-    let written_sha = crate::helpers::objects::write_object("tree", &tree_content)?;
+    let written_sha = crate::core::object_store::write_object("tree", &tree_content)?;
     if written_sha != sha {
     }
     Ok(())
@@ -573,7 +573,7 @@ pub fn fetch_github_commit(client: &reqwest::blocking::Client, target: &GitHubTa
     commit_text.push_str(message);
     commit_text.push('\n');
 
-    crate::helpers::objects::write_object("commit", commit_text.as_bytes())?;
+    crate::core::object_store::write_object("commit", commit_text.as_bytes())?;
     Ok(())
 }
 
@@ -668,8 +668,8 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
             Some(old) => {
                 println!(
                     "   {}..{}  {:16} -> {}/{}",
-                    crate::helpers::commit::short_hash(old),
-                    crate::helpers::commit::short_hash(remote_sha),
+                    crate::core::commit::short_hash(old),
+                    crate::core::commit::short_hash(remote_sha),
                     branch, remote_name, branch
                 );
                 crate::objects::FetchRefResult::Updated {
@@ -687,7 +687,7 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
     }
 
     if let Some((_, sha)) = filtered_refs.iter().find(|(b, _)| b == &default_branch) {
-        let _ = crate::refs::write_ref(&format!("refs/remotes/{}/HEAD", remote_name), sha);
+        let _ = crate::core::refs::write_ref(&format!("refs/remotes/{}/HEAD", remote_name), sha);
     }
 
     crate::helpers::fetch::write_fetch_head(&fetch_head_entries)?;
@@ -721,7 +721,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
                 return Ok(());
             }
 
-            let is_ff = crate::helpers::commit::is_reachable(local_hash, remote_hash).unwrap_or(false);
+            let is_ff = crate::core::commit::is_reachable(local_hash, remote_hash).unwrap_or(false);
             if !is_ff && !force {
                 eprintln!("To {}", remote_display);
                 eprintln!(" ! [rejected]        {} -> {} (non-fast-forward)", src_name, dest_branch);
@@ -770,7 +770,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         }
         missing_commits.push(hash.clone());
 
-        let (obj_type, content) = crate::helpers::objects::read_object(&hash)?;
+        let (obj_type, content) = crate::core::object_store::read_object(&hash)?;
         if obj_type == "commit" {
             let text = String::from_utf8_lossy(&content);
             for line in text.lines() {
@@ -795,7 +795,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
 
     let mut count = 0;
     for commit_hash in &missing_commits {
-        let (obj_type, content) = crate::helpers::objects::read_object(commit_hash)?;
+        let (obj_type, content) = crate::core::object_store::read_object(commit_hash)?;
         if obj_type != "commit" {
             anyhow::bail!("{} is not a commit object", commit_hash);
         }
@@ -821,7 +821,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
             }
         }
 
-        let message = crate::helpers::commit::extract_commit_message(&text);
+        let message = crate::core::commit::extract_commit_message(&text);
         let remote_tree_sha = upload_tree_to_github(
             &client,
             target,
@@ -880,8 +880,8 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         PushStatus::FastForward { ref old_hash, .. } => {
             println!(
                 "   {}..{}  {} -> {}",
-                crate::helpers::commit::short_hash(old_hash),
-                crate::helpers::commit::short_hash(&final_remote_sha),
+                crate::core::commit::short_hash(old_hash),
+                crate::core::commit::short_hash(&final_remote_sha),
                 src_name,
                 dest_branch
             );
@@ -889,8 +889,8 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         PushStatus::ForcedUpdate { ref old_hash, .. } => {
             println!(
                 " + {}...{} {} -> {} (forced update)",
-                crate::helpers::commit::short_hash(old_hash),
-                crate::helpers::commit::short_hash(&final_remote_sha),
+                crate::core::commit::short_hash(old_hash),
+                crate::core::commit::short_hash(&final_remote_sha),
                 src_name,
                 dest_branch
             );

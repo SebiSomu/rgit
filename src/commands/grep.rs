@@ -1,12 +1,10 @@
 use std::fs;
 use std::path::Path;
 use anyhow::Result;
-use crate::helpers::{
-    commit::{resolve_commit_from_source, resolve_tree_from_source},
-    grep::{build_grep_matcher, matches_pathspec, search_content},
-    objects::read_object,
-};
-use crate::index::read_index;
+use crate::helpers::{grep::{build_grep_matcher, matches_pathspec, search_content}};
+use crate::core::commit::{resolve_commit_from_source, resolve_tree_from_source};
+use crate::core::object_store::read_object;
+use crate::core::index::read_index;
 use crate::objects::{GrepFileResult, GrepOptions};
 
 /// `rgit grep [-i] [-v] [-n] [-c] [-l|-L] [-F] [--cached] [-e <pattern>] [<pattern>] [<rev>...] [-- <path>...]`

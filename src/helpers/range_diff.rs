@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::helpers::format_patch::{compacted_changes, diff_commit_against_parent, split_commit_message};
 use crate::helpers::rev_list::{parse_revision_args, select_rev_list_commits};
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
 use crate::objects::{RangeDiffOptions, RangePatch};
 
 /// git's usage text for `range-diff`, printed for `-h` and after usage errors (exit 129).

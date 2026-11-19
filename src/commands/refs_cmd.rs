@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::helpers::refs_verify::{verify_refs, REFS_USAGE};
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit refs list [<options>] [<pattern>...]` / `rgit refs exists <ref>` /
 /// `rgit refs verify [--strict] [--verbose]` / `rgit refs optimize [<options>]`

@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 use crate::objects::ShortlogOptions;
-use crate::refs;
+use crate::core::refs;
 
 /// A single author entry produced by `collect_shortlog`: the display name/email
 /// together with the subject lines of every commit attributed to that author.
@@ -168,7 +168,7 @@ pub fn collect_shortlog(opts: &ShortlogOptions) -> Result<Vec<AuthorEntry>> {
         }
     } else {
         let hash = if let Some(rev) = &opts.rev {
-            crate::helpers::rev_parse::resolve_rev(rev)
+            crate::core::rev_parse::resolve_rev(rev)
                 .with_context(|| format!("bad revision '{}'", rev))?
         } else {
             refs::resolve_head_commit()?

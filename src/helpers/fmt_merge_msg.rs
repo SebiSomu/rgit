@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
-use crate::helpers::commit::is_reachable;
-use crate::helpers::config::{author_identity, get_config_value, read_all_config_entries};
+use crate::core::commit::is_reachable;
+use crate::core::config::{author_identity, get_config_value, read_all_config_entries};
 use crate::helpers::format_patch::split_commit_message;
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 use crate::helpers::rev_list::run_rev_list_walk;
-use crate::helpers::rev_parse::peel_to_type;
+use crate::core::rev_parse::peel_to_type;
 use crate::helpers::symbolic_ref::resolve_ref_unsafe;
-use crate::helpers::wildmatch::{wildmatch, WM_PATHNAME};
+use crate::core::wildmatch::{wildmatch, WM_PATHNAME};
 use crate::objects::{FmtMergeMsgOptions, MergeOrigin, MergeSource, RevListOptions, RevListRoots};
 
 /// git's usage text for `fmt-merge-msg`, printed for `-h` and after option errors (exit 129).

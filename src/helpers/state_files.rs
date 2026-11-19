@@ -4,11 +4,11 @@ use std::path::Path;
 use anyhow::Context;
 
 use crate::helpers::checkout::{build_index_entries_for_tree, ensure_working_tree_clean};
-use crate::helpers::commit::commit_parents;
-use crate::helpers::objects::{flatten_tree, read_object, tree_hash_of_commit};
-use crate::index::{write_index, IndexEntry};
+use crate::core::commit::commit_parents;
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
+use crate::core::index::{write_index, IndexEntry};
 use crate::objects::StashEntry;
-use crate::refs;
+use crate::core::refs;
 
 pub const STASH_LIST_PATH: &str = ".git/STASH_LIST";
 
@@ -39,11 +39,11 @@ pub fn append_line(path: impl AsRef<Path>, line: &str) -> anyhow::Result<()> {
 
 /// Reads all stash entries, most-recent-first (`stash@{0}` == `list[0]`).
 pub fn read_stash_list() -> anyhow::Result<Vec<StashEntry>> {
-    if !crate::repo::path(STASH_LIST_PATH).exists() {
+    if !crate::core::repo::path(STASH_LIST_PATH).exists() {
         return Ok(Vec::new());
     }
 
-    let content = fs::read_to_string(crate::repo::path(STASH_LIST_PATH)).context("Failed to read .git/STASH_LIST")?;
+    let content = fs::read_to_string(crate::core::repo::path(STASH_LIST_PATH)).context("Failed to read .git/STASH_LIST")?;
     let mut entries: Vec<StashEntry> = content
         .lines()
         .filter(|l| !l.is_empty())
@@ -63,8 +63,8 @@ pub fn read_stash_list() -> anyhow::Result<Vec<StashEntry>> {
 /// `stash@{0}`), matching what `read_stash_list` returns.
 pub fn write_stash_list(entries: &[StashEntry]) -> anyhow::Result<()> {
     if entries.is_empty() {
-        if crate::repo::path(STASH_LIST_PATH).exists() {
-            fs::remove_file(crate::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
+        if crate::core::repo::path(STASH_LIST_PATH).exists() {
+            fs::remove_file(crate::core::repo::path(STASH_LIST_PATH)).context("Failed to remove .git/STASH_LIST")?;
         }
         return Ok(());
     }
@@ -73,7 +73,7 @@ pub fn write_stash_list(entries: &[StashEntry]) -> anyhow::Result<()> {
     lines.reverse();
     let mut content = lines.join("\n");
     content.push('\n');
-    fs::write(crate::repo::path(STASH_LIST_PATH), content).context("Failed to write .git/STASH_LIST")?;
+    fs::write(crate::core::repo::path(STASH_LIST_PATH), content).context("Failed to write .git/STASH_LIST")?;
     Ok(())
 }
 
@@ -83,7 +83,7 @@ pub fn append_stash_entry(hash: &str, message: &str) -> anyhow::Result<()> {
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(crate::repo::path(STASH_LIST_PATH))
+        .open(crate::core::repo::path(STASH_LIST_PATH))
         .context("Failed to open .git/STASH_LIST")?;
     writeln!(file, "{} {}", hash, message)?;
     Ok(())
@@ -144,7 +144,7 @@ pub fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::R
         })
         .collect();
 
-    crate::helpers::objects::write_tree_from_index_prefix(&entries, "")
+    crate::core::object_store::write_tree_from_index_prefix(&entries, "")
 }
 
 /// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens
@@ -267,13 +267,13 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
 /// Clean result: the changes are left unstaged, new files staged. Conflicts: cleanly merged
 /// files stay staged, conflicted ones get stages 1-3, the entry is kept and the exit code is 1.
 fn apply_stash_by_merge(base: &str, head_tree: &BTreeMap<String, ([u8; 20], u32)>, w_tree: &BTreeMap<String, ([u8; 20], u32)>, idx: usize, list: Vec<StashEntry>, drop_after: bool) -> anyhow::Result<()> {
-    let base_tree = crate::helpers::commit::resolve_tree_from_source(base)?;
+    let base_tree = crate::core::commit::resolve_tree_from_source(base)?;
     let result = crate::helpers::merge::merge_into_worktree(&base_tree, head_tree, w_tree, "Updated upstream", "Stashed changes", "apply stash")?;
     for m in &result.messages {
         println!("{}", m.text);
     }
     if !result.conflicted.is_empty() {
-        let _ = fs::write(crate::repo::path(crate::helpers::narrate::STASH_CONFLICT_PATH), format!("stash@{{{}}}\n", idx));
+        let _ = fs::write(crate::core::repo::path(crate::helpers::narrate::STASH_CONFLICT_PATH), format!("stash@{{{}}}\n", idx));
         if drop_after {
             eprintln!("The stash entry is kept in case you need it again.");
         }
@@ -309,11 +309,11 @@ pub fn build_stash_commit(tree_hash: &str, parents: &[&str], message: &str) -> a
         content.push_str(&format!("parent {}\n", parent));
     }
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
-    let author = crate::helpers::config::author_identity()?;
+    let author = crate::core::config::author_identity()?;
     content.push_str(&format!("author {} {} +0000\n", author, timestamp));
     content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
     content.push_str(&format!("\n{}\n", message));
-    crate::helpers::objects::write_object("commit", content.as_bytes())
+    crate::core::object_store::write_object("commit", content.as_bytes())
 }
 
 /// Lists the untracked files of the working tree (`.gitignore`-aware; with `include_ignored`,

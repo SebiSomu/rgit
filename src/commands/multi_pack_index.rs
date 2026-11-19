@@ -2,9 +2,9 @@ use std::fs;
 use anyhow::Result;
 
 use crate::helpers::midx::{midx_path, parse_midx, store_midx, verify_midx, write_midx};
-use crate::helpers::pack::{forget_repo_packs, repo_packs};
+use crate::core::pack::{forget_repo_packs, repo_packs};
 use crate::objects::RepoPack;
-use crate::repo;
+use crate::core::repo;
 
 /// `rgit multi-pack-index write [--preferred-pack=<pack>]` / `verify` / `expire`
 ///

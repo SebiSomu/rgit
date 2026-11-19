@@ -2,9 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::helpers::index_plumbing::{bare_index_entry, worktree_state};
-use crate::helpers::objects::flatten_tree;
-use crate::helpers::rev_parse::{peel_to_type, resolve_rev};
-use crate::index::IndexEntry;
+use crate::core::object_store::flatten_tree;
+use crate::core::rev_parse::{peel_to_type, resolve_rev};
+use crate::core::index::IndexEntry;
 use crate::objects::{IndexFileState, ReadTreeOptions, ReadTreePlan};
 
 /// Usage text of `read-tree`, printed for `-h` and usage errors.

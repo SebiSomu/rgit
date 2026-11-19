@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 use std::fs;
-use crate::helpers::commit::{current_signature, is_reachable, write_commit_object};
-use crate::helpers::config::get_config_value;
+use crate::core::commit::{current_signature, is_reachable, write_commit_object};
+use crate::core::config::get_config_value;
 use crate::helpers::format_patch::{parse_commit_object, split_commit_message};
 use crate::helpers::merge::find_merge_base;
-use crate::helpers::objects::{flatten_tree, read_object, write_object};
+use crate::core::object_store::{flatten_tree, read_object, write_object};
 use crate::helpers::rebase::run_editor;
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::rev_parse::resolve_rev;
 use crate::helpers::state_files::build_tree_from_map;
 use crate::objects::{NotesMergeStrategy, NotesTree};
-use crate::refs::{read_ref, write_ref};
+use crate::core::refs::{read_ref, write_ref};
 
 /// Usage text for `notes`, printed for `-h` and after usage errors (exit 129).
 pub const NOTES_USAGE: &str = "usage: rgit notes [--ref <notes-ref>] [list [<object>]]
@@ -164,7 +164,7 @@ pub fn edit_note_text(initial: &str, object: &str) -> anyhow::Result<String> {
     template.push_str("\n#\n# Write/edit the notes for the following object:\n#\n");
     template.push_str(&format!("# {}\n", describe_object(object)));
     template.push_str("#\n");
-    let path = crate::repo::path(".git/NOTES_EDITMSG");
+    let path = crate::core::repo::path(".git/NOTES_EDITMSG");
     fs::write(&path, template)?;
     run_editor(&path, false).map_err(|_| anyhow::anyhow!("fatal: please supply the note contents using either -m or -F option"))?;
     Ok(stripspace(&fs::read_to_string(&path)?, true))

@@ -2,12 +2,10 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::Path;
 
-use crate::helpers::{
-    commit::commit_parents,
-    objects::{flatten_tree, read_object, tree_hash_of_commit},
-};
+use crate::core::commit::commit_parents;
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::objects::{ConflictHunk, RepoSnapshot};
-use crate::refs;
+use crate::core::refs;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -15,7 +13,7 @@ type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 /// `bisect`), read from the state files under `.git`.
 // Used by `take_snapshot`, the narration in ui.rs and `rgit conflicts`.
 pub fn operation_in_progress() -> Option<String> {
-    let exists = |p: &str| crate::repo::path(p).exists();
+    let exists = |p: &str| crate::core::repo::path(p).exists();
     if crate::helpers::rebase::rebase_in_progress() {
         Some("rebase".into())
     } else if exists(".git/MERGE_HEAD") {
@@ -26,7 +24,7 @@ pub fn operation_in_progress() -> Option<String> {
         Some("revert".into())
     } else if exists(crate::commands::bisect::BISECT_START_PATH) {
         Some("bisect".into())
-    } else if exists(STASH_CONFLICT_PATH) && (exists(CONFLICTS_LIST_PATH) || crate::index::read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
+    } else if exists(STASH_CONFLICT_PATH) && (exists(CONFLICTS_LIST_PATH) || crate::core::index::read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
         // `stash apply` that stopped on conflicts: git keeps no state file for it.
         Some("stash".into())
     } else {
@@ -58,7 +56,7 @@ pub fn take_snapshot(worktree: bool) -> RepoSnapshot {
     };
     let head = refs::resolve_head_commit().ok().flatten();
     let refs: BTreeMap<String, String> = crate::helpers::for_each_ref::collect_ref_items(None).into_iter().map(|i| (i.refname, i.oid)).collect();
-    let entries = crate::index::read_index().unwrap_or_default();
+    let entries = crate::core::index::read_index().unwrap_or_default();
     let mut index = BTreeMap::new();
     let mut unmerged: BTreeMap<String, u8> = BTreeMap::new();
     for e in &entries {
@@ -82,7 +80,7 @@ pub fn take_snapshot(worktree: bool) -> RepoSnapshot {
     }
     staged.sort();
     let (worktree_changes, untracked) = if worktree {
-        let changes = crate::helpers::commit::tracked_worktree_changes().unwrap_or_default();
+        let changes = crate::core::commit::tracked_worktree_changes().unwrap_or_default();
         let tracked: BTreeSet<String> = entries.iter().map(|e| e.path.clone()).collect();
         let untracked = crate::helpers::state_files::collect_untracked_files(&tracked, false).unwrap_or_default();
         (Some(changes), Some(untracked))
@@ -118,7 +116,7 @@ pub fn commits_between(old: Option<&str>, new: &str) -> usize {
 /// Whether `ancestor` is reachable from `descendant` (a commit counts as its own ancestor).
 // Used by the narration (fast-forward / already-up-to-date / force-push checks).
 pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
-    ancestor == descendant || crate::helpers::commit::is_reachable(descendant, ancestor).unwrap_or(false)
+    ancestor == descendant || crate::core::commit::is_reachable(descendant, ancestor).unwrap_or(false)
 }
 
 /// What changed between two commits' trees: (added, modified, deleted) paths and the
@@ -362,7 +360,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
 /// (path, what) pairs.
 // Used by the `add` and `commit` warnings.
 pub fn scan_risks(paths: &[String]) -> (Vec<(String, String)>, Vec<String>, Vec<(String, u64)>) {
-    let limit: u64 = crate::helpers::config::get_config_value("rgit.largeFileWarning").ok().flatten().and_then(|v| v.parse().ok()).unwrap_or(50 << 20);
+    let limit: u64 = crate::core::config::get_config_value("rgit.largeFileWarning").ok().flatten().and_then(|v| v.parse().ok()).unwrap_or(50 << 20);
     let content_rules: Vec<(regex::Regex, &str)> = [
         (r"AKIA[0-9A-Z]{16}", "an AWS access key"),
         (r"-----BEGIN [A-Z ]*PRIVATE KEY-----", "a private key"),
@@ -415,21 +413,21 @@ pub const STASH_CONFLICT_PATH: &str = ".git/RGIT_STASH_CONFLICT";
 /// Forgets a finished stash conflict: the marker and the recorded file list.
 // Used by `stash`, `reset` and the "all resolved" progress line.
 pub fn clear_stash_conflict() {
-    let _ = fs::remove_file(crate::repo::path(STASH_CONFLICT_PATH));
-    let _ = fs::remove_file(crate::repo::path(CONFLICTS_LIST_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(STASH_CONFLICT_PATH));
+    let _ = fs::remove_file(crate::core::repo::path(CONFLICTS_LIST_PATH));
 }
 
 /// Records the conflicted paths of the operation that just stopped.
 // Used by the conflict reports.
 pub fn save_conflict_list(paths: &[String]) {
-    let _ = fs::write(crate::repo::path(CONFLICTS_LIST_PATH), paths.join("\n") + "\n");
+    let _ = fs::write(crate::core::repo::path(CONFLICTS_LIST_PATH), paths.join("\n") + "\n");
 }
 
 /// The conflicted paths recorded when the current operation stopped (empty if none, or once
 /// no operation is in progress, when the stale list is removed).
 // Used by `status`, `add` and `rgit conflicts` progress lines.
 pub fn load_conflict_list() -> Vec<String> {
-    let path = crate::repo::path(CONFLICTS_LIST_PATH);
+    let path = crate::core::repo::path(CONFLICTS_LIST_PATH);
     if operation_in_progress().is_none() {
         let _ = fs::remove_file(&path);
         return Vec::new();
@@ -441,7 +439,7 @@ pub fn load_conflict_list() -> Vec<String> {
 /// REVERT_HEAD, or for a rebase the commit named in the file's `>>>>>>>` label.
 // Used by the conflict reports and `rgit conflicts`.
 pub fn their_commit(operation: &str, theirs_label: Option<&str>) -> Option<String> {
-    let read = |p: &str| fs::read_to_string(crate::repo::path(p)).ok().map(|s| s.lines().next().unwrap_or("").trim().to_string()).filter(|s| !s.is_empty());
+    let read = |p: &str| fs::read_to_string(crate::core::repo::path(p)).ok().map(|s| s.lines().next().unwrap_or("").trim().to_string()).filter(|s| !s.is_empty());
     match operation {
         "merge" => read(".git/MERGE_HEAD"),
         "cherry-pick" => read(".git/CHERRY_PICK_HEAD"),
@@ -449,7 +447,7 @@ pub fn their_commit(operation: &str, theirs_label: Option<&str>) -> Option<Strin
         _ => {
             let label = theirs_label?;
             let first = label.split_whitespace().next()?;
-            crate::helpers::rev_parse::resolve_rev(&format!("{}^{{commit}}", first)).ok()
+            crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", first)).ok()
         }
     }
 }
@@ -473,7 +471,7 @@ pub fn exists(path: &str) -> bool {
 /// Counts ignored files below `paths` (all of the working tree for `.`).
 // Used by `add`'s "nothing to add" explanation.
 pub fn ignored_files_under(paths: &[String]) -> Vec<String> {
-    let tracked: BTreeSet<String> = crate::index::read_index().unwrap_or_default().into_iter().map(|e| e.path).collect();
+    let tracked: BTreeSet<String> = crate::core::index::read_index().unwrap_or_default().into_iter().map(|e| e.path).collect();
     let all = crate::helpers::state_files::collect_untracked_files(&tracked, true).unwrap_or_default();
     let plain: BTreeSet<String> = crate::helpers::state_files::collect_untracked_files(&tracked, false).unwrap_or_default().into_iter().collect();
     all.into_iter().filter(|p| !plain.contains(p)).filter(|p| under_any(p, paths)).collect()

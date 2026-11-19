@@ -7,9 +7,9 @@ use tar::{Builder, EntryType, Header};
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
-use crate::helpers::commit::resolve_commit_from_source;
+use crate::core::commit::resolve_commit_from_source;
 use crate::helpers::github::format_unix_timestamp_iso8601;
-use crate::helpers::objects::{flatten_tree, read_object, tree_hash_of_commit};
+use crate::core::object_store::{flatten_tree, read_object, tree_hash_of_commit};
 use crate::objects::ArchiveFormat;
 
 /// Returns the slice of supported archive format names.
@@ -267,7 +267,7 @@ pub fn create_archive<W: Write>(tree_hash: &str,timestamp: u64,format: ArchiveFo
 /// The commit a tree-ish names (directly or through annotated tags), or `None` for a tree.
 // Used by the `archive` command to record the commit id in tar archives.
 pub fn archive_commit_id(tree_ish: &str) -> Option<String> {
-    let hash = crate::helpers::rev_parse::resolve_rev(tree_ish).ok()?;
-    let commit = crate::helpers::rev_parse::peel_to_type(hash, "commit").ok()?;
+    let hash = crate::core::rev_parse::resolve_rev(tree_ish).ok()?;
+    let commit = crate::core::rev_parse::peel_to_type(hash, "commit").ok()?;
     matches!(read_object(&commit), Ok((ref object_type, _)) if object_type == "commit").then_some(commit)
 }

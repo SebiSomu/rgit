@@ -7,11 +7,11 @@ use std::collections::HashSet;
 use crate::helpers::follow::{follow_commit_pairs, render_follow_diff};
 use crate::helpers::graph::{graph_new, graph_padding_line, graph_prefix_lines, graph_show_commit, graph_show_commit_msg, graph_update};
 use crate::helpers::log::{collect_decorations, commit_diff_output, commit_diff_output_width, effective_decorate, format_log_date, format_log_entry, join_entry_and_diff, parse_log_args};
-use crate::helpers::objects::read_object;
+use crate::core::object_store::read_object;
 use crate::helpers::rev_list::{rewrite_rev_list_parents, select_rev_list_commits};
-use crate::helpers::rev_parse::resolve_rev;
+use crate::core::rev_parse::resolve_rev;
 use crate::objects::{LogFormat, LogOptions, WalkedCommit};
-use crate::refs;
+use crate::core::refs;
 
 /// `rgit log [<options>] [<revision-range>] [[--] <path>...]`
 ///

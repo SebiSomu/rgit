@@ -4,8 +4,8 @@ use anyhow::Result;
 
 use crate::helpers::index_plumbing::write_entry_to_worktree;
 use crate::helpers::read_tree::{parse_read_tree_args, plan_read_tree};
-use crate::index::{build_entry, read_index, write_index};
-use crate::repo;
+use crate::core::index::{build_entry, read_index, write_index};
+use crate::core::repo;
 
 /// `rgit read-tree [-m [--trivial] [--aggressive] | --reset | --prefix=<dir>/] [-u | -i]
 /// [-n] (--empty | <tree-ish>...)`

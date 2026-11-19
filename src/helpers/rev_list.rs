@@ -7,7 +7,7 @@ use regex::{Regex, RegexBuilder};
 use crate::helpers::format_patch::{civil_from_days, parse_commit_object, resolve_commit_rev, split_commit_message, tz_offset_seconds};
 use crate::helpers::ls_files::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::helpers::merge::find_all_merge_bases;
-use crate::helpers::objects::flatten_tree;
+use crate::core::object_store::flatten_tree;
 use crate::objects::{CommitSignature, ParsedCommit, RevListFormat, RevListOptions, RevListRoots, RevWalkState, WalkedCommit};
 
 const USAGE: &str = "usage: rgit rev-list [<options>] <commit>... [--] [<path>...]";
@@ -271,12 +271,12 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
         if !wanted || name == "refs/stash" {
             continue;
         }
-        if let Ok(commit) = crate::helpers::rev_parse::peel_to_type(hash, "commit") {
+        if let Ok(commit) = crate::core::rev_parse::peel_to_type(hash, "commit") {
             tips.push(commit);
         }
     }
     if all {
-        if let Ok(Some(head)) = crate::refs::resolve_head_commit() {
+        if let Ok(Some(head)) = crate::core::refs::resolve_head_commit() {
             tips.push(head);
         }
     }
@@ -289,7 +289,7 @@ pub fn collect_ref_tips(all: bool, branches: bool, tags: bool, remotes: bool) ->
 // Used by `collect_ref_tips`, `bundle create --all`, `log` decorations, and `tag`.
 pub fn list_all_refs() -> BTreeMap<String, String> {
     let mut refs: BTreeMap<String, String> = BTreeMap::new();
-    if let Ok(packed) = fs::read_to_string(crate::repo::path(".git/packed-refs")) {
+    if let Ok(packed) = fs::read_to_string(crate::core::repo::path(".git/packed-refs")) {
         for line in packed.lines() {
             if let Some((hash, name)) = line.split_once(' ') {
                 if hash.len() == 40 && !line.starts_with('#') {
@@ -299,7 +299,7 @@ pub fn list_all_refs() -> BTreeMap<String, String> {
         }
     }
     let mut symbolic = Vec::new();
-    collect_loose_refs(&crate::repo::path(".git/refs"), "refs", &mut refs, &mut symbolic);
+    collect_loose_refs(&crate::core::repo::path(".git/refs"), "refs", &mut refs, &mut symbolic);
     for (name, target) in symbolic {
         if let Some(hash) = refs.get(&target).cloned() {
             refs.insert(name, hash);

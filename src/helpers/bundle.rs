@@ -10,8 +10,8 @@ use crate::helpers::bisect::collect_ancestors;
 use crate::helpers::format_patch::{parse_commit_object, resolve_commit_rev, split_commit_message};
 use crate::helpers::merge::find_all_merge_bases;
 use crate::helpers::rev_list::list_all_refs;
-use crate::helpers::rev_parse::peel_to_type;
-use crate::helpers::{objects::{read_object, write_object}};
+use crate::core::rev_parse::peel_to_type;
+use crate::core::object_store::{read_object, write_object};
 use crate::objects::BundleHeader;
 
 /// One positive revision given to `bundle create`: the ref it names (if it names one), the
@@ -97,7 +97,7 @@ pub fn missing_bundle_prerequisites(header: &BundleHeader) -> Vec<String> {
 // Used by `bundle create`.
 pub fn dwim_ref(name: &str, refs: &BTreeMap<String, String>) -> anyhow::Result<Option<(String, String)>> {
     if name == "HEAD" {
-        return Ok(crate::refs::resolve_head_commit()?.map(|hash| ("HEAD".to_string(), hash)));
+        return Ok(crate::core::refs::resolve_head_commit()?.map(|hash| ("HEAD".to_string(), hash)));
     }
     let candidates = [
         name.to_string(),
@@ -152,7 +152,7 @@ Use '--' to separate paths from revisions, like this:
                 };
                 let mut matching: Vec<(String, String)> = refs.iter().filter(|(n, _)| n.starts_with(prefix)).map(|(n, h)| (n.clone(), h.clone())).collect();
                 if rev == "--all" {
-                    if let Some(head) = crate::refs::resolve_head_commit()? {
+                    if let Some(head) = crate::core::refs::resolve_head_commit()? {
                         matching.push(("HEAD".to_string(), head));
                     }
                 }
@@ -400,7 +400,7 @@ pub fn read_packfile(pack: &[u8]) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
 
     let mut resolved: Vec<Option<(String, Vec<u8>)>> = vec![None; entries.len()];
     let mut by_hash: HashMap<String, usize> = HashMap::new();
-    let object_hash = |kind: &str, content: &[u8]| hex::encode(crate::helpers::objects::hash_content(kind, content));
+    let object_hash = |kind: &str, content: &[u8]| hex::encode(crate::core::object_store::hash_content(kind, content));
     loop {
         let mut progress = false;
         for i in 0..entries.len() {

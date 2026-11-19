@@ -1,3 +1,5 @@
+pub mod cli;
+
 use anyhow::Result;
 
 use crate::core::pack::prune_packed_objects;

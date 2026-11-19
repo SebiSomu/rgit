@@ -17,7 +17,10 @@ mod workspace;
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    let stack_size = 64 * 1024 * 1024; // 64 MB — the Commands enum is large enough to overflow the default 8 MB stack
+    // 64 MB of headroom for deep recursion. Before the per-command `Args` structs, clap's
+    // generated parser for the single giant `Commands` enum needed this (it overflowed a 1 MB
+    // stack); now the parser and the test suite fit in 1 MB, so this is only a safety margin.
+    let stack_size = 64 * 1024 * 1024;
     let builder = std::thread::Builder::new().stack_size(stack_size);
     let handler = builder.spawn(|| {
         // After a command that rewrote the working tree, a sparse checkout is applied again.

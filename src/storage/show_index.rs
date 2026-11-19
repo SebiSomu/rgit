@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::io::{self, Read, Write};
 use anyhow::Result;
 

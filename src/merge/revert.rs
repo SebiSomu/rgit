@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use anyhow::Context;

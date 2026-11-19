@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
 use std::path::Path;

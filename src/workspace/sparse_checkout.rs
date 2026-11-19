@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod engine;
 
 use std::fs;

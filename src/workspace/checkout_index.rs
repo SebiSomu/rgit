@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::io::{self, Read};
 use std::path::PathBuf;
 use anyhow::Result;

@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod types;
 
 use crate::ui::narrate::{conflict_kind, file_conflict_hunks, load_conflict_list, operation_in_progress, their_commit};

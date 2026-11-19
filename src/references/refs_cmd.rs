@@ -1,3 +1,5 @@
+pub mod cli;
+
 use anyhow::Result;
 
 use crate::references::refs_verify::{verify_refs, REFS_USAGE};

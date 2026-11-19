@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::collections::BTreeMap;
 use std::fs;
 use anyhow::Result;

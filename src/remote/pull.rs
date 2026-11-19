@@ -1,3 +1,5 @@
+pub mod cli;
+
 use anyhow::Result;
 
 /// `rgit pull [<remote>] [<branch>]`

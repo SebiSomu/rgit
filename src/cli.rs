@@ -1,10 +1,5 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-pub(crate) use crate::history::bisect::types::BisectAction;
-pub(crate) use crate::references::reflog::types::ReflogAction;
-pub(crate) use crate::remote::remote::types::RemoteAction;
-pub(crate) use crate::workspace::{stash::types::StashAction, worktree::types::WorktreeAction};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_subcommand = true)]
@@ -26,985 +21,186 @@ pub struct Cli {
 pub enum Commands {
     #[command(visible_alias = "init-db")]
     Init,
-    HashObject {
-        #[arg(short = 'w')]
-        write: bool,
-        file: PathBuf
-    },
-    CatFile {
-        #[arg(short = 'p')]
-        pretty_print: bool,
-        object_hash: String
-    },
+    HashObject(crate::plumbing::basic::cli::HashObjectArgs),
+    CatFile(crate::plumbing::basic::cli::CatFileArgs),
     WriteTree,
     #[command(visible_alias = "stage")]
-    Add {
-        #[arg(short = 'p', long = "patch")]
-        patch: bool,
-        paths: Vec<PathBuf>
-    },
-    LsTree {
-        #[arg(long)]
-        name_only: bool,
-        tree_hash: String
-    },
-    CommitTree {
-        tree_hash: String,
-        #[arg(short = 'p')]
-        parent_hash: Option<String>,
-        #[arg(short = 'm')]
-        message: String
-    },
-    Commit {
-        #[arg(short = 'm', long = "message", value_name = "MSG")]
-        messages: Vec<String>,
-        #[arg(short = 'F', long = "file", value_name = "FILE", conflicts_with = "messages")]
-        file: Option<String>,
-        #[arg(short = 'C', long = "reuse-message", value_name = "COMMIT", conflicts_with_all = ["messages", "file", "reedit_message"])]
-        reuse_message: Option<String>,
-        #[arg(short = 'c', long = "reedit-message", value_name = "COMMIT", conflicts_with_all = ["messages", "file"])]
-        reedit_message: Option<String>,
-        #[arg(short = 'a', long = "all")]
-        all: bool,
-        #[arg(long = "amend")]
-        amend: bool,
-        #[arg(short = 'e', long = "edit", conflicts_with = "no_edit")]
-        edit: bool,
-        #[arg(long = "no-edit")]
-        no_edit: bool,
-        #[arg(long = "author", value_name = "AUTHOR")]
-        author: Option<String>,
-        #[arg(long = "date", value_name = "DATE")]
-        date: Option<String>,
-        #[arg(long = "reset-author")]
-        reset_author: bool,
-        #[arg(long = "allow-empty")]
-        allow_empty: bool,
-        #[arg(long = "allow-empty-message")]
-        allow_empty_message: bool,
-        #[arg(short = 's', long = "signoff")]
-        signoff: bool,
-        /// `strip` (drop `#` lines), `whitespace` or `default`.
-        #[arg(long = "cleanup", value_name = "MODE", value_parser = ["strip", "whitespace", "default"])]
-        cleanup: Option<String>,
-        #[arg(short = 'q', long = "quiet")]
-        quiet: bool,
-    },
-    Log {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    Status {
-        #[arg(short = 's', long = "short")]
-        short: bool,
-        #[arg(short = 'b', long = "branch")]
-        branch: bool,
-        /// `--porcelain[=v1]`: the short format, stable for scripts.
-        #[arg(long = "porcelain", num_args = 0..=1, default_missing_value = "v1", require_equals = true)]
-        porcelain: Option<String>,
-        #[arg(short = 'z')]
-        nul: bool,
-        #[arg(short = 'u', long = "untracked-files", num_args = 0..=1, default_missing_value = "all")]
-        untracked: Option<String>,
-    },
+    Add(crate::workspace::staging::cli::AddArgs),
+    LsTree(crate::plumbing::basic::cli::LsTreeArgs),
+    CommitTree(crate::workspace::commit::cli::CommitTreeArgs),
+    Commit(crate::workspace::commit::cli::CommitArgs),
+    Log(crate::history::log::cli::LogArgs),
+    Status(crate::workspace::staging::cli::StatusArgs),
     #[command(disable_help_flag = true)]
-    Branch {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    Switch {
-        branch: String,
-        #[arg(short = 'c', long = "create", conflicts_with = "force")]
-        create: bool,
-        #[arg(long = "detach", conflicts_with = "create")]
-        detach: bool,
-        #[arg(short = 'f', long = "force", conflicts_with = "create")]
-        force: bool
-    },
-    Checkout {
-        target: Option<String>,
-        #[arg(short = 'b')]
-        create_branch: Option<String>,
-        #[arg(long = "detach")]
-        detach: bool,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-        #[arg(short = 'p', long = "patch")]
-        patch: bool,
-        /// For unmerged paths, take stage 2 (ours) / stage 3 (theirs).
-        #[arg(long = "ours", overrides_with = "theirs")]
-        ours: bool,
-        #[arg(long = "theirs", overrides_with = "ours")]
-        theirs: bool,
-        /// Recreate the conflicted merge of unmerged paths.
-        #[arg(short = 'm', long = "merge")]
-        merge: bool,
-        /// Like `--merge`, with `merge`, `diff3` or `zdiff3` markers.
-        #[arg(long = "conflict", value_name = "STYLE")]
-        conflict: Option<String>,
-        /// Paths after `--`: restore them instead of switching branches.
-        #[arg(last = true)]
-        paths: Vec<String>
-    },
-    Restore {
-        #[arg(short = 'p', long = "patch")]
-        patch: bool,
-        files: Vec<PathBuf>,
-        #[arg(short = 'S', long = "staged")]
-        staged: bool,
-        #[arg(short = 'W', long = "worktree")]
-        worktree: bool,
-        #[arg(long = "source")]
-        source: Option<String>,
-        /// For unmerged paths, take stage 2 (ours) / stage 3 (theirs).
-        #[arg(long = "ours", overrides_with = "theirs")]
-        ours: bool,
-        #[arg(long = "theirs", overrides_with = "ours")]
-        theirs: bool,
-        /// Recreate the conflicted merge of unmerged paths.
-        #[arg(short = 'm', long = "merge")]
-        merge: bool,
-        /// Like `--merge`, with `merge`, `diff3` or `zdiff3` markers.
-        #[arg(long = "conflict", value_name = "STYLE")]
-        conflict: Option<String>,
-    },
-    Diff {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    Merge {
-        #[arg(long = "ff", overrides_with_all = ["no_ff", "ff_only"])]
-        ff: bool,
-        #[arg(long = "no-ff", overrides_with_all = ["ff", "ff_only"])]
-        no_ff: bool,
-        #[arg(long = "ff-only", overrides_with_all = ["ff", "no_ff"])]
-        ff_only: bool,
-        #[arg(long = "squash", overrides_with = "no_squash")]
-        squash: bool,
-        #[arg(long = "no-squash", overrides_with = "squash")]
-        no_squash: bool,
-        #[arg(long = "commit", overrides_with = "no_commit")]
-        commit: bool,
-        #[arg(long = "no-commit", overrides_with = "commit")]
-        no_commit: bool,
-        #[arg(short = 'm', long = "message", value_name = "MESSAGE")]
-        messages: Vec<String>,
-        #[arg(short = 'F', long = "file", value_name = "FILE")]
-        file: Option<String>,
-        #[arg(short = 's', long = "strategy", value_name = "STRATEGY")]
-        strategy: Option<String>,
-        #[arg(short = 'X', long = "strategy-option", value_name = "OPTION")]
-        strategy_options: Vec<String>,
-        #[arg(long = "abort")]
-        abort: bool,
-        #[arg(long = "continue")]
-        cont: bool,
-        #[arg(long = "quit")]
-        quit: bool,
-        #[arg(short = 'n', long = "no-stat", overrides_with = "stat")]
-        no_stat: bool,
-        #[arg(long = "stat", overrides_with = "no_stat")]
-        stat: bool,
-        #[arg(short = 'q', long = "quiet")]
-        quiet: bool,
-        /// Accepted for compatibility: rgit never opens an editor for a merge commit.
-        #[arg(long = "no-edit")]
-        no_edit: bool,
-        #[arg(long = "allow-unrelated-histories")]
-        allow_unrelated: bool,
-        commits: Vec<String>,
-    },
-    MergeBase {
-        #[arg(short = 'a', long = "all", conflicts_with = "is_ancestor")]
-        all: bool,
-        #[arg(long = "is-ancestor", conflicts_with_all = ["all", "octopus"])]
-        is_ancestor: bool,
-        #[arg(long = "octopus", conflicts_with = "is_ancestor")]
-        octopus: bool,
-        #[arg(required = true)]
-        commits: Vec<String>,
-    },
-    Rm {
-        files: Vec<PathBuf>,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-        #[arg(long = "cached")]
-        cached: bool,
-        #[arg(short = 'r', long = "recursive")]
-        recursive: bool
-    },
-    Reset {
-        commit: Option<String>,
-        #[arg(long = "soft", conflicts_with_all = ["mixed", "hard"])]
-        soft: bool,
-        #[arg(long = "mixed", conflicts_with_all = ["soft", "hard"])]
-        mixed: bool,
-        #[arg(long = "hard", conflicts_with_all = ["soft", "mixed"])]
-        hard: bool,
-        #[arg(short = 'p', long = "patch")]
-        patch: bool,
-        #[arg(last = true)]
-        paths: Vec<PathBuf>
-    },
-    Clean {
-        #[arg(short = 'n', long = "dry-run")]
-        dry_run: bool,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-        #[arg(short = 'd')]
-        dirs: bool,
-        #[arg(short = 'x', conflicts_with = "only_ignored")]
-        ignored: bool,
-        #[arg(short = 'X', conflicts_with = "ignored")]
-        only_ignored: bool
-    },
-    CherryPick {
-        commits: Vec<String>,
-        #[arg(short = 'n', long = "no-commit", overrides_with = "commit")]
-        no_commit: bool,
-        #[arg(long = "commit", overrides_with = "no_commit")]
-        commit: bool,
-        #[arg(short = 'x')]
-        record_origin: bool,
-        #[arg(short = 's', long = "signoff")]
-        signoff: bool,
-        #[arg(short = 'm', long = "mainline", value_name = "PARENT-NUMBER")]
-        mainline: Option<usize>,
-        #[arg(long = "ff")]
-        ff: bool,
-        #[arg(long = "allow-empty")]
-        allow_empty: bool,
-        #[arg(long = "allow-empty-message")]
-        allow_empty_message: bool,
-        #[arg(long = "keep-redundant-commits")]
-        keep_redundant: bool,
-        #[arg(long = "continue", conflicts_with_all = ["skip", "abort", "quit"])]
-        cont: bool,
-        #[arg(long = "skip", conflicts_with_all = ["cont", "abort", "quit"])]
-        skip: bool,
-        #[arg(long = "abort", conflicts_with_all = ["cont", "skip", "quit"])]
-        abort: bool,
-        #[arg(long = "quit", conflicts_with_all = ["cont", "skip", "abort"])]
-        quit: bool,
-    },
-    BananaSplit {
-        commit: Option<String>,
-        #[arg(long = "by-dir")]
-        by_dir: bool,
-        #[arg(short = 'n', long = "dry-run")]
-        dry_run: bool,
-    },
-    Revert {
-        commit: Option<String>,
-        #[arg(short = 'n', long = "no-commit", conflicts_with_all = ["cont", "abort"])]
-        no_commit: bool,
-        #[arg(long = "continue", conflicts_with_all = ["abort", "no_commit"])]
-        cont: bool,
-        #[arg(long = "abort", conflicts_with_all = ["cont", "no_commit"])]
-        abort: bool
-    },
-    Stash {
-        #[arg(short = 'p', long = "patch")]
-        patch: bool,
-        #[arg(short = 'u', long = "include-untracked", conflicts_with = "all")]
-        include_untracked: bool,
-        #[arg(short = 'a', long = "all")]
-        all: bool,
-        #[command(subcommand)]
-        action: Option<StashAction>
-    },
-    Bisect {
-        #[command(subcommand)]
-        action: BisectAction
-    },
-    Show {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    Tag {
-        #[arg(short = 'l', long = "list")]
-        list: bool,
-        #[arg(short = 'd', long = "delete")]
-        delete: bool,
-        #[arg(short = 'a', long = "annotate")]
-        annotate: bool,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-        #[arg(short = 'm', long = "message", value_name = "MSG")]
-        messages: Vec<String>,
-        #[arg(short = 'F', long = "file", value_name = "FILE")]
-        file: Option<String>,
-        #[arg(short = 'e', long = "edit")]
-        edit: bool,
-        /// -n[<num>]: lines of each tag message to print (attached number, like git)
-        #[arg(short = 'n', num_args = 0..=1, default_missing_value = "1", value_name = "NUM")]
-        lines: Option<String>,
-        #[arg(long = "contains", value_name = "COMMIT")]
-        contains: Option<String>,
-        #[arg(long = "points-at", value_name = "OBJECT")]
-        points_at: Option<String>,
-        args: Vec<String>,
-    },
-    Describe {
-        #[arg(long = "tags")]
-        tags: bool,
-        #[arg(long = "always")]
-        always: bool,
-        #[arg(long = "long")]
-        long: bool,
-        #[arg(long = "abbrev", value_name = "N", require_equals = true)]
-        abbrev: Option<usize>,
-        #[arg(long = "exact-match")]
-        exact_match: bool,
-        commits: Vec<String>,
-    },
-    Mv {
-        source: PathBuf,
-        destination: PathBuf,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-    },
-    Config {
-        key: Option<String>,
-        value: Option<String>,
-        #[arg(long = "global")]
-        global: bool,
-        #[arg(short = 'l', long = "list", conflicts_with_all = ["value", "unset"])]
-        list: bool,
-        #[arg(long = "unset", conflicts_with = "value")]
-        unset: bool,
-    },
-    Rebase {
-        upstream: Option<String>,
-        branch: Option<String>,
-        #[arg(long = "onto", value_name = "NEWBASE", conflicts_with = "keep_base")]
-        onto: Option<String>,
-        #[arg(long = "keep-base")]
-        keep_base: bool,
-        #[arg(long = "reapply-cherry-picks", overrides_with = "no_reapply_cherry_picks")]
-        reapply_cherry_picks: bool,
-        #[arg(long = "no-reapply-cherry-picks", overrides_with = "reapply_cherry_picks")]
-        no_reapply_cherry_picks: bool,
-        #[arg(short = 'i', long = "interactive", conflicts_with_all = ["cont", "abort", "skip", "edit_todo"])]
-        interactive: bool,
-        #[arg(long = "continue")]
-        cont: bool,
-        #[arg(long = "abort")]
-        abort: bool,
-        #[arg(long = "skip")]
-        skip: bool,
-        #[arg(long = "edit-todo")]
-        edit_todo: bool,
-    },
-    Push {
-        remote: Option<String>,
-        refspec: Option<String>,
-        #[arg(short = 'f', long = "force")]
-        force: bool,
-        #[arg(short = 'u', long = "set-upstream")]
-        set_upstream: bool,
-    },
-    Fetch {
-        remote: Option<String>,
-        branch: Option<String>,
-    },
-    Clone {
-        repository: String,
-        directory: Option<String>,
-        #[arg(short = 'b', long = "branch")]
-        branch: Option<String>,
-        #[arg(short = 'o', long = "origin")]
-        origin: Option<String>,
-    },
-    Pull {
-        remote: Option<String>,
-        branch: Option<String>,
-    },
-    Remote {
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        #[command(subcommand)]
-        action: Option<RemoteAction>,
-    },
-    Blame {
-        #[arg(short = 'L', value_name = "START,END")]
-        line_range: Option<String>,
-        #[arg(required = true, num_args = 1..=2)]
-        args: Vec<String>,
-    },
-    Annotate {
-        #[arg(short = 'L', value_name = "START,END")]
-        line_range: Option<String>,
-        #[arg(required = true, num_args = 1..=2)]
-        args: Vec<String>,
-    },
-    Whatchanged {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    Archive {
-        #[arg(short = 'f', long = "format")]
-        format: Option<String>,
-        #[arg(short = 'l', long = "list")]
-        list: bool,
-        #[arg(long = "prefix")]
-        prefix: Option<String>,
-        #[arg(short = 'o', long = "output")]
-        output: Option<PathBuf>,
-        #[arg(value_name = "TREE-ISH")]
-        tree_ish: Option<String>,
-        #[arg(value_name = "PATH")]
-        paths: Vec<String>,
-    },
-    Reflog {
-        #[command(subcommand)]
-        action: Option<ReflogAction>,
-    },
-    Gc {
-        #[arg(long = "prune", default_value = "14")]
-        prune: String,
-        #[arg(long = "reflog-expire", default_value = "90")]
-        reflog_expire: String,
-        #[arg(short = 'n', long = "dry-run")]
-        dry_run: bool,
-    },
-    Prune {
-        #[arg(short = 'n', long = "dry-run")]
-        dry_run: bool,
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        /// Accepted for compatibility; prune shows no progress
-        #[arg(long = "progress")]
-        progress: bool,
-        #[arg(long = "expire", value_name = "TIME")]
-        expire: Option<String>,
-        #[arg(value_name = "HEAD")]
-        heads: Vec<String>,
-    },
+    Branch(crate::workspace::branch::cli::BranchArgs),
+    Switch(crate::workspace::branch::cli::SwitchArgs),
+    Checkout(crate::workspace::branch::cli::CheckoutArgs),
+    Restore(crate::workspace::restore::cli::RestoreArgs),
+    Diff(crate::diff::diff::cli::DiffArgs),
+    Merge(crate::merge::merge::cli::MergeArgs),
+    MergeBase(crate::merge::merge::cli::MergeBaseArgs),
+    Rm(crate::workspace::staging::cli::RmArgs),
+    Reset(crate::workspace::reset::cli::ResetArgs),
+    Clean(crate::workspace::clean::cli::CleanArgs),
+    CherryPick(crate::merge::cherry_pick::cli::CherryPickArgs),
+    BananaSplit(crate::merge::banana_split::cli::BananaSplitArgs),
+    Revert(crate::merge::revert::cli::RevertArgs),
+    Stash(crate::workspace::stash::cli::StashArgs),
+    Bisect(crate::history::bisect::cli::BisectArgs),
+    Show(crate::history::log::cli::ShowArgs),
+    Tag(crate::references::tag::cli::TagArgs),
+    Describe(crate::references::tag::cli::DescribeArgs),
+    Mv(crate::workspace::staging::cli::MvArgs),
+    Config(crate::plumbing::config::cli::ConfigArgs),
+    Rebase(crate::merge::rebase::cli::RebaseArgs),
+    Push(crate::remote::push::cli::PushArgs),
+    Fetch(crate::remote::fetch::cli::FetchArgs),
+    Clone(crate::remote::clone::cli::CloneArgs),
+    Pull(crate::remote::pull::cli::PullArgs),
+    Remote(crate::remote::remote::cli::RemoteArgs),
+    Blame(crate::history::blame::cli::BlameArgs),
+    Annotate(crate::history::blame::cli::AnnotateArgs),
+    Whatchanged(crate::history::log::cli::WhatchangedArgs),
+    Archive(crate::export::archive::cli::ArchiveArgs),
+    Reflog(crate::references::reflog::cli::ReflogArgs),
+    Gc(crate::storage::gc::cli::GcArgs),
+    Prune(crate::storage::prune::cli::PruneArgs),
     #[command(visible_alias = "fsck-objects")]
-    Fsck {
-        #[arg(long = "connectivity-only")]
-        connectivity_only: bool,
-        #[arg(long = "no-dangling")]
-        no_dangling: bool,
-        #[arg(long = "unreachable")]
-        unreachable: bool,
-        #[arg(long = "no-reflogs")]
-        no_reflogs: bool,
-    },
-    Grep {
-        #[arg(short = 'i', long = "ignore-case")]
-        ignore_case: bool,
-        #[arg(short = 'v', long = "invert-match")]
-        invert_match: bool,
-        #[arg(short = 'n', long = "line-number")]
-        line_number: bool,
-        #[arg(short = 'c', long = "count")]
-        count: bool,
-        #[arg(short = 'l', long = "files-with-matches")]
-        files_with_matches: bool,
-        #[arg(short = 'L', long = "files-without-match")]
-        files_without_match: bool,
-        #[arg(short = 'F', long = "fixed-strings")]
-        fixed_strings: bool,
-        #[arg(long = "cached")]
-        cached: bool,
-        #[arg(short = 'e')]
-        pattern_flag: Option<String>,
-        args: Vec<String>,
-        #[arg(last = true)]
-        path_specs: Vec<String>,
-    },
-    CountObjects {
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        #[arg(short = 'H', long = "human-readable")]
-        human_readable: bool,
-    },
-    RevParse {
-        #[arg(long = "git-dir")]
-        git_dir: bool,
-        #[arg(long = "show-toplevel")]
-        show_toplevel: bool,
-        #[arg(long = "is-inside-work-tree")]
-        is_inside_work_tree: bool,
-        #[arg(long = "is-bare-repository")]
-        is_bare_repository: bool,
-        #[arg(long = "abbrev-ref")]
-        abbrev_ref: bool,
-        #[arg(long = "symbolic-full-name")]
-        symbolic_full_name: bool,
-        #[arg(long = "verify")]
-        verify: bool,
-        #[arg(short = 'q', long = "quiet")]
-        quiet: bool,
-        #[arg(long = "short", num_args = 0..=1, default_missing_value = "7", require_equals = true, value_name = "N")]
-        short: Option<usize>,
-        #[arg(long = "sq")]
-        sq: bool,
-        revs: Vec<String>,
-    },
-    Shortlog {
-        #[arg(short = 's', long = "summary")]
-        summary: bool,
-        #[arg(short = 'n', long = "numbered")]
-        numbered: bool,
-        #[arg(short = 'e', long = "email")]
-        email: bool,
-        #[arg(long = "all")]
-        all: bool,
-        rev: Option<String>,
-    },
-    LsFiles {
-        #[arg(short = 'c', long = "cached")]
-        cached: bool,
-        #[arg(short = 'd', long = "deleted")]
-        deleted: bool,
-        #[arg(short = 'm', long = "modified")]
-        modified: bool,
-        #[arg(short = 'o', long = "others")]
-        others: bool,
-        #[arg(short = 'i', long = "ignored")]
-        ignored: bool,
-        #[arg(long = "exclude-standard")]
-        exclude_standard: bool,
-        #[arg(short = 's', long = "stage")]
-        stage: bool,
-        #[arg(short = 'u', long = "unmerged")]
-        unmerged: bool,
-        #[arg(short = 't')]
-        show_tags: bool,
-        #[arg(short = 'z')]
-        null_terminated: bool,
-        #[arg(value_name = "PATHSPEC")]
-        pathspecs: Vec<String>,
-    },
-    CheckIgnore {
-        #[arg(short = 'q', long = "quiet")]
-        quiet: bool,
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        #[arg(short = 'n', long = "non-matching")]
-        non_matching: bool,
-        #[arg(long = "no-index")]
-        no_index: bool,
-        #[arg(long = "stdin")]
-        stdin: bool,
-        #[arg(short = 'z')]
-        null_terminated: bool,
-        #[arg(value_name = "PATHNAME")]
-        paths: Vec<String>,
-    },
-    CheckRefFormat {
-        #[arg(long = "normalize", visible_alias = "print")]
-        normalize: bool,
-        #[arg(long = "allow-onelevel", overrides_with = "no_allow_onelevel")]
-        allow_onelevel: bool,
-        #[arg(long = "no-allow-onelevel", overrides_with = "allow_onelevel")]
-        no_allow_onelevel: bool,
-        #[arg(long = "refspec-pattern")]
-        refspec_pattern: bool,
-        #[arg(
-            long = "branch",
-            value_name = "BRANCHNAME",
-            allow_hyphen_values = true,
-            conflicts_with_all = ["normalize", "allow_onelevel", "no_allow_onelevel", "refspec_pattern", "refname"]
-        )]
-        branch: Option<String>,
-        #[arg(value_name = "REFNAME", required_unless_present = "branch")]
-        refname: Option<String>,
-    },
-    Apply {
-        #[arg(long = "check")]
-        check: bool,
-        #[arg(long = "stat")]
-        stat: bool,
-        #[arg(long = "numstat")]
-        numstat: bool,
-        #[arg(long = "summary")]
-        summary: bool,
-        #[arg(long = "apply")]
-        apply: bool,
-        #[arg(long = "cached")]
-        cached: bool,
-        #[arg(long = "index")]
-        index: bool,
-        #[arg(short = 'R', long = "reverse")]
-        reverse: bool,
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        #[arg(short = 'p', value_name = "N", default_value = "1")]
-        strip: usize,
-        #[arg(value_name = "PATCH")]
-        patches: Vec<String>,
-    },
+    Fsck(crate::storage::fsck::cli::FsckArgs),
+    Grep(crate::history::grep::cli::GrepArgs),
+    CountObjects(crate::storage::count_objects::cli::CountObjectsArgs),
+    RevParse(crate::plumbing::rev_parse::cli::RevParseArgs),
+    Shortlog(crate::history::shortlog::cli::ShortlogArgs),
+    LsFiles(crate::workspace::ls_files::cli::LsFilesArgs),
+    CheckIgnore(crate::workspace::check_ignore::cli::CheckIgnoreArgs),
+    CheckRefFormat(crate::references::check_ref_format::cli::CheckRefFormatArgs),
+    Apply(crate::mail::apply::cli::ApplyArgs),
     #[command(allow_negative_numbers = true)]
-    FormatPatch {
-        #[arg(long = "max-count")]
-        max_count: Option<usize>,
-        #[arg(long = "root")]
-        root: bool,
-        #[arg(long = "stdout")]
-        stdout: bool,
-        #[arg(short = 'o', long = "output-directory")]
-        output_directory: Option<String>,
-        #[arg(short = 'n', long = "numbered", conflicts_with = "no_numbered")]
-        numbered: bool,
-        #[arg(short = 'N', long = "no-numbered")]
-        no_numbered: bool,
-        #[arg(long = "start-number", default_value = "1")]
-        start_number: usize,
-        #[arg(long = "subject-prefix", default_value = "PATCH")]
-        subject_prefix: String,
-        #[arg(short = 'k', long = "keep-subject", conflicts_with = "numbered")]
-        keep_subject: bool,
-        #[arg(long = "signature")]
-        signature: Option<String>,
-        #[arg(long = "no-signature")]
-        no_signature: bool,
-        #[arg(value_name = "REVISION")]
-        revs: Vec<String>,
-    },
-    Am {
-        #[arg(long = "continue", short = 'r', alias = "resolved", conflicts_with_all = ["skip", "abort", "quit", "show_current_patch"])]
-        cont: bool,
-        #[arg(long = "skip", conflicts_with_all = ["abort", "quit", "show_current_patch"])]
-        skip: bool,
-        #[arg(long = "abort", conflicts_with_all = ["quit", "show_current_patch"])]
-        abort: bool,
-        #[arg(long = "quit", conflicts_with = "show_current_patch")]
-        quit: bool,
-        #[arg(long = "show-current-patch", num_args = 0..=1, default_missing_value = "raw", require_equals = true, value_name = "raw|diff")]
-        show_current_patch: Option<String>,
-        #[arg(short = 'k', long = "keep-subject")]
-        keep_subject: bool,
-        #[arg(value_name = "MBOX")]
-        mboxes: Vec<String>,
-    },
+    FormatPatch(crate::mail::format_patch::cli::FormatPatchArgs),
+    Am(crate::mail::am::cli::AmArgs),
     #[command(disable_help_flag = true)]
-    RevList {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    RevList(crate::history::rev_list::cli::RevListArgs),
     #[command(disable_help_flag = true)]
-    ShowRef {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    ShowRef(crate::references::show_ref::cli::ShowRefArgs),
     #[command(disable_help_flag = true)]
-    SymbolicRef {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    SymbolicRef(crate::references::symbolic_ref::cli::SymbolicRefArgs),
     #[command(disable_help_flag = true)]
-    UpdateRef {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    UpdateRef(crate::references::update_ref::cli::UpdateRefArgs),
     #[command(disable_help_flag = true)]
-    PackRefs {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    PackRefs(crate::references::pack_refs::cli::PackRefsArgs),
     #[command(disable_help_flag = true)]
-    ForEachRef {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    MergeTree {
-        #[arg(long = "write-tree")]
-        write_tree: bool,
-        #[arg(long = "name-only")]
-        name_only: bool,
-        #[arg(long = "messages", overrides_with = "no_messages")]
-        messages: bool,
-        #[arg(long = "no-messages", overrides_with = "messages")]
-        no_messages: bool,
-        #[arg(short = 'z')]
-        nul: bool,
-        #[arg(long = "merge-base", value_name = "TREE-ISH")]
-        merge_base: Option<String>,
-        #[arg(long = "allow-unrelated-histories")]
-        allow_unrelated_histories: bool,
-        #[arg(long = "explain")]
-        explain: bool,
-        branch1: String,
-        branch2: String,
-    },
-    Cherry {
-        #[arg(short = 'v', long = "verbose")]
-        verbose: bool,
-        #[arg(long = "abbrev", value_name = "N", num_args = 0..=1, require_equals = true, default_missing_value = "7")]
-        abbrev: Option<usize>,
-        upstream: Option<String>,
-        head: Option<String>,
-        limit: Option<String>,
-    },
-    Worktree {
-        #[command(subcommand)]
-        action: WorktreeAction,
-    },
-    Bundle {
-        #[command(subcommand)]
-        action: crate::remote::bundle::types::BundleAction,
-    },
+    ForEachRef(crate::references::for_each_ref::cli::ForEachRefArgs),
+    MergeTree(crate::merge::merge_tree::cli::MergeTreeArgs),
+    Cherry(crate::history::cherry::cli::CherryArgs),
+    Worktree(crate::workspace::worktree::cli::WorktreeArgs),
+    Bundle(crate::remote::bundle::cli::BundleArgs),
     #[command(disable_help_flag = true)]
-    PatchId {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    PatchId(crate::diff::patch_id::cli::PatchIdArgs),
     #[command(disable_help_flag = true)]
-    Mailsplit {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Mailsplit(crate::mail::mailsplit::cli::MailsplitArgs),
     #[command(disable_help_flag = true)]
-    Mailinfo {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Mailinfo(crate::mail::mailinfo::cli::MailinfoArgs),
     #[command(disable_help_flag = true)]
-    InterpretTrailers {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    InterpretTrailers(crate::mail::interpret_trailers::cli::InterpretTrailersArgs),
     #[command(disable_help_flag = true)]
-    CheckMailmap {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    CheckMailmap(crate::mail::check_mailmap::cli::CheckMailmapArgs),
     #[command(disable_help_flag = true)]
-    FmtMergeMsg {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    FmtMergeMsg(crate::merge::fmt_merge_msg::cli::FmtMergeMsgArgs),
     #[command(disable_help_flag = true)]
-    RequestPull {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    RequestPull(crate::mail::request_pull::cli::RequestPullArgs),
     #[command(disable_help_flag = true)]
-    Replace {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Replace(crate::references::replace::cli::ReplaceArgs),
     #[command(disable_help_flag = true)]
-    Notes {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Notes(crate::references::notes::cli::NotesArgs),
     #[command(disable_help_flag = true)]
     /// List unresolved conflicts with who changed what; `--explain <file>` shows each one side by side.
     #[command(disable_help_flag = true)]
-    Conflicts {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
-    ShowBranch {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Conflicts(crate::merge::conflicts::cli::ConflictsArgs),
+    ShowBranch(crate::history::show_branch::cli::ShowBranchArgs),
     #[command(disable_help_flag = true)]
-    LastModified {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    LastModified(crate::history::last_modified::cli::LastModifiedArgs),
     #[command(disable_help_flag = true)]
-    Repo {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Repo(crate::plumbing::repo_info::cli::RepoArgs),
     #[command(disable_help_flag = true)]
-    RangeDiff {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    RangeDiff(crate::history::range_diff::cli::RangeDiffArgs),
     #[command(disable_help_flag = true)]
-    Hook {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Hook(crate::plumbing::hook::cli::HookArgs),
     #[command(disable_help_flag = true)]
-    Maintenance {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Maintenance(crate::storage::maintenance::cli::MaintenanceArgs),
     #[command(disable_help_flag = true)]
-    ForEachRepo {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    ForEachRepo(crate::storage::maintenance::cli::ForEachRepoArgs),
     #[command(disable_help_flag = true)]
-    Replay {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Replay(crate::merge::replay::cli::ReplayArgs),
     #[command(disable_help_flag = true)]
-    Rerere {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Rerere(crate::merge::rerere::cli::RerereArgs),
     #[command(disable_help_flag = true)]
-    Stripspace {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Stripspace(crate::plumbing::stripspace::cli::StripspaceArgs),
     #[command(disable_help_flag = true)]
-    Column {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Column(crate::plumbing::column::cli::ColumnArgs),
     #[command(disable_help_flag = true)]
-    Var {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Var(crate::plumbing::var::cli::VarArgs),
     #[command(disable_help_flag = true)]
-    Version {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Version(crate::plumbing::version::cli::VersionArgs),
     #[command(disable_help_flag = true)]
-    Help {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Help(crate::plumbing::help::cli::HelpArgs),
     #[command(disable_help_flag = true)]
-    NameRev {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    NameRev(crate::history::name_rev::cli::NameRevArgs),
     #[command(disable_help_flag = true)]
-    Refs {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Refs(crate::references::refs_cmd::cli::RefsArgs),
     #[command(disable_help_flag = true)]
-    MergeFile {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    MergeFile(crate::merge::merge_file::cli::MergeFileCliArgs),
     #[command(disable_help_flag = true)]
-    Mktree {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Mktree(crate::plumbing::mktree::cli::MktreeArgs),
     #[command(disable_help_flag = true)]
-    Mktag {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Mktag(crate::plumbing::mktag::cli::MktagArgs),
     #[command(disable_help_flag = true)]
-    UnpackFile {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    UnpackFile(crate::plumbing::unpack_file::cli::UnpackFileArgs),
     #[command(disable_help_flag = true)]
-    GetTarCommitId {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    GetTarCommitId(crate::export::get_tar_commit_id::cli::GetTarCommitIdArgs),
     #[command(disable_help_flag = true)]
-    UpdateIndex {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    UpdateIndex(crate::workspace::update_index::cli::UpdateIndexArgs),
     #[command(disable_help_flag = true)]
-    CheckoutIndex {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    CheckoutIndex(crate::workspace::checkout_index::cli::CheckoutIndexArgs),
     #[command(disable_help_flag = true)]
-    ReadTree {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    ReadTree(crate::workspace::read_tree::cli::ReadTreeArgs),
     #[command(disable_help_flag = true)]
-    DiffTree {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    DiffTree(crate::diff::diff_tree::cli::DiffTreeArgs),
     #[command(disable_help_flag = true)]
-    DiffIndex {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    DiffIndex(crate::diff::diff_index::cli::DiffIndexArgs),
     #[command(disable_help_flag = true)]
-    DiffFiles {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    DiffFiles(crate::diff::diff_files::cli::DiffFilesArgs),
     #[command(disable_help_flag = true)]
-    ShowIndex {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    ShowIndex(crate::storage::show_index::cli::ShowIndexArgs),
     #[command(disable_help_flag = true)]
-    VerifyPack {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    VerifyPack(crate::storage::verify_pack::cli::VerifyPackArgs),
     #[command(disable_help_flag = true)]
-    IndexPack {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    IndexPack(crate::storage::index_pack::cli::IndexPackArgs),
     #[command(disable_help_flag = true)]
-    UnpackObjects {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    UnpackObjects(crate::storage::unpack_objects::cli::UnpackObjectsArgs),
     #[command(disable_help_flag = true)]
-    PrunePacked {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    PrunePacked(crate::storage::prune_packed::cli::PrunePackedArgs),
     #[command(disable_help_flag = true)]
-    PackObjects {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    PackObjects(crate::storage::pack_objects::cli::PackObjectsArgs),
     #[command(disable_help_flag = true)]
-    Repack {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Repack(crate::storage::repack::cli::RepackArgs),
     #[command(disable_help_flag = true)]
-    CommitGraph {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    CommitGraph(crate::storage::commit_graph::cli::CommitGraphArgs),
     #[command(disable_help_flag = true)]
-    MultiPackIndex {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    MultiPackIndex(crate::storage::multi_pack_index::cli::MultiPackIndexArgs),
     #[command(disable_help_flag = true)]
-    FastExport {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    FastExport(crate::export::fast_export::cli::FastExportArgs),
     #[command(disable_help_flag = true)]
-    FastImport {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    FastImport(crate::export::fast_import::cli::FastImportArgs),
     #[command(disable_help_flag = true)]
-    SparseCheckout {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    SparseCheckout(crate::workspace::sparse_checkout::cli::SparseCheckoutArgs),
     #[command(disable_help_flag = true)]
-    Submodule {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 0.., value_name = "ARGS")]
-        args: Vec<String>,
-    },
+    Submodule(crate::workspace::submodule::cli::SubmoduleArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
 /// `show` and `rev-list` need it to tell paths from revisions, and `show-ref` and
 /// `for-each-ref` to tell patterns from options.
-fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
+pub(crate) fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().position(|a| a == subcommand) {
         Some(pos) => args[pos + 1..].to_vec(),
@@ -1021,7 +217,7 @@ pub fn handle_commands() -> Result<()> {
     // These commands copy, verify or delete objects by hash, so they must not see replacements.
     if matches!(
         *cli.command,
-        Commands::Fsck { .. } | Commands::Gc { .. } | Commands::Prune { .. } | Commands::CountObjects { .. } | Commands::Bundle { .. } | Commands::Push { .. } | Commands::Fetch { .. } | Commands::Clone { .. } | Commands::Pull { .. } | Commands::Replace { .. }
+        Commands::Fsck(..) | Commands::Gc(..) | Commands::Prune(..) | Commands::CountObjects(..) | Commands::Bundle(..) | Commands::Push(..) | Commands::Fetch(..) | Commands::Clone(..) | Commands::Pull(..) | Commands::Replace(..)
     ) {
         crate::core::object_store::disable_replace_objects();
     }
@@ -1030,677 +226,121 @@ pub fn handle_commands() -> Result<()> {
         Commands::Init => {
             crate::plumbing::basic::init()?;
         }
-        Commands::HashObject { write, file} => {
-            crate::plumbing::basic::hash_object(write, file)?;
-        }
-        Commands::CatFile { pretty_print, object_hash } => {
-            crate::plumbing::basic::cat_file(pretty_print, object_hash)?;
-        }
+        Commands::HashObject(args) => crate::plumbing::basic::cli::dispatch_hash_object(args)?,
+        Commands::CatFile(args) => crate::plumbing::basic::cli::dispatch_cat_file(args)?,
         Commands::WriteTree => {
             crate::plumbing::basic::write_tree()?;
         }
-        Commands::Add { patch: true, paths } => {
-            crate::workspace::patch::add_patch(paths.iter().map(|p| p.to_string_lossy().to_string()).collect())?;
-        }
-        Commands::Add { patch: false, paths } => {
-            crate::workspace::staging::add(paths)?;
-        }
-        Commands::LsTree { name_only, tree_hash } => {
-            crate::plumbing::basic::ls_tree(name_only, tree_hash)?;
-        }
-        Commands::CommitTree { tree_hash, parent_hash, message } => {
-            crate::workspace::commit::commit_tree(tree_hash, parent_hash, message)?;
-        }
-        Commands::Commit {
-            messages,
-            file,
-            reuse_message,
-            reedit_message,
-            all,
-            amend,
-            edit,
-            no_edit,
-            author,
-            date,
-            reset_author,
-            allow_empty,
-            allow_empty_message,
-            signoff,
-            cleanup,
-            quiet,
-        } => {
-            let opts = crate::workspace::commit::types::CommitOptions {
-                messages,
-                file,
-                reedit: reedit_message.is_some(),
-                reuse_message: reuse_message.or(reedit_message),
-                all,
-                amend,
-                edit,
-                no_edit,
-                author,
-                date,
-                reset_author,
-                allow_empty,
-                allow_empty_message,
-                signoff,
-                cleanup_strip: cleanup.as_deref() == Some("strip"),
-                quiet,
-            };
-            crate::workspace::commit::commit(opts)?;
-        }
-        Commands::Log { args } => {
-            crate::history::log::log(raw_args_after("log", args))?;
-        }
-        Commands::Status { short, branch, porcelain, nul, untracked } => {
-            if let Some(v) = porcelain.as_deref().filter(|v| *v != "v1") {
-                anyhow::bail!("fatal: unsupported porcelain version '{}'", v);
-            }
-            let untracked = untracked.unwrap_or_else(|| "normal".to_string());
-            if !["no", "normal", "all"].contains(&untracked.as_str()) {
-                anyhow::bail!("fatal: Invalid untracked files mode '{}'", untracked);
-            }
-            // `-z` implies the porcelain format, like git.
-            crate::workspace::staging::status(crate::workspace::status::types::StatusOptions { short: short || porcelain.is_some() || nul, branch, nul, untracked })?;
-        }
-        Commands::Branch { args } => {
-            crate::workspace::branch::branch(raw_args_after("branch", args))?;
-        }
-        Commands::Switch { branch, create, detach, force } => {
-            crate::workspace::branch::die_if_operation_in_progress()?;
-            crate::workspace::branch::switch(branch, create, detach, force)?;
-        }
-        Commands::Checkout { patch: true, .. } => {
-            crate::workspace::patch::checkout_patch(raw_args_after("checkout", Vec::new()))?;
-        }
-        Commands::Checkout { target, create_branch: None, ours, theirs, merge, conflict, paths, .. } if !paths.is_empty() => {
-            let stage = crate::workspace::restore::writeout_stage(ours, theirs, merge, conflict)?;
-            crate::workspace::restore::checkout_paths(target, stage, paths.iter().map(PathBuf::from).collect())?;
-        }
-        Commands::Checkout { target, create_branch, detach, force, ours, theirs, merge, conflict, .. } => {
-            if ours || theirs || merge || conflict.is_some() {
-                anyhow::bail!("fatal: --ours, --theirs, --merge and --conflict need paths after '--' (e.g. 'rgit checkout --theirs -- <file>')");
-            }
-            crate::workspace::branch::checkout(target, create_branch, detach, force)?;
-        }
-        Commands::Restore { patch: true, files, staged, worktree, source, .. } => {
-            crate::workspace::patch::restore_patch(files.iter().map(|p| p.to_string_lossy().to_string()).collect(), staged, worktree, source)?;
-        }
-        Commands::Restore { patch: false, files, staged, worktree, source, ours, theirs, merge, conflict } => {
-            let stage = crate::workspace::restore::writeout_stage(ours, theirs, merge, conflict)?;
-            crate::workspace::restore::restore(files, staged, worktree, source, stage)?;
-        }
-        Commands::Diff { args } => {
-            crate::diff::diff::diff(raw_args_after("diff", args))?;
-        }
-        Commands::Merge { ff: _, no_ff, ff_only, squash, no_squash: _, commit, no_commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, stat: _, quiet, no_edit: _, allow_unrelated, commits } => {
-            use crate::merge::merge::types::{FastForwardMode, MergeOptions};
-            let ff = if no_ff { FastForwardMode::Never } else if ff_only { FastForwardMode::Only } else { FastForwardMode::Allow };
-            let commit = if commit { Some(true) } else if no_commit { Some(false) } else { None };
-            crate::merge::merge::merge(MergeOptions { commits, ff, squash, commit, messages, file, strategy, strategy_options, abort, cont, quit, no_stat, quiet, allow_unrelated })?;
-        }
-        Commands::MergeBase { all, is_ancestor, octopus, commits } => {
-            crate::merge::merge::merge_base(all, is_ancestor, octopus, commits)?;
-        }
-        Commands::Rm { files, force, cached, recursive } => {
-            crate::workspace::staging::rm(files, force, cached, recursive)?;
-        }
-        Commands::Reset { patch: true, soft, hard, .. } => {
-            if soft || hard {
-                anyhow::bail!("fatal: options '--patch' and '--{}' cannot be used together", if soft { "soft" } else { "hard" });
-            }
-            crate::workspace::patch::reset_patch(raw_args_after("reset", Vec::new()))?;
-        }
-        Commands::Reset { commit, soft, mixed, hard, paths, .. } => {
-            crate::workspace::reset::reset(commit, soft, mixed, hard, paths)?;
-        }
-        Commands::Clean { dry_run, force, dirs, ignored, only_ignored } => {
-            crate::workspace::clean::clean(dry_run, force, dirs, ignored, only_ignored)?;
-        }
-        Commands::CherryPick { commits, no_commit, commit: _, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit } => {
-            crate::merge::cherry_pick::cherry_pick(crate::merge::cherry_pick::types::CherryPickOptions { commits, no_commit, record_origin, signoff, mainline, ff, allow_empty, allow_empty_message, keep_redundant, cont, skip, abort, quit })?;
-        }
-        Commands::BananaSplit { commit, by_dir, dry_run } => {
-            crate::merge::banana_split::banana_split(commit, by_dir, dry_run)?;
-        }
-        Commands::Revert { commit, no_commit, cont, abort } => {
-            crate::merge::revert::revert(commit, no_commit, cont, abort)?;
-        }
-        Commands::Stash { patch: true, action: None, .. } => {
-            crate::workspace::patch::stash_patch(None, Vec::new())?;
-        }
-        Commands::Stash { action: None, include_untracked, all, .. } if include_untracked || all => {
-            crate::workspace::stash::stash(Some(crate::workspace::stash::types::StashAction::Push { message: None, patch: false, include_untracked, all, paths: Vec::new() }))?;
-        }
-        Commands::Stash { action, .. } => {
-            crate::workspace::stash::stash(action)?;
-        }
-        Commands::Bisect { action } => {
-            crate::history::bisect::bisect(action)?;
-        }
-        Commands::Show { args } => {
-            crate::history::log::show(raw_args_after("show", args))?;
-        }
-        Commands::Tag { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, mut args } => {
-            // git's `-n` only takes an attached number (`-n2`); a separate word after it is a pattern.
-            let lines = lines.map(|value| match value.parse::<usize>() {
-                Ok(n) => n,
-                Err(_) => {
-                    args.insert(0, value);
-                    1
-                }
-            });
-            let opts = crate::references::tag::types::TagOptions { list, delete, annotate, force, messages, file, edit, lines, contains, points_at, args };
-            crate::references::tag::tag(opts)?;
-        }
-        Commands::Describe { tags, always, long, abbrev, exact_match, commits } => {
-            let opts = crate::references::tag::types::DescribeOptions { tags, always, long, abbrev, exact_match, commits };
-            crate::references::tag::describe(opts)?;
-        }
-        Commands::Mv { source, destination, force} => {
-            crate::workspace::staging::mv(source, destination, force)?;
-        }
-        Commands::Config { key, value, global, list, unset } => {
-            crate::plumbing::config::config(key, value, global, list, unset)?;
-        }
-        Commands::Rebase { upstream, branch, onto, keep_base, reapply_cherry_picks, no_reapply_cherry_picks, interactive, cont, abort, skip, edit_todo } => {
-            let reapply_cherry_picks = if reapply_cherry_picks { Some(true) } else if no_reapply_cherry_picks { Some(false) } else { None };
-            crate::merge::rebase::rebase(crate::merge::rebase::types::RebaseOptions { upstream, branch, onto, keep_base, reapply_cherry_picks, interactive, cont, abort, skip, edit_todo })?;
-        }
-        Commands::Push { remote, refspec, force, set_upstream } => {
-            crate::remote::push::push(remote, refspec, force, set_upstream)?;
-        }
-        Commands::Fetch { remote, branch } => {
-            crate::remote::fetch::fetch(remote, branch)?;
-        }
-        Commands::Clone { repository, directory, branch, origin } => {
-            crate::remote::clone::clone(repository, directory, branch, origin)?;
-        }
-        Commands::Pull { remote, branch } => {
-            crate::remote::pull::pull(remote, branch)?;
-        }
-        Commands::Remote { verbose, action } => {
-            crate::remote::remote::remote(verbose, action)?;
-        }
-        Commands::Blame { line_range, args } => {
-            crate::history::blame::blame(args, line_range)?;
-        }
-        Commands::Annotate { line_range, args } => {
-            crate::history::blame::annotate(args, line_range)?;
-        }
-        Commands::Whatchanged { args } => {
-            crate::history::log::whatchanged(raw_args_after("whatchanged", args))?;
-        }
-        Commands::Archive { format, list, prefix, output, tree_ish, paths } => {
-            crate::export::archive::archive(format, list, prefix, output, tree_ish, paths)?;
-        }
-        Commands::Reflog { action } => {
-            crate::references::reflog::reflog(action)?;
-        }
-        Commands::Gc { prune, reflog_expire, dry_run } => {
-            crate::storage::gc::gc(prune, reflog_expire, dry_run)?;
-        }
-        Commands::Prune { dry_run, verbose, progress: _, expire, heads } => {
-            crate::storage::prune::prune(dry_run, verbose, expire, heads)?;
-        }
-        Commands::Fsck { connectivity_only, no_dangling, unreachable, no_reflogs } => {
-            crate::storage::fsck::fsck(connectivity_only, no_dangling, unreachable, no_reflogs)?;
-        }
-        Commands::Grep {
-            ignore_case,
-            invert_match,
-            line_number,
-            count,
-            files_with_matches,
-            files_without_match,
-            fixed_strings,
-            cached,
-            pattern_flag,
-            args,
-            path_specs,
-        } => {
-            let (pattern, remaining_args) = if let Some(p) = pattern_flag {
-                (p, args)
-            } else {
-                if args.is_empty() {
-                    anyhow::bail!("fatal: no pattern given");
-                }
-                (args[0].clone(), args[1..].to_vec())
-            };
-
-            let mut revisions = Vec::new();
-            let mut final_path_specs = path_specs;
-
-            if final_path_specs.is_empty() {
-                for arg in remaining_args {
-                    if crate::core::commit::resolve_commit_from_source(&arg).is_ok() {
-                        revisions.push(arg);
-                    } else {
-                        final_path_specs.push(arg);
-                    }
-                }
-            } else {
-                revisions.extend(remaining_args);
-            }
-
-            let options = crate::history::grep::types::GrepOptions {
-                ignore_case,
-                invert_match,
-                line_number,
-                count,
-                files_with_matches,
-                files_without_match,
-                fixed_strings,
-                cached,
-            };
-
-            crate::history::grep::grep(pattern, revisions, final_path_specs, options)?;
-        }
-        Commands::CountObjects { verbose, human_readable } => {
-            crate::storage::count_objects::count_objects(verbose, human_readable)?;
-        }
-        Commands::RevParse {
-            git_dir,
-            show_toplevel,
-            is_inside_work_tree,
-            is_bare_repository,
-            abbrev_ref,
-            symbolic_full_name,
-            verify,
-            quiet,
-            short,
-            sq,
-            revs,
-        } => {
-            let opts = crate::plumbing::rev_parse::types::RevParseOptions {
-                git_dir,
-                show_toplevel,
-                is_inside_work_tree,
-                is_bare_repository,
-                abbrev_ref,
-                symbolic_full_name,
-                verify,
-                quiet,
-                short,
-                sq,
-                revs,
-            };
-            crate::plumbing::rev_parse::rev_parse(opts)?;
-        }
-        Commands::Shortlog {
-            summary,
-            numbered,
-            email,
-            all,
-            rev,
-        } => {
-            let opts = crate::history::shortlog::types::ShortlogOptions {
-                summary,
-                numbered,
-                email,
-                all,
-                rev,
-            };
-            crate::history::shortlog::shortlog(opts)?;
-        }
-        Commands::LsFiles {
-            cached,
-            deleted,
-            modified,
-            others,
-            ignored,
-            exclude_standard,
-            stage,
-            unmerged,
-            show_tags,
-            null_terminated,
-            pathspecs,
-        } => {
-            let opts = crate::workspace::ls_files::types::LsFilesOptions {
-                cached,
-                deleted,
-                modified,
-                others,
-                ignored,
-                exclude_standard,
-                // Unmerged entries only make sense with their stage numbers.
-                stage: stage || unmerged,
-                unmerged,
-                show_tags,
-                null_terminated,
-                pathspecs,
-            };
-            crate::workspace::ls_files::ls_files(opts)?;
-        }
-        Commands::CheckIgnore {
-            quiet,
-            verbose,
-            non_matching,
-            no_index,
-            stdin,
-            null_terminated,
-            paths,
-        } => {
-            let opts = crate::workspace::check_ignore::types::CheckIgnoreOptions {
-                quiet,
-                verbose,
-                non_matching,
-                no_index,
-                stdin,
-                null_terminated,
-                paths,
-            };
-            crate::workspace::check_ignore::check_ignore(opts)?;
-        }
-        Commands::CheckRefFormat {
-            normalize,
-            allow_onelevel,
-            no_allow_onelevel: _,
-            refspec_pattern,
-            branch,
-            refname,
-        } => {
-            let opts = crate::references::check_ref_format::types::CheckRefFormatOptions {
-                normalize,
-                allow_onelevel,
-                refspec_pattern,
-                branch,
-                refname,
-            };
-            crate::references::check_ref_format::check_ref_format(opts)?;
-        }
-        Commands::Apply {
-            check,
-            stat,
-            numstat,
-            summary,
-            apply,
-            cached,
-            index,
-            reverse,
-            verbose,
-            strip,
-            patches,
-        } => {
-            let opts = crate::mail::apply::types::ApplyOptions {
-                check,
-                stat,
-                numstat,
-                summary,
-                apply,
-                cached,
-                index,
-                reverse,
-                verbose,
-                strip,
-                patches,
-            };
-            crate::mail::apply::apply(opts)?;
-        }
-        Commands::FormatPatch {
-            max_count,
-            root,
-            stdout,
-            output_directory,
-            numbered,
-            no_numbered,
-            start_number,
-            subject_prefix,
-            keep_subject,
-            signature,
-            no_signature,
-            revs,
-        } => {
-            let opts = crate::mail::format_patch::types::FormatPatchOptions {
-                revs,
-                max_count,
-                root,
-                stdout,
-                output_directory,
-                numbered,
-                no_numbered,
-                start_number,
-                subject_prefix,
-                keep_subject,
-                signature,
-                no_signature,
-            };
-            crate::mail::format_patch::format_patch(opts)?;
-        }
-        Commands::Am {
-            cont,
-            skip,
-            abort,
-            quit,
-            show_current_patch,
-            keep_subject,
-            mboxes,
-        } => {
-            let opts = crate::mail::am::types::AmOptions {
-                mboxes,
-                cont,
-                skip,
-                abort,
-                quit,
-                show_current_patch,
-                keep_subject,
-            };
-            crate::mail::am::am(opts)?;
-        }
-        Commands::RevList { args } => {
-            crate::history::rev_list::rev_list(raw_args_after("rev-list", args))?;
-        }
-        Commands::ShowRef { args } => {
-            crate::references::show_ref::show_ref(raw_args_after("show-ref", args))?;
-        }
-        Commands::SymbolicRef { args } => {
-            crate::references::symbolic_ref::symbolic_ref(raw_args_after("symbolic-ref", args))?;
-        }
-        Commands::UpdateRef { args } => {
-            crate::references::update_ref::update_ref(raw_args_after("update-ref", args))?;
-        }
-        Commands::PackRefs { args } => {
-            crate::references::pack_refs::pack_refs(raw_args_after("pack-refs", args))?;
-        }
-        Commands::ForEachRef { args } => {
-            crate::references::for_each_ref::for_each_ref(raw_args_after("for-each-ref", args))?;
-        }
-        Commands::MergeTree {
-            write_tree: _,
-            name_only,
-            messages,
-            no_messages,
-            nul,
-            merge_base,
-            allow_unrelated_histories,
-            explain,
-            branch1,
-            branch2,
-        } => {
-            let opts = crate::merge::merge_tree::types::MergeTreeOptions {
-                name_only,
-                messages: if messages { Some(true) } else if no_messages { Some(false) } else { None },
-                nul,
-                merge_base,
-                allow_unrelated_histories,
-                explain,
-                branch1,
-                branch2,
-            };
-            crate::merge::merge_tree::merge_tree(opts)?;
-        }
-        Commands::Cherry {
-            verbose,
-            abbrev,
-            upstream,
-            head,
-            limit,
-        } => {
-            let opts = crate::history::cherry::types::CherryOptions {
-                verbose,
-                abbrev,
-                upstream,
-                head,
-                limit,
-            };
-            crate::history::cherry::cherry(opts)?;
-        }
-        Commands::Worktree { action } => {
-            crate::workspace::worktree::worktree(action)?;
-        }
-        Commands::Bundle { action } => {
-            crate::remote::bundle::bundle(action)?;
-        }
-        Commands::PatchId { args } => {
-            crate::diff::patch_id::patch_id(raw_args_after("patch-id", args))?;
-        }
-        Commands::Mailsplit { args } => {
-            crate::mail::mailsplit::mailsplit(raw_args_after("mailsplit", args))?;
-        }
-        Commands::Mailinfo { args } => {
-            crate::mail::mailinfo::mailinfo(raw_args_after("mailinfo", args))?;
-        }
-        Commands::InterpretTrailers { args } => {
-            crate::mail::interpret_trailers::interpret_trailers(raw_args_after("interpret-trailers", args))?;
-        }
-        Commands::CheckMailmap { args } => {
-            crate::mail::check_mailmap::check_mailmap(raw_args_after("check-mailmap", args))?;
-        }
-        Commands::FmtMergeMsg { args } => {
-            crate::merge::fmt_merge_msg::fmt_merge_msg(raw_args_after("fmt-merge-msg", args))?;
-        }
-        Commands::RequestPull { args } => {
-            crate::mail::request_pull::request_pull(raw_args_after("request-pull", args))?;
-        }
-        Commands::Replace { args } => {
-            crate::references::replace::replace(raw_args_after("replace", args))?;
-        }
-        Commands::Notes { args } => {
-            crate::references::notes::notes(raw_args_after("notes", args))?;
-        }
-        Commands::Conflicts { args } => {
-            crate::merge::conflicts::conflicts(raw_args_after("conflicts", args))?;
-        }
-        Commands::ShowBranch { args } => {
-            crate::history::show_branch::show_branch(raw_args_after("show-branch", args))?;
-        }
-        Commands::LastModified { args } => {
-            crate::history::last_modified::last_modified(raw_args_after("last-modified", args))?;
-        }
-        Commands::Repo { args } => {
-            crate::plumbing::repo_info::repo(raw_args_after("repo", args))?;
-        }
-        Commands::RangeDiff { args } => {
-            crate::history::range_diff::range_diff(raw_args_after("range-diff", args))?;
-        }
-        Commands::Hook { args } => {
-            crate::plumbing::hook::hook(raw_args_after("hook", args))?;
-        }
-        Commands::Maintenance { args } => {
-            crate::storage::maintenance::maintenance(raw_args_after("maintenance", args))?;
-        }
-        Commands::ForEachRepo { args } => {
-            crate::storage::maintenance::for_each_repo(raw_args_after("for-each-repo", args))?;
-        }
-        Commands::Replay { args } => {
-            crate::merge::replay::replay(raw_args_after("replay", args))?;
-        }
-        Commands::Rerere { args } => {
-            crate::merge::rerere::rerere(raw_args_after("rerere", args))?;
-        }
-        Commands::Stripspace { args } => {
-            crate::plumbing::stripspace::stripspace(raw_args_after("stripspace", args))?;
-        }
-        Commands::Column { args } => {
-            crate::plumbing::column::column(raw_args_after("column", args))?;
-        }
-        Commands::Var { args } => {
-            crate::plumbing::var::var(raw_args_after("var", args))?;
-        }
-        Commands::Version { args } => {
-            crate::plumbing::version::version(raw_args_after("version", args))?;
-        }
-        Commands::Help { args } => {
-            crate::plumbing::help::help(raw_args_after("help", args))?;
-        }
-        Commands::NameRev { args } => {
-            crate::history::name_rev::name_rev(raw_args_after("name-rev", args))?;
-        }
-        Commands::Refs { args } => {
-            crate::references::refs_cmd::refs(raw_args_after("refs", args))?;
-        }
-        Commands::MergeFile { args } => {
-            crate::merge::merge_file::merge_file(raw_args_after("merge-file", args))?;
-        }
-        Commands::Mktree { args } => {
-            crate::plumbing::mktree::mktree(raw_args_after("mktree", args))?;
-        }
-        Commands::Mktag { args } => {
-            crate::plumbing::mktag::mktag(raw_args_after("mktag", args))?;
-        }
-        Commands::UnpackFile { args } => {
-            crate::plumbing::unpack_file::unpack_file(raw_args_after("unpack-file", args))?;
-        }
-        Commands::GetTarCommitId { args } => {
-            crate::export::get_tar_commit_id::get_tar_commit_id(raw_args_after("get-tar-commit-id", args))?;
-        }
-        Commands::UpdateIndex { args } => {
-            crate::workspace::update_index::update_index(raw_args_after("update-index", args))?;
-        }
-        Commands::CheckoutIndex { args } => {
-            crate::workspace::checkout_index::checkout_index(raw_args_after("checkout-index", args))?;
-        }
-        Commands::ReadTree { args } => {
-            crate::workspace::read_tree::read_tree(raw_args_after("read-tree", args))?;
-        }
-        Commands::DiffTree { args } => {
-            crate::diff::diff_tree::diff_tree(raw_args_after("diff-tree", args))?;
-        }
-        Commands::DiffIndex { args } => {
-            crate::diff::diff_index::diff_index(raw_args_after("diff-index", args))?;
-        }
-        Commands::DiffFiles { args } => {
-            crate::diff::diff_files::diff_files(raw_args_after("diff-files", args))?;
-        }
-        Commands::ShowIndex { args } => {
-            crate::storage::show_index::show_index(raw_args_after("show-index", args))?;
-        }
-        Commands::VerifyPack { args } => {
-            crate::storage::verify_pack::verify_pack(raw_args_after("verify-pack", args))?;
-        }
-        Commands::IndexPack { args } => {
-            crate::storage::index_pack::index_pack(raw_args_after("index-pack", args))?;
-        }
-        Commands::UnpackObjects { args } => {
-            crate::storage::unpack_objects::unpack_objects(raw_args_after("unpack-objects", args))?;
-        }
-        Commands::PrunePacked { args } => {
-            crate::storage::prune_packed::prune_packed(raw_args_after("prune-packed", args))?;
-        }
-        Commands::PackObjects { args } => {
-            crate::storage::pack_objects::pack_objects(raw_args_after("pack-objects", args))?;
-        }
-        Commands::Repack { args } => {
-            crate::storage::repack::repack(raw_args_after("repack", args))?;
-        }
-        Commands::CommitGraph { args } => {
-            crate::storage::commit_graph::commit_graph(raw_args_after("commit-graph", args))?;
-        }
-        Commands::MultiPackIndex { args } => {
-            crate::storage::multi_pack_index::multi_pack_index(raw_args_after("multi-pack-index", args))?;
-        }
-        Commands::FastExport { args } => {
-            crate::export::fast_export::fast_export(raw_args_after("fast-export", args))?;
-        }
-        Commands::FastImport { args } => {
-            crate::export::fast_import::fast_import(raw_args_after("fast-import", args))?;
-        }
-        Commands::SparseCheckout { args } => {
-            crate::workspace::sparse_checkout::sparse_checkout(raw_args_after("sparse-checkout", args))?;
-        }
-        Commands::Submodule { args } => {
-            crate::workspace::submodule::submodule(raw_args_after("submodule", args))?;
-        }
+        Commands::Add(args) => crate::workspace::staging::cli::dispatch_add(args)?,
+        Commands::LsTree(args) => crate::plumbing::basic::cli::dispatch_ls_tree(args)?,
+        Commands::CommitTree(args) => crate::workspace::commit::cli::dispatch_commit_tree(args)?,
+        Commands::Commit(args) => crate::workspace::commit::cli::dispatch_commit(args)?,
+        Commands::Log(args) => crate::history::log::cli::dispatch_log(args)?,
+        Commands::Status(args) => crate::workspace::staging::cli::dispatch_status(args)?,
+        Commands::Branch(args) => crate::workspace::branch::cli::dispatch_branch(args)?,
+        Commands::Switch(args) => crate::workspace::branch::cli::dispatch_switch(args)?,
+        Commands::Checkout(args) => crate::workspace::branch::cli::dispatch_checkout(args)?,
+        Commands::Restore(args) => crate::workspace::restore::cli::dispatch_restore(args)?,
+        Commands::Diff(args) => crate::diff::diff::cli::dispatch_diff(args)?,
+        Commands::Merge(args) => crate::merge::merge::cli::dispatch_merge(args)?,
+        Commands::MergeBase(args) => crate::merge::merge::cli::dispatch_merge_base(args)?,
+        Commands::Rm(args) => crate::workspace::staging::cli::dispatch_rm(args)?,
+        Commands::Reset(args) => crate::workspace::reset::cli::dispatch_reset(args)?,
+        Commands::Clean(args) => crate::workspace::clean::cli::dispatch_clean(args)?,
+        Commands::CherryPick(args) => crate::merge::cherry_pick::cli::dispatch_cherry_pick(args)?,
+        Commands::BananaSplit(args) => crate::merge::banana_split::cli::dispatch_banana_split(args)?,
+        Commands::Revert(args) => crate::merge::revert::cli::dispatch_revert(args)?,
+        Commands::Stash(args) => crate::workspace::stash::cli::dispatch_stash(args)?,
+        Commands::Bisect(args) => crate::history::bisect::cli::dispatch_bisect(args)?,
+        Commands::Show(args) => crate::history::log::cli::dispatch_show(args)?,
+        Commands::Tag(args) => crate::references::tag::cli::dispatch_tag(args)?,
+        Commands::Describe(args) => crate::references::tag::cli::dispatch_describe(args)?,
+        Commands::Mv(args) => crate::workspace::staging::cli::dispatch_mv(args)?,
+        Commands::Config(args) => crate::plumbing::config::cli::dispatch_config(args)?,
+        Commands::Rebase(args) => crate::merge::rebase::cli::dispatch_rebase(args)?,
+        Commands::Push(args) => crate::remote::push::cli::dispatch_push(args)?,
+        Commands::Fetch(args) => crate::remote::fetch::cli::dispatch_fetch(args)?,
+        Commands::Clone(args) => crate::remote::clone::cli::dispatch_clone(args)?,
+        Commands::Pull(args) => crate::remote::pull::cli::dispatch_pull(args)?,
+        Commands::Remote(args) => crate::remote::remote::cli::dispatch_remote(args)?,
+        Commands::Blame(args) => crate::history::blame::cli::dispatch_blame(args)?,
+        Commands::Annotate(args) => crate::history::blame::cli::dispatch_annotate(args)?,
+        Commands::Whatchanged(args) => crate::history::log::cli::dispatch_whatchanged(args)?,
+        Commands::Archive(args) => crate::export::archive::cli::dispatch_archive(args)?,
+        Commands::Reflog(args) => crate::references::reflog::cli::dispatch_reflog(args)?,
+        Commands::Gc(args) => crate::storage::gc::cli::dispatch_gc(args)?,
+        Commands::Prune(args) => crate::storage::prune::cli::dispatch_prune(args)?,
+        Commands::Fsck(args) => crate::storage::fsck::cli::dispatch_fsck(args)?,
+        Commands::Grep(args) => crate::history::grep::cli::dispatch_grep(args)?,
+        Commands::CountObjects(args) => crate::storage::count_objects::cli::dispatch_count_objects(args)?,
+        Commands::RevParse(args) => crate::plumbing::rev_parse::cli::dispatch_rev_parse(args)?,
+        Commands::Shortlog(args) => crate::history::shortlog::cli::dispatch_shortlog(args)?,
+        Commands::LsFiles(args) => crate::workspace::ls_files::cli::dispatch_ls_files(args)?,
+        Commands::CheckIgnore(args) => crate::workspace::check_ignore::cli::dispatch_check_ignore(args)?,
+        Commands::CheckRefFormat(args) => crate::references::check_ref_format::cli::dispatch_check_ref_format(args)?,
+        Commands::Apply(args) => crate::mail::apply::cli::dispatch_apply(args)?,
+        Commands::FormatPatch(args) => crate::mail::format_patch::cli::dispatch_format_patch(args)?,
+        Commands::Am(args) => crate::mail::am::cli::dispatch_am(args)?,
+        Commands::RevList(args) => crate::history::rev_list::cli::dispatch_rev_list(args)?,
+        Commands::ShowRef(args) => crate::references::show_ref::cli::dispatch_show_ref(args)?,
+        Commands::SymbolicRef(args) => crate::references::symbolic_ref::cli::dispatch_symbolic_ref(args)?,
+        Commands::UpdateRef(args) => crate::references::update_ref::cli::dispatch_update_ref(args)?,
+        Commands::PackRefs(args) => crate::references::pack_refs::cli::dispatch_pack_refs(args)?,
+        Commands::ForEachRef(args) => crate::references::for_each_ref::cli::dispatch_for_each_ref(args)?,
+        Commands::MergeTree(args) => crate::merge::merge_tree::cli::dispatch_merge_tree(args)?,
+        Commands::Cherry(args) => crate::history::cherry::cli::dispatch_cherry(args)?,
+        Commands::Worktree(args) => crate::workspace::worktree::cli::dispatch_worktree(args)?,
+        Commands::Bundle(args) => crate::remote::bundle::cli::dispatch_bundle(args)?,
+        Commands::PatchId(args) => crate::diff::patch_id::cli::dispatch_patch_id(args)?,
+        Commands::Mailsplit(args) => crate::mail::mailsplit::cli::dispatch_mailsplit(args)?,
+        Commands::Mailinfo(args) => crate::mail::mailinfo::cli::dispatch_mailinfo(args)?,
+        Commands::InterpretTrailers(args) => crate::mail::interpret_trailers::cli::dispatch_interpret_trailers(args)?,
+        Commands::CheckMailmap(args) => crate::mail::check_mailmap::cli::dispatch_check_mailmap(args)?,
+        Commands::FmtMergeMsg(args) => crate::merge::fmt_merge_msg::cli::dispatch_fmt_merge_msg(args)?,
+        Commands::RequestPull(args) => crate::mail::request_pull::cli::dispatch_request_pull(args)?,
+        Commands::Replace(args) => crate::references::replace::cli::dispatch_replace(args)?,
+        Commands::Notes(args) => crate::references::notes::cli::dispatch_notes(args)?,
+        Commands::Conflicts(args) => crate::merge::conflicts::cli::dispatch_conflicts(args)?,
+        Commands::ShowBranch(args) => crate::history::show_branch::cli::dispatch_show_branch(args)?,
+        Commands::LastModified(args) => crate::history::last_modified::cli::dispatch_last_modified(args)?,
+        Commands::Repo(args) => crate::plumbing::repo_info::cli::dispatch_repo(args)?,
+        Commands::RangeDiff(args) => crate::history::range_diff::cli::dispatch_range_diff(args)?,
+        Commands::Hook(args) => crate::plumbing::hook::cli::dispatch_hook(args)?,
+        Commands::Maintenance(args) => crate::storage::maintenance::cli::dispatch_maintenance(args)?,
+        Commands::ForEachRepo(args) => crate::storage::maintenance::cli::dispatch_for_each_repo(args)?,
+        Commands::Replay(args) => crate::merge::replay::cli::dispatch_replay(args)?,
+        Commands::Rerere(args) => crate::merge::rerere::cli::dispatch_rerere(args)?,
+        Commands::Stripspace(args) => crate::plumbing::stripspace::cli::dispatch_stripspace(args)?,
+        Commands::Column(args) => crate::plumbing::column::cli::dispatch_column(args)?,
+        Commands::Var(args) => crate::plumbing::var::cli::dispatch_var(args)?,
+        Commands::Version(args) => crate::plumbing::version::cli::dispatch_version(args)?,
+        Commands::Help(args) => crate::plumbing::help::cli::dispatch_help(args)?,
+        Commands::NameRev(args) => crate::history::name_rev::cli::dispatch_name_rev(args)?,
+        Commands::Refs(args) => crate::references::refs_cmd::cli::dispatch_refs(args)?,
+        Commands::MergeFile(args) => crate::merge::merge_file::cli::dispatch_merge_file(args)?,
+        Commands::Mktree(args) => crate::plumbing::mktree::cli::dispatch_mktree(args)?,
+        Commands::Mktag(args) => crate::plumbing::mktag::cli::dispatch_mktag(args)?,
+        Commands::UnpackFile(args) => crate::plumbing::unpack_file::cli::dispatch_unpack_file(args)?,
+        Commands::GetTarCommitId(args) => crate::export::get_tar_commit_id::cli::dispatch_get_tar_commit_id(args)?,
+        Commands::UpdateIndex(args) => crate::workspace::update_index::cli::dispatch_update_index(args)?,
+        Commands::CheckoutIndex(args) => crate::workspace::checkout_index::cli::dispatch_checkout_index(args)?,
+        Commands::ReadTree(args) => crate::workspace::read_tree::cli::dispatch_read_tree(args)?,
+        Commands::DiffTree(args) => crate::diff::diff_tree::cli::dispatch_diff_tree(args)?,
+        Commands::DiffIndex(args) => crate::diff::diff_index::cli::dispatch_diff_index(args)?,
+        Commands::DiffFiles(args) => crate::diff::diff_files::cli::dispatch_diff_files(args)?,
+        Commands::ShowIndex(args) => crate::storage::show_index::cli::dispatch_show_index(args)?,
+        Commands::VerifyPack(args) => crate::storage::verify_pack::cli::dispatch_verify_pack(args)?,
+        Commands::IndexPack(args) => crate::storage::index_pack::cli::dispatch_index_pack(args)?,
+        Commands::UnpackObjects(args) => crate::storage::unpack_objects::cli::dispatch_unpack_objects(args)?,
+        Commands::PrunePacked(args) => crate::storage::prune_packed::cli::dispatch_prune_packed(args)?,
+        Commands::PackObjects(args) => crate::storage::pack_objects::cli::dispatch_pack_objects(args)?,
+        Commands::Repack(args) => crate::storage::repack::cli::dispatch_repack(args)?,
+        Commands::CommitGraph(args) => crate::storage::commit_graph::cli::dispatch_commit_graph(args)?,
+        Commands::MultiPackIndex(args) => crate::storage::multi_pack_index::cli::dispatch_multi_pack_index(args)?,
+        Commands::FastExport(args) => crate::export::fast_export::cli::dispatch_fast_export(args)?,
+        Commands::FastImport(args) => crate::export::fast_import::cli::dispatch_fast_import(args)?,
+        Commands::SparseCheckout(args) => crate::workspace::sparse_checkout::cli::dispatch_sparse_checkout(args)?,
+        Commands::Submodule(args) => crate::workspace::submodule::cli::dispatch_submodule(args)?,
     }
 
     Ok(())

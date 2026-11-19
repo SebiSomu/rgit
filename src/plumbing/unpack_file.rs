@@ -1,3 +1,5 @@
+pub mod cli;
+
 use anyhow::Result;
 
 use crate::workspace::index_plumbing::write_merge_temp_file;

@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod types;
 
 use std::collections::{BTreeMap, BTreeSet};

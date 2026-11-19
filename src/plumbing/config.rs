@@ -1,3 +1,5 @@
+pub mod cli;
+
 use std::path::{Path, PathBuf};
 use crate::core::config::{
     get_config_value, get_from, global_config_path, read_entries_from, set_in, unset_in,

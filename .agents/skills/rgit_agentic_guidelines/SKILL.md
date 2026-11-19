@@ -26,195 +26,17 @@ This document defines the constraints, protocols, and architectural patterns tha
 
 ## 2. Project Architecture & Complete Structure
 
-`rgit` is a modular, lightweight Git implementation in Rust. Its architecture strictly separates command entry points, domain objects, and operational helpers:
+`rgit` is a modular, lightweight Git implementation in Rust. Code is grouped by domain; inside each domain, thin command modules sit on top of engines, and every domain builds on `core/`:
 
 ```text
 src/
 ├── main.rs                   # Entry point calling cli::handle_commands()
-├── cli.rs                    # Parses CLI arguments with clap and routes to commands
-├── commands.rs               # Root module declaring the command modules (no re-exports)
-├── commands/                 # High-level CLI command entry points
-│   ├── plumbing.rs           # init, hash-object, cat-file, write-tree, ls-tree
-│   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
-│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
-│   ├── staging.rs            # add, status (long, -s/--short, -b, --porcelain[=v1], -z, -u[no|normal|all]), rm, mv
-│   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
-│   ├── branch.rs             # branch (list -a/-r/-v/-vv/patterns/--merged/--contains/--points-at, create -f/-t/--no-track, -d/-D/-r, -m/-M, -c/-C, -u, --unset-upstream, --show-current), switch, checkout
-│   ├── restore.rs            # restore (worktree and staged paths)
-│   ├── diff.rs               # diff (porcelain on the raw diff engine: worktree/index/commits, ranges, all formats, renames)
-│   ├── merge.rs              # merge, merge-base
-│   ├── reset.rs              # reset
-│   ├── conflicts.rs          # conflicts (rgit-only: unresolved files, who changed each side, --explain <file> side by side)
-│   ├── clean.rs              # clean
-│   ├── cherry_pick.rs        # cherry-pick (commit lists/ranges, -x, -s, -n, -m, --ff, --continue, --skip, --abort, --quit)
-│   ├── revert.rs             # revert (--continue, --abort)
-│   ├── stash.rs              # stash (push, pop, apply, list, drop, show, clear)
-│   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
-│   ├── tag.rs                # tag (list/filters/-n, lightweight + annotated, -f, -d), describe (--tags/--always/--long/--abbrev/--exact-match)
-│   ├── config.rs             # config (get, set, unset, list)
-│   ├── rebase.rs             # rebase (--onto, --keep-base, <branch>, --reapply-cherry-picks, -i, --continue, --abort, --skip, --edit-todo)
-│   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
-│   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
-│   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
-│   ├── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
-│   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
-│   ├── remote.rs             # remote (list, verbose, add, remove/rm, rename, get-url, set-url, show)
-│   ├── blame.rs              # blame (line-by-line commit attribution, -L ranges, uncommitted changes), annotate
-│   ├── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
-│   ├── reflog.rs             # reflog (show, exists, delete, expire)
-│   ├── gc.rs                 # gc (reflog expiry + unreachable loose object pruning, --dry-run)
-│   ├── prune.rs              # prune (-n, -v, --expire, <head>...)
-│   ├── fsck.rs               # fsck (object integrity, connectivity, dangling/unreachable reports)
-│   ├── grep.rs               # grep (worktree, --cached, and revision search with regex/fixed strings)
-│   ├── count_objects.rs      # count-objects (-v, -H)
-│   ├── rev_parse.rs          # rev-parse (revision resolution & repository property queries)
-│   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
-│   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
-│   ├── check_ignore.rs       # check-ignore (-q, -v, -n, --no-index, --stdin, -z)
-│   ├── check_ref_format.rs   # check-ref-format (--normalize/--print, --[no-]allow-onelevel, --refspec-pattern, --branch)
-│   ├── apply.rs              # apply (--check, --stat, --numstat, --summary, --cached, --index, -R, -v, -p<n>)
-│   ├── format_patch.rs       # format-patch (-<n>, --root, --stdout, -o, -n/-N, --start-number, --subject-prefix, -k, --signature)
-│   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
-│   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
-│   ├── show_ref.rs           # show-ref (patterns, --head, --heads/--tags, -d, -s/--hash, --abbrev, --verify, --exists, --exclude-existing)
-│   ├── for_each_ref.rs       # for-each-ref (formats/atoms, --sort, --count, filters, quoting, --color, --stdin)
-│   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
-│   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
-│   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
-│   ├── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
-│   ├── patch_id.rs           # patch-id (--stable, --unstable, --verbatim)
-│   ├── mailsplit.rs          # mailsplit (-o<dir>, -d<prec>, -f<n>, -b, --keep-cr, --mboxrd, mbox/Maildir/stdin)
-│   ├── mailinfo.rs           # mailinfo (-k, -b, -m, -u/-n/--encoding, --[no-]scissors, --no-inbody-headers, --quoted-cr)
-│   ├── interpret_trailers.rs # interpret-trailers (--trailer, --where, --if-exists, --if-missing, --parse, --in-place, ...)
-│   ├── check_mailmap.rs      # check-mailmap (--stdin, --mailmap-file, --mailmap-blob, <contact>...)
-│   ├── fmt_merge_msg.rs      # fmt-merge-msg (-m, --into-name, --log[=<n>], --no-log, -F)
-│   ├── request_pull.rs       # request-pull ([-p] <start> <url> [<end>])
-│   ├── replace.rs            # replace (<object> <replacement>, --graft, --edit, -d, -l, --format)
-│   ├── notes.rs              # notes (list, add, append, edit, copy, show, remove, prune, merge, get-ref; --ref)
-│   ├── show_branch.rs        # show-branch (-a, -r, --current, --more, --list, --independent, --merge-base, --topics, --sparse, ...)
-│   ├── range_diff.rs         # range-diff (--creation-factor, --left-only, --right-only, -s; two ranges, A...B, base tip1 tip2)
-│   ├── last_modified.rs      # last-modified (-r, -t, -z, <revision-range>, paths)
-│   ├── repo_info.rs          # repo (info, structure)
-│   ├── hook.rs               # hook run (--ignore-missing, --to-stdin)
-│   ├── maintenance.rs        # maintenance (run, register, unregister), for-each-repo (--config, --keep-going)
-│   ├── replay.rs             # replay (--onto | --advance, --contained, ranges)
-│   ├── rerere.rs             # rerere (record/replay, clear, forget, diff, status, remaining, gc)
-│   ├── name_rev.rs           # name-rev (--name-only, --tags, --refs, --exclude, --all, --annotate-stdin)
-│   ├── refs_cmd.rs           # refs (list, exists, verify, optimize)
-│   ├── var.rs                # var (-l, <variable>)
-│   ├── stripspace.rs         # stripspace (-s, -c)
-│   ├── column.rs             # column (--mode, --width, --padding, --indent, --nl)
-│   ├── version.rs            # version (--build-options)
-│   ├── help.rs               # help (-a, <command>)
-│   ├── read_tree.rs          # read-tree (--empty, --prefix, -m 1/2/3 trees, --reset, -u, -i, -n)
-│   ├── update_index.rs       # update-index (--add, --remove, --cacheinfo, --chmod, --refresh, --index-info, --stdin)
-│   ├── checkout_index.rs     # checkout-index (-a, -f, -n, -u, --prefix, --temp, --stdin)
-│   ├── diff_tree.rs          # diff-tree (-r, -t, --root, -m, --stdin, -v/--pretty, common diff options)
-│   ├── diff_index.rs         # diff-index (--cached, -m, common diff options)
-│   ├── diff_files.rs         # diff-files (common diff options)
-│   ├── merge_file.rs         # merge-file (-p, --diff3, --zdiff3, --ours/--theirs/--union, --object-id, -L)
-│   ├── mktree.rs             # mktree (-z, --missing, --batch)
-│   ├── mktag.rs              # mktag (--no-strict)
-│   ├── unpack_file.rs        # unpack-file <blob>
-│   ├── get_tar_commit_id.rs  # get-tar-commit-id
-│   ├── repack.rs             # repack (-a, -A, -d, --window, --depth)
-│   ├── pack_objects.rs       # pack-objects (--revs, --all, --unpacked, --stdout | <base-name>)
-│   ├── unpack_objects.rs     # unpack-objects (-n, -r)
-│   ├── index_pack.rs         # index-pack (<pack>, -o, --stdin, --fix-thin, --keep, --verify)
-│   ├── verify_pack.rs        # verify-pack (-v, -s)
-│   ├── show_index.rs         # show-index
-│   ├── prune_packed.rs       # prune-packed (-n)
-│   ├── commit_graph.rs       # commit-graph (write, verify)
-│   ├── multi_pack_index.rs   # multi-pack-index (write, verify, expire)
-│   ├── fast_export.rs        # fast-export (revs, marks, --no-data, --full-tree, --signed-tags)
-│   ├── fast_import.rs        # fast-import (--force, --stats, --done, marks)
-│   ├── sparse_checkout.rs    # sparse-checkout (init, set, add, list, reapply, disable, check-rules)
-│   └── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
-├── helpers.rs                # Root module declaring the helper modules (no re-exports)
-├── helpers/                  # Lower-level helpers & engines
-│   ├── commit_summary.rs     # `[branch abbrev] subject` summary + diffstat printed after commit / cherry-pick
-│   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
-│   ├── diff.rs               # Myers diff algorithm & unified diff formatting
-│   ├── gitignore.rs          # Gitignore parsing and pattern matching
-│   ├── merge.rs              # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
-│   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
-│   ├── status.rs             # status --short rendering (XY codes, path quoting, -z), untracked dir collapsing, ## branch header
-│   ├── narrate.rs            # Narration support: repo snapshots, tree/line counts, last change per path, conflict hunks, risk scan, suggestions
-│   ├── branch.rs             # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
-│   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
-│   ├── clean.rs              # Directory walker for untracked/ignored cleanup candidates
-│   ├── banana_split.rs       # Path grouping helpers for banana-split
-│   ├── rebase.rs             # Rebase engine: git's commit selection, up-to-date check, todo editor, replay runner
-│   ├── push.rs               # Remote repo resolution, object enumeration, loose object copier, ref updates
-│   ├── github.rs             # GitHub Git Data API client, blob/tree/commit uploader, remote ref updates
-│   ├── fetch.rs              # Local filesystem fetch transport, remote branch walking, object downloading
-│   ├── clone.rs              # Source classification, skeleton repo creation, target dir prep/cleanup, worktree checkout
-│   ├── remote.rs             # Remote config queries, name validation, ref directory manipulation, tracking branch collection
-│   ├── blame.rs              # Line attribution algorithm, diff-mapping, tree lookups, date formatting
-│   ├── archive.rs            # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
-│   ├── gc.rs                 # Reachability roots, unreachable loose object detection, pruning
-│   ├── prune.rs              # --expire parsing, stale temp/stray file discovery in .git/objects, empty fan-out cleanup
-│   ├── fsck.rs               # Object integrity checks, connectivity walks, dangling object reports
-│   ├── grep.rs               # Matcher construction, pathspec filtering, content search
-│   ├── count_objects.rs      # Loose/packed object statistics, human-readable sizes
-│   ├── shortlog.rs           # Author grouping of reachable commits
-│   ├── ls_files.rs           # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
-│   ├── check_ignore.rs       # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
-│   ├── apply.rs              # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
-│   ├── format_patch.rs       # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
-│   ├── am.rs                 # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
-│   ├── rev_list.rs           # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
-│   ├── show_ref.rs           # show-ref option parsing, pattern matching, ref resolution/existence, output, --exclude-existing
-│   ├── for_each_ref.rs       # for-each-ref: ref-filter port (option/atom parsing, ref collection, filters, values, if/align stack, quoting, versioncmp)
-│   ├── log.rs                # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
-│   ├── tag.rs                # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
-│   ├── cherry.rs             # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
-│   ├── bundle.rs             # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
-│   ├── merge_tree.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases
-│   ├── worktree.rs           # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
-│   ├── patch_id.rs           # git patch-id port: patch stream splitting, hunk scanning, unstable/stable/verbatim hashing
-│   ├── mailsplit.rs          # mbox From-line detection, message splitting, Maildir listing, numbered file output
-│   ├── mailinfo.rs           # git mailinfo.c port: headers, RFC 2047, in-body headers, scissors, MIME/base64/QP/flowed, charsets
-│   ├── interpret_trailers.rs # git trailer.c port: trailer block detection, trailer.* config, placement rules, commands, in-place
-│   ├── mailmap.rs            # .mailmap / mailmap.file / mailmap.blob parsing, map_user, contact splitting
-│   ├── fmt_merge_msg.rs      # git fmt-merge-msg.c port: FETCH_HEAD lines, title, tag messages, shortlog credits, branch descriptions
-│   ├── request_pull.rs       # ls-remote style ref listing (local/GitHub), matching-ref lookup, range shortlog, tree diffs
-│   ├── replace.rs            # refs/replace listing/creation/deletion, graft commits, object editing
-│   ├── notes.rs              # Notes refs/trees (git fan-out), notes commits, stripspace, notes merge, note lookup for log/show
-│   ├── show_branch.rs        # git show-branch.c port: tip collection, join_revs walk, topo sort, commit naming, column display
-│   ├── range_diff.rs         # git range-diff.c port: normalized patches, exact matches, linear assignment, pair output
-│   ├── last_modified.rs      # Per-path last-change lookup over a range (recursion, trees, boundary commits)
-│   ├── repo_info.rs          # repo info keys, repo structure counts, table/key-value output
-│   ├── hook.rs               # Hook lookup (core.hooksPath, executable check) and execution
-│   ├── maintenance.rs        # Config path lists, running rgit in other repos, maintenance tasks, maintenance.repo registration
-│   ├── replay.rs             # In-memory commit replay onto a new base, update-ref command output
-│   ├── rerere.rs             # Conflict normalization and IDs, rr-cache store, MERGE_RR, resolution replay
-│   ├── name_rev.rs           # git name-rev.c port: tip ranking, name propagation, ref filters/shortening, stdin annotation
-│   ├── refs_verify.rs        # Loose ref name/content checks and packed-refs checks for refs verify
-│   ├── var.rs                # Logical variables (identity, editors, pager, default branch, shell, global config)
-│   ├── stripspace.rs         # Whitespace cleanup on raw bytes, comment-line prefixing
-│   ├── column.rs             # git column.c port: mode parsing, display width, column/row/dense layout
-│   ├── help.rs               # Command list and per-command help lookup (clap)
-│   ├── index_plumbing.rs     # Entry vs worktree state, path normalization, add_index_entry rules, refresh, temp files
-│   ├── read_tree.rs          # unpack-trees rules: plain read, --prefix, one/two/three-way merges, worktree checks
-│   ├── diff_plumbing.rs      # Raw diffs: tree walk, tree/index/worktree comparison, raw/name/stat/patch rendering
-│   ├── merge_file.rs         # merge-file argument parsing
-│   ├── mktree.rs             # ls-tree line parsing and checks, tree serialization
-│   ├── mktag.rs              # Standalone tag fsck (headers, ident) with git's message ids
-│   ├── chunk_file.rs         # Chunk file format shared by commit-graph and multi-pack-index
-│   ├── commit_graph.rs       # Commit-graph writer and verifier
-│   ├── midx.rs               # Multi-pack-index writer, parser and verifier
-│   ├── fast_export.rs        # fast-import stream writer (ref naming, commit order, marks)
-│   ├── fast_import.rs        # fast-import stream reader (marks, branch trees, commits, tags, refs)
-│   ├── sparse.rs             # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
-│   ├── submodule.rs          # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
-│   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
-│   ├── rename.rs             # git diffcore-rename port: exact/basename/similarity rename+copy detection, -M/-C parsing, limit warnings
-│   ├── combine_diff.rs       # git combine-diff.c port: diff --cc of unmerged paths vs the working tree
-│   └── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
-│
-├── ui.rs                     # Narration layer (C.1/C.10): verbosity levels, before/after snapshot + exit hook, ALL narration wording (stderr only)
-├── core.rs                   # Root module declaring the core modules
+├── cli.rs                    # Parses CLI arguments with clap and routes each subcommand to its domain's command function
+├── objects.rs                # Special types, enums, structs, and type aliases
+├── ui.rs                     # Narration layer (--explain/--teach/--plain, RGIT_VERBOSITY): before/after snapshots, reports, exit hook
+├── ui/
+│   └── narrate.rs            # Narration support: repo snapshots, tree/line counts, last change per path, conflict hunks, risk scan, suggestions
+├── core.rs                   # Declares the core modules
 ├── core/                     # Repository fundamentals every domain builds on (no command entry points)
 │   ├── check_ref_format.rs   # Git ref name rules, slash normalization, branch shorthand validation
 │   ├── commit.rs             # Commit building, parsing (parse_commit_object, split_commit_message), parent chains, ancestor walks (is_reachable, collect_ancestors)
@@ -229,8 +51,210 @@ src/
 │   ├── repo.rs               # Repository path resolution (`repo::path(".git/...")`), main vs linked worktree
 │   ├── rev_parse.rs          # Revision syntax resolution, worktree root discovery, property queries
 │   └── wildmatch.rs          # git wildmatch() port (WM_PATHNAME, WM_CASEFOLD)
-│
-├── objects.rs                # Special types, enums, structs, and type aliases
+├── diff.rs                   # Declares the diff modules
+├── diff/                     # Diff engines (Myers, xdiff-style hunks, renames, combined diffs, raw/plumbing diffs) and the diff commands
+│   ├── combine.rs            # git combine-diff.c port: diff --cc of unmerged paths vs the working tree
+│   ├── diff.rs               # diff (porcelain on the raw diff engine: worktree/index/commits, ranges, all formats, renames)
+│   ├── diff_files.rs         # diff-files (common diff options)
+│   ├── diff_index.rs         # diff-index (--cached, -m, common diff options)
+│   ├── diff_tree.rs          # diff-tree (-r, -t, --root, -m, --stdin, -v/--pretty, common diff options)
+│   ├── hunks.rs              # git-compatible line diffs: xdiff change compaction, unified hunks with function context, diffstat, binary literals
+│   ├── myers.rs              # Myers diff algorithm & unified diff formatting
+│   ├── patch_id.rs           # patch-id (--stable, --unstable, --verbatim)
+│   │   └── engine.rs         # git patch-id port: patch stream splitting, hunk scanning, unstable/stable/verbatim hashing
+│   ├── plumbing.rs           # Raw diffs: tree walk, tree/index/worktree comparison, raw/name/stat/patch rendering
+│   └── rename.rs             # git diffcore-rename port: exact/basename/similarity rename+copy detection, -M/-C parsing, limit warnings
+├── history.rs                # Declares the history modules
+├── history/                  # Walking and presenting history: log/show, rev-list, graph, blame, shortlog, name-rev, bisect, grep
+│   ├── bisect.rs             # bisect (start, bad, good, skip, reset, log, run)
+│   │   └── engine.rs         # Bisect candidate ordering, checkout of the next commit, first-bad / outcome reports
+│   ├── blame.rs              # blame (line-by-line commit attribution, -L ranges, uncommitted changes), annotate
+│   │   └── engine.rs         # Line attribution algorithm, diff-mapping, tree lookups, date formatting
+│   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
+│   │   └── engine.rs         # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
+│   ├── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
+│   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
+│   ├── grep.rs               # grep (worktree, --cached, and revision search with regex/fixed strings)
+│   │   └── engine.rs         # Matcher construction, pathspec filtering, content search
+│   ├── last_modified.rs      # last-modified (-r, -t, -z, <revision-range>, paths)
+│   │   └── engine.rs         # Per-path last-change lookup over a range (recursion, trees, boundary commits)
+│   ├── log.rs                # log (pretty formats, --date, --decorate, -p/--stat/--name-status/--raw, notes, --graph, --follow), show (commits, tags, trees, blobs), whatchanged
+│   │   └── engine.rs         # log/show arg parsing, pretty formats, date modes, decorations, diff output layout
+│   ├── name_rev.rs           # name-rev (--name-only, --tags, --refs, --exclude, --all, --annotate-stdin)
+│   │   └── engine.rs         # git name-rev.c port: tip ranking, name propagation, ref filters/shortening, stdin annotation
+│   ├── range_diff.rs         # range-diff (--creation-factor, --left-only, --right-only, -s; two ranges, A...B, base tip1 tip2)
+│   │   └── engine.rs         # git range-diff.c port: normalized patches, exact matches, linear assignment, pair output
+│   ├── rev_list.rs           # rev-list (ranges, --not, ref sets, ordering, limits, filters, paths, output formats)
+│   │   └── engine.rs         # Arg parsing, git revision-walk simulation, history simplification, topo sort, filters, select_rev_list_commits
+│   ├── shortlog.rs           # shortlog (-s, -n, -e, --all)
+│   │   └── engine.rs         # Author grouping of reachable commits
+│   └── show_branch.rs        # show-branch (-a, -r, --current, --more, --list, --independent, --merge-base, --topics, --sparse, ...)
+│       └── engine.rs         # git show-branch.c port: tip collection, join_revs walk, topo sort, commit naming, column display
+├── merge.rs                  # Declares the merge modules
+├── merge/                    # Merging and replaying commits: merge engines, conflicts, rerere, sequencer, cherry-pick, revert, rebase
+│   ├── banana_split.rs       # banana-split (splits commit by path/dir into atomic commits)
+│   │   └── engine.rs         # Path grouping helpers for banana-split
+│   ├── cherry_pick.rs        # cherry-pick (commit lists/ranges, -x, -s, -n, -m, --ff, --continue, --skip, --abort, --quit)
+│   ├── conflicts.rs          # conflicts (rgit-only: unresolved files, who changed each side, --explain <file> side by side)
+│   ├── fmt_merge_msg.rs      # fmt-merge-msg (-m, --into-name, --log[=<n>], --no-log, -F)
+│   │   └── engine.rs         # git fmt-merge-msg.c port: FETCH_HEAD lines, title, tag messages, shortlog credits, branch descriptions
+│   ├── merge.rs              # merge, merge-base
+│   │   └── engine.rs         # merge bases/commits; merge result → worktree + index stages 1-3; unmerged-index refusals; reset --merge / state cleanup
+│   ├── merge_file.rs         # merge-file (-p, --diff3, --zdiff3, --ours/--theirs/--union, --object-id, -L)
+│   │   └── engine.rs         # merge-file argument parsing
+│   ├── merge_tree.rs         # merge-tree (--name-only, --[no-]messages, -z, --merge-base, --allow-unrelated-histories, --explain)
+│   │   └── engine.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases
+│   ├── rebase.rs             # rebase (--onto, --keep-base, <branch>, --reapply-cherry-picks, -i, --continue, --abort, --skip, --edit-todo)
+│   │   └── engine.rs         # Rebase engine: git's commit selection, up-to-date check, todo editor, replay runner
+│   ├── replay.rs             # replay (--onto | --advance, --contained, ranges)
+│   │   └── engine.rs         # In-memory commit replay onto a new base, update-ref command output
+│   ├── rerere.rs             # rerere (record/replay, clear, forget, diff, status, remaining, gc)
+│   │   └── engine.rs         # Conflict normalization and IDs, rr-cache store, MERGE_RR, resolution replay
+│   ├── revert.rs             # revert (--continue, --abort)
+│   └── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
+├── mail.rs                   # Declares the mail modules
+├── mail/                     # Patch and mail workflows: format-patch, am, apply, mailinfo/mailsplit, trailers, mailmap, request-pull
+│   ├── am.rs                 # am (mbox/stdin, -k, --continue, --skip, --abort, --quit, --show-current-patch)
+│   │   └── engine.rs         # Mailbox split, header decoding, author-preserving commits, .git/rebase-apply state
+│   ├── apply.rs              # apply (--check, --stat, --numstat, --summary, --cached, --index, -R, -v, -p<n>)
+│   │   └── engine.rs         # Patch parsing (incl. binary), hunk placement, binary deltas, shared check/write, diffstat
+│   ├── check_mailmap.rs      # check-mailmap (--stdin, --mailmap-file, --mailmap-blob, <contact>...)
+│   ├── format_patch.rs       # format-patch (-<n>, --root, --stdout, -o, -n/-N, --start-number, --subject-prefix, -k, --signature)
+│   │   └── engine.rs         # Commit selection, mail headers, git-compatible diff/hunks, diffstat, binary literals
+│   ├── interpret_trailers.rs # interpret-trailers (--trailer, --where, --if-exists, --if-missing, --parse, --in-place, ...)
+│   │   └── engine.rs         # git trailer.c port: trailer block detection, trailer.* config, placement rules, commands, in-place
+│   ├── mailinfo.rs           # mailinfo (-k, -b, -m, -u/-n/--encoding, --[no-]scissors, --no-inbody-headers, --quoted-cr)
+│   │   └── engine.rs         # git mailinfo.c port: headers, RFC 2047, in-body headers, scissors, MIME/base64/QP/flowed, charsets
+│   ├── mailmap.rs            # .mailmap / mailmap.file / mailmap.blob parsing, map_user, contact splitting
+│   ├── mailsplit.rs          # mailsplit (-o<dir>, -d<prec>, -f<n>, -b, --keep-cr, --mboxrd, mbox/Maildir/stdin)
+│   │   └── engine.rs         # mbox From-line detection, message splitting, Maildir listing, numbered file output
+│   └── request_pull.rs       # request-pull ([-p] <start> <url> [<end>])
+│       └── engine.rs         # ls-remote style ref listing (local/GitHub), matching-ref lookup, range shortlog, tree diffs
+├── remote.rs                 # Declares the remote modules
+├── remote/                   # Remotes and transports (local paths, GitHub Git Data API, bundles): clone, fetch, pull, push
+│   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
+│   │   └── engine.rs         # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
+│   ├── clone.rs              # clone (local transport & GitHub Git Data API: init + fetch + checkout + upstream setup)
+│   │   └── engine.rs         # Source classification, skeleton repo creation, target dir prep/cleanup, worktree checkout
+│   ├── fetch.rs              # fetch (local transport & GitHub Git Data API: download objects, update remote-tracking refs)
+│   │   └── engine.rs         # Local filesystem fetch transport, remote branch walking, object downloading
+│   ├── github.rs             # GitHub Git Data API client, blob/tree/commit uploader, remote ref updates
+│   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
+│   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
+│   │   └── engine.rs         # Remote repo resolution, object enumeration, loose object copier, ref updates
+│   └── remote.rs             # remote (list, verbose, add, remove/rm, rename, get-url, set-url, show)
+│       └── engine.rs         # Remote config queries, name validation, ref directory manipulation, tracking branch collection
+├── references.rs             # Declares the references modules
+├── references/               # Ref-level commands: for-each-ref, show/update/symbolic-ref, pack-refs, reflog, tags, notes, replace
+│   ├── check_ref_format.rs   # check-ref-format (--normalize/--print, --[no-]allow-onelevel, --refspec-pattern, --branch)
+│   ├── for_each_ref.rs       # for-each-ref (formats/atoms, --sort, --count, filters, quoting, --color, --stdin)
+│   │   └── engine.rs         # for-each-ref: ref-filter port (option/atom parsing, ref collection, filters, values, if/align stack, quoting, versioncmp)
+│   ├── notes.rs              # notes (list, add, append, edit, copy, show, remove, prune, merge, get-ref; --ref)
+│   │   └── engine.rs         # Notes refs/trees (git fan-out), notes commits, stripspace, notes merge, note lookup for log/show
+│   ├── pack_refs.rs          # pack-refs (--all, --no-prune, --include, --exclude)
+│   │   └── engine.rs         # Option parsing, packed-refs read/lock/write (peeled tags, sorted), pattern-filtered packing
+│   ├── reflog.rs             # reflog (show, exists, delete, expire)
+│   ├── refs_cmd.rs           # refs (list, exists, verify, optimize)
+│   ├── refs_verify.rs        # Loose ref name/content checks and packed-refs checks for refs verify
+│   ├── replace.rs            # replace (<object> <replacement>, --graft, --edit, -d, -l, --format)
+│   │   └── engine.rs         # refs/replace listing/creation/deletion, graft commits, object editing
+│   ├── show_ref.rs           # show-ref (patterns, --head, --heads/--tags, -d, -s/--hash, --abbrev, --verify, --exists, --exclude-existing)
+│   │   └── engine.rs         # show-ref option parsing, pattern matching, ref resolution/existence, output, --exclude-existing
+│   ├── symbolic_ref.rs       # symbolic-ref (read, --short, --no-recurse, -q, set with -m, --delete)
+│   │   └── engine.rs         # Option parsing, raw ref reads, symref resolution (SYMREF_MAXDEPTH), creation conflicts, symref writes
+│   ├── tag.rs                # tag (list/filters/-n, lightweight + annotated, -f, -d), describe (--tags/--always/--long/--abbrev/--exact-match)
+│   │   └── engine.rs         # Tag listing (loose + packed), tag objects, -n lines, packed tag deletion, describe selection
+│   └── update_ref.rs         # update-ref (<ref> <new> [<old>], -d, --no-deref, --create-reflog, --stdin [-z] transactions)
+│       └── engine.rs         # Option parsing, object-id lookup, ref transactions (queue, prepare, commit), C-style unquoting
+├── workspace.rs              # Declares the workspace modules
+├── workspace/                # Working tree and index: add/status/rm/mv, checkout/switch, restore, reset, clean, stash, commit, worktrees, sparse, submodules
+│   ├── branch.rs             # branch (list -a/-r/-v/-vv/patterns/--merged/--contains/--points-at, create -f/-t/--no-track, -d/-D/-r, -m/-M, -c/-C, -u, --unset-upstream, --show-current), switch, checkout
+│   │   └── engine.rs         # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
+│   ├── check_ignore.rs       # check-ignore (-q, -v, -n, --no-index, --stdin, -z)
+│   │   └── engine.rs         # Source/line-tracked ignore rules, deciding-rule lookup, path normalization
+│   ├── checkout.rs           # Working tree sync, switch safety checks, index resets
+│   ├── checkout_index.rs     # checkout-index (-a, -f, -n, -u, --prefix, --temp, --stdin)
+│   ├── clean.rs              # clean
+│   │   └── engine.rs         # Directory walker for untracked/ignored cleanup candidates
+│   ├── commit.rs             # commit (-m/-F/-C/-c, -a, --amend, editor, --author/--date, -s), commit-tree
+│   ├── commit_summary.rs     # `[branch abbrev] subject` summary + diffstat printed after commit / cherry-pick
+│   ├── gitignore.rs          # Gitignore parsing and pattern matching
+│   ├── index_plumbing.rs     # Entry vs worktree state, path normalization, add_index_entry rules, refresh, temp files
+│   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
+│   │   └── engine.rs         # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
+│   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
+│   │   └── engine.rs         # Interactive hunk engine for -p modes: patch parsing, hunk split/render, applying selected hunks
+│   ├── read_tree.rs          # read-tree (--empty, --prefix, -m 1/2/3 trees, --reset, -u, -i, -n)
+│   │   └── engine.rs         # unpack-trees rules: plain read, --prefix, one/two/three-way merges, worktree checks
+│   ├── reset.rs              # reset
+│   ├── restore.rs            # restore (worktree and staged paths)
+│   ├── sparse_checkout.rs    # sparse-checkout (init, set, add, list, reapply, disable, check-rules)
+│   │   └── engine.rs         # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
+│   ├── staging.rs            # add, status (long, -s/--short, -b, --porcelain[=v1], -z, -u[no|normal|all]), rm, mv
+│   ├── stash.rs              # stash (push, pop, apply, list, drop, show, clear)
+│   ├── state_files.rs        # In-progress operation state files, stash list storage and apply/pop
+│   ├── status.rs             # status --short rendering (XY codes, path quoting, -z), untracked dir collapsing, ## branch header
+│   ├── submodule.rs          # submodule (add, status, init, update, deinit, foreach, sync, set-url, set-branch)
+│   │   └── engine.rs         # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
+│   ├── update_index.rs       # update-index (--add, --remove, --cacheinfo, --chmod, --refresh, --index-info, --stdin)
+│   └── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
+│       └── engine.rs         # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting
+├── storage.rs                # Declares the storage modules
+├── storage/                  # Object storage maintenance: packs, pack indexes, commit-graph, multi-pack-index, gc, prune, fsck
+│   ├── chunk_file.rs         # Chunk file format shared by commit-graph and multi-pack-index
+│   ├── commit_graph.rs       # commit-graph (write, verify)
+│   │   └── engine.rs         # Commit-graph writer and verifier
+│   ├── count_objects.rs      # count-objects (-v, -H)
+│   │   └── engine.rs         # Loose/packed object statistics, human-readable sizes
+│   ├── fsck.rs               # fsck (object integrity, connectivity, dangling/unreachable reports)
+│   │   └── engine.rs         # Object integrity checks, connectivity walks, dangling object reports
+│   ├── gc.rs                 # gc (reflog expiry + unreachable loose object pruning, --dry-run)
+│   │   └── engine.rs         # Reachability roots, unreachable loose object detection, pruning
+│   ├── index_pack.rs         # index-pack (<pack>, -o, --stdin, --fix-thin, --keep, --verify)
+│   ├── maintenance.rs        # maintenance (run, register, unregister), for-each-repo (--config, --keep-going)
+│   │   └── engine.rs         # Config path lists, running rgit in other repos, maintenance tasks, maintenance.repo registration
+│   ├── multi_pack_index.rs   # multi-pack-index (write, verify, expire)
+│   │   └── engine.rs         # Multi-pack-index writer, parser and verifier
+│   ├── pack_objects.rs       # pack-objects (--revs, --all, --unpacked, --stdout | <base-name>)
+│   ├── prune.rs              # prune (-n, -v, --expire, <head>...)
+│   │   └── engine.rs         # --expire parsing, stale temp/stray file discovery in .git/objects, empty fan-out cleanup
+│   ├── prune_packed.rs       # prune-packed (-n)
+│   ├── repack.rs             # repack (-a, -A, -d, --window, --depth)
+│   ├── show_index.rs         # show-index
+│   ├── unpack_objects.rs     # unpack-objects (-n, -r)
+│   └── verify_pack.rs        # verify-pack (-v, -s)
+├── export.rs                 # Declares the export modules
+├── export/                   # Exporting/importing history: archive, fast-export, fast-import
+│   ├── archive.rs            # archive (tar, tar.gz/tgz, zip archives with path filters and prefix)
+│   │   └── engine.rs         # Archive packing, tar/tar.gz/zip streams, timestamp preservation, path filters
+│   ├── fast_export.rs        # fast-export (revs, marks, --no-data, --full-tree, --signed-tags)
+│   │   └── engine.rs         # fast-import stream writer (ref naming, commit order, marks)
+│   ├── fast_import.rs        # fast-import (--force, --stats, --done, marks)
+│   │   └── engine.rs         # fast-import stream reader (marks, branch trees, commits, tags, refs)
+│   └── get_tar_commit_id.rs  # get-tar-commit-id
+├── plumbing.rs               # Declares the plumbing modules
+├── plumbing/                 # Low-level and utility commands: init/hash-object/cat-file/..., mktree, mktag, rev-parse, config, var, help
+│   ├── basic.rs              # init, hash-object, cat-file, write-tree, ls-tree
+│   ├── column.rs             # column (--mode, --width, --padding, --indent, --nl)
+│   │   └── engine.rs         # git column.c port: mode parsing, display width, column/row/dense layout
+│   ├── config.rs             # config (get, set, unset, list)
+│   ├── help.rs               # help (-a, <command>)
+│   │   └── engine.rs         # Command list and per-command help lookup (clap)
+│   ├── hook.rs               # hook run (--ignore-missing, --to-stdin)
+│   │   └── engine.rs         # Hook lookup (core.hooksPath, executable check) and execution
+│   ├── mktag.rs              # mktag (--no-strict)
+│   │   └── engine.rs         # Standalone tag fsck (headers, ident) with git's message ids
+│   ├── mktree.rs             # mktree (-z, --missing, --batch)
+│   │   └── engine.rs         # ls-tree line parsing and checks, tree serialization
+│   ├── repo_info.rs          # repo (info, structure)
+│   │   └── engine.rs         # repo info keys, repo structure counts, table/key-value output
+│   ├── rev_parse.rs          # rev-parse (revision resolution & repository property queries)
+│   ├── stripspace.rs         # stripspace (-s, -c)
+│   │   └── engine.rs         # Whitespace cleanup on raw bytes, comment-line prefixing
+│   ├── unpack_file.rs        # unpack-file <blob>
+│   ├── var.rs                # var (-l, <variable>)
+│   │   └── engine.rs         # Logical variables (identity, editors, pager, default branch, shell, global config)
+│   └── version.rs            # version (--build-options)
 └── bin/
     └── rtest.rs              # Isolated test runner executing rgit within test-sandbox/
 ```
@@ -238,9 +262,13 @@ src/
 ### Module Responsibilities:
 
 1. **[cli.rs](file:///c:/rgit-main/src/cli.rs)**: Parses and routes all command-line arguments using `clap`. All subcommands are declared here.
-2. **[commands/](file:///c:/rgit-main/src/commands)**: Contains *only* high-level command entry points. Functions here orchestrate workflows between `helpers`, `refs`, and `index`, and must return `anyhow::Result<()>`. They do not contain low-level helper logic.
-3. **[helpers/](file:///c:/rgit-main/src/helpers)**: Standalone operational functions that read/write compressed objects, execute file I/O, spawn editors, walk commit graphs, manage state files, and resolve merge conflicts.
-4. **[objects.rs](file:///c:/rgit-main/src/objects.rs)**: Single source of truth for all domain structures, enums, AST items, and shared type aliases used across commands and helpers.
+2. **Domains** (`diff/`, `history/`, `merge/`, `mail/`, `remote/`, `references/`, `workspace/`, `storage/`, `export/`, `plumbing/`): code is grouped by what it works on, not by layer. Inside a domain:
+   - **Command modules** — `<domain>/<command>.rs`, named after the git command (`merge/cherry_pick.rs`). They contain *only* the entry points `cli.rs` calls; they orchestrate engines and `core/`, return `anyhow::Result<()>`, and hold no low-level logic.
+   - **Engines** — the lower-level logic. An engine serving one command lives *under* it as `<domain>/<command>/engine.rs` (declared with `pub mod engine;` at the top of the command module). Engines shared within a domain get their own flat file named for what they are (`diff/myers.rs`, `merge/sequencer.rs`, `workspace/checkout.rs`).
+   - A domain may use `core/` and other domains' engines; `core/` never uses a domain. Code needed by several domains belongs in `core/`.
+   - Domain modules are declared private (`mod diff;`) in `main.rs`; `cli`, `core`, `objects` and `ui` stay `pub`.
+3. **[core/](file:///c:/rgit-main/src/core)**: Repository fundamentals with no command entry points (object store, packs, index, refs, repo paths, config, reflog, commits, revision parsing, dates, editor, ref-name rules, wildmatch).
+4. **[objects.rs](file:///c:/rgit-main/src/objects.rs)**: Single source of truth for all domain structures, enums, AST items, and shared type aliases used across domains and `core/`.
 5. **[core/refs.rs](file:///c:/rgit-main/src/core/refs.rs)**: Manages reference resolution (`HEAD`, branch heads under `refs/heads/`). Handles attached/detached HEAD state transitions.
 6. **[core/index.rs](file:///c:/rgit-main/src/core/index.rs)**: Reads and writes the staging index (`.git/index`).
 7. **[core/repo.rs](file:///c:/rgit-main/src/core/repo.rs)**: Resolves every path inside `.git`. **Never open `.git/...` paths directly**: wrap them in `crate::core::repo::path(".git/...")`, which returns them unchanged in a main worktree and routes them to the shared `.git` (objects, refs, config, logs/refs, STASH_LIST) or to `.git/worktrees/<id>/` (HEAD, index, MERGE_*/REBASE_*/BISECT_* state) inside a linked worktree.
@@ -252,8 +280,8 @@ src/
 
 - **Error Handling**: Use `anyhow::Result` and add context with `.context()` or `.with_context()` to help debug file system issues.
 - **Branch Validation**: All branch creation and renaming must pass through `refs::is_valid_branch_name` to prevent formatting conflicts (following `git-check-ref-format`).
-- **Core vs. Helpers**: `core/` holds the repository fundamentals (object store, packs, index, refs, repo paths, config, reflog, commits, revision parsing, ref-name rules, wildmatch). Code in `core/` must not depend on `commands/` or feature helpers; when a feature helper grows something every domain needs, move it into `core/`.
-- **Explicit Imports**: Import items from the module that defines them (`use crate::core::object_store::read_object;`, `crate::commands::merge::merge(...)`). Never add `pub use x::*` re-exports to `helpers.rs` or `commands.rs`, and never `#![allow(unused_imports)]` to hide them.
+- **Core vs. Domains**: Code in `core/` must not depend on any domain. When a domain engine grows something several domains need (commit parsing, dates, editors...), move it into `core/`.
+- **Explicit Imports**: Import items from the module that defines them (`use crate::core::object_store::read_object;`, `crate::merge::merge::merge(...)`). Never add `pub use x::*` re-exports to module files, and never `#![allow(unused_imports)]` to hide them.
 - **Graph Walks**: Use the BFS-based `is_reachable` ancestor walk in `core/commit.rs` rather than assuming linear history (handles branched or merged histories).
 - **Nested Directory Handling**: When deleting branch refs, clean up parent directories under `.git/refs/heads/` recursively if they become empty (so nested namespaces like `feature/login` don't leave empty folder structures).
 - **Index Sorting**: The `.git/index` file must have entries sorted alphabetically by path. Use `BTreeMap` or sort vectors before serialization.
@@ -267,10 +295,10 @@ src/
 
 ### Helper Functions vs. Methods:
 - **Methods on Types (`impl Type`) in `objects.rs`**: Use methods for pure data transformations that do not perform disk I/O, process spawning, or repository lookups (e.g., `Action::parse`, `Action::name`, `TodoItem::format_line`, `CleanMode::wants`).
-- **Standalone Helper Functions in `helpers/`**: Use standalone functions in `helpers/` when interacting with the file system, repository metadata, state files, child processes, or multi-step graph algorithms.
+- **Standalone Functions in Engines**: Use standalone functions in engine modules (or `core/`) when interacting with the file system, repository metadata, state files, child processes, or multi-step graph algorithms.
 
-### Comment Requirements for Helper Functions:
-All helper functions in `helpers/` must have a comment written above them explaining what they do and for which feature they are needed. The comments must follow this format:
+### Comment Requirements for Engine Functions:
+All functions in engine modules and `core/` must have a comment written above them explaining what they do and for which feature they are needed. The comments must follow this format:
 ```rust
 /// One or more lines explaining what the helper function does.
 // Used by `<command_or_caller>`.
@@ -286,7 +314,7 @@ Every struct, enum, and type alias in `objects.rs` must have descriptive documen
 Example:
 ```rust
 /// An instruction action assigned to an individual commit entry in an interactive rebase todo file.
-// Used by: src/helpers/rebase.rs, src/commands/rebase.rs
+// Used by: src/merge/rebase/engine.rs, src/merge/rebase.rs
 // Used by command/helper: `parse_edited_todo`, `render_todo_for_editing`, `commit_item`, and the `rebase` command
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Action {

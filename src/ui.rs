@@ -11,12 +11,14 @@
 //! the default is `normal`, but only when stderr is a terminal, so scripts and parity tests
 //! that pipe rgit's output see no change.
 
+pub mod narrate;
+
 use std::collections::BTreeSet;
 use std::io::IsTerminal;
 use std::sync::{Mutex, OnceLock};
 
 use crate::core::commit::commit_parents;
-use crate::helpers::narrate::*;
+use crate::ui::narrate::*;
 use crate::objects::{RepoSnapshot, Verbosity};
 
 static LEVEL: OnceLock<Verbosity> = OnceLock::new();
@@ -370,7 +372,7 @@ fn index_diff(b: &RepoSnapshot, a: &RepoSnapshot) -> Vec<String> {
 /// The branch's upstream ref; like rgit's `pull`/`push`, falls back to
 /// `refs/remotes/<branch.<b>.remote or origin>/<b>` when that exists.
 fn upstream_of(branch: &str) -> Option<String> {
-    crate::helpers::for_each_ref::branch_upstream(branch).or_else(|| {
+    crate::references::for_each_ref::engine::branch_upstream(branch).or_else(|| {
         let remote = crate::core::config::get_config_value(&format!("branch.{}.remote", branch)).ok().flatten().unwrap_or_else(|| "origin".into());
         let candidate = format!("refs/remotes/{}/{}", remote, branch);
         crate::core::refs::read_ref(&candidate).ok().flatten().map(|_| candidate)
@@ -384,7 +386,7 @@ fn not_pushed_line(a: &RepoSnapshot) -> Option<String> {
         Some(up) => {
             let up_hash = a.refs.get(&up)?;
             let ahead = commits_between(Some(up_hash), head);
-            let short_up = crate::helpers::for_each_ref::shorten_unambiguous_ref(&up);
+            let short_up = crate::references::for_each_ref::engine::shorten_unambiguous_ref(&up);
             Some(if ahead == 0 { format!("in sync with {}", short_up) } else { format!("{} not pushed to {} yet", plural(ahead, "commit", "commits"), short_up) })
         }
         None => None,
@@ -650,7 +652,7 @@ fn behind_line(a: &RepoSnapshot) {
     let Some(up_hash) = a.refs.get(&up) else { return };
     let behind = commits_between(Some(head), up_hash);
     let ahead = commits_between(Some(up_hash), head);
-    let short_up = crate::helpers::for_each_ref::shorten_unambiguous_ref(&up);
+    let short_up = crate::references::for_each_ref::engine::shorten_unambiguous_ref(&up);
     if behind > 0 {
         note(&format!("'{}' is now {} behind {}{}.", branch, plural(behind, "commit", "commits"), short_up, if ahead > 0 { format!(" and {} ahead (diverged)", ahead) } else { String::new() }));
         next(&format!("`rgit pull` (or `rgit merge {}`) to catch up.", short_up));
@@ -674,7 +676,7 @@ fn report_pull(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok: Option<b
     let changes = remote_changes(b, a);
     if changes.is_empty() && a.head == b.head {
         if ok == Some(true) {
-            let up = a.head_branch.as_ref().and_then(|br| upstream_of(br)).map(|u| crate::helpers::for_each_ref::shorten_unambiguous_ref(&u)).unwrap_or_else(|| "the remote".into());
+            let up = a.head_branch.as_ref().and_then(|br| upstream_of(br)).map(|u| crate::references::for_each_ref::engine::shorten_unambiguous_ref(&u)).unwrap_or_else(|| "the remote".into());
             note(&format!("Already up to date: {} has nothing new for you.", up));
         }
         return;
@@ -821,8 +823,8 @@ fn report_conflicts(a: &RepoSnapshot, b: &RepoSnapshot) {
     let operation = a.operation.clone().unwrap_or_else(|| "merge".into());
     let title = match operation.as_str() {
         "rebase" => {
-            let total: usize = std::fs::read_to_string(crate::core::repo::path(crate::helpers::rebase::REBASE_TOTAL_PATH)).ok().and_then(|t| t.trim().parse().ok()).unwrap_or(0);
-            let left = std::fs::read_to_string(crate::core::repo::path(crate::helpers::rebase::REBASE_TODO_PATH)).map(|t| t.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count()).unwrap_or(0);
+            let total: usize = std::fs::read_to_string(crate::core::repo::path(crate::merge::rebase::engine::REBASE_TOTAL_PATH)).ok().and_then(|t| t.trim().parse().ok()).unwrap_or(0);
+            let left = std::fs::read_to_string(crate::core::repo::path(crate::merge::rebase::engine::REBASE_TODO_PATH)).map(|t| t.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count()).unwrap_or(0);
             let current = (total.saturating_sub(left) + 1).min(total);
             if total > 0 { format!("Rebase stopped at commit {} of {}", current, total) } else { "Rebase stopped".to_string() }
         }
@@ -914,7 +916,7 @@ fn report_status_progress(a: &RepoSnapshot) {
         note(&if all.len() == 1 { "The conflicted file is resolved.".to_string() } else { format!("All {} conflicted files are resolved.", all.len()) });
         if op == "stash" {
             next("the stashed changes are in; the stash entry was kept: `rgit stash drop` when you're done with it.");
-            crate::helpers::narrate::clear_stash_conflict();
+            crate::ui::narrate::clear_stash_conflict();
         } else {
             next(&format!("`rgit {} --continue` to finish.", op));
         }
@@ -939,7 +941,7 @@ fn head_move(b: &RepoSnapshot, a: &RepoSnapshot) -> Option<String> {
 
 fn report_reset(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, ok: Option<bool>) {
     if b.operation.as_deref() == Some("stash") && a.unmerged.is_empty() {
-        crate::helpers::narrate::clear_stash_conflict();
+        crate::ui::narrate::clear_stash_conflict();
     }
     let paths = positionals(args, &[]);
     let hard = has(args, &["--hard"]);
@@ -1013,7 +1015,7 @@ fn switch_summary(b: &RepoSnapshot, a: &RepoSnapshot, created: bool) {
         parts.push(format!("new branch '{}' starts at {}", branch, head.as_deref().map(short).unwrap_or("")));
     }
     if let Some(h) = &head {
-        let compare = upstream_of(&branch).and_then(|u| a.refs.get(&u).map(|x| (crate::helpers::for_each_ref::shorten_unambiguous_ref(&u), x.clone())))
+        let compare = upstream_of(&branch).and_then(|u| a.refs.get(&u).map(|x| (crate::references::for_each_ref::engine::shorten_unambiguous_ref(&u), x.clone())))
             .or_else(|| b.head_branch.clone().filter(|p| p != &branch).and_then(|p| b.head.clone().map(|x| (p, x))));
         if let Some((name, other)) = compare.filter(|_| !created) {
             let (ahead, behind) = (commits_between(Some(&other), h), commits_between(Some(h), &other));

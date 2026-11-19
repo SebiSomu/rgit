@@ -1,0 +1,13 @@
+pub mod bisect;
+pub mod blame;
+pub mod cherry;
+pub mod follow;
+pub mod graph;
+pub mod grep;
+pub mod last_modified;
+pub mod log;
+pub mod name_rev;
+pub mod range_diff;
+pub mod rev_list;
+pub mod shortlog;
+pub mod show_branch;

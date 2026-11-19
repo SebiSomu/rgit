@@ -80,3 +80,27 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let doy = (153 * mp + 2) / 5 + day - 1;
     era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468
 }
+
+/// Formats a timestamp in RFC 2822 style for mail headers, in the commit's own timezone
+/// (e.g. `Sat, 3 Oct 2026 09:05:07 +0300`).
+// Used by `format-patch`.
+pub fn format_rfc2822_date(timestamp: i64, tz: &str) -> String {
+    let offset = tz_offset_seconds(tz);
+    let local = timestamp + offset;
+    let days = local.div_euclid(86_400);
+    let secs = local.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    const WEEKDAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    format!(
+        "{}, {} {} {} {:02}:{:02}:{:02} {}",
+        WEEKDAYS[days.rem_euclid(7) as usize],
+        day,
+        MONTHS[(month - 1) as usize],
+        year,
+        secs / 3600,
+        (secs / 60) % 60,
+        secs % 60,
+        tz
+    )
+}

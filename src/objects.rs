@@ -33,7 +33,7 @@ pub struct CommitData {
 }
 
 /// Encapsulates a parsed gitignore glob pattern rule and its directory context.
-// Used by: src/helpers/gitignore.rs, src/helpers/clean.rs, src/commands/clean.rs
+// Used by: src/workspace/gitignore.rs, src/workspace/clean/engine.rs, src/workspace/clean.rs
 // Used by command/helper: `parse_gitignore_line`, `is_path_ignored`, `collect_clean_candidates`, and the `clean` command
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GitIgnoreRule {
@@ -45,7 +45,7 @@ pub struct GitIgnoreRule {
 }
 
 /// Represents an atomic edit operation emitted during Myers line-by-line diff calculation.
-// Used by: src/helpers/diff.rs, src/commands/diff.rs
+// Used by: src/diff/myers.rs, src/diff/diff.rs
 // Used by command/helper: `myers_diff`, `format_diff_output`, and the `diff` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiffOp {
@@ -55,7 +55,7 @@ pub enum DiffOp {
 }
 
 /// Enum of subcommands supported by the stash command.
-// Used by: src/cli.rs, src/commands/stash.rs
+// Used by: src/cli.rs, src/workspace/stash.rs
 // Used by command/helper: CLI argument parser and the `stash` command dispatcher
 #[derive(Subcommand, Debug)]
 pub enum StashAction {
@@ -90,7 +90,7 @@ pub enum StashAction {
 }
 
 /// Represents an individual recorded entry in the stash reference log (`.git/logs/refs/stash`).
-// Used by: src/helpers/state_files.rs, src/commands/stash.rs
+// Used by: src/workspace/state_files.rs, src/workspace/stash.rs
 // Used by command/helper: `read_stash_list`, `write_stash_list`, and the `stash` command
 pub struct StashEntry {
     pub hash: String,
@@ -98,7 +98,7 @@ pub struct StashEntry {
 }
 
 /// Represents the step calculation result of a binary search commit inspection in bisect.
-// Used by: src/helpers/bisect.rs, src/commands/bisect.rs
+// Used by: src/history/bisect/engine.rs, src/history/bisect.rs
 // Used by command/helper: `bisect_step` helper and the `bisect` command
 pub enum BisectOutcome {
     WaitingForBad,
@@ -108,7 +108,7 @@ pub enum BisectOutcome {
 }
 
 /// Enum of subcommands supported by the bisect command.
-// Used by: src/cli.rs, src/commands/bisect.rs
+// Used by: src/cli.rs, src/history/bisect.rs
 // Used by command/helper: CLI argument parser and the `bisect` command dispatcher
 #[derive(Subcommand, Debug)]
 pub enum BisectAction {
@@ -158,7 +158,7 @@ pub enum ReflogAction {
 }
 
 /// Defines the working tree and staging index update mode for `reset`.
-// Used by: src/commands/reset.rs
+// Used by: src/workspace/reset.rs
 // Used by command/helper: The `reset` command
 pub enum ResetMode {
     Soft,
@@ -167,12 +167,12 @@ pub enum ResetMode {
 }
 
 /// An in-memory flattened map of relative file paths to their 20-byte object hash and mode.
-// Used by: src/core/object_store.rs, src/core/commit.rs, src/helpers/checkout.rs, src/helpers/state_files.rs, src/helpers/banana_split.rs, src/commands/banana_split.rs
+// Used by: src/core/object_store.rs, src/core/commit.rs, src/workspace/checkout.rs, src/workspace/state_files.rs, src/merge/banana_split/engine.rs, src/merge/banana_split.rs
 // Used by command/helper: `flatten_tree`, `resolve_tree_from_source`, `build_tree_from_map`, and the `banana_split` command
 pub type Tree = std::collections::BTreeMap<String, ([u8; 20], u32)>;
 
 /// Filter mode determining whether untracked files, ignored files, or both are targeted for cleaning.
-// Used by: src/helpers/clean.rs, src/commands/clean.rs
+// Used by: src/workspace/clean/engine.rs, src/workspace/clean.rs
 // Used by command/helper: `collect_clean_candidates` helper and the `clean` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CleanMode {
@@ -192,7 +192,7 @@ impl CleanMode {
 }
 
 /// An instruction action assigned to an individual commit entry in an interactive rebase todo file.
-// Used by: src/helpers/rebase.rs, src/commands/rebase.rs
+// Used by: src/merge/rebase/engine.rs, src/merge/rebase.rs
 // Used by command/helper: `parse_edited_todo`, `render_todo_for_editing`, `commit_item`, and the `rebase` command
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Action {
@@ -230,7 +230,7 @@ impl Action {
 }
 
 /// A parsed line entry from `.git/REBASE_TODO` tracking a commit, its instruction action, and subject.
-// Used by: src/helpers/rebase.rs, src/commands/rebase.rs
+// Used by: src/merge/rebase/engine.rs, src/merge/rebase.rs
 // Used by command/helper: `read_todo`, `write_todo`, `render_todo_for_editing`, `process_rebase_todo`, and the `rebase` command
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TodoItem {
@@ -247,7 +247,7 @@ impl TodoItem {
 }
 
 /// Execution outcome of applying a single todo item during the rebase replay cycle.
-// Used by: src/helpers/rebase.rs
+// Used by: src/merge/rebase/engine.rs
 // Used by command/helper: `commit_item`, `rebase_continue`, and `process_rebase_todo` helpers
 #[derive(Debug, PartialEq, Eq)]
 pub enum ItemResult {
@@ -256,7 +256,7 @@ pub enum ItemResult {
 }
 
 /// Represents the result or update status of a reference during a push operation.
-// Used by: src/helpers/push.rs, src/commands/push.rs
+// Used by: src/remote/push/engine.rs, src/remote/push.rs
 // Used by command/helper: `push` command and push reporting helpers
 #[derive(Debug, PartialEq, Eq)]
 pub enum PushStatus {
@@ -268,7 +268,7 @@ pub enum PushStatus {
 }
 
 /// The update status of a single remote-tracking ref after a fetch operation.
-// Used by: src/helpers/fetch.rs, src/commands/fetch.rs
+// Used by: src/remote/fetch/engine.rs, src/remote/fetch.rs
 // Used by command/helper: `fetch_from_local`, `fetch_from_github`, and the `fetch` command
 #[derive(Debug, PartialEq, Eq)]
 pub enum FetchRefResult {
@@ -278,7 +278,7 @@ pub enum FetchRefResult {
 }
 
 /// Target repository metadata and authentication credentials for pushing to GitHub via the Git Data API.
-// Used by: src/helpers/github.rs, src/commands/push.rs
+// Used by: src/remote/github.rs, src/remote/push.rs
 // Used by command/helper: `push_to_github`, `resolve_github_target`, and the `push` command
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GitHubTarget {
@@ -288,7 +288,7 @@ pub struct GitHubTarget {
 }
 
 /// Parsed author or committer metadata extracted from a raw commit object for API serialization.
-// Used by: src/helpers/github.rs
+// Used by: src/remote/github.rs
 // Used by command/helper: `parse_commit_identity`, `create_github_commit`
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CommitIdentity {
@@ -298,7 +298,7 @@ pub struct CommitIdentity {
 }
 
 /// A single file or subtree entry in a GitHub tree creation request.
-// Used by: src/helpers/github.rs
+// Used by: src/remote/github.rs
 // Used by command/helper: `upload_tree_to_github`, `create_github_tree`
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GitHubTreeEntry {
@@ -311,7 +311,7 @@ pub struct GitHubTreeEntry {
 /// The place a `clone` reads from, once the repository argument has been classified. It is
 /// either a directory on the local filesystem (cloned by copying objects across, the same
 /// way `fetch` reads a local remote) or a GitHub repository reached through the Git Data API.
-// Used by: src/helpers/clone.rs, src/commands/clone.rs
+// Used by: src/remote/clone/engine.rs, src/remote/clone.rs
 // Used by command/helper: `classify_clone_source`, `remote_default_branch`, and the `clone` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CloneSource {
@@ -350,7 +350,7 @@ impl CloneSource {
 }
 
 /// Subcommands supported by the `remote` command for managing tracking repositories.
-// Used by: src/cli.rs, src/commands/remote.rs
+// Used by: src/cli.rs, src/remote/remote.rs
 // Used by command/helper: CLI argument parser and the `remote` command dispatcher
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum RemoteAction {
@@ -383,7 +383,7 @@ pub enum RemoteAction {
 }
 
 /// Detailed information about a configured remote repository.
-// Used by: src/helpers/remote.rs, src/commands/remote.rs
+// Used by: src/remote/remote/engine.rs, src/remote/remote.rs
 // Used by command/helper: `get_remote_info` helper and the `remote show` command
 #[derive(Debug, Clone)]
 pub struct RemoteInfo {
@@ -396,7 +396,7 @@ pub struct RemoteInfo {
 /// One line of a file's blame result: the line itself and the commit that last changed it,
 /// with that commit's author and author time. Lines that exist only in the working copy
 /// carry an all-zero commit hash and the author "Not Committed Yet".
-// Used by: src/helpers/blame.rs, src/commands/blame.rs
+// Used by: src/history/blame/engine.rs, src/history/blame.rs
 // Used by command/helper: `blame_file`, `format_blame_output`, and the `blame` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlameLine {
@@ -420,7 +420,7 @@ impl BlameLine {
 }
 
 /// Represents the supported serialization archive format (tar, tar.gz, or zip).
-// Used by: src/commands/archive.rs, src/helpers/archive.rs
+// Used by: src/export/archive.rs, src/export/archive/engine.rs
 // Used by command/helper: `create_archive`, `ArchiveFormat::parse`, and the `archive` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArchiveFormat {
@@ -464,7 +464,7 @@ impl ArchiveFormat {
 /// One line of a reflog: a ref moving from one commit to another, who did it, when, and why.
 /// Stored one per line in `.git/logs/<ref>` in git's own format:
 /// `<old> <new> <name> <<email>> <timestamp> <tz>\t<message>`.
-// Used by: src/core/reflog.rs, src/commands/reflog.rs
+// Used by: src/core/reflog.rs, src/references/reflog.rs
 // Used by command/helper: `append_reflog_entry`, `read_reflog`, `write_reflog`, `expire_reflog`, `format_reflog_output`, and the `reflog` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReflogEntry {
@@ -521,7 +521,7 @@ impl ReflogEntry {
 /// A loose object file found in `.git/objects/xx/`: what it is called, where it lives, how
 /// large the compressed file is and when it was last modified (which is how `gc` decides an
 /// unreferenced object is old enough to prune).
-// Used by: src/helpers/gc.rs, src/commands/gc.rs
+// Used by: src/storage/gc/engine.rs, src/storage/gc.rs
 // Used by command/helper: `list_loose_objects`, `plan_gc`, `remove_loose_object`, and the `gc` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LooseObject {
@@ -538,7 +538,7 @@ pub struct LooseObject {
 /// What a `gc` run found: how many loose objects exist, how many are reachable, which
 /// unreachable ones were (or, in a dry run, would be) pruned, and how many reflog entries
 /// expired.
-// Used by: src/helpers/gc.rs, src/commands/gc.rs
+// Used by: src/storage/gc/engine.rs, src/storage/gc.rs
 // Used by command/helper: `plan_gc` and the `gc` command
 #[derive(Debug, Clone, Default)]
 pub struct GcReport {
@@ -565,7 +565,7 @@ impl GcReport {
 
 /// How serious a problem found by `fsck` is: an error means the repository is damaged and
 /// makes `fsck` exit non-zero; a warning is worth knowing about but doesn't.
-// Used by: src/helpers/fsck.rs, src/commands/fsck.rs
+// Used by: src/storage/fsck/engine.rs, src/storage/fsck.rs
 // Used by command/helper: `FsckIssue`, `FsckReport`, and the `fsck` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsckSeverity {
@@ -574,7 +574,7 @@ pub enum FsckSeverity {
 }
 
 /// One problem found by `fsck`, with a human-readable description.
-// Used by: src/helpers/fsck.rs, src/commands/fsck.rs
+// Used by: src/storage/fsck/engine.rs, src/storage/fsck.rs
 // Used by command/helper: `verify_loose_object`, `check_refs`, `check_index`, `mark_reachable_in_graph`, and the `fsck` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FsckIssue {
@@ -597,7 +597,7 @@ impl FsckIssue {
 /// One object in the graph `fsck` builds: its type (`blob`, `tree`, `commit`, `tag`, or
 /// `unknown` if it could not be read) and the objects it links to, each with the type the link
 /// claims they have (`any` for a tag's target).
-// Used by: src/helpers/fsck.rs
+// Used by: src/storage/fsck/engine.rs
 // Used by command/helper: `verify_loose_object`, `mark_reachable_in_graph`, and `run_fsck_checks`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FsckNode {
@@ -608,7 +608,7 @@ pub struct FsckNode {
 /// Everything an `fsck` run found: how many objects it looked at, the problems, and the objects
 /// nothing reaches (all of them, and the subset that nothing else unreachable points at, which
 /// are called dangling). Types and hashes are stored as `(type, hash)` pairs.
-// Used by: src/helpers/fsck.rs, src/commands/fsck.rs
+// Used by: src/storage/fsck/engine.rs, src/storage/fsck.rs
 // Used by command/helper: `run_fsck_checks` and the `fsck` command
 #[derive(Debug, Clone, Default)]
 pub struct FsckReport {
@@ -631,7 +631,7 @@ impl FsckReport {
 }
 
 /// Options controlling pattern search, target files, and output formatting for `grep`.
-// Used by: src/commands/grep.rs, src/helpers/grep.rs
+// Used by: src/history/grep.rs, src/history/grep/engine.rs
 // Used by command/helper: `grep` command and `search_content` helper
 #[derive(Debug, Clone)]
 pub struct GrepOptions {
@@ -646,7 +646,7 @@ pub struct GrepOptions {
 }
 
 /// The result of searching a single file or blob in `grep`.
-// Used by: src/commands/grep.rs, src/helpers/grep.rs
+// Used by: src/history/grep.rs, src/history/grep/engine.rs
 // Used by command/helper: `grep` command and `search_content` helper
 #[derive(Debug, Clone)]
 pub struct GrepFileResult {
@@ -656,7 +656,7 @@ pub struct GrepFileResult {
 }
 
 /// Statistics collected by the `count-objects` command about loose objects, packs, and garbage.
-// Used by: src/helpers/count_objects.rs, src/commands/count_objects.rs
+// Used by: src/storage/count_objects/engine.rs, src/storage/count_objects.rs
 // Used by command/helper: `collect_object_counts`, `format_human_readable_size`, and the `count_objects` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ObjectCountReport {
@@ -672,7 +672,7 @@ pub struct ObjectCountReport {
 
 /// Parsed options for the `rev-parse` command, covering both revision-resolution
 /// mode and repository-property query mode.
-// Used by: src/core/rev_parse.rs, src/commands/rev_parse.rs
+// Used by: src/core/rev_parse.rs, src/plumbing/rev_parse.rs
 // Used by command/helper: `resolve_rev`, `run_rev_parse`, and the `rev_parse` command
 #[derive(Debug, Clone, Default)]
 pub struct RevParseOptions {
@@ -701,7 +701,7 @@ pub struct RevParseOptions {
 }
 
 /// Options for the `shortlog` command, which summarises `git log` output grouped by author.
-// Used by: src/helpers/shortlog.rs, src/commands/shortlog.rs
+// Used by: src/history/shortlog/engine.rs, src/history/shortlog.rs
 // Used by command/helper: `collect_shortlog` and the `shortlog` command
 #[derive(Debug, Clone, Default)]
 pub struct ShortlogOptions {
@@ -718,7 +718,7 @@ pub struct ShortlogOptions {
 }
 /// Options for the `ls-files` command, which lists paths from the staging index
 /// (`.git/index`) and/or untracked paths from the working tree.
-// Used by: src/cli.rs, src/commands/ls_files.rs
+// Used by: src/cli.rs, src/workspace/ls_files.rs
 // Used by command/helper: the `ls_files` command (option parsing and output selection)
 #[derive(Debug, Clone, Default)]
 pub struct LsFilesOptions {
@@ -747,7 +747,7 @@ pub struct LsFilesOptions {
 }
 
 /// Working-tree state of a tracked index entry, as reported by `ls-files -m` / `-d`.
-// Used by: src/helpers/ls_files.rs, src/commands/ls_files.rs
+// Used by: src/workspace/ls_files/engine.rs, src/workspace/ls_files.rs
 // Used by command/helper: `worktree_state` helper and the `ls_files` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorktreeState {
@@ -758,7 +758,7 @@ pub enum WorktreeState {
 
 /// An untracked working-tree path found by the `ls-files --others` walk, together with
 /// whether `.gitignore` rules (including an ignored ancestor directory) exclude it.
-// Used by: src/helpers/ls_files.rs, src/commands/ls_files.rs
+// Used by: src/workspace/ls_files/engine.rs, src/workspace/ls_files.rs
 // Used by command/helper: `collect_untracked_paths` helper and the `ls_files` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UntrackedPath {
@@ -769,7 +769,7 @@ pub struct UntrackedPath {
 
 /// Options for the `check-ignore` command, which reports which paths are excluded by
 /// `.gitignore` rules and, in verbose mode, which rule excluded them.
-// Used by: src/cli.rs, src/commands/check_ignore.rs
+// Used by: src/cli.rs, src/workspace/check_ignore.rs
 // Used by command/helper: the `check_ignore` command (validation, input source, and output format)
 #[derive(Debug, Clone, Default)]
 pub struct CheckIgnoreOptions {
@@ -791,7 +791,7 @@ pub struct CheckIgnoreOptions {
 
 /// A parsed `.gitignore` rule together with where it was defined: the `.gitignore` file,
 /// the 1-based line number, and the pattern text as written (including `!` and trailing `/`).
-// Used by: src/helpers/check_ignore.rs, src/commands/check_ignore.rs
+// Used by: src/workspace/check_ignore/engine.rs, src/workspace/check_ignore.rs
 // Used by command/helper: `find_ignore_match` helper and the `check_ignore` command (`-v` output)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourcedIgnoreRule {
@@ -803,7 +803,7 @@ pub struct SourcedIgnoreRule {
 
 /// Options for the `apply` command, which applies a unified/git diff to the working tree
 /// and/or the index, or only inspects it (`--check`, `--stat`, `--numstat`, `--summary`).
-// Used by: src/cli.rs, src/commands/apply.rs
+// Used by: src/cli.rs, src/mail/apply.rs
 // Used by command/helper: the `apply` command (mode selection, targets, and output)
 #[derive(Debug, Clone, Default)]
 pub struct ApplyOptions {
@@ -832,7 +832,7 @@ pub struct ApplyOptions {
 }
 
 /// The role of a single line inside a patch hunk.
-// Used by: src/helpers/apply.rs, src/commands/apply.rs
+// Used by: src/mail/apply/engine.rs, src/mail/apply.rs
 // Used by command/helper: `parse_patch`, `apply_hunks`, `FilePatch::reversed`, and the `apply` command (stats)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HunkLineKind {
@@ -844,7 +844,7 @@ pub enum HunkLineKind {
 /// One line of a patch hunk: its role, its text (without line terminator or trailing `\r`),
 /// whether the patch line carried a `\r` (CRLF content), and whether it was followed by
 /// `\ No newline at end of file`.
-// Used by: src/helpers/apply.rs
+// Used by: src/mail/apply/engine.rs
 // Used by command/helper: `parse_patch` and `apply_hunks`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HunkLine {
@@ -855,7 +855,7 @@ pub struct HunkLine {
 }
 
 /// A single `@@ -old_start,old_count +new_start,new_count @@` hunk of a file patch.
-// Used by: src/helpers/apply.rs
+// Used by: src/mail/apply/engine.rs
 // Used by command/helper: `parse_patch`, `apply_hunks`, and `FilePatch::reversed`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchHunk {
@@ -868,7 +868,7 @@ pub struct PatchHunk {
 
 /// Everything a patch says about one file: old/new paths (`None` for `/dev/null`), modes,
 /// creation/deletion/rename/copy flags, rename similarity, binary marker, and its hunks.
-// Used by: src/helpers/apply.rs, src/commands/apply.rs
+// Used by: src/mail/apply/engine.rs, src/mail/apply.rs
 // Used by command/helper: `parse_patch`, `apply_hunks`, `format_apply_stat`, and the `apply` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FilePatch {
@@ -891,7 +891,7 @@ pub struct FilePatch {
 
 /// One decoded hunk of a `GIT binary patch`: either the full new content (`literal`) or a
 /// git delta against the old content (`delta`), already inflated from zlib + base85.
-// Used by: src/helpers/apply.rs
+// Used by: src/mail/apply/engine.rs
 // Used by command/helper: `parse_patch`, `apply_git_delta`, `check_file_patch`, and `FilePatch::reversed`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BinaryHunk {
@@ -977,7 +977,7 @@ impl FilePatch {
 /// One line of a file being patched: its text (without terminator) and its original line
 /// ending (`"\n"`, `"\r\n"`, or `""` for a final line without newline), so CRLF files and
 /// missing final newlines survive `apply` unchanged.
-// Used by: src/helpers/apply.rs
+// Used by: src/mail/apply/engine.rs
 // Used by command/helper: `split_image`, `join_image`, and `apply_hunks`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchImageLine {
@@ -987,7 +987,7 @@ pub struct PatchImageLine {
 
 /// Why a hunk could not be applied: the hunk's 1-based position in its file patch, the
 /// `old_start` line git reports, and the preimage text that was searched for (for `-v`).
-// Used by: src/helpers/apply.rs, src/commands/apply.rs
+// Used by: src/mail/apply/engine.rs, src/mail/apply.rs
 // Used by command/helper: `apply_hunks` and the `apply` command (error reporting)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HunkFailure {
@@ -999,12 +999,12 @@ pub struct HunkFailure {
 /// Planned results of checking a set of file patches, keyed by path: `Some((content, mode))`
 /// for a file to write, `None` for a file to delete. Nothing touches disk until every patch
 /// in the set has been checked, which is what makes `apply` and `am` all-or-nothing.
-// Used by: src/helpers/apply.rs, src/commands/apply.rs, src/commands/am.rs
+// Used by: src/mail/apply/engine.rs, src/mail/apply.rs, src/mail/am.rs
 // Used by command/helper: `check_file_patch`, `load_patch_target`, `patch_target_exists`, `write_planned_changes`, and the `apply`/`am` commands
 pub type PlannedChanges = std::collections::BTreeMap<String, Option<(Vec<u8>, u32)>>;
 
 /// Options for the `format-patch` command, which turns commits into mailbox-style patch files.
-// Used by: src/cli.rs, src/commands/format_patch.rs
+// Used by: src/cli.rs, src/mail/format_patch.rs
 // Used by command/helper: the `format_patch` command (commit selection, numbering, and output)
 #[derive(Debug, Clone, Default)]
 pub struct FormatPatchOptions {
@@ -1036,7 +1036,7 @@ pub struct FormatPatchOptions {
 
 /// An author or committer identity from a commit object: name, email, Unix timestamp, and
 /// the `+HHMM` timezone it was recorded in.
-// Used by: src/helpers/format_patch.rs, src/helpers/am.rs, src/commands/format_patch.rs, src/commands/am.rs
+// Used by: src/mail/format_patch/engine.rs, src/mail/am/engine.rs, src/mail/format_patch.rs, src/mail/am.rs
 // Used by command/helper: `parse_commit_object`, `format_rfc2822_date`, `parse_mail`, `build_commit_with_author`, and the `format_patch`/`am` commands
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommitSignature {
@@ -1047,7 +1047,7 @@ pub struct CommitSignature {
 }
 
 /// A commit object parsed into its parts: tree, parents, author, committer, and raw message.
-// Used by: src/helpers/format_patch.rs, src/commands/format_patch.rs
+// Used by: src/mail/format_patch/engine.rs, src/mail/format_patch.rs
 // Used by command/helper: `parse_commit_object`, `select_patch_commits`, and the `format_patch` command
 #[derive(Debug, Clone, Default)]
 pub struct ParsedCommit {
@@ -1061,7 +1061,7 @@ pub struct ParsedCommit {
 
 /// One file's contribution to a `--stat` block: display name, added/deleted line counts,
 /// and `(old_size, new_size)` in bytes for binary files.
-// Used by: src/helpers/format_patch.rs
+// Used by: src/mail/format_patch/engine.rs
 // Used by command/helper: `diff_tree_file` and `format_diffstat`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DiffStatEntry {
@@ -1075,7 +1075,7 @@ pub struct DiffStatEntry {
 
 /// The git-format diff of one path between two trees: the full `diff --git` section, its
 /// diffstat entry, and its `--summary` line (creation, deletion, or mode change), if any.
-// Used by: src/helpers/format_patch.rs, src/commands/format_patch.rs
+// Used by: src/mail/format_patch/engine.rs, src/mail/format_patch.rs
 // Used by command/helper: `diff_tree_file`, `diff_commit_against_parent`, and the `format_patch` command
 #[derive(Debug, Clone, Default)]
 pub struct FileDiff {
@@ -1085,7 +1085,7 @@ pub struct FileDiff {
 }
 
 /// Options for the `am` command, which applies a mailbox of patches as commits.
-// Used by: src/cli.rs, src/commands/am.rs
+// Used by: src/cli.rs, src/mail/am.rs
 // Used by command/helper: the `am` command (input, resume actions, and subject handling)
 #[derive(Debug, Clone, Default)]
 pub struct AmOptions {
@@ -1108,7 +1108,7 @@ pub struct AmOptions {
 /// A patch email decoded by `am`: author identity and date (from `From:`/`Date:`, possibly
 /// overridden by in-body headers), the cleaned subject, the final commit message, and the
 /// diff text that follows the `---` separator.
-// Used by: src/helpers/am.rs, src/commands/am.rs
+// Used by: src/mail/am/engine.rs, src/mail/am.rs
 // Used by command/helper: `parse_mail`, `commit_mail`, and the `am` command
 #[derive(Debug, Clone, Default)]
 pub struct MailPatch {
@@ -1121,7 +1121,7 @@ pub struct MailPatch {
 /// Parsed arguments for the `rev-list` command: which commits to start from and exclude,
 /// how to walk and order them, which to keep, and how to print them. Parsed by hand (not by
 /// clap) because git's syntax is order-sensitive (`--not`) and allows `-<n>` / `-n<n>`.
-// Used by: src/helpers/rev_list.rs, src/commands/rev_list.rs
+// Used by: src/history/rev_list/engine.rs, src/history/rev_list.rs
 // Used by command/helper: `parse_rev_list_args`, `run_rev_list_walk`, `format_rev_list_entry`, and the `rev_list` command
 #[derive(Debug, Clone, Default)]
 pub struct RevListOptions {
@@ -1176,7 +1176,7 @@ pub struct RevListOptions {
 }
 
 /// How `rev-list` prints each commit beyond its hash line.
-// Used by: src/helpers/rev_list.rs, src/commands/rev_list.rs
+// Used by: src/history/rev_list/engine.rs, src/history/rev_list.rs
 // Used by command/helper: `parse_rev_list_args`, `format_rev_list_entry`, and the `rev_list` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RevListFormat {
@@ -1190,7 +1190,7 @@ pub enum RevListFormat {
 /// A commit visited by the `rev-list` walk: its parsed object, the parents the walk followed
 /// (simplified when paths limit history), whether history simplification hides it, and
 /// whether it belongs to the left side of a symmetric range.
-// Used by: src/helpers/rev_list.rs, src/commands/rev_list.rs
+// Used by: src/history/rev_list/engine.rs, src/history/rev_list.rs
 // Used by command/helper: `run_rev_list_walk`, `sort_rev_list_topologically`, `rewrite_rev_list_parents`, and the `rev_list` command
 #[derive(Debug, Clone, Default)]
 pub struct WalkedCommit {
@@ -1204,7 +1204,7 @@ pub struct WalkedCommit {
 /// it is negative, i.e. excluded, and whether it is the left side of a symmetric `A...B`), and
 /// the "bottoms" (the excluded commits that were named explicitly, which git still treats as
 /// relevant parents when simplifying path-limited history).
-// Used by: src/helpers/rev_list.rs, src/commands/rev_list.rs
+// Used by: src/history/rev_list/engine.rs, src/history/rev_list.rs
 // Used by command/helper: `resolve_rev_list_tips`, `run_rev_list_walk`, and the `rev_list` command
 #[derive(Debug, Clone, Default)]
 pub struct RevListRoots {
@@ -1218,7 +1218,7 @@ pub struct RevListRoots {
 /// `ADDED` (parents processed), `UNINTERESTING` (excluded, marked gradually as the walk goes,
 /// which is what makes path simplification depend on walk order exactly like git),
 /// `TREESAME` (hidden by simplification), and `SYMMETRIC_LEFT`.
-// Used by: src/helpers/rev_list.rs, src/commands/rev_list.rs
+// Used by: src/history/rev_list/engine.rs, src/history/rev_list.rs
 // Used by command/helper: `run_rev_list_walk`, `rewrite_rev_list_parents`, and the `rev_list` command
 #[derive(Debug, Clone, Default)]
 pub struct RevWalkState {
@@ -1242,7 +1242,7 @@ impl RevWalkState {
 /// Subcommands of `worktree`, which manages extra working trees attached to one repository.
 /// Each linked worktree has its own HEAD, index and in-progress state under
 /// `.git/worktrees/<id>/`, while objects, refs and config stay shared.
-// Used by: src/cli.rs, src/commands/worktree.rs
+// Used by: src/cli.rs, src/workspace/worktree.rs
 // Used by command/helper: CLI argument parser and the `worktree` command dispatcher
 #[derive(Subcommand, Debug)]
 pub enum WorktreeAction {
@@ -1314,7 +1314,7 @@ pub enum WorktreeAction {
 
 /// One worktree of the repository as `worktree list` reports it: where it is, what its HEAD
 /// points at, and whether it is locked or can be pruned. The main worktree has no `id`.
-// Used by: src/helpers/worktree.rs, src/commands/worktree.rs, src/commands/branch.rs
+// Used by: src/workspace/worktree/engine.rs, src/workspace/worktree.rs, src/workspace/branch.rs
 // Used by command/helper: `list_worktrees`, `find_worktree`, `worktree_using_branch`, and the `worktree` command
 #[derive(Debug, Clone)]
 pub struct WorktreeInfo {
@@ -1350,7 +1350,7 @@ impl WorktreeInfo {
 }
 
 /// How `worktree add` comes by the branch it checks out in the new worktree.
-// Used by: src/commands/worktree.rs
+// Used by: src/workspace/worktree.rs
 // Used by command/helper: the `worktree add` command
 pub enum BranchCreation {
     /// Already exists (or there is no branch: detached HEAD).
@@ -1363,7 +1363,7 @@ pub enum BranchCreation {
 
 /// Options for the `check-ref-format` command, which validates a proposed ref name against
 /// git's ref naming rules (and, with `--branch`, against the rules for a branch name).
-// Used by: src/cli.rs, src/commands/check_ref_format.rs, src/core/check_ref_format.rs
+// Used by: src/cli.rs, src/references/check_ref_format.rs, src/core/check_ref_format.rs
 // Used by command/helper: the `check_ref_format` command and `check_refname_format`
 #[derive(Debug, Clone, Default)]
 pub struct CheckRefFormatOptions {
@@ -1381,7 +1381,7 @@ pub struct CheckRefFormatOptions {
 
 /// Options for the `cherry` command, which marks the commits of `<head>` missing from
 /// `<upstream>` as `+` (not applied there) or `-` (an equivalent patch is already upstream).
-// Used by: src/cli.rs, src/commands/cherry.rs
+// Used by: src/cli.rs, src/history/cherry.rs
 // Used by command/helper: the `cherry` command
 #[derive(Debug, Clone, Default)]
 pub struct CherryOptions {
@@ -1399,7 +1399,7 @@ pub struct CherryOptions {
 
 /// Options for the `merge-tree` command, which merges two commits in memory and writes only
 /// the resulting tree, without touching the index, working tree, or refs.
-// Used by: src/cli.rs, src/commands/merge_tree.rs
+// Used by: src/cli.rs, src/merge/merge_tree.rs
 // Used by command/helper: the `merge_tree` command
 #[derive(Debug, Clone, Default)]
 pub struct MergeTreeOptions {
@@ -1420,7 +1420,7 @@ pub struct MergeTreeOptions {
 }
 
 /// How one side of a merge changed a path relative to the merge base.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_trees_in_memory` and the `merge_tree --explain` report
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SideChange {
@@ -1452,7 +1452,7 @@ impl SideChange {
 }
 
 /// What the in-memory merge decided for one path.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_trees_in_memory` and the `merge_tree --explain` report
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MergePathOutcome {
@@ -1469,7 +1469,7 @@ pub enum MergePathOutcome {
 }
 
 /// One region of a file where both sides changed the same base lines differently.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_file_lines` and the `merge_tree --explain` conflict preview
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConflictRegion {
@@ -1481,7 +1481,7 @@ pub struct ConflictRegion {
 }
 
 /// The result of a line-level three-way merge of one file.
-// Used by: src/helpers/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs
 // Used by command/helper: `merge_file_lines` and `merge_trees_in_memory`
 #[derive(Debug, Clone, Default)]
 pub struct FileMergeResult {
@@ -1495,7 +1495,7 @@ pub struct FileMergeResult {
 }
 
 /// The decision report for one path that at least one side changed.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_trees_in_memory` and the `merge_tree --explain` report
 #[derive(Debug, Clone)]
 pub struct MergePathReport {
@@ -1508,7 +1508,7 @@ pub struct MergePathReport {
 }
 
 /// One informational message of a merge, as git's `merge-tree` reports it.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_trees_in_memory` and the `merge_tree` output
 #[derive(Debug, Clone)]
 pub struct MergeMessage {
@@ -1520,7 +1520,7 @@ pub struct MergeMessage {
 }
 
 /// The full result of an in-memory tree merge.
-// Used by: src/helpers/merge_tree.rs, src/commands/merge_tree.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_tree.rs
 // Used by command/helper: `merge_trees_in_memory` and the `merge_tree` command
 #[derive(Debug, Clone, Default)]
 pub struct TreeMergeResult {
@@ -1534,7 +1534,7 @@ pub struct TreeMergeResult {
 
 /// Subcommands of `bundle`, which packs commits and the objects they need into a single file
 /// for offline transfer, and inspects or unpacks such files.
-// Used by: src/cli.rs, src/commands/bundle.rs
+// Used by: src/cli.rs, src/remote/bundle.rs
 // Used by command/helper: CLI argument parser and the `bundle` command dispatcher
 #[derive(Subcommand, Debug)]
 pub enum BundleAction {
@@ -1577,7 +1577,7 @@ pub enum BundleAction {
 /// The parsed header of a bundle file: its format version, `@key=value` capabilities (v3),
 /// the prerequisite commits a repository must already have (with their comments), the refs
 /// it carries, and where the packfile starts.
-// Used by: src/helpers/bundle.rs, src/commands/bundle.rs
+// Used by: src/remote/bundle/engine.rs, src/remote/bundle.rs
 // Used by command/helper: `parse_bundle_header`, `check_bundle_prerequisites`, and the `bundle` command
 #[derive(Debug, Clone, Default)]
 pub struct BundleHeader {
@@ -1591,7 +1591,7 @@ pub struct BundleHeader {
 /// A file in `.git/objects` that is not a loose object: a temporary file left by an
 /// interrupted write (`tmp_obj_*` in a fan-out directory, `tmp_*` in `objects/` or
 /// `objects/pack/`), with its modification time, or any other stray file in a fan-out directory.
-// Used by: src/helpers/prune.rs, src/commands/prune.rs
+// Used by: src/storage/prune/engine.rs, src/storage/prune.rs
 // Used by command/helper: `list_object_dir_cruft` and the `prune` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectDirCruft {
@@ -1602,7 +1602,7 @@ pub enum ObjectDirCruft {
 /// Options for the `commit` command: where the message comes from (`-m`, `-F`, `-C`/`-c`, the
 /// editor), what to commit (`-a`, `--amend`, `--allow-empty`), and who and when it is
 /// attributed to (`--author`, `--date`, `--reset-author`, `-s`).
-// Used by: src/cli.rs, src/commands/commit.rs
+// Used by: src/cli.rs, src/workspace/commit.rs
 // Used by command/helper: the `commit` command
 #[derive(Debug, Clone, Default)]
 pub struct CommitOptions {
@@ -1636,7 +1636,7 @@ pub struct CommitOptions {
 /// Parsed arguments of `rgit rebase`: what to replay (`<upstream>..<branch>`), where to
 /// (`--onto`, `--keep-base`), and the mode (`-i`, `--continue`, `--abort`, `--skip`,
 /// `--edit-todo`).
-// Used by: src/cli.rs, src/commands/rebase.rs
+// Used by: src/cli.rs, src/merge/rebase.rs
 // Used by command/helper: the `rebase` command
 #[derive(Debug, Clone, Default)]
 pub struct RebaseOptions {
@@ -1658,7 +1658,7 @@ pub struct RebaseOptions {
 }
 
 /// Parsed arguments of `rgit cherry-pick`; also what `.git/sequencer/opts` stores.
-// Used by: src/cli.rs, src/commands/cherry_pick.rs, src/helpers/sequencer.rs
+// Used by: src/cli.rs, src/merge/cherry_pick.rs, src/merge/sequencer.rs
 // Used by command/helper: the `cherry-pick` command and `start_sequence` / `read_sequence_options`
 #[derive(Debug, Clone, Default)]
 pub struct CherryPickOptions {
@@ -1684,7 +1684,7 @@ pub struct CherryPickOptions {
 }
 
 /// `merge --ff` (default), `--no-ff` or `--ff-only`; the last one given wins.
-// Used by: src/cli.rs, src/commands/merge.rs
+// Used by: src/cli.rs, src/merge/merge.rs
 // Used by command/helper: the `merge` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FastForwardMode {
@@ -1695,7 +1695,7 @@ pub enum FastForwardMode {
 }
 
 /// Parsed arguments of `rgit merge`.
-// Used by: src/cli.rs, src/commands/merge.rs, src/commands/pull.rs
+// Used by: src/cli.rs, src/merge/merge.rs, src/remote/pull.rs
 // Used by command/helper: the `merge` and `pull` commands
 #[derive(Debug, Clone, Default)]
 pub struct MergeOptions {
@@ -1726,7 +1726,7 @@ pub struct MergeOptions {
 /// How `log` and `show` lay out each commit: git's built-in pretty formats, or a
 /// `--format` / `--pretty=format:` template (`terminator` is true for `tformat:`, which ends
 /// every entry with a newline, and false for `format:`, which only separates entries).
-// Used by: src/helpers/log.rs, src/commands/log.rs
+// Used by: src/history/log/engine.rs, src/history/log.rs
 // Used by command/helper: `parse_log_args`, `format_log_entry`, and the `log`/`show` commands
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum LogFormat {
@@ -1741,7 +1741,7 @@ pub enum LogFormat {
 }
 
 /// How `log --date=<mode>` prints author and committer dates.
-// Used by: src/helpers/log.rs
+// Used by: src/history/log/engine.rs
 // Used by command/helper: `parse_log_args` and `format_log_date`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LogDateMode {
@@ -1758,7 +1758,7 @@ pub enum LogDateMode {
 
 /// How `log --decorate` names the refs pointing at a commit: not at all, by short name
 /// (`main`, `origin/main`, `tag: v1`), or by full name (`refs/heads/main`).
-// Used by: src/helpers/log.rs, src/commands/log.rs
+// Used by: src/history/log/engine.rs, src/history/log.rs
 // Used by command/helper: `parse_log_args`, `collect_decorations`, and the `log`/`show` commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LogDecorate {
@@ -1770,7 +1770,7 @@ pub enum LogDecorate {
 
 /// Options for `log` and `show`: which commits (the revision walk shared with `rev-list`),
 /// how each one is printed, and what diff output follows it.
-// Used by: src/helpers/log.rs, src/commands/log.rs
+// Used by: src/history/log/engine.rs, src/history/log.rs
 // Used by command/helper: `parse_log_args`, `format_log_entry`, and the `log`/`show` commands
 #[derive(Debug, Clone, Default)]
 pub struct LogOptions {
@@ -1805,7 +1805,7 @@ pub struct LogOptions {
 /// plain branch lines, a `...` marker for skipped output, the rows that make room before an
 /// octopus merge, the commit row itself, the row that fans a merge out to its parents, and the
 /// rows that move branch lines left until they sit in their columns.
-// Used by: src/helpers/graph.rs
+// Used by: src/history/graph.rs
 // Used by command/helper: `graph_update`, `graph_next_line`, and the `log` command through them
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GraphState {
@@ -1822,7 +1822,7 @@ pub enum GraphState {
 /// shown and its interesting parents, the branch lines (each the commit it leads to) before and
 /// after this commit, and the mapping from screen columns (two characters per branch line) to the
 /// line each one has to move to. Indices stay signed, with -1 for "none", as in git.
-// Used by: src/helpers/graph.rs, src/commands/log.rs
+// Used by: src/history/graph.rs, src/history/log.rs
 // Used by command/helper: every `graph_*` helper and the `log` command
 #[derive(Debug, Clone, Default)]
 pub struct GitGraph {
@@ -1854,7 +1854,7 @@ pub struct GitGraph {
 /// One file pair in the diff `log --follow` shows for a commit: the old and new path with their
 /// tree entries, and the rename/copy status and similarity (`R`/`C`, git's 0..60000 score) when
 /// the pair was found by rename detection.
-// Used by: src/helpers/follow.rs, src/commands/log.rs
+// Used by: src/history/follow.rs, src/history/log.rs
 // Used by command/helper: `follow_commit_pairs`, `render_follow_diff`, and the `log` command
 #[derive(Debug, Clone)]
 pub struct FollowPair {
@@ -1869,7 +1869,7 @@ pub struct FollowPair {
 /// Options for the `tag` command: list (with patterns, `-n` annotation lines, `--contains`,
 /// `--points-at`), create (lightweight, or annotated with `-a`/`-m`/`-F`, replacing with `-f`),
 /// or delete tags.
-// Used by: src/cli.rs, src/commands/tag.rs
+// Used by: src/cli.rs, src/references/tag.rs
 // Used by command/helper: the `tag` command
 #[derive(Debug, Clone, Default)]
 pub struct TagOptions {
@@ -1890,7 +1890,7 @@ pub struct TagOptions {
 }
 
 /// Options for the `describe` command, which names a commit after the nearest tag.
-// Used by: src/cli.rs, src/commands/tag.rs, src/helpers/tag.rs
+// Used by: src/cli.rs, src/references/tag.rs, src/references/tag/engine.rs
 // Used by command/helper: `describe_commit` and the `describe` command
 #[derive(Debug, Clone, Default)]
 pub struct DescribeOptions {
@@ -1910,7 +1910,7 @@ pub struct DescribeOptions {
 /// Parsed arguments for the `show-ref` command. Parsed by hand like git's option parser
 /// (`--hash[=<n>]`, `--abbrev[=<n>]`, `--exclude-existing[=<pattern>]`, options after
 /// patterns), so usage errors can exit 129 as git does.
-// Used by: src/helpers/show_ref.rs, src/commands/show_ref.rs
+// Used by: src/references/show_ref/engine.rs, src/references/show_ref.rs
 // Used by command/helper: `parse_show_ref_args`, `show_ref_line`, and the `show_ref` command
 #[derive(Debug, Clone, Default)]
 pub struct ShowRefOptions {
@@ -1939,7 +1939,7 @@ pub struct ShowRefOptions {
 
 /// How `for-each-ref` quotes each interpolated value (`-s`/`--shell`, `-p`/`--perl`,
 /// `--python`, `--tcl`), so the output can be `eval`ed by that language.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_for_each_ref_args` and `quote_ref_value`
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RefQuoteStyle {
@@ -1954,7 +1954,7 @@ pub enum RefQuoteStyle {
 /// Parsed arguments for the `for-each-ref` command. Parsed by hand like git's option parser
 /// (abbreviated long options, `--no-*` negations, `--merged`/`--contains` defaulting to HEAD
 /// when last), so errors can exit 129/128 as git does. Revisions are already resolved.
-// Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs, src/references/for_each_ref.rs
 // Used by command/helper: `parse_for_each_ref_args` and the `for_each_ref` command
 #[derive(Debug, Clone, Default)]
 pub struct ForEachRefOptions {
@@ -1987,7 +1987,7 @@ pub struct ForEachRefOptions {
 }
 
 /// A `for-each-ref` failure carrying git's exit code and what to print on each stream.
-// Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs, src/references/for_each_ref.rs
 // Used by command/helper: `parse_for_each_ref_args`, `prepare_ref_format` and the `for_each_ref` command
 #[derive(Debug, Clone, Default)]
 pub struct ForEachRefExit {
@@ -1997,7 +1997,7 @@ pub struct ForEachRefExit {
 }
 
 /// The field a `%(atom)` in a `for-each-ref` format or `--sort` key names (git's `valid_atom`).
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `populate_ref_values`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefAtomKind {
@@ -2051,7 +2051,7 @@ pub enum RefAtomKind {
 
 /// How a ref name is shown by `%(refname)`, `%(symref)`, `%(upstream)` and `%(push)`: in full,
 /// `:short` (shortest unambiguous), `:lstrip=<n>` or `:rstrip=<n>` (negative = keep `-n`).
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `show_ref_name`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefnameShow {
@@ -2063,7 +2063,7 @@ pub enum RefnameShow {
 
 /// What `%(upstream:...)` / `%(push:...)` prints: the ref, `track` (`[ahead 1, behind 2]`),
 /// `trackshort` (`<>`), `remotename` or `remoteref`.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `remote_ref_details`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteRefShow {
@@ -2076,7 +2076,7 @@ pub enum RemoteRefShow {
 
 /// Which part of a commit or tag message `%(subject)`, `%(body)`, `%(trailers)` and
 /// `%(contents:...)` print.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `grab_message_values`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefContentsPart {
@@ -2093,7 +2093,7 @@ pub enum RefContentsPart {
 
 /// Options of `%(trailers:...)`: `only`, `unfold`, `keyonly`, `valueonly`, `key=<k>` (repeatable,
 /// implies `only`), `separator=<s>` and `key_value_separator=<s>` (with `%n`/`%xNN` expanded).
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_trailer_options` and `format_message_trailers`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrailerFormatOptions {
@@ -2107,7 +2107,7 @@ pub struct TrailerFormatOptions {
 }
 
 /// Where `%(align:...)` puts its text inside the padded width.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `align_ref_text`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefAlign {
@@ -2117,7 +2117,7 @@ pub enum RefAlign {
 }
 
 /// An atom's parsed argument (the part after `:`), per atom kind.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom` and `populate_ref_values`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefAtomArg {
@@ -2144,7 +2144,7 @@ pub enum RefAtomArg {
 }
 
 /// One distinct atom used by a `for-each-ref` format or sort key (git's `used_atom`).
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_atom`, `populate_ref_values`, `format_ref_item` and `compare_ref_items`
 #[derive(Debug, Clone)]
 pub struct RefFilterAtom {
@@ -2161,7 +2161,7 @@ pub struct RefFilterAtom {
 }
 
 /// A ref selected by `for-each-ref`, before its values are computed.
-// Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs, src/references/for_each_ref.rs
 // Used by command/helper: `collect_ref_items`, `filter_ref_items` and `populate_ref_values`
 #[derive(Debug, Clone)]
 pub struct RefArrayItem {
@@ -2174,7 +2174,7 @@ pub struct RefArrayItem {
 
 /// An atom's value for one ref: the bytes to print and, for numeric atoms, the sort value.
 /// `binary` marks raw object data, which is compared by length instead of up to a NUL.
-// Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs, src/references/for_each_ref.rs
 // Used by command/helper: `populate_ref_values`, `format_ref_item` and `compare_ref_items`
 #[derive(Debug, Clone, Default)]
 pub struct RefAtomValue {
@@ -2186,7 +2186,7 @@ pub struct RefAtomValue {
 /// A `--date`-style mode for `%(authordate:<mode>)` and friends: git's `relative`, `iso`,
 /// `iso-strict`, `rfc`, `short`, `default`, `human`, `raw`, `unix` and `format:<strftime>`,
 /// each optionally `-local`.
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_date_mode` and `show_ref_date`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RefDateMode {
@@ -2196,7 +2196,7 @@ pub struct RefDateMode {
 }
 
 /// The base kind of a [`RefDateMode`].
-// Used by: src/helpers/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs
 // Used by command/helper: `parse_ref_date_mode` and `show_ref_date`
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RefDateKind {
@@ -2215,14 +2215,14 @@ pub enum RefDateKind {
 
 /// One piece of a parsed `for-each-ref` format: literal text (with `%%` / `%xx` still to
 /// expand) or the index of an atom in the parsed atom list.
-// Used by: src/helpers/for_each_ref.rs, src/commands/for_each_ref.rs
+// Used by: src/references/for_each_ref/engine.rs, src/references/for_each_ref.rs
 // Used by command/helper: `prepare_ref_format` and `format_ref_item`
 pub type RefFormatPiece = (Option<String>, Option<usize>);
 
 /// Parsed arguments for the `symbolic-ref` command. Parsed by hand like git's option parser
 /// (bundled switches such as `-qd`, `-m<reason>` or `-m <reason>`, options after the names,
 /// `--` ending option parsing), so usage errors can exit 129 as git does.
-// Used by: src/helpers/symbolic_ref.rs, src/commands/symbolic_ref.rs
+// Used by: src/references/symbolic_ref/engine.rs, src/references/symbolic_ref.rs
 // Used by command/helper: `parse_symbolic_ref_args` and the `symbolic_ref` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolicRefOptions {
@@ -2248,7 +2248,7 @@ impl Default for SymbolicRefOptions {
 
 /// What a single ref file (or `packed-refs` entry) holds, read without following symbolic
 /// refs: nothing, an object hash, a `ref: <target>` pointer, or contents that are neither.
-// Used by: src/helpers/symbolic_ref.rs
+// Used by: src/references/symbolic_ref/engine.rs
 // Used by command/helper: `read_raw_ref_value` and `resolve_ref_unsafe` (for the `symbolic-ref` command)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawRefValue {
@@ -2260,7 +2260,7 @@ pub enum RawRefValue {
 
 /// The result of resolving a ref name the way git's `resolve_ref_unsafe` does: the ref name
 /// the walk ended on, its hash when that ref exists, and whether any symbolic ref was followed.
-// Used by: src/helpers/symbolic_ref.rs, src/commands/symbolic_ref.rs
+// Used by: src/references/symbolic_ref/engine.rs, src/references/symbolic_ref.rs
 // Used by command/helper: `resolve_ref_unsafe` and the `symbolic_ref` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedRef {
@@ -2272,7 +2272,7 @@ pub struct ResolvedRef {
 /// Parsed arguments for the `update-ref` command. Parsed by hand like git's option parser
 /// (bundled switches such as `-dz`, `-m<reason>` or `-m <reason>`, options after the names,
 /// `--` ending option parsing), so usage errors can exit 129 as git does.
-// Used by: src/helpers/update_ref.rs, src/commands/update_ref.rs
+// Used by: src/references/update_ref/engine.rs, src/references/update_ref.rs
 // Used by command/helper: `parse_update_ref_args` and the `update_ref` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UpdateRefOptions {
@@ -2295,7 +2295,7 @@ pub struct UpdateRefOptions {
 /// One queued change in a ref transaction (`update-ref` arguments or an `--stdin` command).
 /// Hashes are full hex; the all-zero hash in `new_hash` means "delete", in `old_hash` "must not
 /// exist yet". `new_hash: None` is a `verify` (check only), `old_hash: None` skips the check.
-// Used by: src/helpers/update_ref.rs, src/commands/update_ref.rs
+// Used by: src/references/update_ref/engine.rs, src/references/update_ref.rs
 // Used by command/helper: `queue_ref_update`, `prepare_ref_transaction`, and the `update_ref` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RefUpdate {
@@ -2310,7 +2310,7 @@ pub struct RefUpdate {
 
 /// A [`RefUpdate`] whose checks passed: the ref file that will actually change (after
 /// following symbolic refs unless `no_deref`) and the value it holds right now.
-// Used by: src/helpers/update_ref.rs
+// Used by: src/references/update_ref/engine.rs
 // Used by command/helper: `prepare_ref_transaction` and `commit_ref_transaction`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedRefUpdate {
@@ -2329,7 +2329,7 @@ pub struct PreparedRefUpdate {
 /// transaction, committed at end of input), `Started` (after `start`), `Prepared` (after
 /// `prepare`; only `commit`/`abort` may follow) and `Closed` (after `commit`/`abort`; only
 /// `start` may follow).
-// Used by: src/helpers/update_ref.rs
+// Used by: src/references/update_ref/engine.rs
 // Used by command/helper: `run_update_ref_stdin` (for `update-ref --stdin`)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UpdateRefsState {
@@ -2341,7 +2341,7 @@ pub enum UpdateRefsState {
 
 /// Parsed arguments for the `pack-refs` command: which loose refs get moved into
 /// `.git/packed-refs` and whether their loose files are removed afterwards.
-// Used by: src/helpers/pack_refs.rs, src/commands/pack_refs.rs
+// Used by: src/references/pack_refs/engine.rs, src/references/pack_refs.rs
 // Used by command/helper: `parse_pack_refs_args`, `pack_refs_matching`, and the `pack_refs` command
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackRefsOptions {
@@ -2363,7 +2363,7 @@ impl Default for PackRefsOptions {
 
 /// One `.git/packed-refs` entry: the object a ref points at and, for an annotated tag, the
 /// non-tag object it peels to (written as the `^<hash>` line after the entry).
-// Used by: src/helpers/pack_refs.rs
+// Used by: src/references/pack_refs/engine.rs
 // Used by command/helper: `read_packed_entries`, `write_packed_refs`, and `pack_refs_matching`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedRefEntry {
@@ -2372,7 +2372,7 @@ pub struct PackedRefEntry {
 }
 
 /// Parsed arguments for the `patch-id` command: which of git's patch-ID algorithms to use.
-// Used by: src/helpers/patch_id.rs, src/commands/patch_id.rs
+// Used by: src/diff/patch_id/engine.rs, src/diff/patch_id.rs
 // Used by command/helper: `parse_patch_id_args`, `compute_patch_ids`, and the `patch_id` command
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PatchIdOptions {
@@ -2385,7 +2385,7 @@ pub struct PatchIdOptions {
 
 /// Parsed arguments for the `mailsplit` command, which cuts mbox files (or Maildirs) into
 /// one numbered file per message.
-// Used by: src/helpers/mailsplit.rs, src/commands/mailsplit.rs
+// Used by: src/mail/mailsplit/engine.rs, src/mail/mailsplit.rs
 // Used by command/helper: `parse_mailsplit_args`, `split_mbox_messages`, `first_maildir_message`, and the `mailsplit` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MailsplitOptions {
@@ -2406,7 +2406,7 @@ pub struct MailsplitOptions {
 }
 
 /// What `mailinfo` does when a base64 / quoted-printable part decodes to lines ending in CRLF.
-// Used by: src/helpers/mailinfo.rs
+// Used by: src/mail/mailinfo/engine.rs
 // Used by command/helper: `parse_mailinfo_args` and `extract_mail_info` (for `mailinfo --quoted-cr`)
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum QuotedCrAction {
@@ -2420,7 +2420,7 @@ pub enum QuotedCrAction {
 }
 
 /// The `Content-Transfer-Encoding` of the mail part `mailinfo` is currently reading.
-// Used by: src/helpers/mailinfo.rs
+// Used by: src/mail/mailinfo/engine.rs
 // Used by command/helper: `extract_mail_info` and its body decoding helpers
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum MailTransferEncoding {
@@ -2435,7 +2435,7 @@ pub enum MailTransferEncoding {
 
 /// Parsed arguments for the `mailinfo` command, which separates one email into commit
 /// message, patch, and author/subject/date summary.
-// Used by: src/helpers/mailinfo.rs, src/commands/mailinfo.rs
+// Used by: src/mail/mailinfo/engine.rs, src/mail/mailinfo.rs
 // Used by command/helper: `parse_mailinfo_args`, `extract_mail_info`, and the `mailinfo` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MailinfoOptions {
@@ -2462,7 +2462,7 @@ pub struct MailinfoOptions {
 /// The working state of one `mailinfo` run, mirroring git's `struct mailinfo`: the input
 /// and read position, the collected mail and in-body headers, the MIME decoding state of
 /// the current part, and the message and patch built so far.
-// Used by: src/helpers/mailinfo.rs
+// Used by: src/mail/mailinfo/engine.rs
 // Used by command/helper: `extract_mail_info` and its header/body parsing helpers
 #[derive(Debug, Clone, Default)]
 pub struct MailinfoState {
@@ -2503,7 +2503,7 @@ pub struct MailinfoState {
 
 /// What `mailinfo` produces from one email: the commit message, the patch, the summary
 /// printed on standard output, and whether the mail was empty or could not be decoded.
-// Used by: src/helpers/mailinfo.rs, src/commands/mailinfo.rs
+// Used by: src/mail/mailinfo/engine.rs, src/mail/mailinfo.rs
 // Used by command/helper: `extract_mail_info` and the `mailinfo` command
 #[derive(Debug, Clone, Default)]
 pub struct MailinfoOutput {
@@ -2515,7 +2515,7 @@ pub struct MailinfoOutput {
 
 /// Where `interpret-trailers` puts a new trailer relative to the existing ones
 /// (`--where` / `trailer.where` / `trailer.<token>.where`).
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TrailerWhere {
@@ -2534,7 +2534,7 @@ pub enum TrailerWhere {
 
 /// What `interpret-trailers` does with a new trailer whose token already exists in the
 /// message (`--if-exists` / `trailer.ifexists` / `trailer.<token>.ifexists`).
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TrailerIfExists {
@@ -2555,7 +2555,7 @@ pub enum TrailerIfExists {
 
 /// What `interpret-trailers` does with a new trailer whose token isn't in the message yet
 /// (`--if-missing` / `trailer.ifmissing` / `trailer.<token>.ifmissing`).
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `parse_interpret_trailers_args`, `read_trailer_config`, and `process_trailers`
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TrailerIfMissing {
@@ -2571,7 +2571,7 @@ pub enum TrailerIfMissing {
 /// The settings of one configured trailer (`trailer.<name>.*`), or the defaults when `name`
 /// is empty: its canonical `key`, an optional `command` / `cmd` that computes its value, and
 /// where and when it is added.
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `read_trailer_config` and `process_trailers`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrailerConf {
@@ -2586,7 +2586,7 @@ pub struct TrailerConf {
 
 /// The whole `trailer.*` configuration: the separator characters (`trailer.separators`,
 /// `:` by default), the default settings, and the configured trailers in config order.
-// Used by: src/helpers/interpret_trailers.rs, src/commands/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs, src/mail/interpret_trailers.rs
 // Used by command/helper: `read_trailer_config`, `process_trailers`, and the `interpret_trailers` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrailerConfig {
@@ -2597,7 +2597,7 @@ pub struct TrailerConfig {
 
 /// One line of a message's trailer block: a trailer (`token` and `value`), or, when `token`
 /// is `None`, a non-trailer line kept as it is in `value`.
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `process_trailers` and its list-editing helpers
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrailerItem {
@@ -2607,7 +2607,7 @@ pub struct TrailerItem {
 
 /// A trailer about to be added to a message (from `--trailer` or from a configured
 /// `command`), with the settings that decide where and whether it goes in.
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `process_trailers` and its list-editing helpers
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TrailerArg {
@@ -2618,7 +2618,7 @@ pub struct TrailerArg {
 
 /// One `--trailer <token>[(=|:)<value>]` argument together with the `--where`,
 /// `--if-exists` and `--if-missing` options that were in effect when it was given.
-// Used by: src/helpers/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs
 // Used by command/helper: `parse_interpret_trailers_args` and `process_trailers`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NewTrailer {
@@ -2630,7 +2630,7 @@ pub struct NewTrailer {
 
 /// Parsed arguments for the `interpret-trailers` command, which adds or parses the
 /// `Token: value` lines at the end of commit messages.
-// Used by: src/helpers/interpret_trailers.rs, src/commands/interpret_trailers.rs
+// Used by: src/mail/interpret_trailers/engine.rs, src/mail/interpret_trailers.rs
 // Used by command/helper: `parse_interpret_trailers_args`, `process_trailers`, and the `interpret_trailers` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct InterpretTrailersOptions {
@@ -2654,7 +2654,7 @@ pub struct InterpretTrailersOptions {
 
 /// The corrected name and/or email a mailmap line gives for a commit identity; a `None`
 /// part is left as it was.
-// Used by: src/helpers/mailmap.rs
+// Used by: src/mail/mailmap.rs
 // Used by command/helper: `add_mailmap_line` and `map_user`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MailmapInfo {
@@ -2665,7 +2665,7 @@ pub struct MailmapInfo {
 /// Everything the mailmap says about one commit email: the mapping that applies whatever
 /// the commit name is (`simple`), and the mappings that only apply to a specific commit
 /// name (`by_name`, keyed by that name).
-// Used by: src/helpers/mailmap.rs
+// Used by: src/mail/mailmap.rs
 // Used by command/helper: `add_mailmap_line` and `map_user`
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MailmapEntry {
@@ -2676,7 +2676,7 @@ pub struct MailmapEntry {
 
 /// A parsed mailmap (`.mailmap`, `mailmap.file`, `mailmap.blob`): one entry per commit
 /// email, compared ignoring case.
-// Used by: src/helpers/mailmap.rs, src/helpers/request_pull.rs, src/commands/check_mailmap.rs
+// Used by: src/mail/mailmap.rs, src/mail/request_pull/engine.rs, src/mail/check_mailmap.rs
 // Used by command/helper: `read_mailmap`, `map_user`, and the `check_mailmap` / `request_pull` commands
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Mailmap {
@@ -2685,7 +2685,7 @@ pub struct Mailmap {
 
 /// Parsed arguments for the `check-mailmap` command, which shows the canonical name and
 /// email of contacts.
-// Used by: src/helpers/mailmap.rs, src/commands/check_mailmap.rs
+// Used by: src/mail/mailmap.rs, src/mail/check_mailmap.rs
 // Used by command/helper: `parse_check_mailmap_args` and the `check_mailmap` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CheckMailmapOptions {
@@ -2701,7 +2701,7 @@ pub struct CheckMailmapOptions {
 
 /// Parsed arguments for the `fmt-merge-msg` command, which writes the default message of a
 /// merge commit.
-// Used by: src/helpers/fmt_merge_msg.rs, src/commands/fmt_merge_msg.rs
+// Used by: src/merge/fmt_merge_msg/engine.rs, src/merge/fmt_merge_msg.rs
 // Used by command/helper: `parse_fmt_merge_msg_args`, `format_merge_message`, and the `fmt_merge_msg` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FmtMergeMsgOptions {
@@ -2718,7 +2718,7 @@ pub struct FmtMergeMsgOptions {
 /// What a merge takes from one repository (the text after ` of ` on `FETCH_HEAD` lines,
 /// `.` for the local one), grouped by kind for the title. `head_status` has bit 1 when the
 /// repository's HEAD is merged and bit 2 when named refs are.
-// Used by: src/helpers/fmt_merge_msg.rs
+// Used by: src/merge/fmt_merge_msg/engine.rs
 // Used by command/helper: `format_merge_message` and its title helpers
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MergeSource {
@@ -2733,7 +2733,7 @@ pub struct MergeSource {
 /// One tip being merged: its display name for the shortlog (`topic`, or `'topic' of
 /// <repo>`), the object named on its `FETCH_HEAD` line, and whether it is a branch of the
 /// local repository (only those can have a branch description).
-// Used by: src/helpers/fmt_merge_msg.rs
+// Used by: src/merge/fmt_merge_msg/engine.rs
 // Used by command/helper: `format_merge_message` and its tag-message / shortlog helpers
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MergeOrigin {
@@ -2744,7 +2744,7 @@ pub struct MergeOrigin {
 
 /// Parsed arguments for the `request-pull` command, which writes a summary of pending
 /// changes for someone to pull.
-// Used by: src/helpers/request_pull.rs, src/commands/request_pull.rs
+// Used by: src/mail/request_pull/engine.rs, src/mail/request_pull.rs
 // Used by command/helper: `parse_request_pull_args` and the `request_pull` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RequestPullOptions {
@@ -2759,7 +2759,7 @@ pub struct RequestPullOptions {
 }
 
 /// What the `replace` command was asked to do.
-// Used by: src/helpers/replace.rs, src/commands/replace.rs
+// Used by: src/references/replace/engine.rs, src/references/replace.rs
 // Used by command/helper: `parse_replace_args` and the `replace` command
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReplaceMode {
@@ -2777,7 +2777,7 @@ pub enum ReplaceMode {
 }
 
 /// Parsed arguments for the `replace` command, which manages `refs/replace/` object substitutions.
-// Used by: src/helpers/replace.rs, src/commands/replace.rs
+// Used by: src/references/replace/engine.rs, src/references/replace.rs
 // Used by command/helper: `parse_replace_args` and the `replace` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReplaceOptions {
@@ -2794,7 +2794,7 @@ pub struct ReplaceOptions {
 
 /// A loaded notes ref: its name, the notes commit it points at (if any), the notes as
 /// `annotated object -> note blob`, and whatever else its tree contains.
-// Used by: src/helpers/notes.rs, src/commands/notes.rs
+// Used by: src/references/notes/engine.rs, src/references/notes.rs
 // Used by command/helper: `load_notes_tree`, `commit_notes_tree`, `merge_notes`, and the `notes` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NotesTree {
@@ -2805,7 +2805,7 @@ pub struct NotesTree {
 }
 
 /// How `notes merge` settles a note that both sides changed differently (`-s <strategy>`).
-// Used by: src/helpers/notes.rs, src/commands/notes.rs
+// Used by: src/references/notes/engine.rs, src/references/notes.rs
 // Used by command/helper: `merge_notes` and the `notes` command
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum NotesMergeStrategy {
@@ -2824,7 +2824,7 @@ pub enum NotesMergeStrategy {
 
 /// Parsed arguments for the `show-branch` command, which shows branches and the commits
 /// that set them apart.
-// Used by: src/helpers/show_branch.rs, src/commands/show_branch.rs
+// Used by: src/history/show_branch/engine.rs, src/history/show_branch.rs
 // Used by command/helper: `parse_show_branch_args`, `collect_show_branch_names`, `show_branch_output`, and the `show_branch` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShowBranchOptions {
@@ -2853,7 +2853,7 @@ pub struct ShowBranchOptions {
 
 /// Parsed arguments for the `last-modified` command, which shows the commit that last
 /// changed each path.
-// Used by: src/helpers/last_modified.rs, src/commands/last_modified.rs
+// Used by: src/history/last_modified/engine.rs, src/history/last_modified.rs
 // Used by command/helper: `parse_last_modified_args`, `last_modified_paths`, and the `last_modified` command
 #[derive(Debug, Clone, Default)]
 pub struct LastModifiedOptions {
@@ -2868,7 +2868,7 @@ pub struct LastModifiedOptions {
 }
 
 /// Parsed arguments for the `range-diff` command, which compares two versions of a commit range.
-// Used by: src/helpers/range_diff.rs, src/commands/range_diff.rs
+// Used by: src/history/range_diff/engine.rs, src/history/range_diff.rs
 // Used by command/helper: `parse_range_diff_args`, `format_range_diff`, and the `range_diff` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RangeDiffOptions {
@@ -2888,7 +2888,7 @@ pub struct RangeDiffOptions {
 /// normalized patch text (metadata, message, then the diff starting at `diff_offset`), the
 /// diff's size in lines, the commit of the other range it is paired with, and whether it
 /// has been printed.
-// Used by: src/helpers/range_diff.rs, src/commands/range_diff.rs
+// Used by: src/history/range_diff/engine.rs, src/history/range_diff.rs
 // Used by command/helper: `read_range_patches`, `match_range_patches`, `format_range_diff`, and the `range_diff` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RangePatch {
@@ -2904,7 +2904,7 @@ pub struct RangePatch {
 
 /// Parsed arguments for the `replay` command, which re-creates commits on a new base
 /// without touching the working tree.
-// Used by: src/helpers/replay.rs, src/commands/replay.rs
+// Used by: src/merge/replay/engine.rs, src/merge/replay.rs
 // Used by command/helper: `parse_replay_args`, `replay_commits`, and the `replay` command
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReplayOptions {
@@ -2922,7 +2922,7 @@ pub struct ReplayOptions {
 /// `struct column_options`: whether columns are on (`always`/`never`/`auto`), how items are
 /// filled in (down the columns, across the rows, or one per line), whether columns shrink to
 /// their own widest item (`dense`), and the width / padding / indent / line ending to use.
-// Used by: src/helpers/column.rs, src/commands/column.rs, src/commands/help.rs
+// Used by: src/plumbing/column/engine.rs, src/plumbing/column.rs, src/plumbing/help.rs
 // Used by command/helper: `parse_column_args`, `apply_column_mode`, `render_columns`, and the `column` / `help` commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnOptions {
@@ -2943,7 +2943,7 @@ pub struct ColumnOptions {
 }
 
 /// Whether `column` lays its input out in columns at all.
-// Used by: src/helpers/column.rs, src/commands/help.rs
+// Used by: src/plumbing/column/engine.rs, src/plumbing/help.rs
 // Used by command/helper: `apply_column_mode`, `render_columns`, and the `column` / `help` commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnEnable {
@@ -2953,7 +2953,7 @@ pub enum ColumnEnable {
 }
 
 /// How `column` fills its table.
-// Used by: src/helpers/column.rs, src/commands/help.rs
+// Used by: src/plumbing/column/engine.rs, src/plumbing/help.rs
 // Used by command/helper: `apply_column_mode`, `render_columns`, and the `column` / `help` commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnLayout {
@@ -2966,7 +2966,7 @@ pub enum ColumnLayout {
 }
 
 /// Parsed arguments of the `name-rev` command.
-// Used by: src/helpers/name_rev.rs, src/commands/name_rev.rs
+// Used by: src/history/name_rev/engine.rs, src/history/name_rev.rs
 // Used by command/helper: `parse_name_rev_args`, `build_rev_names`, and the `name_rev` command
 #[derive(Debug, Clone, Default)]
 pub struct NameRevOptions {
@@ -2993,7 +2993,7 @@ pub struct NameRevOptions {
 /// The best name `name-rev` has found for a commit so far: the ref it is reached from and
 /// how — `generation` first-parent steps after the last merge hop recorded in `tip_name`.
 /// `distance` (first-parent steps count 1, other parents 65535) decides between names.
-// Used by: src/helpers/name_rev.rs
+// Used by: src/history/name_rev/engine.rs
 // Used by command/helper: `build_rev_names`, `rev_name_text`, and the `name_rev` command
 #[derive(Debug, Clone)]
 pub struct RevName {
@@ -3011,7 +3011,7 @@ pub struct RevName {
 
 /// Everything `name-rev` worked out from the refs: the best name of every commit it reached,
 /// and the name of each object a ref points at directly (for tags, trees and blobs).
-// Used by: src/helpers/name_rev.rs, src/commands/name_rev.rs
+// Used by: src/history/name_rev/engine.rs, src/history/name_rev.rs
 // Used by command/helper: `build_rev_names`, `object_name`, `annotate_line`, and the `name_rev` command
 #[derive(Debug, Clone, Default)]
 pub struct RevNames {
@@ -3023,7 +3023,7 @@ pub struct RevNames {
 
 /// A ref `name-rev` may name commits after: its short name, the commit it leads to (if any),
 /// the date used to rank it, and whether it is a tag / an annotated tag that was peeled.
-// Used by: src/helpers/name_rev.rs
+// Used by: src/history/name_rev/engine.rs
 // Used by command/helper: `build_rev_names` and the `name_rev` command
 #[derive(Debug, Clone)]
 pub struct NameRevTip {
@@ -3041,7 +3041,7 @@ pub struct NameRevTip {
 
 /// How `help <command>` shows a command: `Raw` commands parse their own arguments and print
 /// their own usage for `-h` (the value is the command name); `Clap` holds rendered clap help.
-// Used by: src/helpers/help.rs, src/commands/help.rs
+// Used by: src/plumbing/help/engine.rs, src/plumbing/help.rs
 // Used by command/helper: `command_help` and the `help` command
 #[derive(Debug, Clone)]
 pub enum CommandHelp {
@@ -3050,7 +3050,7 @@ pub enum CommandHelp {
 }
 
 /// Settings of a line-level three-way file merge (git's `xmparam_t`).
-// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs, src/commands/merge_file.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_file/engine.rs, src/merge/merge_file.rs
 // Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
 #[derive(Debug, Clone)]
 pub struct MergeFileOptions {
@@ -3077,7 +3077,7 @@ impl Default for MergeFileOptions {
 }
 
 /// Which version of an unmerged path `restore` / `checkout -- <paths>` write to the working tree.
-// Used by: src/cli.rs, src/commands/restore.rs
+// Used by: src/cli.rs, src/workspace/restore.rs
 // Used by command/helper: `writeout_stage`, `restore`, `checkout_paths`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WriteoutStage {
@@ -3092,7 +3092,7 @@ pub enum WriteoutStage {
 }
 
 /// How conflicts are written by a file merge.
-// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_file/engine.rs
 // Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MergeConflictStyle {
@@ -3105,7 +3105,7 @@ pub enum MergeConflictStyle {
 }
 
 /// The side a file merge takes for conflicting regions instead of writing markers.
-// Used by: src/helpers/merge_tree.rs, src/helpers/merge_file.rs
+// Used by: src/merge/merge_tree/engine.rs, src/merge/merge_file/engine.rs
 // Used by command/helper: `merge_file_lines_with`, `parse_merge_file_args`, and the `merge_file` command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MergeFavor {
@@ -3116,7 +3116,7 @@ pub enum MergeFavor {
 }
 
 /// Parsed arguments of the `merge-file` command.
-// Used by: src/helpers/merge_file.rs, src/commands/merge_file.rs
+// Used by: src/merge/merge_file/engine.rs, src/merge/merge_file.rs
 // Used by command/helper: `parse_merge_file_args` and the `merge_file` command
 #[derive(Debug, Clone)]
 pub struct MergeFileArgs {
@@ -3139,7 +3139,7 @@ pub struct MergeFileArgs {
 }
 
 /// What the working tree holds for an index entry.
-// Used by: src/helpers/index_plumbing.rs, src/helpers/diff_plumbing.rs, src/commands/update_index.rs, src/commands/checkout_index.rs, src/commands/read_tree.rs
+// Used by: src/workspace/index_plumbing.rs, src/diff/plumbing.rs, src/workspace/update_index.rs, src/workspace/checkout_index.rs, src/workspace/read_tree.rs
 // Used by command/helper: `worktree_state`, `refresh_index`, `diff_index_changes`, and the `update_index` / `checkout_index` / `read_tree` / `diff_files` / `diff_index` commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexFileState {
@@ -3152,7 +3152,7 @@ pub enum IndexFileState {
 }
 
 /// The switches of `update-index` that apply to the paths and actions after them.
-// Used by: src/helpers/index_plumbing.rs, src/commands/update_index.rs
+// Used by: src/workspace/index_plumbing.rs, src/workspace/update_index.rs
 // Used by command/helper: `update_index_path`, `add_cache_entry`, and the `update_index` command
 #[derive(Debug, Clone, Default)]
 pub struct UpdateIndexFlags {
@@ -3180,7 +3180,7 @@ pub struct UpdateIndexFlags {
 }
 
 /// Parsed arguments of the `read-tree` command.
-// Used by: src/helpers/read_tree.rs, src/commands/read_tree.rs
+// Used by: src/workspace/read_tree/engine.rs, src/workspace/read_tree.rs
 // Used by command/helper: `parse_read_tree_args`, `plan_read_tree`, and the `read_tree` command
 #[derive(Debug, Clone, Default)]
 pub struct ReadTreeOptions {
@@ -3207,7 +3207,7 @@ pub struct ReadTreeOptions {
 }
 
 /// What `read-tree` decided to do: the new index, and for `-u` the files to write and remove.
-// Used by: src/helpers/read_tree.rs, src/commands/read_tree.rs
+// Used by: src/workspace/read_tree/engine.rs, src/workspace/read_tree.rs
 // Used by command/helper: `plan_read_tree` and the `read_tree` command
 #[derive(Debug, Clone, Default)]
 pub struct ReadTreePlan {
@@ -3225,7 +3225,7 @@ pub struct ReadTreePlan {
 
 /// One side of a raw diff entry: the mode and object of a path in a tree, the index or the
 /// working tree.
-// Used by: src/helpers/diff_plumbing.rs
+// Used by: src/diff/plumbing.rs
 // Used by command/helper: `diff_trees`, `diff_index_changes`, `diff_files_changes`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiffSide {
@@ -3238,7 +3238,7 @@ pub struct DiffSide {
 }
 
 /// One changed path of a raw diff.
-// Used by: src/helpers/diff_plumbing.rs
+// Used by: src/diff/plumbing.rs
 // Used by command/helper: `diff_trees`, `diff_index_changes`, `diff_files_changes`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
 #[derive(Debug, Clone, Default)]
 pub struct DiffChange {
@@ -3257,7 +3257,7 @@ pub struct DiffChange {
 /// Which renames/copies `diffcore_rename` looks for (git's `-M`, `-C`, `--find-copies-harder`,
 /// `-l`, `diff.renames`): the kind, whether unmodified files can be copy sources, the minimum
 /// similarity (out of 60000) and the rename limit.
-// Used by: src/helpers/rename.rs, src/helpers/diff_plumbing.rs, src/helpers/log.rs, src/commands/diff.rs, src/commands/staging.rs, src/helpers/fast_export.rs
+// Used by: src/diff/rename.rs, src/diff/plumbing.rs, src/history/log/engine.rs, src/diff/diff.rs, src/workspace/staging.rs, src/export/fast_export/engine.rs
 // Used by command/helper: `detect_renames`, `parse_rename_option`, and the diff/log/status/fast-export commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenameOptions {
@@ -3275,7 +3275,7 @@ impl Default for RenameOptions {
 }
 
 /// Options shared by `diff-tree`, `diff-index` and `diff-files`.
-// Used by: src/helpers/diff_plumbing.rs, src/commands/diff_tree.rs, src/commands/diff_index.rs, src/commands/diff_files.rs
+// Used by: src/diff/plumbing.rs, src/diff/diff_tree.rs, src/diff/diff_index.rs, src/diff/diff_files.rs
 // Used by command/helper: `parse_diff_plumbing_args`, `render_diff_changes`, and the `diff_tree` / `diff_index` / `diff_files` commands
 #[derive(Debug, Clone, Default)]
 pub struct DiffPlumbingOptions {
@@ -3341,7 +3341,7 @@ pub struct DiffPlumbingOptions {
 
 /// A parsed pack index (`.idx`, version 1 or 2): the object names it lists in sorted order
 /// with each object's offset in the pack and, for version 2, the CRC-32 of its packed bytes.
-// Used by: src/core/pack.rs, src/helpers/midx.rs, src/commands/show_index.rs, src/commands/verify_pack.rs
+// Used by: src/core/pack.rs, src/storage/multi_pack_index/engine.rs, src/storage/show_index.rs, src/storage/verify_pack.rs
 // Used by command/helper: `parse_pack_index`, `repo_packs`, `read_packed_object`, and the `show_index` / `verify_pack` / `index_pack` / `multi_pack_index` commands
 #[derive(Debug, Clone, Default)]
 pub struct PackIndexData {
@@ -3358,7 +3358,7 @@ pub struct PackIndexData {
 }
 
 /// One pack of the repository: its files, its index and (once needed) its bytes.
-// Used by: src/core/pack.rs, src/helpers/midx.rs, src/helpers/commit_graph.rs
+// Used by: src/core/pack.rs, src/storage/multi_pack_index/engine.rs, src/storage/commit_graph/engine.rs
 // Used by command/helper: `repo_packs`, `read_packed_object`, `packed_object_names`, and the `repack` / `prune_packed` / `multi_pack_index` / `commit_graph` commands
 #[derive(Debug)]
 pub struct RepoPack {
@@ -3420,7 +3420,7 @@ pub struct PackedObject {
 }
 
 /// Settings for building a pack.
-// Used by: src/core/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by: src/core/pack.rs, src/storage/pack_objects.rs, src/storage/repack.rs
 // Used by command/helper: `build_pack`, and the `pack_objects` / `repack` commands
 #[derive(Debug, Clone)]
 pub struct PackBuildOptions {
@@ -3431,7 +3431,7 @@ pub struct PackBuildOptions {
 }
 
 /// A pack that was just built: its bytes and, per object, name, offset and CRC-32.
-// Used by: src/core/pack.rs, src/commands/pack_objects.rs, src/commands/repack.rs
+// Used by: src/core/pack.rs, src/storage/pack_objects.rs, src/storage/repack.rs
 // Used by command/helper: `build_pack`, `store_pack`, and the `pack_objects` / `repack` commands
 #[derive(Debug, Clone, Default)]
 pub struct BuiltPack {
@@ -3444,7 +3444,7 @@ pub struct BuiltPack {
 }
 
 /// Parsed arguments of the `fast-export` command.
-// Used by: src/helpers/fast_export.rs, src/commands/fast_export.rs
+// Used by: src/export/fast_export/engine.rs, src/export/fast_export.rs
 // Used by command/helper: `parse_fast_export_args`, `run_fast_export`, and the `fast_export` command
 #[derive(Debug, Clone, Default)]
 pub struct FastExportOptions {
@@ -3475,7 +3475,7 @@ pub struct FastExportOptions {
 }
 
 /// Everything `fast-import` keeps while reading a stream.
-// Used by: src/helpers/fast_import.rs, src/commands/fast_import.rs
+// Used by: src/export/fast_import/engine.rs, src/export/fast_import.rs
 // Used by command/helper: `run_fast_import`, `finish_fast_import`, and the `fast_import` command
 #[derive(Debug, Clone, Default)]
 pub struct FastImportState {
@@ -3502,7 +3502,7 @@ pub struct FastImportState {
 }
 
 /// A cursor over the bytes of a `fast-import` stream.
-// Used by: src/helpers/fast_import.rs
+// Used by: src/export/fast_import/engine.rs
 // Used by command/helper: `run_fast_import`, `import_commit`, and the `fast_import` command
 #[derive(Debug)]
 pub struct FastImportInput<'a> {
@@ -3513,7 +3513,7 @@ pub struct FastImportInput<'a> {
 }
 
 /// One submodule as described by `.gitmodules`.
-// Used by: src/helpers/submodule.rs, src/commands/submodule.rs
+// Used by: src/workspace/submodule/engine.rs, src/workspace/submodule.rs
 // Used by command/helper: `read_gitmodules`, `selected_submodules`, and the `submodule` command
 #[derive(Debug, Clone, Default)]
 pub struct SubmoduleInfo {
@@ -3530,7 +3530,7 @@ pub struct SubmoduleInfo {
 }
 
 /// The answer given to one hunk in patch mode (`add -p` and friends).
-// Used by: src/helpers/add_patch.rs
+// Used by: src/workspace/patch/engine.rs
 // Used by command/helper: `run_patch_mode`, `patch_update_file`, `apply_file_hunks`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HunkUse {
@@ -3542,7 +3542,7 @@ pub enum HunkUse {
 
 /// What patch mode changes when the chosen hunks are applied: the index, the working tree,
 /// both (`checkout -p <tree-ish>`), or a scratch tree that becomes a stash (`stash -p`).
-// Used by: src/helpers/add_patch.rs, src/commands/patch.rs
+// Used by: src/workspace/patch/engine.rs, src/workspace/patch.rs
 // Used by command/helper: `PatchModeSpec`, `apply_patch_file`, and the `-p` commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchTarget {
@@ -3555,7 +3555,7 @@ pub enum PatchTarget {
 /// One of git's patch modes (`add-patch.c`'s `struct patch_mode`): the four prompts (mode
 /// change, deletion, addition, hunk; `%s` takes the extra commands), the hint shown when editing
 /// a hunk, the mode-specific help lines, whether the diff is applied in reverse, and the target.
-// Used by: src/helpers/add_patch.rs, src/commands/patch.rs
+// Used by: src/workspace/patch/engine.rs, src/workspace/patch.rs
 // Used by command/helper: `run_patch_mode` and the `add`/`reset`/`checkout`/`restore`/`stash` `-p` commands
 #[derive(Debug, Clone, Copy)]
 pub struct PatchModeSpec {
@@ -3570,7 +3570,7 @@ pub struct PatchModeSpec {
 /// context with its newline, or empty), its lines (each with marker and line end), the answer,
 /// how many change groups it could be split into, and whether it is the pseudo hunk standing for
 /// a file's `old mode`/`new mode` lines.
-// Used by: src/helpers/add_patch.rs
+// Used by: src/workspace/patch/engine.rs
 // Used by command/helper: `parse_patch_file`, `split_hunk`, `edit_hunk`, `apply_file_hunks`
 #[derive(Debug, Clone, Default)]
 pub struct InteractiveHunk {
@@ -3591,7 +3591,7 @@ pub struct InteractiveHunk {
 /// One file in patch mode: its diff header (without the mode lines, which become the first
 /// pseudo hunk), its hunks, what kind of change it is, and both sides of the diff (entry and
 /// content), so the chosen hunks can be applied to whichever side is the target.
-// Used by: src/helpers/add_patch.rs, src/commands/patch.rs
+// Used by: src/workspace/patch/engine.rs, src/workspace/patch.rs
 // Used by command/helper: `parse_patch_file`, `patch_update_file`, `apply_patch_file`
 #[derive(Debug, Clone, Default)]
 pub struct InteractiveFile {
@@ -3613,7 +3613,7 @@ pub struct InteractiveFile {
 /// Parsed `rgit branch` command line: which mode runs (list / create / delete / rename / copy /
 /// upstream changes / show-current), its flags, the already-resolved filter commits, and the
 /// remaining non-option arguments (branch names, start point or list patterns).
-// Used by: src/helpers/branch.rs, src/commands/branch.rs
+// Used by: src/workspace/branch/engine.rs, src/workspace/branch.rs
 // Used by command/helper: `parse_branch_args`, `format_branch_list` and the `branch` command
 #[derive(Debug, Clone, Default)]
 pub struct BranchOptions {
@@ -3643,7 +3643,7 @@ pub struct BranchOptions {
 
 /// One row of `rgit branch` listing output: display name, short name for sorting/patterns,
 /// kind (0 = detached HEAD, 1 = local, 2 = remote-tracking), tip, and markers.
-// Used by: src/helpers/branch.rs
+// Used by: src/workspace/branch/engine.rs
 // Used by command/helper: `format_branch_list`
 #[derive(Debug, Clone)]
 pub struct BranchListEntry {
@@ -3662,7 +3662,7 @@ pub struct BranchListEntry {
 /// Options of `rgit status`: the short/porcelain format and its `-b` header and `-z`
 /// terminators, and which untracked files are shown (`no`, `normal` = collapsed directories,
 /// `all` = every file).
-// Used by: src/cli.rs, src/commands/staging.rs, src/helpers/status.rs
+// Used by: src/cli.rs, src/workspace/staging.rs, src/workspace/status.rs
 // Used by command/helper: the `status` command and `format_short_status`
 #[derive(Debug, Clone, Default)]
 pub struct StatusOptions {
@@ -3689,7 +3689,7 @@ pub enum Verbosity {
 /// HEAD, all refs, the index (stage 0 and unmerged stage masks), what is staged against HEAD,
 /// the stash count, the operation in progress and (when needed) the working tree's tracked
 /// changes and untracked files.
-// Used by: src/helpers/narrate.rs, src/ui.rs
+// Used by: src/ui/narrate.rs, src/ui.rs
 // Used by command/helper: `take_snapshot` and the exit-time narration
 #[derive(Debug, Clone, Default)]
 pub struct RepoSnapshot {
@@ -3710,7 +3710,7 @@ pub struct RepoSnapshot {
 
 /// One block of conflict markers in a file: its 1-based line range, the lines of each side
 /// (and of the common ancestor, with the diff3 style) and the labels after the markers.
-// Used by: src/helpers/narrate.rs, src/ui.rs, src/commands/conflicts.rs
+// Used by: src/ui/narrate.rs, src/ui.rs, src/merge/conflicts.rs
 // Used by command/helper: `parse_conflict_hunks`, the conflict reports and `rgit conflicts`
 #[derive(Debug, Clone)]
 pub struct ConflictHunk {

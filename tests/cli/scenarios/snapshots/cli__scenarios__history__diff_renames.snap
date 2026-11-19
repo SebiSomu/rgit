@@ -1,0 +1,86 @@
+---
+source: tests/cli/scenarios/history.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write big.txt (42 bytes)
+$ rgit add big.txt
+Staged files to index (1 new).
+$ rgit commit -m big
+[main <H4:7>] big
+ Author: Test Author <author@example.com>
+ 1 file changed, 6 insertions(+)
+ create mode 100644 big.txt
+$ rgit mv big.txt moved.txt
+renamed 'big.txt' -> 'moved.txt'
+$ write moved.txt (42 bytes)
+$ rgit add moved.txt
+Staged files to index (1 modified).
+$ rgit diff --cached --stat
+ big.txt => moved.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit diff --cached -M --name-status
+R083	big.txt	moved.txt
+$ rgit diff --cached --no-renames --name-status
+D	big.txt
+A	moved.txt
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	moved.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H9>
+  parent <H3>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  big
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  moved.txt
+    | line a
+    | line b
+    | line c
+    | line d
+    | line e
+    | line F
+  src/lib.txt
+    | lib v2

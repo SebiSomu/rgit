@@ -222,3 +222,7 @@ pub fn render_follow_diff(pairs: &[FollowPair], opts: &LogOptions, stat_width: u
     }
     Ok(out)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/follow.rs"]
+mod tests;

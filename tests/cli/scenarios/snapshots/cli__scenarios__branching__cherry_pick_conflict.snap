@@ -1,0 +1,96 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write conflict.txt (18 bytes)
+$ rgit add conflict.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 3 insertions(+)
+ create mode 100644 conflict.txt
+$ rgit branch topic
+$ write conflict.txt (24 bytes)
+$ rgit commit -a -m 'main edit'
+[main <H2:7>] main edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch topic
+Switched to branch 'topic'
+$ write conflict.txt (25 bytes)
+$ rgit commit -a -m 'topic edit'
+[topic <H3:7>] topic edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit cherry-pick topic
+Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+[stderr]
+error: could not apply <H3:7>... topic edit
+hint: After resolving the conflicts, mark them with
+hint: "rgit add/rm <pathspec>", then run
+hint: "rgit cherry-pick --continue".
+hint: You can instead skip this commit with "rgit cherry-pick --skip".
+hint: To abort and get back to the state before "rgit cherry-pick",
+hint: run "rgit cherry-pick --abort".
+[exit 1]
+$ rgit status
+On branch main
+You are currently cherry-picking commit <H3:7>.
+
+Unmerged paths:
+	both modified:   conflict.txt
+
+no changes added to commit (use "rgit add" and/or "rgit commit -a")
+$ rgit cherry-pick --abort
+$ rgit status --short
+$ rgit cherry-pick topic
+Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+[stderr]
+error: could not apply <H3:7>... topic edit
+hint: After resolving the conflicts, mark them with
+hint: "rgit add/rm <pathspec>", then run
+hint: "rgit cherry-pick --continue".
+hint: You can instead skip this commit with "rgit cherry-pick --skip".
+hint: To abort and get back to the state before "rgit cherry-pick",
+hint: run "rgit cherry-pick --abort".
+[exit 1]
+$ write conflict.txt (7 bytes)
+$ rgit add conflict.txt
+Staged files to index (1 modified).
+$ rgit cherry-pick --continue
+[main <H4:7>] topic edit
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:19:20 2023 +0000
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+$ rgit log --format='%s'
+topic edit
+main edit
+base
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+  refs/heads/topic <H3>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H5> 0	conflict.txt
+HEAD commit:
+  tree <H6>
+  parent <H2>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000840 +0000
+  
+  topic edit
+  
+worktree:
+  conflict.txt
+    | picked

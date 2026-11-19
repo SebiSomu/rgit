@@ -1,0 +1,123 @@
+---
+source: tests/cli/scenarios/mail.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write msg (0 bytes)
+$ write patch (0 bytes)
+$ rgit mailinfo msg patch
+<stdin>
+From <X1> Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?J=C3=B6rg?= <jorg@example.com>
+Date: Tue, 14 Nov 2023 22:13:20 +0000
+Subject: [PATCH 1/2] Fix the thing
+
+Body text.
+
+Signed-off-by: J <j@example.com>
+---
+ a | 1 +
+
+diff --git a/a b/a
+Author: Jörg
+Email: jorg@example.com
+Subject: Fix the thing
+Date: Tue, 14 Nov 2023 22:13:20 +0000
+
+$ rgit mailinfo -k msg patch
+<stdin>
+From <X1> Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?J=C3=B6rg?= <jorg@example.com>
+Date: Tue, 14 Nov 2023 22:13:20 +0000
+Subject: [PATCH 1/2] Fix the thing
+
+Body text.
+
+Signed-off-by: J <j@example.com>
+---
+ a | 1 +
+
+diff --git a/a b/a
+Author: Jörg
+Email: jorg@example.com
+Subject: [PATCH 1/2] Fix the thing
+Date: Tue, 14 Nov 2023 22:13:20 +0000
+
+$ write box.mbox (540 bytes)
+$ rgit mailsplit -oout box.mbox
+[stderr]
+fatal: unable to create 'out/0001': No such file or directory
+[exit 128]
+$ rgit interpret-trailers --trailer 'Reviewed-by: R <r@example.com>'
+<stdin>
+Subject
+
+Body
+Subject
+
+Body
+
+Reviewed-by: R <r@example.com>
+$ rgit interpret-trailers --parse
+<stdin>
+Subject
+
+Body
+
+Signed-off-by: A <a@x>
+Acked-by: B
+Signed-off-by: A <a@x>
+Acked-by: B
+$ rgit check-mailmap 'Some One <some@example.com>'
+<stdin>
+
+[no newline at end]
+Some One <some@example.com>
+$ rgit patch-id
+<stdin>
+diff --git a/a b/a
+--- a/a
++++ b/a
+@@ -1 +1 @@
+-x
++y
+<X2> <X3>
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+git-dir entries:
+  
+worktree:
+  box.mbox
+    | From <X1> Mon Sep 17 00:00:00 2001
+    | From: =?UTF-8?q?J=C3=B6rg?= <jorg@example.com>
+    | Date: Tue, 14 Nov 2023 22:13:20 +0000
+    | Subject: [PATCH 1/2] Fix the thing
+    | 
+    | Body text.
+    | 
+    | Signed-off-by: J <j@example.com>
+    | ---
+    |  a | 1 +
+    | 
+    | diff --git a/a b/a
+    | From <X1> Mon Sep 17 00:00:00 2001
+    | From: =?UTF-8?q?J=C3=B6rg?= <jorg@example.com>
+    | Date: Tue, 14 Nov 2023 22:13:20 +0000
+    | Subject: [PATCH 2/2] Fix the thing
+    | 
+    | Body text.
+    | 
+    | Signed-off-by: J <j@example.com>
+    | ... 4 more lines
+  msg
+    | Body text.
+    | 
+    | Signed-off-by: J <j@example.com>
+  patch
+    | ---
+    |  a | 1 +
+    | 
+    | diff --git a/a b/a

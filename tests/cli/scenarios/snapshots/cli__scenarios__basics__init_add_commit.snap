@@ -1,0 +1,72 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (6 bytes)
+$ write dir/b.txt (6 bytes)
+$ rgit status
+On branch main
+
+No commits yet
+
+Untracked files:
+	a.txt
+	dir/
+
+nothing added to commit but untracked files present (use "rgit add" to track)
+$ rgit add a.txt dir
+Staged files to index (2 new).
+$ rgit status
+On branch main
+
+No commits yet
+
+Changes to be committed:
+	new file:   a.txt
+	new file:   dir/b.txt
+
+$ rgit commit -m first
+[main (root-commit) <H1:7>] first
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 dir/b.txt
+$ write a.txt (12 bytes)
+$ rgit status
+On branch main
+Changes not staged for commit:
+	modified:   a.txt
+
+no changes added to commit (use "rgit add" and/or "rgit commit -a")
+$ rgit commit -a -m second
+[main <H2:7>] second
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit log --oneline
+<H2:7> second
+<H1:7> first
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H3> 0	a.txt
+  100644 <H4> 0	dir/b.txt
+HEAD commit:
+  tree <H5>
+  parent <H1>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
+  
+  second
+  
+worktree:
+  a.txt
+    | hello again
+  dir/b.txt
+    | world

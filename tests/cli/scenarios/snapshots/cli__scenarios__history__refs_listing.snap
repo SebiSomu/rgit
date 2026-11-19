@@ -1,0 +1,120 @@
+---
+source: tests/cli/scenarios/history.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit tag v1
+$ rgit tag -a v2 -m annotated feature
+$ rgit show-ref
+<H4> refs/heads/feature
+<H2> refs/heads/main
+<H2> refs/tags/v1
+<H5> refs/tags/v2
+$ rgit show-ref --heads
+<H4> refs/heads/feature
+<H2> refs/heads/main
+$ rgit show-ref --tags -d
+<H2> refs/tags/v1
+<H5> refs/tags/v2
+<H4> refs/tags/v2^{}
+$ rgit show-ref --verify refs/heads/main
+<H2> refs/heads/main
+$ rgit show-ref --verify refs/heads/missing
+[stderr]
+fatal: 'refs/heads/missing' - not a valid ref
+[exit 128]
+$ rgit for-each-ref
+<H4> commit	refs/heads/feature
+<H2> commit	refs/heads/main
+<H2> commit	refs/tags/v1
+<H5> tag	refs/tags/v2
+$ rgit for-each-ref --format='%(refname:short) %(objecttype) %(subject)' --sort=-refname
+v2 tag annotated
+v1 commit main work
+main commit main work
+feature commit more feature work
+$ rgit for-each-ref --count=1 refs/heads
+<H4> commit	refs/heads/feature
+$ rgit for-each-ref --format='%(if)%(upstream)%(then)up%(else)none%(end) %(refname)'
+none refs/heads/feature
+none refs/heads/main
+none refs/tags/v1
+none refs/tags/v2
+$ rgit name-rev HEAD feature~1
+HEAD tags/v1
+feature~1 tags/v2~1
+$ rgit show-branch main feature
+* [main] main work
+ ! [feature] more feature work
+--
+ + [feature] more feature work
+ + [feature^] feature work
+*  [main] main work
+*+ [feature~2] base
+$ rgit cherry main feature
++ <H3>
++ <H4>
+$ rgit cherry -v main feature
++ <H3> feature work
++ <H4> more feature work
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H4>
+  refs/heads/main <H2>
+  refs/tags/v1 <H2>
+  refs/tags/v2 <H5>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	base.txt
+  100644 <H7> 0	main.txt
+HEAD commit:
+  tree <H8>
+  parent <H1>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  main work
+  
+worktree:
+  base.txt
+    | base
+  main.txt
+    | on main

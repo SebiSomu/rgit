@@ -1,0 +1,104 @@
+---
+source: tests/cli/scenarios/history.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit rev-parse HEAD
+<H2>
+$ rgit rev-parse --short HEAD
+<H2:7>
+$ rgit rev-parse --abbrev-ref HEAD
+main
+$ rgit rev-parse HEAD~1 main^ feature@{0}
+<H1>
+<H1>
+<H4>
+$ rgit rev-parse --show-toplevel
+<REPO>
+$ rgit rev-parse --git-dir
+.git
+$ rgit rev-parse --is-inside-work-tree
+true
+$ rgit rev-parse --verify nope
+[stderr]
+fatal: ambiguous argument 'nope': unknown revision or path not in the working tree
+[exit 1]
+$ rgit rev-list --count HEAD
+2
+$ rgit rev-list main..feature
+<H4>
+<H3>
+$ rgit rev-list --left-right main...feature
+><H4>
+><H3>
+<<H2>
+$ rgit rev-list --all --topo-order
+<H4>
+<H3>
+<H2>
+<H1>
+$ rgit rev-list --max-count=1 feature
+<H4>
+$ rgit rev-list --parents feature
+<H4> <H3>
+<H3> <H1>
+<H1>
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H4>
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	base.txt
+  100644 <H6> 0	main.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  main work
+  
+worktree:
+  base.txt
+    | base
+  main.txt
+    | on main

@@ -903,3 +903,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/github.rs"]
+mod tests;

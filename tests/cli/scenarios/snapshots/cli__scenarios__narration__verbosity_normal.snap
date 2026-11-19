@@ -1,0 +1,72 @@
+---
+source: tests/cli/scenarios/narration.rs
+expression: "narrated_story(\"normal\")"
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export RGIT_VERBOSITY=normal
+$ write a.txt (2 bytes)
+$ write .env (9 bytes)
+$ rgit add .
+Staged files to index (2 new).
+[stderr]
+rgit: warning: '.env' looks like it contains a secrets/key file. Once committed and pushed, it's in the history for good.
+  next: unstage with `rgit restore --staged <file>` and add it to .gitignore.
+$ rgit commit -m first
+[main (root-commit) <H1:7>] first
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 .env
+ create mode 100644 a.txt
+[stderr]
+rgit: Recorded <H1:7> on main: 2 files, +2 -0.
+$ write a.txt (3 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit commit -m second
+[main <H2:7>] second
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[stderr]
+rgit: Recorded <H2:7> on main: 1 file, +1 -1.
+$ rgit branch side
+[stderr]
+rgit: Created 'side' at <H2:7>; you're still on 'main' (`rgit switch side` to move there).
+$ rgit switch side
+Switched to branch 'side'
+[stderr]
+rgit: On 'side': same commit as 'main'.
+$ rgit switch main
+Switched to branch 'main'
+[stderr]
+rgit: On 'main': same commit as 'side'.
+$ rgit reset --hard HEAD~1
+HEAD is now at <H1:7> first
+[stderr]
+rgit: HEAD moved 1 commit back (<H2:7> -> <H1:7>); no uncommitted work was lost. Undo: `rgit reset --hard ORIG_HEAD`.
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+  refs/heads/side <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H3> 0	.env
+  100644 <H4> 0	a.txt
+HEAD commit:
+  tree <H5>
+  author Test Author <author@example.com> 1700000120 +0000
+  committer Test Committer <committer@example.com> 1700000120 +0000
+  
+  first
+  
+worktree:
+  .env
+    | SECRET=1
+  a.txt
+    | a

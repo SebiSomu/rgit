@@ -263,3 +263,7 @@ pub fn collect_object_counts(verbose: bool) -> Result<ObjectCountReport> {
 
     Ok(report)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/count_objects.rs"]
+mod tests;

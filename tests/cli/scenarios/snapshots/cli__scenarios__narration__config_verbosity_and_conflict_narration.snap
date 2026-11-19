@@ -1,0 +1,91 @@
+---
+source: tests/cli/scenarios/narration.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write conflict.txt (18 bytes)
+$ rgit add conflict.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 3 insertions(+)
+ create mode 100644 conflict.txt
+$ rgit branch topic
+$ write conflict.txt (24 bytes)
+$ rgit commit -a -m 'main edit'
+[main <H2:7>] main edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch topic
+Switched to branch 'topic'
+$ write conflict.txt (25 bytes)
+$ rgit commit -a -m 'topic edit'
+[topic <H3:7>] topic edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit config rgit.verbosity explain
+$ rgit merge topic
+Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+Automatic merge failed; fix conflicts and then commit the result.
+[stderr]
+rgit: Merge stopped: 1 file conflict.
+      conflict.txt             conflict in 1 place (lines 2-6)  both sides edited the same lines
+          ours:   HEAD               'main edit' (Test Author, 3 years ago)
+          theirs: topic              'topic edit' (Test Author, 3 years ago)
+  next: open each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,
+  next: then `rgit add <file>` for each one and `rgit merge --continue`.
+  next: Changed your mind? `rgit merge --abort` puts everything back as it was.
+      `rgit conflicts --explain <file>` shows each conflict as YOURS / THEIRS side by side.
+[exit 1]
+$ rgit status
+On branch main
+You have unmerged paths.
+
+Unmerged paths:
+	both modified:   conflict.txt
+
+no changes added to commit (use "rgit add" and/or "rgit commit -a")
+[stderr]
+rgit: Conflicts: 0 of 1 resolved; still to do: conflict.txt.
+$ rgit conflicts
+merge in progress: 1 left of 1.
+
+  conflict.txt             conflict in 1 place (lines 2-6)  both sides edited the same lines
+      ours:   HEAD               'main edit' (Test Author, 3 years ago)
+      theirs: topic              'topic edit' (Test Author, 3 years ago)
+
+Next: edit each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,
+      then `rgit add <file>` for each one and `rgit merge --continue`.
+      Changed your mind? `rgit merge --abort` puts everything back as it was.
+      `rgit conflicts --explain <file>` shows each conflict side by side.
+$ rgit merge --abort
+[stderr]
+rgit: Merge aborted: 'main' and your files are back to how they were before the merge.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H2>
+  refs/heads/topic <H3>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD RGIT_CONFLICTS config
+index (ls-files -s):
+  100644 <H4> 0	conflict.txt
+HEAD commit:
+  tree <H5>
+  parent <H1>
+  author Test Author <author@example.com> 1700000240 +0000
+  committer Test Committer <committer@example.com> 1700000240 +0000
+  
+  main edit
+  
+worktree:
+  conflict.txt
+    | line1
+    | main change
+    | line3

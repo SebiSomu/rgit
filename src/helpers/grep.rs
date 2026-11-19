@@ -87,3 +87,7 @@ pub fn search_content(
         matches,
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/grep.rs"]
+mod tests;

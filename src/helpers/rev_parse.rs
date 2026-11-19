@@ -469,3 +469,7 @@ pub fn symbolic_full_name_symbolic(rev: &str) -> Result<String> {
     let hash = resolve_rev(rev)?;
     symbolic_full_name_for(&hash)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/rev_parse.rs"]
+mod tests;

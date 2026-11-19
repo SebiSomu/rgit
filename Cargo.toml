@@ -22,3 +22,7 @@ base64 = "0.22"
 tar = "0.4.46"
 zip = { version = "9.0.2", default-features = false, features = ["deflate"] }
 regex = "1.10"
+
+[dev-dependencies]
+insta = "1"
+tempfile = "3"

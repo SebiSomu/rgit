@@ -1,0 +1,145 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (6 bytes)
+$ rgit restore a.txt
+$ rgit status --short
+$ write a.txt (7 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit restore --staged a.txt
+$ rgit status --short
+ M a.txt
+$ rgit restore a.txt
+$ rgit restore --source HEAD~2 src/lib.txt
+$ rgit status --short
+ M src/lib.txt
+$ rgit restore src/lib.txt
+$ rgit reset --soft HEAD~1
+$ rgit status --short
+A  b.txt
+M  src/lib.txt
+
+==== state: after soft ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000180 +0000
+  committer Test Committer <committer@example.com> 1700000180 +0000
+  
+  second commit
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2
+
+$ rgit reset HEAD~1
+Unstaged changes after reset:
+M	a.txt
+M	src/lib.txt
+$ rgit status --short
+ M a.txt
+ M src/lib.txt
+?? b.txt
+
+==== state: after mixed ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H8> 0	a.txt
+  100644 <H9> 0	src/lib.txt
+HEAD commit:
+  tree <H10>
+  author Test Author <author@example.com> 1700000120 +0000
+  committer Test Committer <committer@example.com> 1700000120 +0000
+  
+  first commit
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2
+
+$ rgit reset --hard HEAD
+HEAD is now at <H1:7> first commit
+$ rgit status --short
+?? b.txt
+$ rgit reset --hard HEAD@{1}
+HEAD is now at <H2:7> second commit
+$ rgit log --oneline
+<H2:7> second commit
+<H1:7> first commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H9> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000180 +0000
+  committer Test Committer <committer@example.com> 1700000180 +0000
+  
+  second commit
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v1

@@ -1,0 +1,59 @@
+---
+source: tests/cli/scenarios/errors.rs
+expression: r.finish()
+---
+$ rgit status
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit log
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit add x
+[stderr]
+Error: path 'x' did not match any files
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit commit -m x
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit branch
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit diff
+$ rgit rev-parse HEAD
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit stash
+[stderr]
+Error: Failed to read .git/HEAD — is this an rgit repository?
+
+Caused by:
+    No such file or directory (os error 2)
+[exit 1]
+$ rgit tag
+
+==== final state ====
+(no .git)
+worktree:

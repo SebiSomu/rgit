@@ -1,0 +1,116 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit stash list
+$ rgit stash
+No local changes to save
+$ write a.txt (6 bytes)
+$ rgit stash
+Saved working directory and index state WIP on main: <H3:7> third commit
+$ rgit stash list
+stash@{0}: WIP on main: <H3:7> third commit
+$ write b.txt (6 bytes)
+$ write untracked.txt (2 bytes)
+$ rgit stash push -u -m 'second wip'
+Saved working directory and index state On main: second wip
+$ rgit stash list
+stash@{0}: On main: second wip
+stash@{1}: WIP on main: <H3:7> third commit
+$ rgit stash show
+diff --git a/b.txt b/b.txt
+--- a/b.txt
++++ b/b.txt
+@@ -1,1 +1,1 @@
+-bee
++wip 2
+$ rgit stash show -p stash@{1}
+[stderr]
+error: unexpected argument '-p' found
+
+  tip: to pass '-p' as a value, use '-- -p'
+
+Usage: rgit stash show [STASH]
+
+For more information, try '--help'.
+[exit 2]
+$ rgit stash apply stash@{1}
+Applied stash@{1} (WIP on main: <H3:7> third commit)
+$ rgit status --short
+ M a.txt
+$ rgit reset --hard
+HEAD is now at <H3:7> third commit
+$ rgit stash pop
+Dropped stash@{0} (On main: second wip)
+$ rgit status --short
+ M b.txt
+?? untracked.txt
+$ rgit stash drop
+Dropped stash@{0} (WIP on main: <H3:7> third commit)
+$ rgit stash list
+$ rgit stash drop
+[stderr]
+Error: No stash entries found.
+[exit 1]
+$ write a.txt (2 bytes)
+$ rgit stash
+Saved working directory and index state WIP on main: <H3:7> third commit
+$ rgit stash clear
+$ rgit stash list
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2
+  untracked.txt
+    | u

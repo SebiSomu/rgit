@@ -1,0 +1,226 @@
+---
+source: tests/cli/scenarios/mail.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit format-patch -2 --stdout
+From <H2> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:16:20 +0000
+Subject: [PATCH 1/2] second commit
+
+---
+ a.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/a.txt b/a.txt
+index <H4:7>..<H5:7> 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1 +1,2 @@
+ one
++two
+-- 
+rgit 0.1.0
+
+
+From <H3> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:18:20 +0000
+Subject: [PATCH 2/2] third commit
+
+With a body paragraph.
+---
+ b.txt       | 1 +
+ src/lib.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+
+diff --git a/b.txt b/b.txt
+new file mode 100644
+index 0000000..<H6:7>
+--- /dev/null
++++ b/b.txt
+@@ -0,0 +1 @@
++bee
+diff --git a/src/lib.txt b/src/lib.txt
+index <H7:7>..<H8:7> 100644
+--- a/src/lib.txt
++++ b/src/lib.txt
+@@ -1 +1 @@
+-lib v1
++lib v2
+-- 
+rgit 0.1.0
+
+$ rgit format-patch -1 -o patches
+patches/0001-third-commit.patch
+$ rgit format-patch --root -n --stdout HEAD~1
+From <H1> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:15:20 +0000
+Subject: [PATCH 1/2] first commit
+
+---
+ a.txt       | 1 +
+ src/lib.txt | 1 +
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+
+diff --git a/a.txt b/a.txt
+new file mode 100644
+index 0000000..<H4:7>
+--- /dev/null
++++ b/a.txt
+@@ -0,0 +1 @@
++one
+diff --git a/src/lib.txt b/src/lib.txt
+new file mode 100644
+index 0000000..<H7:7>
+--- /dev/null
++++ b/src/lib.txt
+@@ -0,0 +1 @@
++lib v1
+-- 
+rgit 0.1.0
+
+
+From <H2> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:16:20 +0000
+Subject: [PATCH 2/2] second commit
+
+---
+ a.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/a.txt b/a.txt
+index <H4:7>..<H5:7> 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1 +1,2 @@
+ one
++two
+-- 
+rgit 0.1.0
+
+$ rgit reset --hard HEAD~2
+HEAD is now at <H1:7> first commit
+$ rgit clean -f -d
+Removing patches/
+$ rgit am
+<stdin>
+From <H2> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:16:20 +0000
+Subject: [PATCH 1/2] second commit
+
+---
+ a.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/a.txt b/a.txt
+index <H4:7>..<H5:7> 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1 +1,2 @@
+ one
++two
+-- 
+rgit 0.1.0
+
+
+From <H3> Mon Sep 17 00:00:00 2001
+From: Test Author <author@example.com>
+Date: Tue, 14 Nov 2023 22:18:20 +0000
+Subject: [PATCH 2/2] third commit
+
+With a body paragraph.
+---
+ b.txt       | 1 +
+ src/lib.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+
+diff --git a/b.txt b/b.txt
+new file mode 100644
+index 0000000..<H6:7>
+--- /dev/null
++++ b/b.txt
+@@ -0,0 +1 @@
++bee
+diff --git a/src/lib.txt b/src/lib.txt
+index <H7:7>..<H8:7> 100644
+--- a/src/lib.txt
++++ b/src/lib.txt
+@@ -1 +1 @@
+-lib v1
++lib v2
+-- 
+rgit 0.1.0
+
+Applying: second commit
+Applying: third commit
+$ rgit log --format='%s | %an'
+third commit | Test Author
+second commit | Test Author
+first commit | Test Author
+$ rgit am --abort
+[stderr]
+fatal: Resolve operation not in progress, we are not resuming.
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H9>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H10>
+  parent <H11>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer rgit <rgit@example.com> <NOW> +0000
+  
+  third commit
+  
+  With a body paragraph.
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

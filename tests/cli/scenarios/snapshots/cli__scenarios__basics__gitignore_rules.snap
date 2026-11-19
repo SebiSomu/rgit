@@ -1,0 +1,61 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write .gitignore (48 bytes)
+$ write a.o (0 bytes)
+$ write keep.o (0 bytes)
+$ write build/out (0 bytes)
+$ write root-only.txt (0 bytes)
+$ write sub/root-only.txt (0 bytes)
+$ write docs/x/y/z.tmp (0 bytes)
+$ write docs/ok.md (0 bytes)
+$ rgit status --short
+?? .gitignore
+?? docs/
+?? keep.o
+?? sub/
+$ rgit add .
+Staged files to index (4 new).
+$ rgit status --short
+A  .gitignore
+A  docs/ok.md
+A  keep.o
+A  sub/root-only.txt
+$ rgit check-ignore -v a.o keep.o build/out root-only.txt sub/root-only.txt docs/x/y/z.tmp docs/ok.md
+.gitignore:1:*.o	a.o
+.gitignore:3:build/	build/out
+.gitignore:4:/root-only.txt	root-only.txt
+.gitignore:5:docs/**/*.tmp	docs/x/y/z.tmp
+$ rgit ls-files -o -i --exclude-standard
+a.o
+build/out
+docs/x/y/z.tmp
+root-only.txt
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+git-dir entries:
+  
+index (ls-files -s):
+  100644 <H1> 0	.gitignore
+  100644 <H2> 0	docs/ok.md
+  100644 <H2> 0	keep.o
+  100644 <H2> 0	sub/root-only.txt
+worktree:
+  .gitignore
+    | *.o
+    | !keep.o
+    | build/
+    | /root-only.txt
+    | docs/**/*.tmp
+  a.o (empty)
+  build/out (empty)
+  docs/ok.md (empty)
+  docs/x/y/z.tmp (empty)
+  keep.o (empty)
+  root-only.txt (empty)
+  sub/root-only.txt (empty)

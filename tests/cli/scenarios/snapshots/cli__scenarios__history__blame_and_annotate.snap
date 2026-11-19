@@ -1,0 +1,89 @@
+---
+source: tests/cli/scenarios/history.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (14 bytes)
+$ rgit commit -a -m 'third line'
+[main <H4:7>] third line
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit blame a.txt
+^<H1:7> (Test Author 2023-11-14 22:15:20 +0000 1) one
+<H2:8> (Test Author 2023-11-14 22:16:20 +0000 2) two
+<H4:8> (Test Author 2023-11-14 22:19:20 +0000 3) three
+$ rgit blame -L 2,3 a.txt
+<H2:8> (Test Author 2023-11-14 22:16:20 +0000 2) two
+<H4:8> (Test Author 2023-11-14 22:19:20 +0000 3) three
+$ rgit blame -s a.txt
+[stderr]
+error: unexpected argument '-s' found
+
+  tip: to pass '-s' as a value, use '-- -s'
+
+Usage: rgit blame [OPTIONS] <ARGS>...
+
+For more information, try '--help'.
+[exit 2]
+$ rgit annotate a.txt
+<H1:8>	(Test Author	2023-11-14 22:15:20 +0000	1)one
+<H2:8>	(Test Author	2023-11-14 22:16:20 +0000	2)two
+<H4:8>	(Test Author	2023-11-14 22:19:20 +0000	3)three
+$ write a.txt (18 bytes)
+$ rgit blame a.txt
+^<H1:7> (Test Author       2023-11-14 22:15:20 +0000 1) one
+00000000 (Not Committed Yet <NOW-DATE> 2) changed
+<H4:8> (Test Author       2023-11-14 22:19:20 +0000 3) three
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H3>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
+  
+  third line
+  
+worktree:
+  a.txt
+    | one
+    | changed
+    | three
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

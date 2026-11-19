@@ -26,3 +26,8 @@ commands-ideas.txt
 # Claude Code local settings
 **/.claude/settings.local.json
 commands-ideas-2.txt
+
+# insta: pending/rejected snapshots from failed test runs (accepted .snap files ARE committed)
+*.snap.new
+.*.pending-snap
+*.pending-snap

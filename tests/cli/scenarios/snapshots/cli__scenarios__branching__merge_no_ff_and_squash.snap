@@ -1,0 +1,96 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit switch -c squashed
+Switched to a new branch 'squashed'
+$ rgit merge --squash feature
+Squash commit -- not updating HEAD
+[stderr]
+Automatic merge went well; stopped before committing as requested
+$ rgit status --short
+A  feature.txt
+$ rgit commit -m squashed
+[squashed <H5:7>] squashed
+ Author: Test Author <author@example.com>
+ 1 file changed, 2 insertions(+)
+ create mode 100644 feature.txt
+$ rgit switch main
+Switched to branch 'main'
+$ rgit merge --no-ff feature -m 'no ff'
+Merge made by the 'ort' strategy.
+ feature.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 feature.txt
+$ rgit log --oneline
+<H6:7> no ff
+<H4:7> more feature work
+<H3:7> feature work
+<H2:7> main work
+<H1:7> base
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H4>
+  refs/heads/main <H6>
+  refs/heads/squashed <H5>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H7> 0	base.txt
+  100644 <H8> 0	feature.txt
+  100644 <H9> 0	main.txt
+HEAD commit:
+  tree <H10>
+  parent <H2>
+  parent <H4>
+  author Test Committer <committer@example.com> 1700000960 +0000
+  committer Test Committer <committer@example.com> 1700000960 +0000
+  
+  no ff
+  
+worktree:
+  base.txt
+    | base
+  feature.txt
+    | on feature
+    | more
+  main.txt
+    | on main

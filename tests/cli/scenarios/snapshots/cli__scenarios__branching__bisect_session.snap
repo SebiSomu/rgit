@@ -1,0 +1,86 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write n.txt (2 bytes)
+$ rgit add n.txt
+Staged files to index (1 new).
+$ rgit commit -a -m 'commit 1'
+[main (root-commit) <H1:7>] commit 1
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 n.txt
+$ write n.txt (2 bytes)
+$ rgit commit -a -m 'commit 2'
+[main <H2:7>] commit 2
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write n.txt (2 bytes)
+$ rgit commit -a -m 'commit 3'
+[main <H3:7>] commit 3
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write n.txt (2 bytes)
+$ rgit commit -a -m 'commit 4'
+[main <H4:7>] commit 4
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write n.txt (2 bytes)
+$ rgit commit -a -m 'commit 5'
+[main <H5:7>] commit 5
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write n.txt (2 bytes)
+$ rgit commit -a -m 'commit 6'
+[main <H6:7>] commit 6
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit bisect start
+$ rgit bisect bad
+status: waiting for good commit(s), bad commit known
+$ rgit bisect good HEAD~5
+Bisecting: 4 revisions left to test after this (roughly 2 steps)
+[<H4:7>] commit 4
+$ rgit bisect good
+Bisecting: 1 revision left to test after this (roughly 0 steps)
+[<H5:7>] commit 5
+$ rgit bisect bad
+<H5> is the first bad commit
+commit <H5>
+Author: Test Author <author@example.com> 1700000360 +0000
+
+    commit 5
+$ rgit bisect log
+git bisect start
+git bisect bad <H6>
+git bisect good <H1>
+git bisect good <H4>
+git bisect bad <H5>
+$ rgit bisect reset
+Switched to branch 'main'
+Bisect session ended.
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H6>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H7> 0	n.txt
+HEAD commit:
+  tree <H8>
+  parent <H5>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  commit 6
+  
+worktree:
+  n.txt
+    | 6

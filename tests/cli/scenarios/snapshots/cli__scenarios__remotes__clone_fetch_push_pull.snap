@@ -1,0 +1,127 @@
+---
+source: tests/cli/scenarios/remotes.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+(../clone) $ rgit log --oneline
+<H3:7> third commit
+<H2:7> second commit
+<H1:7> first commit
+(../clone) $ rgit remote -v
+origin	<REPO> (fetch)
+origin	<REPO> (push)
+(../clone) $ rgit branch -a
+* main
+  remotes/origin/HEAD
+  remotes/origin/main
+$ write upstream.txt (2 bytes)
+$ rgit add upstream.txt
+Staged files to index (1 new).
+$ rgit commit -m 'upstream change'
+[main <H4:7>] upstream change
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 upstream.txt
+(../clone) $ rgit fetch
+From <REPO>
+   <H3:7>..<H4:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+(../clone) $ rgit status
+On branch main
+nothing to commit, working tree clean
+(../clone) $ rgit pull
+From <REPO>
+ = [up to date]      main                 -> origin/main
+Updating <H3:7>..<H4:7>
+Fast-forward
+ upstream.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 upstream.txt
+(../clone) $ rgit log --oneline -1
+<H4:7> upstream change
+$ write ../clone/c.txt (11 bytes)
+(../clone) $ rgit add c.txt
+Staged files to index (1 new).
+(../clone) $ rgit commit -m 'clone change'
+[main <H5:7>] clone change
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+$ rgit switch -c other
+Switched to a new branch 'other'
+(../clone) $ rgit push
+Enumerating objects: 3, done.
+Writing objects: 100% (3/3), done.
+Total 3 (delta 0), reused 0 (delta 0)
+To <REPO>
+   <H4:7>..<H5:7>  main -> main
+(../clone) $ rgit push origin main
+Everything up-to-date
+$ rgit switch main
+Switched to branch 'main'
+$ rgit log --oneline -1
+<H5:7> clone change
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H5>
+  refs/heads/other <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	b.txt
+  100644 <H8> 0	c.txt
+  100644 <H9> 0	src/lib.txt
+  100644 <H10> 0	upstream.txt
+HEAD commit:
+  tree <H11>
+  parent <H4>
+  author Test Author <author@example.com> 1700001020 +0000
+  committer Test Committer <committer@example.com> 1700001020 +0000
+  
+  clone change
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  c.txt
+    | from clone
+  src/lib.txt
+    | lib v2
+  upstream.txt
+    | u

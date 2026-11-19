@@ -1,0 +1,129 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write conflict.txt (18 bytes)
+$ rgit add conflict.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 3 insertions(+)
+ create mode 100644 conflict.txt
+$ rgit branch topic
+$ write conflict.txt (24 bytes)
+$ rgit commit -a -m 'main edit'
+[main <H2:7>] main edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch topic
+Switched to branch 'topic'
+$ write conflict.txt (25 bytes)
+$ rgit commit -a -m 'topic edit'
+[topic <H3:7>] topic edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit switch topic
+Switched to branch 'topic'
+$ rgit rebase main
+Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+[stderr]
+Rebasing (1/1)error: could not apply <H3:7>... topic edit
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "rgit add/rm <conflicted_files>", then run "rgit rebase --continue".
+hint: You can instead skip this commit: run "rgit rebase --skip".
+hint: To abort and get back to the state before "rgit rebase", run "rgit rebase --abort".
+Could not apply <H3:7>... topic edit
+[exit 1]
+$ rgit status
+HEAD detached at <H2:7>
+Unmerged paths:
+	both modified:   conflict.txt
+
+no changes added to commit (use "rgit add" and/or "rgit commit -a")
+
+==== state: rebase stopped ====
+HEAD: <H2>
+refs:
+  refs/heads/main <H2>
+  refs/heads/topic <H3>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD REBASE_BRANCH REBASE_ONTO REBASE_ORIG_HEAD REBASE_TODO REBASE_TOTAL
+index (ls-files -s):
+  100644 <H4> 1	conflict.txt
+  100644 <H5> 2	conflict.txt
+  100644 <H6> 3	conflict.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000240 +0000
+  committer Test Committer <committer@example.com> 1700000240 +0000
+  
+  main edit
+  
+worktree:
+  conflict.txt
+    | line1
+    | <<<<<<< HEAD
+    | main change
+    | =======
+    | topic change
+    | >>>>>>> <H3:7> (topic edit)
+    | line3
+
+$ rgit rebase --abort
+$ rgit log --format='%s'
+topic edit
+base
+$ rgit rebase main
+Auto-merging conflict.txt
+CONFLICT (content): Merge conflict in conflict.txt
+[stderr]
+Rebasing (1/1)error: could not apply <H3:7>... topic edit
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "rgit add/rm <conflicted_files>", then run "rgit rebase --continue".
+hint: You can instead skip this commit: run "rgit rebase --skip".
+hint: To abort and get back to the state before "rgit rebase", run "rgit rebase --abort".
+Could not apply <H3:7>... topic edit
+[exit 1]
+$ write conflict.txt (17 bytes)
+$ rgit add conflict.txt
+Staged files to index (1 modified).
+$ rgit rebase --continue
+[detached HEAD <H8:7>] topic edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[stderr]
+[KSuccessfully rebased and updated refs/heads/topic.
+$ rgit log --format='%s'
+topic edit
+main edit
+base
+
+==== final state ====
+HEAD: ref: refs/heads/topic
+refs:
+  refs/heads/main <H2>
+  refs/heads/topic <H8>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H9> 0	conflict.txt
+HEAD commit:
+  tree <H10>
+  parent <H2>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000900 +0000
+  
+  topic edit
+  
+worktree:
+  conflict.txt
+    | line1
+    | both
+    | line3

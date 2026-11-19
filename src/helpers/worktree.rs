@@ -388,3 +388,7 @@ pub fn format_worktree_porcelain(worktrees: &[WorktreeInfo]) -> String {
     }
     out
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/worktree.rs"]
+mod tests;

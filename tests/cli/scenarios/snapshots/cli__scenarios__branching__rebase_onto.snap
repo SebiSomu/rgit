@@ -1,0 +1,75 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit branch base-two main~1
+$ rgit switch feature
+Switched to branch 'feature'
+$ rgit rebase --onto base-two main~1 feature
+Current branch feature is up to date.
+$ rgit log --format='%s'
+more feature work
+feature work
+base
+
+==== final state ====
+HEAD: ref: refs/heads/feature
+refs:
+  refs/heads/base-two <H1>
+  refs/heads/feature <H4>
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	base.txt
+  100644 <H6> 0	feature.txt
+HEAD commit:
+  tree <H7>
+  parent <H3>
+  author Test Author <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  more feature work
+  
+worktree:
+  base.txt
+    | base
+  feature.txt
+    | on feature
+    | more

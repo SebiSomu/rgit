@@ -1,0 +1,104 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit describe
+[stderr]
+fatal: No names found, cannot describe anything.
+[exit 128]
+$ rgit describe --always
+<H3:7>
+$ rgit tag v1.0 HEAD~2
+$ rgit tag -a v2.0 -m 'release two' HEAD~1
+$ rgit tag
+v1.0
+v2.0
+$ rgit tag -n
+v1.0            first commit
+v2.0            release two
+$ rgit describe
+v2.0-1-gc1a8820
+$ rgit describe --tags
+v2.0-1-gc1a8820
+$ rgit describe --long --tags
+v2.0-1-gc1a8820
+$ rgit describe --exact-match HEAD~1
+v2.0
+$ rgit tag v1.0
+[stderr]
+fatal: tag 'v1.0' already exists
+[exit 128]
+$ rgit tag -f v1.0
+Updated tag 'v1.0' (was <H1:7>)
+$ rgit tag -d v2.0
+Deleted tag 'v2.0' (was <H4:7>)
+$ rgit tag -l 'v*'
+v1.0
+$ rgit show v1.0 --stat
+commit <H3>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:18:20 2023 +0000
+
+    third commit
+    
+    With a body paragraph.
+
+ b.txt       | 1 +
+ src/lib.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+  refs/tags/v1.0 <H3>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

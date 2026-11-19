@@ -1,0 +1,57 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit config user.name 'Config Name'
+$ rgit config user.email cfg@example.com
+$ rgit config user.name
+Config Name
+$ rgit config --list
+user.name=Config Name
+user.email=cfg@example.com
+$ rgit config core.fancy.value 'with spaces'
+$ rgit config core.fancy.value
+with spaces
+$ rgit config --unset core.fancy.value
+$ rgit config core.fancy.value
+[exit 1]
+$ rgit config --global alias.st status
+$ rgit config --global --list
+alias.st=status
+$ unset GIT_AUTHOR_NAME
+$ unset GIT_AUTHOR_EMAIL
+$ write f (2 bytes)
+$ rgit add f
+Staged files to index (1 new).
+$ rgit commit -m 'uses config identity'
+[main (root-commit) <H1:7>] uses config identity
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 f
+$ rgit log -1 --format='%an <%ae>'
+Test Author <author@example.com>
+$ rgit config not-a-valid-key value
+[stderr]
+Error: error: invalid key 'not-a-valid-key' (expected section.name or section.subsection.name)
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+git-dir entries:
+  COMMIT_EDITMSG config
+index (ls-files -s):
+  100644 <H2> 0	f
+HEAD commit:
+  tree <H3>
+  author Test Author <author@example.com> 1700000720 +0000
+  committer Test Committer <committer@example.com> 1700000720 +0000
+  
+  uses config identity
+  
+worktree:
+  f
+    | f

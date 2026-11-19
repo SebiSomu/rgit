@@ -175,3 +175,7 @@ pub fn normalize(path: &Path) -> PathBuf {
 pub fn to_git_path_string(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/repo.rs"]
+mod tests;

@@ -946,3 +946,7 @@ fn edit_hunk_manually(mode: &PatchModeSpec, hunk: &InteractiveHunk) -> anyhow::R
     new_hunk.splittable_into = count_change_groups(&new_hunk.lines);
     Ok(Some(Some(new_hunk)))
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/add_patch.rs"]
+mod tests;

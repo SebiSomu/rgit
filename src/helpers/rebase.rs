@@ -845,3 +845,7 @@ pub fn collect_commits_to_replay(tip: &str, base: &str) -> anyhow::Result<Vec<St
     commits.reverse();
     Ok(commits)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/rebase.rs"]
+mod tests;

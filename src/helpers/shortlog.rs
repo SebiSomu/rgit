@@ -205,3 +205,7 @@ pub fn collect_shortlog(opts: &ShortlogOptions) -> Result<Vec<AuthorEntry>> {
 
     Ok(result)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/helpers/shortlog.rs"]
+mod tests;

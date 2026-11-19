@@ -1,0 +1,139 @@
+---
+source: tests/cli/scenarios/plumbing.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write f.txt (9 bytes)
+$ write d/g.txt (7 bytes)
+$ rgit hash-object f.txt
+<H1>
+$ rgit hash-object -w f.txt
+<H1>
+$ rgit cat-file -p 'HEAD'
+[stderr]
+Error: Failed to read object file
+
+Caused by:
+    Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit add .
+Staged files to index (2 new).
+$ rgit write-tree
+<H2>
+$ rgit ls-files -s
+100644 <H3> 0	d/g.txt
+100644 <H1> 0	f.txt
+$ rgit ls-files
+d/g.txt
+f.txt
+$ rgit ls-files --stage d
+100644 <H3> 0	d/g.txt
+$ rgit commit -m tree
+[main (root-commit) <H4:7>] tree
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 d/g.txt
+ create mode 100644 f.txt
+$ rgit ls-tree HEAD
+[stderr]
+Error: Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit ls-tree --name-only HEAD
+[stderr]
+Error: Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit ls-tree -r HEAD
+[stderr]
+error: unexpected argument '-r' found
+
+  tip: to pass '-r' as a value, use '-- -r'
+
+Usage: rgit ls-tree [OPTIONS] <TREE_HASH>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit ls-tree HEAD d
+[stderr]
+error: unexpected argument 'd' found
+
+Usage: rgit ls-tree [OPTIONS] <TREE_HASH>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit cat-file -t HEAD
+[stderr]
+error: unexpected argument '-t' found
+
+  tip: to pass '-t' as a value, use '-- -t'
+
+Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit cat-file -s HEAD
+[stderr]
+error: unexpected argument '-s' found
+
+  tip: to pass '-s' as a value, use '-- -s'
+
+Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit cat-file -p HEAD
+[stderr]
+Error: Failed to read object file
+
+Caused by:
+    Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit cat-file -p HEAD:d/g.txt
+[stderr]
+Error: Failed to read object file
+
+Caused by:
+    Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit cat-file -e HEAD
+[stderr]
+error: unexpected argument '-e' found
+
+  tip: to pass '-e' as a value, use '-- -e'
+
+Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit cat-file -t <X1>
+[stderr]
+error: unexpected argument '-t' found
+
+  tip: to pass '-t' as a value, use '-- -t'
+
+Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
+
+For more information, try '--help'.
+[exit 2]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H3> 0	d/g.txt
+  100644 <H1> 0	f.txt
+HEAD commit:
+  tree <H2>
+  author Test Author <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  tree
+  
+worktree:
+  d/g.txt
+    | nested
+  f.txt
+    | plumbing

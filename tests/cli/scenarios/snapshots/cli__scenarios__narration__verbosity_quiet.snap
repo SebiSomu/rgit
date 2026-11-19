@@ -1,0 +1,57 @@
+---
+source: tests/cli/scenarios/narration.rs
+expression: "narrated_story(\"quiet\")"
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export RGIT_VERBOSITY=quiet
+$ write a.txt (2 bytes)
+$ write .env (9 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m first
+[main (root-commit) <H1:7>] first
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 .env
+ create mode 100644 a.txt
+$ write a.txt (3 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit commit -m second
+[main <H2:7>] second
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit branch side
+$ rgit switch side
+Switched to branch 'side'
+$ rgit switch main
+Switched to branch 'main'
+$ rgit reset --hard HEAD~1
+HEAD is now at <H1:7> first
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+  refs/heads/side <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H3> 0	.env
+  100644 <H4> 0	a.txt
+HEAD commit:
+  tree <H5>
+  author Test Author <author@example.com> 1700000120 +0000
+  committer Test Committer <committer@example.com> 1700000120 +0000
+  
+  first
+  
+worktree:
+  .env
+    | SECRET=1
+  a.txt
+    | a

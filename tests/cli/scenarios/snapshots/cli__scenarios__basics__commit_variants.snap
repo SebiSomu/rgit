@@ -1,0 +1,107 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write c.txt (2 bytes)
+$ rgit add c.txt
+Staged files to index (1 new).
+$ rgit commit -m 'subject' -m 'body line' -s
+[main <H4:7>] subject
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+$ rgit commit --amend -m 'amended subject'
+[main <H5:7>] amended subject
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:20:20 2023 +0000
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+$ write msg.txt (21 bytes)
+$ write a.txt (12 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit commit -F msg.txt
+[main <H6:7>] from file
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+$ write a.txt (9 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit commit -m authored --author 'Other Person <other@example.com>'
+[main <H7:7>] authored
+ Author: Other Person <other@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit commit -m 'nothing to commit'
+On branch main
+nothing to commit, working tree clean
+[exit 1]
+$ rgit commit --allow-empty -m empty
+[main <H8:7>] empty
+ Author: Test Author <author@example.com>
+$ rgit log --format='%h %an <%ae> | %cn | %s'
+<H8:7> Test Author <author@example.com> | Test Committer | empty
+<H7:7> Other Person <other@example.com> | Test Committer | authored
+<H6:7> Test Author <author@example.com> | Test Committer | from file
+<H5:7> Test Author <author@example.com> | Test Committer | amended subject
+<H3:7> Test Author <author@example.com> | Test Committer | third commit
+<H2:7> Test Author <author@example.com> | Test Committer | second commit
+<H1:7> Test Author <author@example.com> | Test Committer | first commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H8>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H9> 0	a.txt
+  100644 <H10> 0	b.txt
+  100644 <H11> 0	c.txt
+  100644 <H12> 0	src/lib.txt
+HEAD commit:
+  tree <H13>
+  parent <H7>
+  author Test Author <author@example.com> 1700000840 +0000
+  committer Test Committer <committer@example.com> 1700000840 +0000
+  
+  empty
+  
+worktree:
+  a.txt
+    | authored
+  b.txt
+    | bee
+  c.txt
+    | c
+  msg.txt
+    | from file
+    | 
+    | file body
+  src/lib.txt
+    | lib v2

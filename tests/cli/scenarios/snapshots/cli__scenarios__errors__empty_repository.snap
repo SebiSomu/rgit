@@ -1,0 +1,61 @@
+---
+source: tests/cli/scenarios/errors.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit log
+[stderr]
+fatal: your current branch 'main' does not have any commits yet
+[exit 128]
+$ rgit show
+[stderr]
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'rgit <command> [<revision>...] -- [<file>...]'
+[exit 128]
+$ rgit diff HEAD
+[stderr]
+fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+[exit 128]
+$ rgit branch x
+[stderr]
+fatal: not a valid object name: 'main'
+[exit 128]
+$ rgit rev-parse HEAD
+[stderr]
+Error: fatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree
+[exit 1]
+$ rgit reset --hard
+[stderr]
+Error: error: invalid reference: 'HEAD'
+[exit 1]
+$ rgit merge main
+[stderr]
+Error: fatal: HEAD has no commits yet
+[exit 1]
+$ rgit rebase main
+[stderr]
+fatal: invalid upstream 'main'
+[exit 128]
+$ rgit stash
+[stderr]
+Error: fatal: You do not have the initial commit yet
+[exit 1]
+$ rgit describe
+[stderr]
+fatal: Not a valid object name HEAD
+[exit 128]
+$ rgit blame a
+[stderr]
+Error: error: invalid reference: 'HEAD'
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+git-dir entries:
+  
+worktree:

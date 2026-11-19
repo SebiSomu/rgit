@@ -1,0 +1,98 @@
+---
+source: tests/cli/scenarios/basics.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit rm b.txt
+rm 'b.txt'
+$ rgit status --short
+D  b.txt
+$ rgit rm --cached a.txt
+rm 'a.txt'
+$ rgit status --short
+D  a.txt
+D  b.txt
+?? a.txt
+$ rgit add a.txt
+Staged files to index (1 new).
+$ rgit mv src/lib.txt src/renamed.txt
+renamed 'src/lib.txt' -> 'src/renamed.txt'
+$ rgit status --short
+D  b.txt
+R  src/lib.txt -> src/renamed.txt
+$ rgit mv a.txt moved
+renamed 'a.txt' -> 'moved'
+$ rgit status
+On branch main
+Changes to be committed:
+	deleted:    b.txt
+	renamed:    a.txt -> moved
+	renamed:    src/lib.txt -> src/renamed.txt
+
+$ rgit rm nonexistent.txt
+[stderr]
+Error: fatal: pathspec 'nonexistent.txt' did not match any files
+[exit 1]
+$ write src/renamed.txt (6 bytes)
+$ rgit rm src/renamed.txt
+[stderr]
+Error: error: the following file has changes staged in the index:
+    src/renamed.txt
+(use --cached to keep the file, or -f to force removal)
+[exit 1]
+$ rgit commit -m 'moves and removes'
+[main <H4:7>] moves and removes
+ Author: Test Author <author@example.com>
+ 3 files changed, 1 deletion(-)
+ delete mode 100644 b.txt
+ rename a.txt => moved (100%)
+ rename src/{lib.txt => renamed.txt} (100%)
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	moved
+  100644 <H6> 0	src/renamed.txt
+HEAD commit:
+  tree <H7>
+  parent <H3>
+  author Test Author <author@example.com> 1700001020 +0000
+  committer Test Committer <committer@example.com> 1700001020 +0000
+  
+  moves and removes
+  
+worktree:
+  moved
+    | one
+    | two
+  src/renamed.txt
+    | dirty

@@ -1,0 +1,165 @@
+---
+source: tests/cli/scenarios/plumbing.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit ls-tree HEAD
+[stderr]
+Error: Failed to read object file (does this hash exist?)
+[exit 1]
+$ rgit mktree
+<stdin>
+
+[no newline at end]
+<H4>
+$ write base (6 bytes)
+$ write ours (6 bytes)
+$ write theirs (6 bytes)
+$ write conf (6 bytes)
+$ rgit merge-file -p ours base theirs
+a
+<<<<<<< ours
+B
+c
+=======
+b
+C
+>>>>>>> theirs
+[exit 1]
+$ rgit merge-file -p conf base ours
+a
+<<<<<<< conf
+X
+=======
+B
+>>>>>>> ours
+c
+[exit 1]
+$ rgit merge-file -p --diff3 conf base ours
+a
+<<<<<<< conf
+X
+||||||| base
+b
+=======
+B
+>>>>>>> ours
+c
+[exit 1]
+$ rgit merge-file -p --union conf base ours
+a
+X
+B
+c
+$ rgit merge-tree --write-tree main main~1
+<H5>
+$ rgit stripspace
+$ rgit stripspace
+<stdin>
+  a  
+
+
+# c
+b
+  a
+
+# c
+b
+$ rgit stripspace -s
+<stdin>
+keep
+# drop
+keep
+$ rgit stripspace -c
+<stdin>
+x
+
+y
+# x
+#
+# y
+$ rgit column --mode=column --width=20
+<stdin>
+a
+b
+c
+d
+e
+f
+a b c d e f
+$ rgit var GIT_AUTHOR_IDENT
+Test Committer <committer@example.com> 1700001080 +0000
+$ rgit var GIT_DEFAULT_BRANCH
+main
+$ rgit var GIT_PAGER
+less
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	b.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H5>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+  
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  base
+    | a
+    | b
+    | c
+  conf
+    | a
+    | X
+    | c
+  ours
+    | a
+    | B
+    | c
+  src/lib.txt
+    | lib v2
+  theirs
+    | a
+    | b
+    | C

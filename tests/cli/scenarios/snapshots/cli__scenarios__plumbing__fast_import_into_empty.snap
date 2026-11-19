@@ -1,0 +1,89 @@
+---
+source: tests/cli/scenarios/plumbing.rs
+expression: i.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit fast-import
+<stdin>
+blob
+mark :1
+data 4
+one
+
+blob
+mark :2
+data 7
+lib v1
+
+reset refs/heads/main
+commit refs/heads/main
+mark :3
+author Test Author <author@example.com> 1700000120 +0000
+committer Test Committer <committer@example.com> 1700000120 +0000
+data 13
+first commit
+M 100644 :1 a.txt
+M 100644 :2 src/lib.txt
+
+blob
+mark :4
+data 8
+one
+two
+
+commit refs/heads/main
+mark :5
+author Test Author <author@example.com> 1700000180 +0000
+committer Test Committer <committer@example.com> 1700000180 +0000
+data 14
+second commit
+from :3
+M 100644 :4 a.txt
+
+blob
+mark :6
+data 4
+bee
+
+blob
+mark :7
+data 7
+lib v2
+
+commit refs/heads/main
+mark :8
+author Test Author <author@example.com> 1700000300 +0000
+committer Test Committer <committer@example.com> 1700000300 +0000
+data 37
+third commit
+
+With a body paragraph.
+from :5
+M 100644 :6 b.txt
+M 100644 :7 src/lib.txt
+
+$ rgit log --all --format='%s'
+third commit
+second commit
+first commit
+$ rgit fsck
+Checked 13 objects: 0 errors, 0 warnings, 0 dangling.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+git-dir entries:
+  
+HEAD commit:
+  tree <H2>
+  parent <H3>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+  
+worktree:

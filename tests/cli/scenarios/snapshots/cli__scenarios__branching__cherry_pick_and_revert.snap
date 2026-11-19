@@ -1,0 +1,110 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit cherry-pick feature
+CONFLICT (modify/delete): feature.txt deleted in HEAD and modified in <H4:7> (more feature work).  Version <H4:7> (more feature work) of feature.txt left in tree.
+[stderr]
+error: could not apply <H4:7>... more feature work
+hint: After resolving the conflicts, mark them with
+hint: "rgit add/rm <pathspec>", then run
+hint: "rgit cherry-pick --continue".
+hint: You can instead skip this commit with "rgit cherry-pick --skip".
+hint: To abort and get back to the state before "rgit cherry-pick",
+hint: run "rgit cherry-pick --abort".
+[exit 1]
+$ rgit log --format='%s'
+main work
+base
+$ rgit cherry-pick -x feature~1
+[stderr]
+error: Cherry-picking is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'rgit add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: cherry-pick failed
+[exit 128]
+$ rgit log -1 --format=%B
+main work
+
+$ rgit revert HEAD --no-edit
+[stderr]
+error: unexpected argument '--no-edit' found
+
+  tip: a similar argument exists: '--no-commit'
+
+Usage: rgit revert --no-commit <COMMIT>
+
+For more information, try '--help'.
+[exit 2]
+$ rgit log --format='%s'
+main work
+base
+$ rgit cherry-pick nonexistent
+[stderr]
+fatal: bad revision 'nonexistent'
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H4>
+  refs/heads/main <H2>
+git-dir entries:
+  AUTO_MERGE CHERRY_PICK_HEAD COMMIT_EDITMSG MERGE_MSG
+index (ls-files -s):
+  100644 <H5> 0	base.txt
+  100644 <H6> 1	feature.txt
+  100644 <H7> 3	feature.txt
+  100644 <H8> 0	main.txt
+HEAD commit:
+  tree <H9>
+  parent <H1>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  main work
+  
+worktree:
+  base.txt
+    | base
+  feature.txt
+    | on feature
+    | more
+  main.txt
+    | on main

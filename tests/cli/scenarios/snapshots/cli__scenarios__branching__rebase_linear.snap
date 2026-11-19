@@ -1,0 +1,80 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit switch feature
+Switched to branch 'feature'
+$ rgit rebase main
+[stderr]
+Rebasing (1/2)Rebasing (2/2)[KSuccessfully rebased and updated refs/heads/feature.
+$ rgit log --format='%s'
+more feature work
+feature work
+main work
+base
+$ rgit rebase main
+Current branch feature is up to date.
+
+==== final state ====
+HEAD: ref: refs/heads/feature
+refs:
+  refs/heads/feature <H5>
+  refs/heads/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H6> 0	base.txt
+  100644 <H7> 0	feature.txt
+  100644 <H8> 0	main.txt
+HEAD commit:
+  tree <H9>
+  parent <H10>
+  author Test Author <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000720 +0000
+  
+  more feature work
+  
+worktree:
+  base.txt
+    | base
+  feature.txt
+    | on feature
+    | more
+  main.txt
+    | on main

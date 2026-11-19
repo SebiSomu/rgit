@@ -12,6 +12,7 @@ use crate::core::rev_parse::resolve_rev;
 use crate::references::tag::engine::describe_commit_matching;
 use crate::core::wildmatch::{wildmatch, WM_CASEFOLD, WM_PATHNAME};
 use crate::references::for_each_ref::types::{ForEachRefExit, ForEachRefOptions, RefAlign, RefArrayItem, RefAtomArg, RefAtomKind, RefAtomValue, RefContentsPart, RefDateKind, RefDateMode, RefFilterAtom, RefFormatPiece, RefnameShow, RefQuoteStyle, RemoteRefShow, TrailerFormatOptions};
+use crate::core::date::days_from_civil;
 
 /// git's `--format` default for `for-each-ref`.
 pub const FOR_EACH_REF_DEFAULT_FORMAT: &str = "%(objectname) %(objecttype)\t%(refname)";
@@ -2075,16 +2076,6 @@ fn gmtime(t: i64) -> Tm {
         wday: (days + 4).rem_euclid(7),
         yday: days - jan1,
     }
-}
-
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
 }
 
 fn now_seconds() -> i64 {

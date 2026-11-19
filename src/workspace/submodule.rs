@@ -13,12 +13,6 @@ use crate::workspace::submodule::engine::{describe_submodule_commit, read_gitmod
 use crate::core::index::{read_index, write_index};
 use crate::core::repo;
 
-/// Prints a message and exits.
-fn die(message: &str, code: i32) -> ! {
-    eprint!("{}", message);
-    crate::ui::exit(code);
-}
-
 /// `rgit submodule [add | status | init | update | deinit | foreach | sync | set-url | set-branch]`
 ///
 /// Keeps other repositories inside this one. A submodule is recorded in two places: a
@@ -53,7 +47,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
         args.remove(0);
     }
     if !repo::exists() {
-        die("fatal: not a git repository (or any of the parent directories): .git\n", 128);
+        crate::ui::die_raw(128, "fatal: not a git repository (or any of the parent directories): .git\n");
     }
     let action = match args.first().map(String::as_str) {
         None => "status".to_string(),
@@ -105,8 +99,8 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
             }
             other if other.starts_with("--branch=") => branch = Some(other["--branch=".len()..].to_string()),
             other if other.starts_with("--name=") => name = Some(other["--name=".len()..].to_string()),
-            "--remote" | "--merge" | "--rebase" | "--depth" | "--reference" | "--jobs" | "--single-branch" => die(&format!("fatal: {} is not supported by rgit submodule\n", arg), 128),
-            other if other.starts_with('-') => die(&format!("error: unknown option `{}'\n{}", other.trim_start_matches('-'), SUBMODULE_USAGE), 129),
+            "--remote" | "--merge" | "--rebase" | "--depth" | "--reference" | "--jobs" | "--single-branch" => crate::ui::die_raw(128, &format!("fatal: {} is not supported by rgit submodule\n", arg)),
+            other if other.starts_with('-') => crate::ui::die_raw(129, &format!("error: unknown option `{}'\n{}", other.trim_start_matches('-'), SUBMODULE_USAGE)),
             _ => rest.push(arg),
         }
     }
@@ -120,36 +114,36 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
 
     match action.as_str() {
         "add" => {
-            let Some(url) = rest.first().cloned() else { die(SUBMODULE_USAGE, 129) };
+            let Some(url) = rest.first().cloned() else { crate::ui::die_raw(129, SUBMODULE_USAGE) };
             let path = match rest.get(1) {
                 Some(path) => path.trim_end_matches('/').to_string(),
                 None => url.trim_end_matches('/').trim_end_matches(".git").rsplit(['/', ':']).next().unwrap_or("").to_string(),
             };
             if path.is_empty() {
-                die(&format!("fatal: cannot guess a directory name from '{}'\n", url), 128);
+                crate::ui::die_raw(128, &format!("fatal: cannot guess a directory name from '{}'\n", url));
             }
             let name = name.unwrap_or_else(|| path.clone());
             let mut entries = read_index().unwrap_or_default();
             if entries.iter().any(|e| e.path == path || e.path.starts_with(&format!("{}/", path))) {
-                die(&format!("fatal: '{}' already exists in the index\n", path), 128);
+                crate::ui::die_raw(128, &format!("fatal: '{}' already exists in the index\n", path));
             }
             if submodule_git_dir(&path).is_none() {
                 if Path::new(&path).exists() && fs::read_dir(&path).map(|mut d| d.next().is_some()).unwrap_or(true) {
-                    die(&format!("fatal: '{}' already exists and is not a valid git repo\n", path), 128);
+                    crate::ui::die_raw(128, &format!("fatal: '{}' already exists and is not a valid git repo\n", path));
                 }
                 let source = resolve_submodule_url(&url);
                 if !run_rgit_in(&toplevel, &["clone", &source, &path], quiet)? {
-                    die(&format!("fatal: clone of '{}' into submodule path '{}' failed\n", url, path), 128);
+                    crate::ui::die_raw(128, &format!("fatal: clone of '{}' into submodule path '{}' failed\n", url, path));
                 }
                 if let Some(branch) = &branch {
                     if !run_rgit_in(Path::new(&path), &["switch", branch], quiet)? {
-                        die(&format!("fatal: unable to check out branch '{}' in submodule path '{}'\n", branch, path), 128);
+                        crate::ui::die_raw(128, &format!("fatal: unable to check out branch '{}' in submodule path '{}'\n", branch, path));
                     }
                 }
             } else {
                 say(format!("Adding existing repo at '{}' to the index", path));
             }
-            let Some(head) = submodule_head(&path) else { die(&format!("fatal: no commit checked out in submodule path '{}'\n", path), 128) };
+            let Some(head) = submodule_head(&path) else { crate::ui::die_raw(128, &format!("fatal: no commit checked out in submodule path '{}'\n", path)) };
             let gitmodules = Path::new(".gitmodules");
             set_in(gitmodules, &format!("submodule.{}.path", name), &path)?;
             set_in(gitmodules, &format!("submodule.{}.url", name), &url)?;
@@ -194,7 +188,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
                     continue;
                 }
                 if module.url.is_empty() {
-                    die(&format!("fatal: No url found for submodule path '{}' in .gitmodules\n", module.path), 128);
+                    crate::ui::die_raw(128, &format!("fatal: No url found for submodule path '{}' in .gitmodules\n", module.path));
                 }
                 let url = resolve_submodule_url(&module.url);
                 set_in(&config, &format!("submodule.{}.active", module.name), "true")?;
@@ -212,7 +206,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
                         continue;
                     }
                     if module.url.is_empty() {
-                        die(&format!("fatal: No url found for submodule path '{}' in .gitmodules\n", module.path), 128);
+                        crate::ui::die_raw(128, &format!("fatal: No url found for submodule path '{}' in .gitmodules\n", module.path));
                     }
                     let resolved = resolve_submodule_url(&module.url);
                     set_in(&config, &format!("submodule.{}.active", module.name), "true")?;
@@ -262,13 +256,13 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
         }
         "deinit" => {
             if rest.is_empty() && !all {
-                die("fatal: Use '--all' if you really want to deinitialize all submodules\n", 128);
+                crate::ui::die_raw(128, "fatal: Use '--all' if you really want to deinitialize all submodules\n");
             }
             for module in selected_submodules(&rest)? {
                 let path = Path::new(&module.path);
                 if let Some(git_dir) = submodule_git_dir(&module.path) {
                     if !force && submodule_head(&module.path) != module.staged {
-                        die(&format!("error: Submodule work tree '{}' contains local modifications; use '-f' to discard them\n", module.path), 1);
+                        crate::ui::die_raw(1, &format!("error: Submodule work tree '{}' contains local modifications; use '-f' to discard them\n", module.path));
                     }
                     // Keep the repository itself: park it under .git/modules/<name>.
                     if git_dir == path.join(".git") {
@@ -294,7 +288,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
         }
         "foreach" => {
             if rest.is_empty() {
-                die(SUBMODULE_USAGE, 129);
+                crate::ui::die_raw(129, SUBMODULE_USAGE);
             }
             let script = rest.join(" ");
             for module in read_gitmodules()? {
@@ -311,13 +305,13 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
                     .env("toplevel", &toplevel)
                     .status()?;
                 if !status.success() {
-                    die(&format!("fatal: run_command returned non-zero status for {}\n.\n", module.path), 128);
+                    crate::ui::die_raw(128, &format!("fatal: run_command returned non-zero status for {}\n.\n", module.path));
                 }
                 if recursive && Path::new(&module.path).join(".gitmodules").exists() {
                     let mut nested = vec!["submodule", "foreach", "--recursive"];
                     nested.push(&script);
                     if !run_rgit_in(Path::new(&module.path), &nested, false)? {
-                        die(&format!("fatal: run_command returned non-zero status while recursing in the nested submodules of {}\n.\n", module.path), 128);
+                        crate::ui::die_raw(128, &format!("fatal: run_command returned non-zero status while recursing in the nested submodules of {}\n.\n", module.path));
                     }
                 }
             }
@@ -336,7 +330,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
             }
         }
         "set-url" => {
-            let [path, url] = rest.as_slice() else { die(SUBMODULE_USAGE, 129) };
+            let [path, url] = rest.as_slice() else { crate::ui::die_raw(129, SUBMODULE_USAGE) };
             let module = selected_submodules(std::slice::from_ref(path))?.remove(0);
             set_in(Path::new(".gitmodules"), &format!("submodule.{}.url", module.name), url)?;
             let resolved = resolve_submodule_url(url);
@@ -349,7 +343,7 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
             say(format!("Synchronizing submodule url for '{}'", module.path));
         }
         "set-branch" => {
-            let [path] = rest.as_slice() else { die(SUBMODULE_USAGE, 129) };
+            let [path] = rest.as_slice() else { crate::ui::die_raw(129, SUBMODULE_USAGE) };
             let module = selected_submodules(std::slice::from_ref(path))?.remove(0);
             let key = format!("submodule.{}.branch", module.name);
             match (&branch, default_branch) {
@@ -360,11 +354,11 @@ pub fn submodule(args: Vec<String>) -> Result<()> {
                     let kept: Vec<(String, String)> = read_entries_from(file)?.into_iter().filter(|(k, _)| *k != key).collect();
                     write_entries_to(file, &kept)?;
                 }
-                _ => die("fatal: options '--branch' and '--default' cannot be used together (one is required)\n", 128),
+                _ => crate::ui::die_raw(128, "fatal: options '--branch' and '--default' cannot be used together (one is required)\n"),
             }
         }
-        "summary" | "absorbgitdirs" => die(&format!("fatal: submodule {} is not supported by rgit\n", action), 128),
-        other => die(&format!("error: unknown subcommand: `{}'\n{}", other, SUBMODULE_USAGE), 129),
+        "summary" | "absorbgitdirs" => crate::ui::die_raw(128, &format!("fatal: submodule {} is not supported by rgit\n", action)),
+        other => crate::ui::die_raw(129, &format!("error: unknown subcommand: `{}'\n{}", other, SUBMODULE_USAGE)),
     }
     Ok(())
 }

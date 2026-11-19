@@ -15,11 +15,6 @@ use crate::core::index::read_index;
 use crate::merge::rebase::types::{Action, RebaseOptions, TodoItem};
 use crate::core::refs;
 
-fn die(code: i32, message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(code);
-}
-
 /// `rgit rebase [-i] [--onto <newbase> | --keep-base] [<upstream> [<branch>]]` /
 /// `--continue` / `--abort` / `--skip` / `--edit-todo`
 ///
@@ -68,12 +63,12 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
     };
     let upstream = match resolve_commit_from_source(&upstream_name) {
         Ok(commit) => commit,
-        Err(_) => die(128, &format!("fatal: invalid upstream '{}'", upstream_name)),
+        Err(_) => crate::ui::die(128, &format!("fatal: invalid upstream '{}'", upstream_name)),
     };
     let onto_arg = match &opts.onto {
         Some(name) => match resolve_commit_from_source(name) {
             Ok(commit) => Some(commit),
-            Err(_) => die(128, &format!("fatal: Does not point to a valid commit '{}'", name)),
+            Err(_) => crate::ui::die(128, &format!("fatal: Does not point to a valid commit '{}'", name)),
         },
         None => None,
     };
@@ -85,7 +80,7 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
             } else {
                 match resolve_commit_from_source(name) {
                     Ok(commit) => (refs::HeadState::Detached(commit.clone()), commit),
-                    Err(_) => die(128, &format!("fatal: no such branch/commit '{}'", name)),
+                    Err(_) => crate::ui::die(128, &format!("fatal: no such branch/commit '{}'", name)),
                 }
             }
         }
@@ -100,7 +95,7 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
         (None, true) => {
             let bases = find_all_merge_bases(&upstream, &orig_head)?;
             if bases.len() != 1 {
-                die(128, &format!("fatal: '{}': need exactly one merge base with branch", upstream_name));
+                crate::ui::die(128, &format!("fatal: '{}': need exactly one merge base with branch", upstream_name));
             }
             bases[0].clone()
         }

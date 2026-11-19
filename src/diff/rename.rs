@@ -231,7 +231,7 @@ pub fn parse_rename_option(arg: &str, opts: &mut RenameOptions) -> bool {
     true
 }
 
-fn is_regular(mode: u32) -> bool {
+pub fn is_regular(mode: u32) -> bool {
     mode & 0o170000 == 0o100000
 }
 

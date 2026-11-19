@@ -476,6 +476,7 @@ src/
 - Levels: `quiet` (git-identical) / `normal` / `explain` / `teach`, from `rgit --plain|--explain|--teach`, `RGIT_VERBOSITY`, or `rgit.verbosity`. Default is `normal` only when stderr is a terminal, so piped runs and parity tests are unchanged; set `RGIT_VERBOSITY=quiet` in test scripts to be explicit.
 - New narration belongs in the `report_*` functions in ui.rs (they compare the before/after `RepoSnapshot`), not inside command code.
 - Never call `std::process::exit` in rgit code: use `crate::ui::exit(code)`, so the narration knows how the command ended (`src/bin/` tools are the exception).
+- To stop with an error message, use the shared helpers in `ui.rs` instead of writing a local `die`/`fatal`/`fail`: `crate::ui::die(code, msg)` (prints `msg` + newline to stderr), `crate::ui::die_fatal(msg)` (prints `fatal: msg`, exits 128) and `crate::ui::die_raw(code, msg)` (prints `msg` as-is, for usage texts with their own line breaks). Commands whose errors are returned as values (like `for-each-ref`'s `ForEachRefExit`) keep their own mechanism.
 - Git-style conflict `hint:` blocks are wrapped in `if !crate::ui::narration_replaces_hints()`; do the same for new hints the narration already explains.
 
 ### Helper Functions vs. Methods:

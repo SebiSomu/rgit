@@ -13,13 +13,9 @@ use crate::core::commit::{is_reachable, resolve_commit_from_source, resolve_tree
 use crate::core::index::read_index;
 use crate::merge::merge::types::{FastForwardMode, MergeFavor, MergeOptions};
 use crate::core::refs;
+use crate::merge::merge::engine::move_head;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
-
-fn die(code: i32, message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(code);
-}
 
 /// `rgit merge [<options>] <commit>` / `--abort` / `--continue` / `--quit`
 ///
@@ -38,24 +34,24 @@ fn die(code: i32, message: &str) -> ! {
 pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     if let Some(strategy) = &opts.strategy {
         if !["ort", "recursive", "ours", "resolve", "octopus", "subtree"].contains(&strategy.as_str()) {
-            die(1, &format!("Could not find merge strategy '{}'.\nAvailable strategies are: octopus ours recursive resolve subtree.", strategy));
+            crate::ui::die(1, &format!("Could not find merge strategy '{}'.\nAvailable strategies are: octopus ours recursive resolve subtree.", strategy));
         }
         if !["ort", "recursive", "ours"].contains(&strategy.as_str()) {
-            die(1, &format!("fatal: merge strategy '{}' is not supported by rgit (use ort, recursive or ours)", strategy));
+            crate::ui::die(1, &format!("fatal: merge strategy '{}' is not supported by rgit (use ort, recursive or ours)", strategy));
         }
     }
     let merge_head = crate::core::repo::path(".git/MERGE_HEAD");
     if opts.abort || opts.quit || opts.cont {
         let flag = if opts.abort { "--abort" } else if opts.quit { "--quit" } else { "--continue" };
         if !opts.commits.is_empty() {
-            die(129, &format!("fatal: {} expects no arguments", flag));
+            crate::ui::die(129, &format!("fatal: {} expects no arguments", flag));
         }
         if opts.quit {
             clear_merge_state();
             return Ok(());
         }
         if !merge_head.exists() {
-            die(128, if opts.abort { "fatal: There is no merge to abort (MERGE_HEAD missing)." } else { "fatal: There is no merge in progress (MERGE_HEAD missing)." });
+            crate::ui::die(128, if opts.abort { "fatal: There is no merge to abort (MERGE_HEAD missing)." } else { "fatal: There is no merge in progress (MERGE_HEAD missing)." });
         }
         if opts.abort {
             return abort_merge_to_head();
@@ -65,23 +61,23 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
 
     die_if_unmerged("Merging", "Exiting because of an unresolved conflict.")?;
     if merge_head.exists() {
-        die(128, "fatal: You have not concluded your merge (MERGE_HEAD exists).\nPlease, commit your changes before you merge.");
+        crate::ui::die(128, "fatal: You have not concluded your merge (MERGE_HEAD exists).\nPlease, commit your changes before you merge.");
     }
     if crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() {
-        die(128, "fatal: You have not concluded your cherry-pick (CHERRY_PICK_HEAD exists).\nPlease, commit your changes before you merge.");
+        crate::ui::die(128, "fatal: You have not concluded your cherry-pick (CHERRY_PICK_HEAD exists).\nPlease, commit your changes before you merge.");
     }
     if opts.squash {
         if opts.ff == FastForwardMode::Never {
-            die(128, "fatal: options '--squash' and '--no-ff.' cannot be used together");
+            crate::ui::die(128, "fatal: options '--squash' and '--no-ff.' cannot be used together");
         }
         if opts.commit == Some(true) {
-            die(128, "fatal: options '--squash' and '--commit.' cannot be used together");
+            crate::ui::die(128, "fatal: options '--squash' and '--commit.' cannot be used together");
         }
     }
     match opts.commits.len() {
-        0 => die(128, "fatal: No remote for the current branch."),
+        0 => crate::ui::die(128, "fatal: No remote for the current branch."),
         1 => {}
-        _ => die(128, "fatal: rgit merge takes a single commit (octopus merges are not supported)"),
+        _ => crate::ui::die(128, "fatal: rgit merge takes a single commit (octopus merges are not supported)"),
     }
     let name = &opts.commits[0];
     let strategy = opts.strategy.clone().unwrap_or_else(|| "ort".to_string());
@@ -91,7 +87,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     let our_commit = refs::resolve_head_commit()?.ok_or_else(|| anyhow::anyhow!("fatal: HEAD has no commits yet"))?;
     let their_commit = match resolve_commit_from_source(name) {
         Ok(c) => c,
-        Err(_) => die(1, &format!("merge: {} - not something we can merge", name)),
+        Err(_) => crate::ui::die(1, &format!("merge: {} - not something we can merge", name)),
     };
     let message = merge_commit_message(&opts, name, &head_state)?;
     fs::write(crate::core::repo::path(".git/ORIG_HEAD"), format!("{}\n", our_commit))?;
@@ -111,7 +107,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         let index_entries = read_index().unwrap_or_default();
         let index_map: BTreeMap<String, [u8; 20]> = index_entries.iter().map(|e| (e.path.clone(), e.hash)).collect();
         if let Err(e) = check_switch_safety(&target_tree, &our_tree, &index_map) {
-            die(1, &for_merge(&e.to_string()));
+            crate::ui::die(1, &for_merge(&e.to_string()));
         }
         sync_working_tree(&target_tree, &our_tree, &index_map)?;
         update_index_from_tree(&target_tree, &our_tree)?;
@@ -132,7 +128,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     }
     if opts.ff == FastForwardMode::Only {
         eprintln!("hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \trgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \trgit rebase\nhint: \nhint: Disable this message with \"rgit config advice.diverging false\"");
-        die(128, "fatal: Not possible to fast-forward, aborting.");
+        crate::ui::die(128, "fatal: Not possible to fast-forward, aborting.");
     }
 
     let our_tree = resolve_tree_from_source(&our_commit)?;
@@ -142,12 +138,12 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
     } else {
         let (base_tree, _bases) = match merge_base_tree(&our_commit, &their_commit, opts.allow_unrelated) {
             Ok(base) => base,
-            Err(e) => die(128, &e.to_string()),
+            Err(e) => crate::ui::die(128, &e.to_string()),
         };
         let their_tree = resolve_tree_from_source(&their_commit)?;
         match merge_into_worktree_favoring(&base_tree, &our_tree, &their_tree, "HEAD", name, "merge", favor) {
             Ok(result) => result,
-            Err(e) => die(2, &e.to_string()),
+            Err(e) => crate::ui::die(2, &e.to_string()),
         }
     };
     for line in &result.messages {
@@ -209,10 +205,10 @@ fn favor_from_options(options: &[String]) -> MergeFavor {
             "ours" => MergeFavor::Ours,
             "theirs" => MergeFavor::Theirs,
             "patience" | "histogram" | "minimal" | "ignore-space-change" | "ignore-all-space" | "ignore-space-at-eol" | "ignore-cr-at-eol" | "renormalize" | "no-renormalize" | "no-renames"
-                => die(128, &format!("fatal: strategy option -X{} is not supported by rgit (use -X ours or -X theirs)", option)),
+                => crate::ui::die(128, &format!("fatal: strategy option -X{} is not supported by rgit (use -X ours or -X theirs)", option)),
             o if o.starts_with("diff-algorithm=") || o.starts_with("find-renames") || o.starts_with("rename-threshold=") || o.starts_with("subtree")
-                => die(128, &format!("fatal: strategy option -X{} is not supported by rgit (use -X ours or -X theirs)", option)),
-            _ => die(128, &format!("fatal: unknown strategy option: -X{}", option)),
+                => crate::ui::die(128, &format!("fatal: strategy option -X{} is not supported by rgit (use -X ours or -X theirs)", option)),
+            _ => crate::ui::die(128, &format!("fatal: unknown strategy option: -X{}", option)),
         };
     }
     favor
@@ -226,7 +222,7 @@ fn merge_commit_message(opts: &MergeOptions, name: &str, head_state: &refs::Head
     } else if let Some(file) = &opts.file {
         match fs::read_to_string(file) {
             Ok(text) => text,
-            Err(_) => die(128, &format!("fatal: could not read file '{}'", file)),
+            Err(_) => crate::ui::die(128, &format!("fatal: could not read file '{}'", file)),
         }
     } else {
         let current = match head_state {
@@ -242,14 +238,6 @@ fn merge_commit_message(opts: &MergeOptions, name: &str, head_state: &refs::Head
 /// Rewords a switch/checkout refusal for a merge.
 fn for_merge(error: &str) -> String {
     error.replace("by switch", "by merge").replace("before you switch branches", "before you merge")
-}
-
-/// Points the current branch (or a detached HEAD) at `commit`.
-fn move_head(head_state: &refs::HeadState, commit: &str) -> anyhow::Result<()> {
-    match head_state {
-        refs::HeadState::Branch(branch) => refs::write_ref(&format!("refs/heads/{}", branch), commit),
-        refs::HeadState::Detached(_) => refs::set_head_detached(commit),
-    }
 }
 
 /// git's `squash_message`: `SQUASH_MSG` lists every commit being squashed (`HEAD..<theirs>`,

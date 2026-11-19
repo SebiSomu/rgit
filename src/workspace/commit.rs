@@ -40,7 +40,7 @@ pub fn commit_tree(tree_hash: String, parent_hash: Option<String>, message: Stri
 pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     let merging = crate::core::repo::path(".git/MERGE_HEAD").exists();
     if merging && opts.amend {
-        fail(128, "fatal: You are in the middle of a merge -- cannot amend.");
+        crate::ui::die(128, "fatal: You are in the middle of a merge -- cannot amend.");
     }
     // `-a` resolves conflicts by staging the working tree; otherwise unmerged paths block.
     if opts.all {
@@ -52,7 +52,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     let head = refs::resolve_head_commit()?;
     let head_commit = match (&head, opts.amend) {
         (Some(h), _) => Some(parse_commit_object(h)?),
-        (None, true) => fail(128, "fatal: You have nothing to amend."),
+        (None, true) => crate::ui::die(128, "fatal: You have nothing to amend."),
         (None, false) => None,
     };
     let parents: Vec<String> = if opts.amend {
@@ -95,12 +95,12 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
     };
     let show_date = opts.date.is_some() || (!opts.reset_author && (reused.is_some() || (opts.amend && head_commit.is_some()) || picked.is_some()));
     if let Some(who) = &opts.author {
-        let (name, email) = parse_author_option(who).unwrap_or_else(|e| fail(128, &e.to_string()));
+        let (name, email) = parse_author_option(who).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
         author.name = name;
         author.email = email;
     }
     if let Some(when) = &opts.date {
-        let (timestamp, tz) = parse_commit_date(when).unwrap_or_else(|e| fail(128, &e.to_string()));
+        let (timestamp, tz) = parse_commit_date(when).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
         author.timestamp = timestamp;
         author.tz = tz;
     }
@@ -143,7 +143,7 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
         message = add_signoff(&message, &committer);
     }
     if message.trim().is_empty() && !opts.allow_empty_message {
-        fail(1, "Aborting commit due to empty commit message.");
+        crate::ui::die(1, "Aborting commit due to empty commit message.");
     }
     fs::write(crate::core::repo::path(".git/COMMIT_EDITMSG"), &message)?;
 
@@ -170,11 +170,6 @@ pub fn commit(opts: CommitOptions) -> anyhow::Result<()> {
 }
 
 const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-
-fn fail(code: i32, message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(code);
-}
 
 /// Prints git's explanation of why there is nothing to commit and exits with status 1.
 fn report_nothing_to_commit(head_state: &refs::HeadState, unborn: bool, amend: bool) -> anyhow::Result<()> {

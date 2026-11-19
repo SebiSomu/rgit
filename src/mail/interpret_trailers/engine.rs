@@ -37,7 +37,7 @@ const CUT_LINE: &[u8] = b"\n# ------------------------ >8 ----------------------
 
 /// git's `isspace`: space, tab, LF or CR.
 // Used by `interpret-trailers` (internal to this file's helpers).
-fn is_space(b: u8) -> bool {
+pub fn is_space(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 

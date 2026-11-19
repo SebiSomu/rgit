@@ -30,14 +30,14 @@ pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
         crate::ui::exit(129);
     }
     if !repo::exists() {
-        fatal("fatal: not a git repository (or any of the parent directories): .git");
+        crate::ui::die(128, "fatal: not a git repository (or any of the parent directories): .git");
     }
     let opts = match parse_fmt_merge_msg_args(&args) {
         Ok(opts) => opts,
         Err(e) => {
             let message = e.to_string();
             if message.starts_with("fatal:") || message.starts_with("error: merge.") {
-                fatal(&message);
+                crate::ui::die(128, &message);
             }
             eprint!("{}", message);
             crate::ui::exit(129);
@@ -50,12 +50,12 @@ pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
             Ok(bytes) => input = bytes,
             Err(e) => {
                 let reason = if e.kind() == io::ErrorKind::NotFound { "No such file or directory".to_string() } else { e.to_string() };
-                fatal(&format!("fatal: cannot open '{}': {}", path, reason));
+                crate::ui::die(128, &format!("fatal: cannot open '{}': {}", path, reason));
             }
         },
         None => {
             if io::stdin().lock().read_to_end(&mut input).is_err() {
-                fatal("fatal: could not read input file");
+                crate::ui::die(128, "fatal: could not read input file");
             }
         }
     }
@@ -67,11 +67,7 @@ pub fn fmt_merge_msg(args: Vec<String>) -> Result<()> {
             out.write_all(&message)?;
             Ok(out.flush()?)
         }
-        Err(e) => fatal(&e.to_string()),
+        Err(e) => crate::ui::die(128, &e.to_string()),
     }
 }
 
-fn fatal(message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(128);
-}

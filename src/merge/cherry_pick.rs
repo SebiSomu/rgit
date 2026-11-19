@@ -16,6 +16,7 @@ use crate::core::commit::resolve_tree_from_source;
 
 use crate::core::refs;
 use crate::merge::cherry_pick::types::CherryPickOptions;
+use crate::merge::merge::engine::move_head;
 
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 
@@ -317,13 +318,6 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     update_abort_safety(&new_commit)?;
     print_commit_summary(&head_state, &new_commit, &picked.author, &committer, true)?;
     Ok(Pick::Done)
-}
-
-fn move_head(head_state: &refs::HeadState, commit: &str) -> anyhow::Result<()> {
-    match head_state {
-        refs::HeadState::Branch(branch) => refs::write_ref(&format!("refs/heads/{}", branch), commit),
-        refs::HeadState::Detached(_) => refs::set_head_detached(commit),
-    }
 }
 
 /// Commits the resolved pick the way git's `continue_single_pick` does: `commit --no-edit

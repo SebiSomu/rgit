@@ -1,5 +1,7 @@
 use crate::core::config::get_config_value;
 use crate::mail::mailinfo::types::{MailinfoOptions, MailinfoOutput, MailinfoState, MailTransferEncoding, QuotedCrAction};
+use crate::diff::patch_id::engine::find_bytes;
+use crate::mail::interpret_trailers::engine::is_space;
 
 /// git's usage text for `mailinfo`, printed for `-h` and after argument errors (exit 129).
 pub const MAILINFO_USAGE: &str = "usage: rgit mailinfo [<options>] <msg> <patch> < mail >info
@@ -20,18 +22,6 @@ const MAIL_HEADERS: [&str; 3] = ["From", "Subject", "Date"];
 
 /// Most nested MIME boundaries followed at once (git's `MAX_BOUNDARIES` minus the base slot).
 const MAX_BOUNDARIES: usize = 4;
-
-/// git's `isspace`: space, tab, LF or CR.
-// Used by `mailinfo` (internal to this file's helpers).
-fn is_space(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\n' | b'\r')
-}
-
-/// Position of the first occurrence of `needle` in `haystack`.
-// Used by `mailinfo` (internal to this file's helpers).
-fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|w| w == needle)
-}
 
 /// Position of the first occurrence of `needle` in `haystack`, ignoring ASCII case.
 // Used by `mailinfo` (internal to this file's helpers).

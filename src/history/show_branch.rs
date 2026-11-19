@@ -30,7 +30,7 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
         crate::ui::exit(129);
     }
     if !repo::exists() {
-        fatal("fatal: not a git repository (or any of the parent directories): .git");
+        crate::ui::die(128, "fatal: not a git repository (or any of the parent directories): .git");
     }
     let opts = match parse_show_branch_args(&args) {
         Ok(opts) => opts,
@@ -40,7 +40,7 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
             crate::ui::exit(if message.starts_with("fatal:") { 128 } else { 129 });
         }
     };
-    let (names, head) = collect_show_branch_names(&opts).unwrap_or_else(|e| fatal(&e.to_string()));
+    let (names, head) = collect_show_branch_names(&opts).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     if names.is_empty() {
         eprintln!("No revs to be shown.");
         return Ok(());
@@ -53,11 +53,7 @@ pub fn show_branch(args: Vec<String>) -> Result<()> {
             }
             Ok(())
         }
-        Err(e) => fatal(&e.to_string()),
+        Err(e) => crate::ui::die(128, &e.to_string()),
     }
 }
 
-fn fatal(message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(128);
-}

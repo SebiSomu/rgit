@@ -198,13 +198,6 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
     opts
 }
 
-/// Exits 128 with `fatal: <message>`, git's way of dying in `branch`.
-// Used by the `branch` command and the helpers below.
-pub fn die(message: &str) -> ! {
-    eprintln!("fatal: {}", message);
-    crate::ui::exit(128);
-}
-
 /// The first paragraph of a commit message joined into one line, like `%(contents:subject)`.
 // Used by `format_branch_list` (`branch -v`).
 fn commit_subject(oid: &str) -> String {

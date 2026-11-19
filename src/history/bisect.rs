@@ -26,12 +26,11 @@ use crate::core::object_store::{flatten_tree, tree_hash_of_commit};
 use crate::core::index::read_index;
 use crate::history::bisect::types::{BisectAction, BisectOutcome};
 use crate::core::refs;
-
-pub const BISECT_START_PATH: &str = ".git/BISECT_START";
-pub const BISECT_LOG_PATH: &str = ".git/BISECT_LOG";
-pub const BISECT_BAD_PATH: &str = ".git/BISECT_BAD";
-pub const BISECT_GOOD_PATH: &str = ".git/BISECT_GOOD";
-pub const BISECT_SKIP_PATH: &str = ".git/BISECT_SKIP";
+use crate::history::bisect::engine::BISECT_START_PATH;
+use crate::history::bisect::engine::BISECT_LOG_PATH;
+use crate::history::bisect::engine::BISECT_BAD_PATH;
+use crate::history::bisect::engine::BISECT_GOOD_PATH;
+use crate::history::bisect::engine::BISECT_SKIP_PATH;
 
 /// `rgit bisect start [<bad> [<good>...]]`
 pub fn bisect_start(bad: Option<String>, good: Vec<String>) -> anyhow::Result<()> {

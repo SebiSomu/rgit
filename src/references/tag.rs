@@ -56,13 +56,13 @@ pub fn tag(opts: TagOptions) -> Result<()> {
 
     let name = &opts.args[0];
     if name.starts_with('-') || !check_refname_format(&format!("refs/tags/{}", name), false, false) {
-        fail(&format!("fatal: '{}' is not a valid tag name.", name));
+        crate::ui::die(128, &format!("fatal: '{}' is not a valid tag name.", name));
     }
     let object_name = opts.args.get(1).map(String::as_str).unwrap_or("HEAD");
-    let object = resolve_rev(object_name).unwrap_or_else(|_| fail(&format!("fatal: Failed to resolve '{}' as a valid ref.", object_name)));
+    let object = resolve_rev(object_name).unwrap_or_else(|_| crate::ui::die(128, &format!("fatal: Failed to resolve '{}' as a valid ref.", object_name)));
     let existing = list_tag_refs().get(name).cloned();
     if existing.is_some() && !opts.force {
-        fail(&format!("fatal: tag '{}' already exists", name));
+        crate::ui::die(128, &format!("fatal: tag '{}' already exists", name));
     }
 
     let annotated = opts.annotate || !opts.messages.is_empty() || opts.file.is_some();
@@ -83,11 +83,6 @@ pub fn tag(opts: TagOptions) -> Result<()> {
         println!("Updated tag '{}' (was {})", name, abbreviate_hash(&old));
     }
     Ok(())
-}
-
-fn fail(message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(128);
 }
 
 /// The message of an annotated tag: `-m` paragraphs, `-F` file contents, or what was typed
@@ -111,7 +106,7 @@ fn tag_message(opts: &TagOptions, name: &str) -> Result<String> {
         cleanup_commit_message(given.as_deref().unwrap_or_default(), true)
     };
     if message.is_empty() && given.is_none() {
-        fail("fatal: no tag message?");
+        crate::ui::die(128, "fatal: no tag message?");
     }
     Ok(message)
 }
@@ -120,11 +115,11 @@ fn list_tags(opts: &TagOptions) -> Result<()> {
     let mut patterns = opts.args.clone();
     let lines = opts.lines;
     let contains = match &opts.contains {
-        Some(rev) => Some(resolve_commit_rev(rev).unwrap_or_else(|_| fail(&format!("error: malformed object name {}", rev)))),
+        Some(rev) => Some(resolve_commit_rev(rev).unwrap_or_else(|_| crate::ui::die(128, &format!("error: malformed object name {}", rev)))),
         None => None,
     };
     let points_at = match &opts.points_at {
-        Some(rev) => Some(resolve_rev(rev).unwrap_or_else(|_| fail(&format!("error: malformed object name {}", rev)))),
+        Some(rev) => Some(resolve_rev(rev).unwrap_or_else(|_| crate::ui::die(128, &format!("error: malformed object name {}", rev)))),
         None => None,
     };
     patterns.retain(|p| !p.is_empty());
@@ -169,7 +164,7 @@ fn list_tags(opts: &TagOptions) -> Result<()> {
 pub fn describe(opts: DescribeOptions) -> Result<()> {
     let commits = if opts.commits.is_empty() { vec!["HEAD".to_string()] } else { opts.commits.clone() };
     for name in &commits {
-        let target = resolve_commit_rev(name).unwrap_or_else(|_| fail(&format!("fatal: Not a valid object name {}", name)));
+        let target = resolve_commit_rev(name).unwrap_or_else(|_| crate::ui::die(128, &format!("fatal: Not a valid object name {}", name)));
         let abbrev = |hash: &str| match opts.abbrev {
             Some(n) => abbreviate_hash_min(hash, n),
             None => abbreviate_hash(hash),
@@ -192,20 +187,20 @@ pub fn describe(opts: DescribeOptions) -> Result<()> {
             }
             Some((tag, depth)) if opts.exact_match && depth > 0 => {
                 let _ = tag;
-                fail(&format!("fatal: no tag exactly matches '{}'", target));
+                crate::ui::die(128, &format!("fatal: no tag exactly matches '{}'", target));
             }
             Some((tag, _)) if opts.abbrev == Some(0) => println!("{}", tag),
             Some((tag, depth)) => println!("{}-{}-g{}", tag, depth, abbrev(&target)),
-            None if opts.exact_match => fail(&format!("fatal: no tag exactly matches '{}'", target)),
+            None if opts.exact_match => crate::ui::die(128, &format!("fatal: no tag exactly matches '{}'", target)),
             None if opts.always => println!("{}", abbrev(&target)),
             None => {
                 if list_tag_refs().is_empty() {
-                    fail("fatal: No names found, cannot describe anything.");
+                    crate::ui::die(128, "fatal: No names found, cannot describe anything.");
                 }
                 if !opts.tags && describe_commit(&target, true)?.is_some() {
-                    fail(&format!("fatal: No annotated tags can describe '{}'.\nHowever, there were unannotated tags: try --tags.", target));
+                    crate::ui::die(128, &format!("fatal: No annotated tags can describe '{}'.\nHowever, there were unannotated tags: try --tags.", target));
                 }
-                fail(&format!("fatal: No tags can describe '{}'.\nTry --always, or create some tags.", target));
+                crate::ui::die(128, &format!("fatal: No tags can describe '{}'.\nTry --always, or create some tags.", target));
             }
         }
     }

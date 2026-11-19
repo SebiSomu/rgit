@@ -46,11 +46,11 @@ pub fn interpret_trailers(args: Vec<String>) -> Result<()> {
 
     if opts.files.is_empty() {
         if opts.in_place {
-            fatal("fatal: no input file given for in-place editing");
+            crate::ui::die(128, "fatal: no input file given for in-place editing");
         }
         let mut message = Vec::new();
         if io::stdin().lock().read_to_end(&mut message).is_err() {
-            fatal("fatal: could not read from stdin");
+            crate::ui::die(128, "fatal: could not read from stdin");
         }
         out.write_all(&process_trailers(&message, &opts, &config))?;
         return Ok(out.flush()?);
@@ -64,12 +64,12 @@ pub fn interpret_trailers(args: Vec<String>) -> Result<()> {
                 _ if fs::metadata(file).is_ok_and(|m| m.is_dir()) => "Is a directory".to_string(),
                 _ => e.to_string(),
             };
-            fatal(&format!("fatal: could not read input file '{}': {}", file, reason))
+            crate::ui::die(128, &format!("fatal: could not read input file '{}': {}", file, reason))
         });
         let result = process_trailers(&message, &opts, &config);
         if opts.in_place {
             if let Err(e) = write_trailers_in_place(file, &result) {
-                fatal(&e.to_string());
+                crate::ui::die(128, &e.to_string());
             }
         } else {
             out.write_all(&result)?;
@@ -78,7 +78,3 @@ pub fn interpret_trailers(args: Vec<String>) -> Result<()> {
     Ok(out.flush()?)
 }
 
-fn fatal(message: &str) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(128);
-}

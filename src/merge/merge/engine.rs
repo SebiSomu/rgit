@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use crate::core::object_store::{read_object, write_object};
+use crate::core::refs;
 
 /// Finds all best common ancestors (merge bases) between two commits.
 // Used by `merge_base`.
@@ -283,3 +284,10 @@ pub fn reset_merge_to_tree(target_tree: &TreeMap) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Points the current branch (or a detached HEAD) at `commit`.
+pub fn move_head(head_state: &refs::HeadState, commit: &str) -> anyhow::Result<()> {
+    match head_state {
+        refs::HeadState::Branch(branch) => refs::write_ref(&format!("refs/heads/{}", branch), commit),
+        refs::HeadState::Detached(_) => refs::set_head_detached(commit),
+    }
+}

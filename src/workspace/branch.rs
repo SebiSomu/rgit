@@ -57,14 +57,14 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     }
     if let Some(upstream) = &opts.set_upstream {
         if opts.args.len() > 1 {
-            die("too many arguments to set new upstream");
+            crate::ui::die_fatal("too many arguments to set new upstream");
         }
         let branch_name = match opts.args.first().cloned().or(current.clone()) {
             Some(b) => b,
-            None => die(&format!("could not set upstream of HEAD to {} when it does not point to any branch", upstream)),
+            None => crate::ui::die_fatal(format!("could not set upstream of HEAD to {} when it does not point to any branch", upstream)),
         };
         if refs::read_ref(&format!("refs/heads/{}", branch_name))?.is_none() {
-            die(&format!("branch '{}' does not exist", branch_name));
+            crate::ui::die_fatal(format!("branch '{}' does not exist", branch_name));
         }
         let Some((remote, merge, display)) = upstream_for(upstream) else {
             eprintln!("fatal: the requested upstream branch '{}' does not exist", upstream);
@@ -83,24 +83,24 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     }
     if opts.unset_upstream {
         if opts.args.len() > 1 {
-            die("too many arguments to unset upstream");
+            crate::ui::die_fatal("too many arguments to unset upstream");
         }
         let branch_name = match opts.args.first().cloned().or(current.clone()) {
             Some(b) => b,
-            None => die("could not unset upstream of HEAD when it does not point to any branch"),
+            None => crate::ui::die_fatal("could not unset upstream of HEAD when it does not point to any branch"),
         };
         if refs::read_ref(&format!("refs/heads/{}", branch_name))?.is_none() {
-            die(&format!("branch '{}' does not exist", branch_name));
+            crate::ui::die_fatal(format!("branch '{}' does not exist", branch_name));
         }
         if !unset_branch_upstream(&branch_name)? {
-            die(&format!("branch '{}' has no upstream information", branch_name));
+            crate::ui::die_fatal(format!("branch '{}' has no upstream information", branch_name));
         }
         return Ok(());
     }
 
     // Creating a branch.
     if opts.remotes || opts.all {
-        die("the -a, and -r, options to 'rgit branch' do not take a branch name.\nDid you mean to use: -a|-r --list <pattern>?");
+        crate::ui::die_fatal("the -a, and -r, options to 'rgit branch' do not take a branch name.\nDid you mean to use: -a|-r --list <pattern>?");
     }
     if opts.args.len() > 2 {
         eprint!("{}", BRANCH_USAGE);
@@ -110,19 +110,19 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     let start = opts.args.get(1).cloned().unwrap_or_else(|| "HEAD".to_string());
     let commit = match crate::core::rev_parse::resolve_rev(&format!("{}^{{commit}}", start)) {
         Ok(c) => c,
-        Err(_) if opts.args.len() == 1 => die(&format!("not a valid object name: '{}'", current.as_deref().unwrap_or("HEAD"))),
-        Err(_) => die(&format!("not a valid object name: '{}'", start)),
+        Err(_) if opts.args.len() == 1 => crate::ui::die_fatal(format!("not a valid object name: '{}'", current.as_deref().unwrap_or("HEAD"))),
+        Err(_) => crate::ui::die_fatal(format!("not a valid object name: '{}'", start)),
     };
     let refname = format!("refs/heads/{}", name);
     if refs::read_ref(&refname)?.is_some() {
         if !opts.force {
-            die(&format!("a branch named '{}' already exists", name));
+            crate::ui::die_fatal(format!("a branch named '{}' already exists", name));
         }
         if let Some(user) = worktree_using_branch(&refname, true)? {
-            die(&format!("cannot force update the branch '{}' used by worktree at '{}'", name, user.display_path()));
+            crate::ui::die_fatal(format!("cannot force update the branch '{}' used by worktree at '{}'", name, user.display_path()));
         }
         if !refs::is_valid_branch_name(name) {
-            die(&format!("'{}' is not a valid branch name", name));
+            crate::ui::die_fatal(format!("'{}' is not a valid branch name", name));
         }
         refs::write_ref(&refname, &commit)?;
     } else {
@@ -136,7 +136,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
     };
     if track {
         let Some((remote, merge, display)) = tracking else {
-            die(&format!("cannot set up tracking information; starting point '{}' is not a branch", start));
+            crate::ui::die_fatal(format!("cannot set up tracking information; starting point '{}' is not a branch", start));
         };
         set_branch_upstream(name, &remote, &merge)?;
         if !opts.quiet {
@@ -151,7 +151,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
 fn delete_branches(opts: &crate::workspace::branch::types::BranchOptions) -> anyhow::Result<()> {
     use crate::workspace::branch::engine::*;
     if opts.args.is_empty() {
-        die("branch name required");
+        crate::ui::die_fatal("branch name required");
     }
     let head_commit = refs::resolve_head_commit()?;
     let mut failed = false;
@@ -232,28 +232,28 @@ fn rename_or_copy(opts: &crate::workspace::branch::types::BranchOptions, current
     use crate::workspace::branch::engine::*;
     let verb = if opts.copy { "copy" } else { "rename" };
     let (old, new) = match opts.args.as_slice() {
-        [] => die("branch name required"),
+        [] => crate::ui::die_fatal("branch name required"),
         [new] => match current {
             Some(c) => (c.to_string(), new.clone()),
-            None => die(&format!("cannot {} the current branch while not on any", verb)),
+            None => crate::ui::die_fatal(format!("cannot {} the current branch while not on any", verb)),
         },
         [old, new] => (old.clone(), new.clone()),
-        _ => die(&format!("too many arguments for a {} operation", verb)),
+        _ => crate::ui::die_fatal(format!("too many arguments for a {} operation", verb)),
     };
     let old_ref = format!("refs/heads/{}", old);
     let new_ref = format!("refs/heads/{}", new);
     let Some(tip) = refs::read_ref(&old_ref)? else {
-        die(&format!("no branch named '{}'", old));
+        crate::ui::die_fatal(format!("no branch named '{}'", old));
     };
     if !refs::is_valid_branch_name(&new) {
-        die(&format!("'{}' is not a valid branch name", new));
+        crate::ui::die_fatal(format!("'{}' is not a valid branch name", new));
     }
     if old != new && refs::read_ref(&new_ref)?.is_some() {
         if !opts.force {
-            die(&format!("a branch named '{}' already exists", new));
+            crate::ui::die_fatal(format!("a branch named '{}' already exists", new));
         }
         if let Some(user) = worktree_using_branch(&new_ref, true)? {
-            die(&format!("cannot force update the branch '{}' used by worktree at '{}'", new, user.display_path()));
+            crate::ui::die_fatal(format!("cannot force update the branch '{}' used by worktree at '{}'", new, user.display_path()));
         }
         refs::delete_branch(&new)?;
     }
@@ -284,7 +284,7 @@ pub fn die_if_operation_in_progress() -> anyhow::Result<()> {
         ("cherry-picking", "rgit cherry-pick --abort\"")
     } else if state(".git/REVERT_HEAD") {
         ("reverting", "rgit revert --abort\"")
-    } else if state(crate::history::bisect::BISECT_START_PATH) {
+    } else if state(crate::history::bisect::engine::BISECT_START_PATH) {
         ("bisecting", "rgit bisect reset\"")
     } else {
         return Ok(());

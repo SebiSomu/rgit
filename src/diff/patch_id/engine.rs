@@ -226,7 +226,7 @@ fn flush_one_hunk(result: &mut [u8; 20], hasher: &mut Sha1) {
 
 /// Position of the first occurrence of `needle` in `haystack`.
 // Used by `patch-id` (internal to this file's helpers).
-fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+pub fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 

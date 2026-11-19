@@ -72,7 +72,7 @@ pub fn parse_approx_date(text: &str) -> Option<i64> {
     Some(local - tz_offset_seconds(tz))
 }
 
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = y.div_euclid(400);
     let yoe = y.rem_euclid(400);

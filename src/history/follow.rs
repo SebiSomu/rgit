@@ -17,6 +17,7 @@ use crate::core::types::ParsedCommit;
 use crate::diff::types::DiffStatEntry;
 use crate::history::log::types::LogOptions;
 use crate::history::follow::types::FollowPair;
+use crate::diff::rename::is_regular;
 
 /// git's default minimum rename score (50%).
 const MIN_SCORE: u64 = 30000;
@@ -143,12 +144,6 @@ fn score_compare(a: &Option<(u64, bool, usize)>, b: &Option<(u64, bool, usize)>)
         (Some(a), Some(b)) if a.0 == b.0 => b.1.cmp(&a.1),
         (Some(a), Some(b)) => b.0.cmp(&a.0),
     }
-}
-
-/// Whether a tree entry mode is a regular file (rename detection only scores those).
-// Used by `find_rename_source`.
-fn is_regular(mode: u32) -> bool {
-    mode & 0o170000 == 0o100000
 }
 
 fn status_of(pair: &FollowPair) -> String {

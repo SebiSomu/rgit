@@ -33,18 +33,18 @@ use crate::core::refs;
 /// walks the whole history and shows the commits that change that one path, switching to the
 /// old name at the commit that renamed or copied it (shown as `R`/`C` with its similarity).
 pub fn log(args: Vec<String>) -> Result<()> {
-    let opts = parse_log_args(&args, false).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let opts = parse_log_args(&args, false).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     if opts.revs.revs == ["HEAD"] && refs::resolve_head_commit()?.is_none() {
         let name = match refs::resolve_head()? {
             refs::HeadState::Branch(b) => b,
             refs::HeadState::Detached(_) => "HEAD".to_string(),
         };
-        exit_with(&format!("fatal: your current branch '{}' does not have any commits yet", name), 128);
+        crate::ui::die(128, &format!("fatal: your current branch '{}' does not have any commits yet", name));
     }
     if opts.graph || opts.follow {
         return log_graph_or_follow(&opts);
     }
-    let (mut selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let (mut selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     if opts.revs.reverse {
         selected.reverse();
     }
@@ -74,7 +74,7 @@ fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
     if opts.follow {
         walk.paths.clear();
     }
-    let (mut selected, state) = select_rev_list_commits(&walk).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let (mut selected, state) = select_rev_list_commits(&walk).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     let interesting: HashSet<String> = selected.iter().map(|w| w.commit.hash.clone()).collect();
     let decorations = collect_decorations(effective_decorate(opts))?;
 
@@ -169,14 +169,14 @@ fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
 /// asking for another diff format (`-p`, `--stat`, `--name-only`, `--name-status`) replaces
 /// the raw list.
 pub fn whatchanged(args: Vec<String>) -> Result<()> {
-    let mut opts = parse_log_args(&args, false).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let mut opts = parse_log_args(&args, false).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     reject_log_only_options(&opts);
     if !(opts.patch || opts.stat || opts.shortstat || opts.name_only || opts.name_status) {
         opts.raw = true;
     }
     // `-n` and `--skip` count the commits that are shown, not the ones walked.
     let (limit, skip) = (opts.revs.max_count.take().unwrap_or(usize::MAX), std::mem::take(&mut opts.revs.skip));
-    let (selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let (selected, _) = select_rev_list_commits(&opts.revs).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     let decorations = collect_decorations(effective_decorate(&opts))?;
 
     let mut shown = Vec::new();
@@ -210,20 +210,17 @@ pub fn whatchanged(args: Vec<String>) -> Result<()> {
 /// (`--pretty`/`--format`/`--oneline`, `--date`, `--decorate`, `--stat`, `--name-only`,
 /// `--name-status`, `-s` to drop the diff) and `-- <path>...` to limit the diff.
 pub fn show(args: Vec<String>) -> Result<()> {
-    let opts = parse_log_args(&args, true).unwrap_or_else(|e| exit_with(&e.to_string(), 128));
+    let opts = parse_log_args(&args, true).unwrap_or_else(|e| crate::ui::die(128, &e.to_string()));
     reject_log_only_options(&opts);
     let decorations = collect_decorations(effective_decorate(&opts))?;
     let mut out = BufWriter::new(io::stdout().lock());
     let mut first = true;
     for name in &opts.objects {
         let hash = resolve_rev(name).unwrap_or_else(|_| {
-            exit_with(
-                &format!(
+            crate::ui::die(128, &format!(
                     "fatal: ambiguous argument '{}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'rgit <command> [<revision>...] -- [<file>...]'",
                     name
-                ),
-                128,
-            )
+                ))
         });
         let text = show_object(&hash, name, &opts, &decorations, &mut first)?;
         write_or_quit(&mut out, &text);
@@ -313,7 +310,7 @@ fn entry_separator(opts: &LogOptions) -> &'static str {
 fn reject_log_only_options(opts: &LogOptions) {
     if opts.graph || opts.follow {
         let option = if opts.graph { "--graph" } else { "--follow" };
-        exit_with(&format!("fatal: {} is only supported by 'rgit log' for now", option), 128);
+        crate::ui::die(128, &format!("fatal: {} is only supported by 'rgit log' for now", option));
     }
 }
 
@@ -322,11 +319,7 @@ fn write_or_quit(out: &mut impl Write, text: &str) {
         if e.kind() == io::ErrorKind::BrokenPipe {
             crate::ui::exit(0);
         }
-        exit_with(&format!("fatal: {}", e), 128);
+        crate::ui::die(128, &format!("fatal: {}", e));
     }
 }
 
-fn exit_with(message: &str, code: i32) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(code);
-}

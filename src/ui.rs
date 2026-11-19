@@ -212,6 +212,29 @@ pub fn exit(code: i32) -> ! {
     std::process::exit(code)
 }
 
+/// Prints `message` to stderr with a newline and ends the process with `code`. Commands use it
+/// to stop with git's exact error text (which usually starts with `fatal:` or `error:` itself).
+// Used by `merge`, `rebase`, `commit`, `tag`, `log`, `show-branch`, `update-index`, `interpret-trailers` and `fmt-merge-msg`.
+pub fn die(code: i32, message: &str) -> ! {
+    eprintln!("{}", message);
+    exit(code)
+}
+
+/// Prints `fatal: <message>` to stderr and ends the process with status 128, like git's `die()`.
+// Used by `update-ref` and `branch`.
+pub fn die_fatal(message: impl AsRef<str>) -> ! {
+    eprintln!("fatal: {}", message.as_ref());
+    exit(128)
+}
+
+/// Prints `message` to stderr exactly as given (no newline added) and ends the process with
+/// `code`; for messages that already carry their own line breaks, such as usage texts.
+// Used by `submodule`, `symbolic-ref` and `update-ref`.
+pub fn die_raw(code: i32, message: &str) -> ! {
+    eprint!("{}", message);
+    exit(code)
+}
+
 pub fn set_outcome(ok: bool) {
     if let Ok(mut o) = OUTCOME.lock() {
         *o = Some(ok);

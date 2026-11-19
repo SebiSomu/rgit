@@ -15,12 +15,6 @@ use crate::workspace::update_index::types::UpdateIndexFlags;
 
 const UPDATE_INDEX_USAGE: &str = "usage: rgit update-index [<options>] [--] [<file>...]\n\n    -q                    continue refresh even when index needs update\n    --[no-]add            do not ignore new files\n    --[no-]replace        let files replace directories and vice-versa\n    --[no-]remove         notice files missing from worktree\n    --refresh             refresh stat information\n    --really-refresh      like --refresh\n    --cacheinfo <mode>,<object>,<path>\n                          add the specified entry to the index\n    --chmod (+|-)x        override the executable bit of the listed files\n    --[no-]info-only      add to index only; do not add content to object database\n    --[no-]force-remove   remove named paths even if present in worktree\n    -z                    with --stdin: input lines are terminated by null bytes\n    --stdin               read list of paths to be updated from standard input\n    --index-info          add entries from standard input to the index\n    -g, --again           only update entries that differ from HEAD\n    --[no-]ignore-missing ignore files missing from worktree\n    --[no-]verbose        report actions to standard output\n\n";
 
-/// Prints a message and exits with the given status.
-fn die(message: &str, code: i32) -> ! {
-    eprintln!("{}", message);
-    crate::ui::exit(code);
-}
-
 /// Handles one path the way `update-index <file>` does, including `--force-remove`,
 /// `--chmod` and `--verbose` reporting.
 fn process_path(entries: &mut Vec<IndexEntry>, arg: &str, flags: &UpdateIndexFlags) {
@@ -30,13 +24,13 @@ fn process_path(entries: &mut Vec<IndexEntry>, arg: &str, flags: &UpdateIndexFla
             eprintln!("Ignoring path {}", arg);
             return;
         }
-        Err(message) => die(&message, 128),
+        Err(message) => crate::ui::die(128, &message),
     };
     if let Some(skip) = flags.skip_worktree {
         // Only the bit changes; the file is not looked at.
         match entries.iter_mut().find(|e| e.path == path) {
             Some(entry) => entry.skip_worktree = skip,
-            None => die(&format!("fatal: Unable to mark file {}", path), 128),
+            None => crate::ui::die(128, &format!("fatal: Unable to mark file {}", path)),
         }
         return;
     }
@@ -48,7 +42,7 @@ fn process_path(entries: &mut Vec<IndexEntry>, arg: &str, flags: &UpdateIndexFla
         return;
     }
     if let Err(message) = update_index_path(entries, &path, flags) {
-        die(&format!("{}\nfatal: Unable to process path {}", message, path), 128);
+        crate::ui::die(128, &format!("{}\nfatal: Unable to process path {}", message, path));
     }
     if flags.verbose {
         println!("add '{}'", path);
@@ -57,7 +51,7 @@ fn process_path(entries: &mut Vec<IndexEntry>, arg: &str, flags: &UpdateIndexFla
         let sign = if executable { '+' } else { '-' };
         match entries.iter_mut().find(|e| e.path == path && e.mode & 0o170000 == 0o100000) {
             Some(entry) => entry.mode = if executable { 0o100755 } else { 0o100644 },
-            None => die(&format!("fatal: git update-index: cannot chmod {}x '{}'", sign, path), 128),
+            None => crate::ui::die(128, &format!("fatal: git update-index: cannot chmod {}x '{}'", sign, path)),
         }
         if flags.verbose {
             println!("chmod {}x '{}'", sign, path);
@@ -85,7 +79,7 @@ fn read_index_info(entries: &mut Vec<IndexEntry>, input: &[u8], nul_terminated: 
     let terminator = if nul_terminated { 0u8 } else { b'\n' };
     for line in input.split(|b| *b == terminator).filter(|l| !l.is_empty()) {
         let shown = String::from_utf8_lossy(line).to_string();
-        let malformed = || -> ! { die(&format!("fatal: malformed index info {}", shown), 128) };
+        let malformed = || -> ! { crate::ui::die(128, &format!("fatal: malformed index info {}", shown)) };
         let Some(tab) = line.iter().position(|b| *b == b'\t') else { malformed() };
         let head = String::from_utf8_lossy(&line[..tab]).to_string();
         let fields: Vec<&str> = head.split(' ').collect();
@@ -101,7 +95,7 @@ fn read_index_info(entries: &mut Vec<IndexEntry>, input: &[u8], nul_terminated: 
         if !nul_terminated && name.first() == Some(&b'"') {
             match unquote_c_style(&name, 0) {
                 Some((unquoted, end)) if end == name.len() => name = unquoted,
-                _ => die("fatal: git update-index: bad quoting of path name", 128),
+                _ => crate::ui::die(128, "fatal: git update-index: bad quoting of path name"),
             }
         }
         let path = String::from_utf8_lossy(&name).to_string();
@@ -112,10 +106,10 @@ fn read_index_info(entries: &mut Vec<IndexEntry>, input: &[u8], nul_terminated: 
             continue;
         }
         if stage != 0 {
-            die(&format!("fatal: git update-index: unable to update {}: rgit's index has no conflict stages", path), 128);
+            crate::ui::die(128, &format!("fatal: git update-index: unable to update {}: rgit's index has no conflict stages", path));
         }
         if let Err(message) = add_cacheinfo(entries, mode, &hash.to_lowercase(), &path, &flags) {
-            die(&format!("{}\nfatal: git update-index: unable to update {}", message, path), 128);
+            crate::ui::die(128, &format!("{}\nfatal: git update-index: unable to update {}", message, path));
         }
     }
 }
@@ -147,7 +141,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
         crate::ui::exit(129);
     }
     if !repo::exists() {
-        die("fatal: not a git repository (or any of the parent directories): .git", 128);
+        crate::ui::die(128, "fatal: not a git repository (or any of the parent directories): .git");
     }
     let mut entries = read_index()?;
     let mut flags = UpdateIndexFlags::default();
@@ -229,7 +223,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
                 };
                 if let Err(message) = added {
                     let prefix = if message.is_empty() { String::new() } else { format!("{}\n", message) };
-                    die(&format!("{}fatal: git update-index: --cacheinfo cannot add {}", prefix, path), 128);
+                    crate::ui::die(128, &format!("{}fatal: git update-index: --cacheinfo cannot add {}", prefix, path));
                 }
             }
             other if other.starts_with("--chmod") => {
@@ -253,13 +247,13 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
             "--skip-worktree" => flags.skip_worktree = Some(true),
             "--no-skip-worktree" => flags.skip_worktree = Some(false),
             "--assume-unchanged" | "--no-assume-unchanged" | "--fsmonitor-valid" | "--no-fsmonitor-valid" | "--unresolve" => {
-                die(&format!("fatal: {} is not supported: rgit's index stores no per-entry flags or conflict stages", arg), 128);
+                crate::ui::die(128, &format!("fatal: {} is not supported: rgit's index stores no per-entry flags or conflict stages", arg));
             }
             other if other.starts_with("--") => {
                 let name = other[2..].split('=').next().unwrap_or("");
                 let known_unsupported = ["index-version", "show-index-version", "split-index", "untracked-cache", "test-untracked-cache", "force-untracked-cache", "fsmonitor", "ignore-skip-worktree-entries"];
                 if known_unsupported.contains(&name.trim_start_matches("no-")) {
-                    die(&format!("fatal: {} is not supported by rgit's index format", other), 128);
+                    crate::ui::die(128, &format!("fatal: {} is not supported by rgit's index format", other));
                 }
                 usage_error(format!("error: unknown option '{}'", &other[2..]));
             }
@@ -269,7 +263,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
 
     if read_stdin || index_info {
         if read_stdin && index_info {
-            die("fatal: --stdin and --index-info cannot be used together", 128);
+            crate::ui::die(128, "fatal: --stdin and --index-info cannot be used together");
         }
         let mut input = Vec::new();
         io::stdin().lock().read_to_end(&mut input)?;
@@ -282,7 +276,7 @@ pub fn update_index(args: Vec<String>) -> Result<()> {
                 if !nul && name.first() == Some(&b'"') {
                     match unquote_c_style(&name, 0) {
                         Some((unquoted, end)) if end == name.len() => name = unquoted,
-                        _ => die("fatal: line is badly quoted", 128),
+                        _ => crate::ui::die(128, "fatal: line is badly quoted"),
                     }
                 }
                 process_path(&mut entries, &String::from_utf8_lossy(&name), &flags);

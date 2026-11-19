@@ -35,36 +35,26 @@ pub fn update_ref(args: Vec<String>) -> Result<()> {
 
     let opts = match parse_update_ref_args(&args) {
         Ok(opts) => opts,
-        Err(e) => usage_exit(&e.to_string()),
+        Err(e) => crate::ui::die_raw(129, &e.to_string()),
     };
     if !repo::exists() {
-        fatal("not a git repository (or any of the parent directories): .git");
+        crate::ui::die_fatal("not a git repository (or any of the parent directories): .git");
     }
     if opts.message.as_deref() == Some("") {
-        fatal("Refusing to perform update with empty message.");
+        crate::ui::die_fatal("Refusing to perform update with empty message.");
     }
 
     if opts.stdin {
         if opts.delete || !opts.args.is_empty() {
-            usage_exit(UPDATE_REF_USAGE);
+            crate::ui::die_raw(129, UPDATE_REF_USAGE);
         }
         return run_update_ref_stdin(&opts);
     }
     if opts.nul_terminated {
-        usage_exit(UPDATE_REF_USAGE);
+        crate::ui::die_raw(129, UPDATE_REF_USAGE);
     }
     run_single_update(&opts);
     Ok(())
-}
-
-fn usage_exit(message: &str) -> ! {
-    eprint!("{}", message);
-    crate::ui::exit(129);
-}
-
-fn fatal(message: &str) -> ! {
-    eprintln!("fatal: {}", message);
-    crate::ui::exit(128);
 }
 
 /// The argument form: one update or deletion. Failed deletions are reported as `error:` with
@@ -73,7 +63,7 @@ fn run_single_update(opts: &UpdateRefOptions) {
     let arg_count = opts.args.len();
     let valid_count = if opts.delete { (1..=2).contains(&arg_count) } else { (2..=3).contains(&arg_count) };
     if !valid_count {
-        usage_exit(UPDATE_REF_USAGE);
+        crate::ui::die_raw(129, UPDATE_REF_USAGE);
     }
 
     let refname = opts.args[0].clone();
@@ -81,14 +71,14 @@ fn run_single_update(opts: &UpdateRefOptions) {
         (NULL_HASH.to_string(), opts.args.get(1))
     } else {
         let value = &opts.args[1];
-        let new = get_object_id(value).unwrap_or_else(|| fatal(&format!("{}: not a valid SHA1", value)));
+        let new = get_object_id(value).unwrap_or_else(|| crate::ui::die_fatal(format!("{}: not a valid SHA1", value)));
         (new, opts.args.get(2))
     };
     let old_hash = old_arg.map(|old| {
         if old.is_empty() {
             NULL_HASH.to_string()
         } else {
-            get_object_id(old).unwrap_or_else(|| fatal(&format!("{}: not a valid old SHA1", old)))
+            get_object_id(old).unwrap_or_else(|| crate::ui::die_fatal(format!("{}: not a valid old SHA1", old)))
         }
     });
     // For a deletion the zero hash means "don't care", for backwards compatibility.
@@ -112,6 +102,6 @@ fn run_single_update(opts: &UpdateRefOptions) {
             eprintln!("error: {}", e);
             crate::ui::exit(1);
         }
-        fatal(&format!("update_ref failed for ref '{}': {}", refname, e));
+        crate::ui::die_fatal(format!("update_ref failed for ref '{}': {}", refname, e));
     }
 }

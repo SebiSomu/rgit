@@ -23,7 +23,7 @@ pub fn operation_in_progress() -> Option<String> {
         Some("cherry-pick".into())
     } else if exists(".git/REVERT_HEAD") {
         Some("revert".into())
-    } else if exists(crate::history::bisect::BISECT_START_PATH) {
+    } else if exists(crate::history::bisect::engine::BISECT_START_PATH) {
         Some("bisect".into())
     } else if exists(STASH_CONFLICT_PATH) && (exists(CONFLICTS_LIST_PATH) || crate::core::index::read_index().unwrap_or_default().iter().any(|e| e.stage != 0)) {
         // `stash apply` that stopped on conflicts: git keeps no state file for it.

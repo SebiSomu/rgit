@@ -11,6 +11,7 @@ use crate::core::index::IndexEntry;
 use crate::core::types::CommitSignature;
 use crate::core::refs;
 use crate::mail::am::types::MailPatch;
+use crate::core::date::days_from_civil;
 
 /// Directory holding an in-progress `am` session (same layout as git: `next`, `last`,
 /// `0001`... raw mails, and `orig-head`).
@@ -281,16 +282,6 @@ pub fn parse_rfc2822_date(date: &str) -> Option<(i64, String)> {
     let tz = parts.get(4).filter(|t| t.len() == 5 && (t.starts_with('+') || t.starts_with('-'))).map(|t| t.to_string()).unwrap_or_else(|| "+0000".to_string());
     let local = days_from_civil(year, month, day) * 86_400 + h * 3600 + m * 60 + s;
     Some((local - tz_offset_seconds(&tz), tz))
-}
-
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let y = if month <= 2 { year - 1 } else { year };
-    let era = y.div_euclid(400);
-    let yoe = y.rem_euclid(400);
-    let mp = (month + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + day - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
 }
 
 fn now_seconds() -> i64 {

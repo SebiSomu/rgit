@@ -32,7 +32,7 @@ pub fn symbolic_ref(args: Vec<String>) -> Result<()> {
 
     let opts = match parse_symbolic_ref_args(&args) {
         Ok(opts) => opts,
-        Err(e) => usage_exit(&e.to_string()),
+        Err(e) => crate::ui::die_raw(129, &e.to_string()),
     };
     if !repo::exists() {
         eprintln!("fatal: not a git repository (or any of the parent directories): .git");
@@ -49,18 +49,13 @@ pub fn symbolic_ref(args: Vec<String>) -> Result<()> {
     }
 }
 
-fn usage_exit(message: &str) -> ! {
-    eprint!("{}", message);
-    crate::ui::exit(129);
-}
-
 fn run_symbolic_ref(opts: &SymbolicRefOptions) -> Result<i32> {
     if opts.message.as_deref() == Some("") {
         anyhow::bail!("fatal: Refusing to perform update with empty message");
     }
 
     if opts.delete {
-        let [name] = opts.args.as_slice() else { usage_exit(SYMBOLIC_REF_USAGE) };
+        let [name] = opts.args.as_slice() else { crate::ui::die_raw(129, SYMBOLIC_REF_USAGE) };
         match resolve_ref_unsafe(name, false, false) {
             None => anyhow::bail!("fatal: No such ref: {}", name),
             Some(resolved) if !resolved.is_symref => anyhow::bail!("fatal: Cannot delete {}, not a symbolic ref", name),
@@ -96,7 +91,7 @@ fn run_symbolic_ref(opts: &SymbolicRefOptions) -> Result<i32> {
             }
             Ok(report_failure(write_symbolic_ref(name, target, opts.message.as_deref())))
         }
-        _ => usage_exit(SYMBOLIC_REF_USAGE),
+        _ => crate::ui::die_raw(129, SYMBOLIC_REF_USAGE),
     }
 }
 

@@ -253,12 +253,6 @@ pub fn commit_ref_transaction(prepared: &[PreparedRefUpdate], message: &str) -> 
     Ok(())
 }
 
-/// Prints a fatal `update-ref --stdin` error and exits 128, like git's `die`.
-fn die(message: impl AsRef<str>) -> ! {
-    eprintln!("fatal: {}", message.as_ref());
-    crate::ui::exit(128);
-}
-
 /// A position inside one `--stdin` command (with its terminator, and with `-z` its following
 /// NUL-terminated arguments), read the way git walks its input buffer: past the end reads as
 /// NUL, like the C string's terminator.
@@ -289,11 +283,11 @@ impl StdinCommand<'_> {
         let orig = self.pos;
         if self.at(self.pos) == b'"' {
             let Some((value, end)) = unquote_c_style(self.buf, self.pos) else {
-                die(format!("badly quoted argument: {}", self.rest_from(orig)));
+                crate::ui::die_fatal(format!("badly quoted argument: {}", self.rest_from(orig)));
             };
             self.pos = end;
             if !self.at_end() && self.at(self.pos) != 0 && !self.at(self.pos).is_ascii_whitespace() {
-                die(format!("unexpected character after quoted argument: {}", self.rest_from(orig)));
+                crate::ui::die_fatal(format!("unexpected character after quoted argument: {}", self.rest_from(orig)));
             }
             return value;
         }
@@ -322,7 +316,7 @@ impl StdinCommand<'_> {
         }
         let name = String::from_utf8_lossy(&raw).into_owned();
         if !check_refname_format(&name, true, false) {
-            die(format!("invalid ref format: {}", name));
+            crate::ui::die_fatal(format!("invalid ref format: {}", name));
         }
         Some(name)
     }
@@ -332,7 +326,7 @@ impl StdinCommand<'_> {
     /// input that ends early.
     fn parse_next_oid(&mut self, command: &str, refname: &str, old: bool, allow_empty: bool) -> Option<String> {
         let what = if old { "<oldvalue>" } else { "<newvalue>" };
-        let eof = || -> ! { die(format!("{} {}: unexpected end of input when reading {}", command, refname, what)) };
+        let eof = || -> ! { crate::ui::die_fatal(format!("{} {}: unexpected end of input when reading {}", command, refname, what)) };
         if self.at_end() {
             eof();
         }
@@ -342,7 +336,7 @@ impl StdinCommand<'_> {
                 return None;
             }
             if c != b' ' {
-                die(format!("{} {}: expected SP but got: {}", command, refname, self.rest_from(self.pos)));
+                crate::ui::die_fatal(format!("{} {}: expected SP but got: {}", command, refname, self.rest_from(self.pos)));
             }
             self.pos += 1;
             let arg = self.parse_arg();
@@ -352,7 +346,7 @@ impl StdinCommand<'_> {
             arg
         } else {
             if self.at(self.pos) != 0 {
-                die(format!("{} {}: expected NUL but got: {}", command, refname, self.rest_from(self.pos)));
+                crate::ui::die_fatal(format!("{} {}: expected NUL but got: {}", command, refname, self.rest_from(self.pos)));
             }
             self.pos += 1;
             if self.at_end() {
@@ -371,14 +365,14 @@ impl StdinCommand<'_> {
         let arg = String::from_utf8_lossy(&arg).into_owned();
         match get_object_id(&arg) {
             Some(hash) => Some(hash),
-            None => die(format!("{} {}: invalid {}: {}", command, refname, what, arg)),
+            None => crate::ui::die_fatal(format!("{} {}: invalid {}: {}", command, refname, what, arg)),
         }
     }
 
     /// Dies unless the command ends here (git's "extra input" check).
     fn expect_end(&self, command: &str, refname: &str) {
         if self.at(self.pos) != self.term {
-            die(format!("{} {}: extra input: {}", command, refname, self.rest_from(self.pos)));
+            crate::ui::die_fatal(format!("{} {}: extra input: {}", command, refname, self.rest_from(self.pos)));
         }
     }
 }
@@ -465,7 +459,7 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
         });
         let Some(&(name, args, cmd_state)) = found else {
             let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-            die(format!("unknown command: {}", String::from_utf8_lossy(&buf[..end])));
+            crate::ui::die_fatal(format!("unknown command: {}", String::from_utf8_lossy(&buf[..end])));
         };
         if term == 0 {
             for _ in 1..args {
@@ -478,7 +472,7 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
         match state {
             UpdateRefsState::Open | UpdateRefsState::Started => {
                 if state == UpdateRefsState::Started && cmd_state == UpdateRefsState::Started {
-                    die("cannot restart ongoing transaction");
+                    crate::ui::die_fatal("cannot restart ongoing transaction");
                 }
                 if cmd_state >= state {
                     state = cmd_state;
@@ -486,13 +480,13 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
             }
             UpdateRefsState::Prepared => {
                 if cmd_state != UpdateRefsState::Closed {
-                    die("prepared transactions can only be closed");
+                    crate::ui::die_fatal("prepared transactions can only be closed");
                 }
                 state = cmd_state;
             }
             UpdateRefsState::Closed => {
                 if cmd_state != UpdateRefsState::Started {
-                    die("transaction is closed");
+                    crate::ui::die_fatal("transaction is closed");
                 }
                 state = cmd_state;
                 transaction.clear();
@@ -503,27 +497,27 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
         let flags_no_deref = opts.no_deref || no_deref_next;
         match name {
             "update" | "create" | "delete" | "verify" => {
-                let Some(refname) = cmd.parse_refname() else { die(format!("{}: missing <ref>", name)) };
+                let Some(refname) = cmd.parse_refname() else { crate::ui::die_fatal(format!("{}: missing <ref>", name)) };
                 let (new_hash, old_hash) = match name {
                     "update" => {
                         let Some(new) = cmd.parse_next_oid(name, &refname, false, true) else {
-                            die(format!("update {}: missing <newvalue>", refname))
+                            crate::ui::die_fatal(format!("update {}: missing <newvalue>", refname))
                         };
                         (Some(new), cmd.parse_next_oid(name, &refname, true, false))
                     }
                     "create" => {
                         let Some(new) = cmd.parse_next_oid(name, &refname, false, false) else {
-                            die(format!("create {}: missing <newvalue>", refname))
+                            crate::ui::die_fatal(format!("create {}: missing <newvalue>", refname))
                         };
                         if new == NULL_HASH {
-                            die(format!("create {}: zero <newvalue>", refname));
+                            crate::ui::die_fatal(format!("create {}: zero <newvalue>", refname));
                         }
                         (Some(new), Some(NULL_HASH.to_string()))
                     }
                     "delete" => {
                         let old = cmd.parse_next_oid(name, &refname, true, false);
                         if old.as_deref() == Some(NULL_HASH) {
-                            die(format!("delete {}: zero <oldvalue>", refname));
+                            crate::ui::die_fatal(format!("delete {}: zero <oldvalue>", refname));
                         }
                         (Some(NULL_HASH.to_string()), old)
                     }
@@ -541,7 +535,7 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
                     create_reflog: opts.create_reflog && name != "delete" && name != "verify",
                 };
                 if let Err(e) = queue_ref_update(&mut transaction, update) {
-                    die(e);
+                    crate::ui::die_fatal(e);
                 }
                 no_deref_next = false;
             }
@@ -549,20 +543,20 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
                 let rest = &buf[cmd.pos.min(buf.len())..];
                 let ok = rest.starts_with(b"no-deref") && cmd.at(cmd.pos + "no-deref".len()) == term;
                 if !ok {
-                    die(format!("option unknown: {}", cmd.rest_from(cmd.pos)));
+                    crate::ui::die_fatal(format!("option unknown: {}", cmd.rest_from(cmd.pos)));
                 }
                 no_deref_next = true;
             }
             "start" => println_flush(&stdout, "start: ok")?,
             "prepare" => {
                 if let Err(e) = prepare_ref_transaction(&transaction) {
-                    die(e);
+                    crate::ui::die_fatal(e);
                 }
                 println_flush(&stdout, "prepare: ok")?;
             }
             "commit" => {
-                let prepared = prepare_ref_transaction(&transaction).unwrap_or_else(|e| die(e));
-                commit_ref_transaction(&prepared, &message).unwrap_or_else(|e| die(format!("{:#}", e)));
+                let prepared = prepare_ref_transaction(&transaction).unwrap_or_else(|e| crate::ui::die_fatal(e));
+                commit_ref_transaction(&prepared, &message).unwrap_or_else(|e| crate::ui::die_fatal(format!("{:#}", e)));
                 transaction.clear();
                 println_flush(&stdout, "commit: ok")?;
             }
@@ -574,8 +568,8 @@ pub fn run_update_ref_stdin(opts: &UpdateRefOptions) -> anyhow::Result<()> {
     }
 
     if state == UpdateRefsState::Open {
-        let prepared = prepare_ref_transaction(&transaction).unwrap_or_else(|e| die(e));
-        commit_ref_transaction(&prepared, &message).unwrap_or_else(|e| die(format!("{:#}", e)));
+        let prepared = prepare_ref_transaction(&transaction).unwrap_or_else(|e| crate::ui::die_fatal(e));
+        commit_ref_transaction(&prepared, &message).unwrap_or_else(|e| crate::ui::die_fatal(format!("{:#}", e)));
     }
     Ok(())
 }

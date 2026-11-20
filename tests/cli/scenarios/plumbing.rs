@@ -76,3 +76,20 @@ fn fast_export_import() {
     assert_snapshot!("fast_export_import", r.finish());
     assert_snapshot!("fast_import_into_empty", i.finish());
 }
+
+#[test]
+fn autocrlf_line_endings() {
+    // core.autocrlf=true: CRLF in the working tree is stored as LF, and LF from the
+    // repository is written out as CRLF, so a fresh checkout shows nothing modified.
+    let mut r = Repo::init();
+    r.run("config core.autocrlf true");
+    r.write("crlf.txt", "one\r\ntwo\r\n").write("lf.txt", "plain\n");
+    r.run("add .").run("commit -m eol").run("status");
+    r.run("cat-file -p HEAD:crlf.txt").run("ls-files -s");
+    r.remove("crlf.txt").remove("lf.txt");
+    r.run("restore crlf.txt lf.txt").run("status");
+    assert_eq!(r.read("crlf.txt"), "one\r\ntwo\r\n");
+    assert_eq!(r.read("lf.txt"), "plain\r\n");
+    r.write("crlf.txt", "one\r\nTWO\r\n").run("diff");
+    assert_snapshot!(r.finish());
+}

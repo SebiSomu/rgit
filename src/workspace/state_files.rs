@@ -237,7 +237,7 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
                 fs::create_dir_all(parent)?;
             }
         }
-        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+        fs::write(path, crate::core::eol::smudge(path, &content)).with_context(|| format!("failed to write '{}'", path))?;
 
         #[cfg(unix)]
         {
@@ -378,7 +378,7 @@ fn restore_untracked_files(untracked_commit: &str) -> anyhow::Result<()> {
                 fs::create_dir_all(parent)?;
             }
         }
-        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+        fs::write(path, crate::core::eol::smudge(path, &content)).with_context(|| format!("failed to write '{}'", path))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

@@ -295,7 +295,7 @@ pub fn tracked_worktree_changes() -> anyhow::Result<Vec<(char, String)>> {
         if entry.mode == 0o160000 {
             continue;
         }
-        match fs::read(&entry.path) {
+        match crate::core::eol::read_clean(&entry.path) {
             Ok(content) => {
                 if hash_content("blob", &content) != entry.hash {
                     changes.push(('M', entry.path));
@@ -322,7 +322,7 @@ pub fn stage_tracked_changes() -> anyhow::Result<()> {
     for (kind, path) in changes {
         entries.retain(|e| e.path != path);
         if kind == 'M' {
-            let content = fs::read(&path)?;
+            let content = crate::core::eol::read_clean(&path)?;
             let hash = hash_content("blob", &content);
             write_object("blob", &content)?;
             entries.push(build_entry(&path, hash, &fs::metadata(&path)?));

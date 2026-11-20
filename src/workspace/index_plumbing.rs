@@ -41,7 +41,7 @@ pub fn worktree_state(entry: &IndexEntry) -> IndexFileState {
     if stat_matches {
         return IndexFileState::Clean;
     }
-    match fs::read(&entry.path) {
+    match crate::core::eol::read_clean(&entry.path) {
         Ok(content) if hash_content("blob", &content) == entry.hash => IndexFileState::Clean,
         Ok(_) => IndexFileState::Modified(mode),
         Err(_) => IndexFileState::Missing,
@@ -149,7 +149,7 @@ pub fn update_index_path(entries: &mut Vec<IndexEntry>, path: &str, flags: &Upda
     if existing.is_some_and(|e| worktree_state(e) == IndexFileState::Clean) {
         return Ok(());
     }
-    let content = fs::read(path).map_err(|e| format!("error: open(\"{}\"): {}", path, e))?;
+    let content = crate::core::eol::read_clean(path).map_err(|e| format!("error: open(\"{}\"): {}", path, e))?;
     let hash = hash_content("blob", &content);
     let mut entry = build_entry(path, hash, &metadata);
     entry.mode = worktree_file_mode(&metadata, existing.map(|e| e.mode));
@@ -242,7 +242,7 @@ pub fn write_entry_to_worktree(entry: &IndexEntry, target: &std::path::Path, for
     }
     // Replace rather than write through, so a hard link or read-only file does not get in the way.
     let _ = fs::remove_file(target);
-    fs::write(target, &content).map_err(|e| format!("error: unable to create file {}: {}", target.display(), e))?;
+    fs::write(target, crate::core::eol::smudge(&entry.path, &content)).map_err(|e| format!("error: unable to create file {}: {}", target.display(), e))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

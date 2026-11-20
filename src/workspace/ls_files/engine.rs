@@ -25,7 +25,7 @@ pub fn worktree_state(entry: &IndexEntry) -> anyhow::Result<WorktreeState> {
     if entry.mode & 0o170000 == 0o100000 && crate::workspace::index_plumbing::worktree_file_mode(&metadata, Some(entry.mode)) != entry.mode {
         return Ok(WorktreeState::Modified);
     }
-    let content = fs::read(path).with_context(|| format!("Failed to read {}", entry.path))?;
+    let content = crate::core::eol::clean(&entry.path, fs::read(path).with_context(|| format!("Failed to read {}", entry.path))?);
     if hash_content("blob", &content) == entry.hash {
         Ok(WorktreeState::Unchanged)
     } else {

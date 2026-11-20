@@ -62,7 +62,7 @@ pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::R
             continue;
         }
 
-        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", entry.path))?;
+        let content = crate::core::eol::read_clean(&entry.path).with_context(|| format!("Failed to read {}", entry.path))?;
         let hash = hash_content("blob", &content);
         if hash != entry.hash {
             write_object("blob", &content)?;
@@ -108,7 +108,7 @@ pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::R
     } else {
         let mut untracked_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
         for path in &untracked_files {
-            let content = fs::read(path).with_context(|| format!("Failed to read {}", path))?;
+            let content = crate::core::eol::read_clean(path).with_context(|| format!("Failed to read {}", path))?;
             let hash = write_object("blob", &content)?;
             let mut raw = [0u8; 20];
             hex::decode_to_slice(&hash, &mut raw)?;

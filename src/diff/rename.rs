@@ -242,7 +242,7 @@ fn basename(path: &str) -> &str {
 /// The content of one side of a change (worktree files are read from disk).
 fn side_bytes(path: &str, side: &DiffSide) -> Vec<u8> {
     if side.worktree {
-        return std::fs::read(path).unwrap_or_default();
+        return crate::core::eol::read_clean(path).unwrap_or_default();
     }
     read_object(&hex::encode(side.hash)).map(|o| o.1).unwrap_or_default()
 }
@@ -250,7 +250,7 @@ fn side_bytes(path: &str, side: &DiffSide) -> Vec<u8> {
 /// The blob id of a side (worktree content hashed on the fly).
 fn side_id(path: &str, side: &DiffSide) -> [u8; 20] {
     if side.worktree {
-        return hash_content("blob", &std::fs::read(path).unwrap_or_default());
+        return hash_content("blob", &crate::core::eol::read_clean(path).unwrap_or_default());
     }
     side.hash
 }

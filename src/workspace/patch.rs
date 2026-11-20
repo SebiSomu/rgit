@@ -223,7 +223,7 @@ fn read_worktree(path: &str, known_mode: Option<u32>) -> anyhow::Result<Option<(
     if meta.is_dir() {
         return Ok(None);
     }
-    let bytes = fs::read(p)?;
+    let bytes = crate::core::eol::clean(path, fs::read(p)?);
     Ok(Some(((hash_content("blob", &bytes), worktree_file_mode(&meta, known_mode)), bytes)))
 }
 
@@ -239,7 +239,7 @@ fn write_worktree(path: &str, result: Option<(Vec<u8>, u32)>) -> anyhow::Result<
             if let Some(parent) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(p, &content)?;
+            fs::write(p, crate::core::eol::smudge(path, &content))?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;

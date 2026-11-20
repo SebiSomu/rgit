@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use std::collections::{HashMap, VecDeque};
-use std::fs;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::remote::github::format_unix_timestamp_iso8601;
@@ -233,7 +232,7 @@ pub fn blame_file(path: &str, commit_hash: &str, use_working_copy: bool, line_sp
     let tip_lines = cached_blob_lines(&mut lines_cache, &tip_blob, path)?;
 
     let working_lines: Option<Vec<String>> = if use_working_copy {
-        match fs::read(path) {
+        match crate::core::eol::read_clean(path) {
             Ok(bytes) => Some(split_text_lines(&bytes, path)?),
             Err(_) => None,
         }

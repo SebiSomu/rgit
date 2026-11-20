@@ -85,11 +85,12 @@ pub fn add(paths: Vec<PathBuf>) -> anyhow::Result<()> {
     let mut unchanged = 0;
 
     for file_path in files_to_add {
+        let rel_path = normalize_path(&file_path);
         let content = fs::read(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
+        let content = crate::core::eol::clean(&rel_path, content);
 
         let hash = hash_content("blob", &content);
-        let rel_path = normalize_path(&file_path);
 
         // An unmerged path always gets its stages replaced by the new stage-0 entry.
         let conflicted = entries.iter().any(|e| e.path == rel_path && e.stage != 0);
@@ -250,6 +251,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
     for file_path in &working_files {
         let rel_path = normalize_path(file_path);
         let content = fs::read(file_path).with_context(|| format!("Failed to read {}", file_path.display()))?;
+        let content = crate::core::eol::clean(&rel_path, content);
         working_map.insert(rel_path, hash_content("blob", &content));
     }
 
@@ -257,7 +259,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
         if !working_map.contains_key(path) {
             let path_obj = Path::new(path);
             if path_obj.exists() && path_obj.is_file() {
-                if let Ok(content) = fs::read(path_obj) {
+                if let Ok(content) = crate::core::eol::read_clean(path) {
                     working_map.insert(path.clone(), hash_content("blob", &content));
                 }
             }
@@ -477,7 +479,7 @@ pub fn rm(files: Vec<PathBuf>, force: bool, cached: bool, recursive: bool) -> an
             };
 
             let disk_modified = if !cached && !index_staged && Path::new(path).exists() {
-                if let Ok(content) = fs::read(path) {
+                if let Ok(content) = crate::core::eol::read_clean(path) {
                     let disk_hash = hash_content("blob", &content);
                     idx_hash.map(|ih| disk_hash != ih).unwrap_or(false)
                 } else {

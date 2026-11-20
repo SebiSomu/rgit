@@ -106,7 +106,7 @@ pub fn fill_rename_destination_hashes(changes: &mut [DiffChange]) {
     }
     for change in changes.iter_mut().filter(|c| c.old.is_none()) {
         if let Some(side) = change.new.as_mut().filter(|s| s.worktree && s.hash == [0; 20]) {
-            if let Ok(content) = std::fs::read(&change.path) {
+            if let Ok(content) = crate::core::eol::read_clean(&change.path) {
                 side.hash = hash_content("blob", &content);
             }
         }
@@ -254,7 +254,7 @@ pub fn diff_index_changes(tree: &BTreeMap<String, ([u8; 20], u32)>, index: &[Ind
             let mut new = unmerged_worktree_side(path, entry.mode);
             if porcelain {
                 if let Some(side) = new.as_mut() {
-                    let content = std::fs::read(path).unwrap_or_default();
+                    let content = crate::core::eol::read_clean(path).unwrap_or_default();
                     side.hash = hash_content("blob", &content);
                     if old.as_ref().is_some_and(|o| o.hash == side.hash && o.mode == side.mode) {
                         continue;
@@ -316,7 +316,7 @@ pub fn diff_files_changes(index: &[IndexEntry], specs: &[String], stage: u8, com
             continue;
         }
         let mut worktree = unmerged_worktree_side(&entry.path, entry.mode);
-        let content_hash = if porcelain { worktree.as_ref().map(|_| hash_content("blob", &std::fs::read(&entry.path).unwrap_or_default())) } else { None };
+        let content_hash = if porcelain { worktree.as_ref().map(|_| hash_content("blob", &crate::core::eol::read_clean(&entry.path).unwrap_or_default())) } else { None };
         changes.push(DiffChange { path: entry.path.clone(), old: None, new: worktree.clone(), renamed_from: None, unmerged: true });
         if let Some(chosen) = stages.iter().find(|e| e.stage == stage) {
             let old = DiffSide { mode: chosen.mode, hash: chosen.hash, worktree: false };
@@ -407,7 +407,7 @@ fn side_content(path: &str, side: &Option<DiffSide>) -> anyhow::Result<(Option<(
             Ok((Some((side.hash, side.mode)), bytes))
         }
         Some(side) if side.worktree => {
-            let content = std::fs::read(path).unwrap_or_default();
+            let content = crate::core::eol::read_clean(path).unwrap_or_default();
             Ok((Some((hash_content("blob", &content), side.mode)), content))
         }
         // A submodule link shows as git's one-line pseudo file.

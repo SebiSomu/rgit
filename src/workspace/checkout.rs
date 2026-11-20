@@ -15,7 +15,7 @@ pub fn check_switch_safety(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head
     let mut working_map = BTreeMap::new();
     for file_path in &working_files {
         let rel_path = normalize_path(file_path);
-        let content = fs::read(file_path)?;
+        let content = crate::core::eol::clean(&rel_path, fs::read(file_path)?);
         working_map.insert(rel_path, hash_content("blob", &content));
     }
 
@@ -159,7 +159,7 @@ pub fn sync_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, head_t
                 }
                 fs::remove_dir_all(path)?;
             }
-            fs::write(path, &content)?;
+            fs::write(path, crate::core::eol::smudge(path, &content))?;
 
             #[cfg(unix)]
             {
@@ -253,7 +253,7 @@ pub fn ensure_working_tree_clean(action: &str) -> anyhow::Result<()> {
             );
         }
 
-        let content = fs::read(path_obj).with_context(|| format!("Failed to read {}", path))?;
+        let content = crate::core::eol::read_clean(path).with_context(|| format!("Failed to read {}", path))?;
         let hash = hash_content("blob", &content);
         if hash != *head_hash {
             anyhow::bail!(
@@ -320,7 +320,7 @@ pub fn hard_reset_working_tree(target_tree: &BTreeMap<String, ([u8; 20], u32)>, 
                 fs::create_dir_all(parent)?;
             }
         }
-        fs::write(path, &content).with_context(|| format!("failed to write '{}'", path))?;
+        fs::write(path, crate::core::eol::smudge(path, &content)).with_context(|| format!("failed to write '{}'", path))?;
 
         #[cfg(unix)]
         {

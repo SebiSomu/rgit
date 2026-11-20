@@ -16,7 +16,10 @@ pub fn init() -> anyhow::Result<()> {
 }
 
 pub fn hash_object(write: bool, file: PathBuf) -> anyhow::Result<()> {
-    let content = fs::read(&file)?;
+    let mut content = fs::read(&file)?;
+    if crate::core::repo::exists() {
+        content = crate::core::eol::clean(&crate::core::repo::to_git_path_string(&file), content);
+    }
     if write {
         println!("{}", write_object("blob", &content)?);
     } else {

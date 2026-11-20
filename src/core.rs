@@ -3,6 +3,7 @@ pub mod commit;
 pub mod config;
 pub mod date;
 pub mod editor;
+pub mod eol;
 pub mod index;
 pub mod object_store;
 pub mod pack;

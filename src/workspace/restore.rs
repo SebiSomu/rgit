@@ -148,7 +148,7 @@ fn write_worktree_file(path: &str, bytes: &[u8], mode: u32) -> Result<()> {
             fs::create_dir_all(parent)?;
         }
     }
-    fs::write(path, bytes).with_context(|| format!("failed to restore '{}'", path))?;
+    fs::write(path, crate::core::eol::smudge(path, bytes)).with_context(|| format!("failed to restore '{}'", path))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

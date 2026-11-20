@@ -1,0 +1,64 @@
+---
+source: tests/cli/scenarios/plumbing.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit config core.autocrlf true
+$ write crlf.txt (10 bytes)
+$ write lf.txt (6 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m eol
+[main (root-commit) <H1:7>] eol
+ Author: Test Author <author@example.com>
+ 2 files changed, 3 insertions(+)
+ create mode 100644 crlf.txt
+ create mode 100644 lf.txt
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+$ rgit cat-file -p HEAD:crlf.txt
+one
+two
+$ rgit ls-files -s
+100644 <H2> 0	crlf.txt
+100644 <H3> 0	lf.txt
+$ remove crlf.txt
+$ remove lf.txt
+$ rgit restore crlf.txt lf.txt
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+$ write crlf.txt (10 bytes)
+$ rgit diff
+diff --git a/crlf.txt b/crlf.txt
+index <H2:7>..879de50 100644
+--- a/crlf.txt
++++ b/crlf.txt
+@@ -1,2 +1,2 @@
+ one
+-two
++TWO
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+git-dir entries:
+  COMMIT_EDITMSG config
+index (ls-files -s):
+  100644 <H2> 0	crlf.txt
+  100644 <H3> 0	lf.txt
+HEAD commit:
+  tree <H4>
+  author Test Author <author@example.com> 1700000180 +0000
+  committer Test Committer <committer@example.com> 1700000180 +0000
+  
+  eol
+worktree:
+  crlf.txt
+    | one
+    | TWO
+  lf.txt
+    | plain

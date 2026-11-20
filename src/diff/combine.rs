@@ -63,7 +63,7 @@ pub fn combined_worktree_diffs(index: &[IndexEntry], specs: &[String]) -> anyhow
 fn combined_diff(path: &str, first_mode: u32, parents: [&IndexEntry; NUM_PARENT]) -> anyhow::Result<String> {
     // The result: the working-tree file, or nothing (mode 0) when it is gone.
     let (result, mode) = match std::fs::metadata(path) {
-        Ok(meta) if meta.is_file() => (std::fs::read(path)?, crate::workspace::index_plumbing::worktree_file_mode(&meta, Some(first_mode))),
+        Ok(meta) if meta.is_file() => (crate::core::eol::read_clean(path)?, crate::workspace::index_plumbing::worktree_file_mode(&meta, Some(first_mode))),
         _ => (Vec::new(), 0),
     };
     let deleted = mode == 0;

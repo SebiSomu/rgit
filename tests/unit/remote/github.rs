@@ -61,3 +61,22 @@ fn test_iso8601_to_git_timestamp() {
     // 2024-01-01 00:00:00 UTC = 1704067200
     assert_eq!(iso8601_to_git_timestamp("2024-01-01T00:00:00Z"), "1704067200 +0000");
 }
+
+#[test]
+fn test_build_tree_content_matches_git() {
+    // GitHub reports the directory as `040000`; git (and `git mktree`) stores `40000`.
+    // `dir` must sort after `dir.txt`, because git compares directories as `dir/`.
+    let items: Vec<serde_json::Value> = serde_json::from_str(r#"[
+        {"path": "dir", "mode": "040000", "type": "tree", "sha": "488958086aadb031695daea66ee5dec69cb80f15"},
+        {"path": "dir.txt", "mode": "100644", "type": "blob", "sha": "45b983be36b73c0788dc9cbcb76cbb80fc7bb057"}
+    ]"#).unwrap();
+    let content = build_tree_content(&items).unwrap();
+    let hash = hex::encode(crate::core::object_store::hash_content("tree", &content));
+    assert_eq!(hash, "fb372e232541e395468645882a435bae01be6db3");
+}
+
+#[test]
+fn test_ensure_same_object() {
+    assert!(ensure_same_object("tree", "abc", "abc").is_ok());
+    assert!(ensure_same_object("commit", "abc", "def").is_err());
+}

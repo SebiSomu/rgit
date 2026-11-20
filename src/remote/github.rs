@@ -488,22 +488,29 @@ pub fn fetch_github_tree(client: &reqwest::blocking::Client, target: &GitHubTarg
         }
     }
 
+    let tree_content = build_tree_content(items)?;
+    let written_sha = crate::core::object_store::write_object("tree", &tree_content)?;
+    ensure_same_object("tree", sha, &written_sha)?;
+    Ok(())
+}
+
+/// Maps a tree entry mode from the GitHub API to git's canonical form. GitHub reports
+/// directories as `040000`, but git stores them as `40000`; any other spelling would give
+/// the tree a different hash.
+pub fn git_tree_mode(api_mode: &str) -> &str {
+    if api_mode == "040000" { "40000" } else { api_mode }
+}
+
+/// Rebuilds the raw contents of a git tree from the `tree` array of a GitHub API response,
+/// with git's entry order (directories sort as if their name ended in `/`).
+pub fn build_tree_content(items: &[serde_json::Value]) -> Result<Vec<u8>> {
     let mut entries: Vec<(String, String, String, Vec<u8>)> = Vec::new();
     for item in items {
         let item_path = item["path"].as_str().context("Missing path in tree item")?.to_string();
-        let item_sha = item["sha"].as_str().context("Missing sha in tree item")?.to_string();
-        let item_mode = item["mode"].as_str().unwrap_or("100644").to_string();
-        let item_type = item["type"].as_str().unwrap_or("blob");
-
-        let sort_key = if item_type == "tree" {
-            format!("{}/", item_path)
-        } else {
-            item_path.clone()
-        };
-
-        let sha_bytes = hex::decode(&item_sha)
-            .with_context(|| format!("Invalid SHA hex in tree: {}", item_sha))?;
-
+        let item_sha = item["sha"].as_str().context("Missing sha in tree item")?;
+        let item_mode = git_tree_mode(item["mode"].as_str().unwrap_or("100644")).to_string();
+        let sort_key = if item["type"].as_str() == Some("tree") { format!("{}/", item_path) } else { item_path.clone() };
+        let sha_bytes = hex::decode(item_sha).with_context(|| format!("Invalid SHA hex in tree: {}", item_sha))?;
         entries.push((sort_key, item_mode, item_path, sha_bytes));
     }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -516,9 +523,20 @@ pub fn fetch_github_tree(client: &reqwest::blocking::Client, target: &GitHubTarg
         tree_content.push(0);
         tree_content.extend_from_slice(&sha_bytes);
     }
+    Ok(tree_content)
+}
 
-    let written_sha = crate::core::object_store::write_object("tree", &tree_content)?;
-    if written_sha != sha {
+/// Fails when an object rebuilt from the GitHub API does not hash to the id GitHub gave.
+/// The fetch then stops before any remote-tracking ref is moved, so no ref ever points at
+/// an object that is missing locally.
+pub fn ensure_same_object(kind: &str, expected: &str, written: &str) -> Result<()> {
+    if written != expected {
+        anyhow::bail!(
+            "fatal: could not rebuild {} {} from the GitHub API (got {} instead).\n\
+             The API does not expose every detail of the original object (for example a commit's time zone or signature).\n\
+             No refs were updated. Use `git fetch` for this remote.",
+            kind, expected, written
+        );
     }
     Ok(())
 }
@@ -576,7 +594,8 @@ pub fn fetch_github_commit(client: &reqwest::blocking::Client, target: &GitHubTa
     commit_text.push_str(message);
     commit_text.push('\n');
 
-    crate::core::object_store::write_object("commit", commit_text.as_bytes())?;
+    let written_sha = crate::core::object_store::write_object("commit", commit_text.as_bytes())?;
+    ensure_same_object("commit", sha, &written_sha)?;
     Ok(())
 }
 

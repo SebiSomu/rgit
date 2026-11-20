@@ -127,6 +127,7 @@ impl Repo {
             .env("USERPROFILE", &self.home)
             .env("TZ", "UTC")
             .env("NO_COLOR", "1")
+            .env("COLUMNS", "80")
             .env("LC_ALL", "C")
             .env("GIT_AUTHOR_NAME", "Test Author")
             .env("GIT_AUTHOR_EMAIL", "author@example.com")
@@ -289,6 +290,7 @@ impl Repo {
             .env("USERPROFILE", &self.home)
             .env("RGIT_VERBOSITY", "quiet")
             .env("NO_COLOR", "1")
+            .env("COLUMNS", "80")
             .output()
             .expect("spawn rgit");
         String::from_utf8_lossy(&out.stdout).to_string()

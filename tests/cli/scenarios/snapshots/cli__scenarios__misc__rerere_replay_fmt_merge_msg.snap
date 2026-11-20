@@ -46,7 +46,7 @@ $ rgit fmt-merge-msg
 <X1>		branch 'feature' of ../x
 $ rgit repo info
 $ rgit version
-rgit version 0.1.0
+rgit version 3.0.0
 $ rgit hook run pre-commit --ignore-missing
 
 ==== final state ====

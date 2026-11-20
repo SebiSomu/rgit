@@ -42,7 +42,7 @@ origin	<REPO> (fetch)
 origin	<REPO> (push)
 (../clone) $ rgit branch -a
 * main
-  remotes/origin/HEAD
+  remotes/origin/HEAD -> origin/main
   remotes/origin/main
 $ write upstream.txt (2 bytes)
 $ rgit add upstream.txt
@@ -91,6 +91,20 @@ $ rgit switch main
 Switched to branch 'main'
 $ rgit log --oneline -1
 <H5:7> clone change
+(../clone) $ rgit remote show origin
+* remote origin
+  Fetch URL: <REPO>
+  Push  URL: <REPO>
+  HEAD branch: main
+  Remote branch(es):
+    main tracked
+(../clone) $ rgit remote rename origin up
+(../clone) $ rgit branch -a
+* main
+  remotes/up/HEAD -> up/main
+  remotes/up/main
+(../clone) $ rgit rev-parse --verify -q up
+<H5>
 
 ==== final state ====
 HEAD: ref: refs/heads/main

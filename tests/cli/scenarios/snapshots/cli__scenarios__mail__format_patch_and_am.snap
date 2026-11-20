@@ -46,7 +46,7 @@ index <H4:7>..<H5:7> 100644
  one
 +two
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 
 From <H3> Mon Sep 17 00:00:00 2001
@@ -76,7 +76,7 @@ index <H7:7>..<H8:7> 100644
 -lib v1
 +lib v2
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 $ rgit format-patch -1 -o patches
 patches/0001-third-commit.patch
@@ -108,7 +108,7 @@ index 0000000..<H7:7>
 @@ -0,0 +1 @@
 +lib v1
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 
 From <H2> Mon Sep 17 00:00:00 2001
@@ -128,7 +128,7 @@ index <H4:7>..<H5:7> 100644
  one
 +two
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 $ rgit reset --hard HEAD~2
 HEAD is now at <H1:7> first commit
@@ -153,7 +153,7 @@ index <H4:7>..<H5:7> 100644
  one
 +two
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 
 From <H3> Mon Sep 17 00:00:00 2001
@@ -183,7 +183,7 @@ index <H7:7>..<H8:7> 100644
 -lib v1
 +lib v2
 -- 
-rgit 0.1.0
+rgit 3.0.0
 
 Applying: second commit
 Applying: third commit

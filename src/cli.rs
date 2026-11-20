@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None, disable_help_subcommand = true)]
+#[command(name = "rgit", version, about, long_about = None, disable_help_subcommand = true)]
 pub struct Cli {
     /// Narrate what the command actually did, and what it means (`rgit --explain merge x`).
     #[arg(long = "explain", conflicts_with_all = ["teach", "plain"])]

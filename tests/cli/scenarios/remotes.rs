@@ -13,6 +13,7 @@ fn clone_fetch_push_pull() {
     r.run("switch -c other");
     r.run_in("../clone", "push").run_in("../clone", "push origin main");
     r.run("switch main").run("log --oneline -1");
+    r.run_in("../clone", "remote show origin").run_in("../clone", "remote rename origin up").run_in("../clone", "branch -a").run_in("../clone", "rev-parse --verify -q up");
     assert_snapshot!(r.finish());
 }
 

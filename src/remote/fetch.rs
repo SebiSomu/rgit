@@ -149,10 +149,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
 
     if let Ok(Some(default_branch)) = read_remote_head(&remote_git_dir) {
         if let Some((_, sha)) = filtered_refs.iter().find(|(b, _)| b == &default_branch) {
-            let _ = crate::core::refs::write_ref(
-                &format!("refs/remotes/{}/HEAD", remote_name),
-                sha,
-            );
+            let _ = crate::core::refs::write_remote_head(&remote_name, &default_branch, sha);
         }
     }
 

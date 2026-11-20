@@ -125,7 +125,7 @@ pub fn build_github_client(token: &str) -> Result<reqwest::blocking::Client> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::USER_AGENT,
-        reqwest::header::HeaderValue::from_static("rgit/0.1.0"),
+        reqwest::header::HeaderValue::from_static(concat!("rgit/", env!("CARGO_PKG_VERSION"))),
     );
     headers.insert(
         reqwest::header::ACCEPT,
@@ -690,7 +690,7 @@ pub fn fetch_from_github(target: &GitHubTarget, remote_name: &str, remote_displa
     }
 
     if let Some((_, sha)) = filtered_refs.iter().find(|(b, _)| b == &default_branch) {
-        let _ = crate::core::refs::write_ref(&format!("refs/remotes/{}/HEAD", remote_name), sha);
+        let _ = crate::core::refs::write_remote_head(remote_name, &default_branch, sha);
     }
 
     crate::remote::fetch::engine::write_fetch_head(&fetch_head_entries)?;

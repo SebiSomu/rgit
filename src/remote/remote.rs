@@ -141,7 +141,7 @@ fn show_remote_cmd(name: &str) -> Result<()> {
     let head_branch = if Path::new(&head_path).exists() {
         fs::read_to_string(&head_path)
             .ok()
-            .map(|s| s.trim().strip_prefix("ref: refs/remotes/").unwrap_or(s.trim()).to_string())
+            .map(|s| s.trim().strip_prefix(&format!("ref: refs/remotes/{}/", name)).unwrap_or(s.trim()).to_string())
     } else {
         None
     };

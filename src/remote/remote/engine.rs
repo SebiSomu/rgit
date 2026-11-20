@@ -186,6 +186,15 @@ pub fn rename_remote(old_name: &str, new_name: &str) -> Result<()> {
             .with_context(|| format!("Failed to rename remote directory {} to {}", old_path.display(), new_path.display()))?;
     }
 
+    // `<new>/HEAD` still names the old remote (`ref: refs/remotes/<old>/main`); git retargets it.
+    let head_path = new_path.join("HEAD");
+    if let Ok(content) = fs::read_to_string(&head_path)
+        && let Some(branch) = content.trim().strip_prefix(&format!("ref: refs/remotes/{}/", old_name))
+    {
+        fs::write(&head_path, format!("ref: refs/remotes/{}/{}\n", new_name, branch))
+            .with_context(|| format!("Failed to write {}", head_path.display()))?;
+    }
+
     Ok(())
 }
 

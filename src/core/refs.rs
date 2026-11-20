@@ -128,6 +128,32 @@ pub fn write_ref(ref_name: &str, hash: &str) -> Result<()> {
     Ok(())
 }
 
+/// Points `refs/remotes/<remote>/HEAD` at the remote's default branch as a symbolic ref
+/// (`ref: refs/remotes/<remote>/<branch>`), the way git writes it on clone, so
+/// `branch -a` shows `remotes/origin/HEAD -> origin/main`. The reflog gets an entry when the
+/// commit it resolves to changes, as `write_ref` does.
+// Used by `fetch` (local transport) and the GitHub fetch in `remote::github`.
+pub fn write_remote_head(remote: &str, branch: &str, hash: &str) -> Result<()> {
+    let ref_name = format!("refs/remotes/{}/HEAD", remote);
+    let old_hash = match read_ref(&ref_name).ok().flatten() {
+        Some(value) => match value.strip_prefix("ref: ") {
+            Some(target) => read_ref(target.trim()).ok().flatten(),
+            None => Some(value),
+        },
+        None => None,
+    };
+    let path = repo::path(format!(".git/{}", ref_name));
+    if let Some(parent) = Path::new(&path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&path, format!("ref: refs/remotes/{}/{}\n", remote, branch))
+        .with_context(|| format!("Failed to write ref: {}", ref_name))?;
+    if old_hash.as_deref() != Some(hash) {
+        crate::core::reflog::record_ref_update(&ref_name, old_hash.as_deref(), Some(hash));
+    }
+    Ok(())
+}
+
 /// Returns a sorted list of all branch names, loose (`.git/refs/heads/`) and packed.
 // Used by the `branch` command (list mode).
 pub fn list_branches() -> Result<Vec<String>> {

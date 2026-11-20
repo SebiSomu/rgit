@@ -51,7 +51,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000720 +0000
   
   uses config identity
-  
 worktree:
   f
     | f

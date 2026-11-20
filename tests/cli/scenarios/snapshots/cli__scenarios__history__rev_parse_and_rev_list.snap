@@ -96,7 +96,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000300 +0000
   
   main work
-  
 worktree:
   base.txt
     | base

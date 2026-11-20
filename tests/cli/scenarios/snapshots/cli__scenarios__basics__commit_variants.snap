@@ -91,7 +91,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000840 +0000
   
   empty
-  
 worktree:
   a.txt
     | authored

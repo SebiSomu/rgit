@@ -275,7 +275,7 @@ pub fn stash(action: Option<crate::workspace::stash::types::StashAction>) -> any
         Some(StashAction::Apply { stash }) => stash_apply(stash),
         Some(StashAction::List) => stash_list(),
         Some(StashAction::Drop { stash }) => stash_drop(stash),
-        Some(StashAction::Show { stash }) => stash_show(stash),
+        Some(StashAction::Show { stash, .. }) => stash_show(stash),
         Some(StashAction::Clear) => stash_clear(),
     }
 }

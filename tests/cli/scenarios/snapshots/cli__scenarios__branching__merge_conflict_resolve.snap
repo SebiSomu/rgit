@@ -59,7 +59,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000240 +0000
   
   main edit
-  
 worktree:
   conflict.txt
     | line1
@@ -127,7 +126,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000840 +0000
   
   Merge topic
-  
 worktree:
   conflict.txt
     | line1

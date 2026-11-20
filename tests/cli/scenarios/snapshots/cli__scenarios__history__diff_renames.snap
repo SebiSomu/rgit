@@ -68,7 +68,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000420 +0000
   
   big
-  
 worktree:
   a.txt
     | one

@@ -102,7 +102,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000480 +0000
   
   edit after rename
-  
 worktree:
   b.txt
     | bee

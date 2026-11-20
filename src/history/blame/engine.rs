@@ -395,13 +395,18 @@ pub fn format_annotate_output(lines: &[BlameLine]) -> String {
 
 /// Renders blame results as one line per source line: abbreviated hash, author, author time,
 /// line number and the line itself, with the author and line-number columns padded to align.
+/// With `suppress` (`blame -s`) only the hash, line number and line are shown.
 // Used by `blame`.
-pub fn format_blame_output(lines: &[BlameLine]) -> String {
+pub fn format_blame_output(lines: &[BlameLine], suppress: bool) -> String {
     let author_width = lines.iter().map(|l| l.author.chars().count()).max().unwrap_or(0);
     let number_width = lines.iter().map(|l| l.line_no).max().unwrap_or(0).to_string().len();
 
     let mut out = String::new();
     for line in lines {
+        if suppress {
+            out.push_str(&format!("{} {:>nw$}) {}\n", line.hash_label(), line.line_no, line.content, nw = number_width));
+            continue;
+        }
         out.push_str(&format!(
             "{} ({:<aw$} {} {:>nw$}) {}\n",
             line.hash_label(),

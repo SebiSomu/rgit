@@ -67,7 +67,6 @@ HEAD commit:
   mixed commit (3/3: src/b.rs)
   
   Split from commit <H2>.
-  
 worktree:
   README
     | r

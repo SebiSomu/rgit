@@ -51,15 +51,13 @@ diff --git a/b.txt b/b.txt
 -bee
 +wip 2
 $ rgit stash show -p stash@{1}
-[stderr]
-error: unexpected argument '-p' found
-
-  tip: to pass '-p' as a value, use '-- -p'
-
-Usage: rgit stash show [STASH]
-
-For more information, try '--help'.
-[exit 2]
+diff --git a/a.txt b/a.txt
+--- a/a.txt
++++ b/a.txt
+@@ -1,2 +1,1 @@
+-one
+-two
++wip 1
 $ rgit stash apply stash@{1}
 Applied stash@{1} (WIP on main: <H3:7> third commit)
 $ rgit status --short
@@ -103,7 +101,6 @@ HEAD commit:
   third commit
   
   With a body paragraph.
-  
 worktree:
   a.txt
     | one

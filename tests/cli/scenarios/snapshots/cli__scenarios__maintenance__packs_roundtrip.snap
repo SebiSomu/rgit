@@ -43,12 +43,8 @@ $ rgit log --oneline
 <H2:7> second commit
 <H1:7> first commit
 $ rgit cat-file -p HEAD:a.txt
-[stderr]
-Error: Failed to read object file
-
-Caused by:
-    Failed to read object file (does this hash exist?)
-[exit 1]
+one
+two
 $ rgit fsck
 Checked 13 objects: 0 errors, 0 warnings, 0 dangling.
 $ rgit commit-graph write
@@ -76,7 +72,6 @@ HEAD commit:
   third commit
   
   With a body paragraph.
-  
 worktree:
   a.txt
     | one

@@ -9,6 +9,9 @@ use crate::references::reflog::types::ReflogAction;
 // Used by command/helper: `cli::handle_commands` and `dispatch_reflog`
 #[derive(clap::Args, Debug)]
 pub struct ReflogArgs {
+    // `reflog -n <count>` without `show`, as in git; it also applies to a following `show`.
+    #[arg(short = 'n', long = "max-count")]
+    max_count: Option<usize>,
     #[command(subcommand)]
     action: Option<ReflogAction>,
 }
@@ -16,7 +19,12 @@ pub struct ReflogArgs {
 /// Runs `rgit reflog` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_reflog(args: ReflogArgs) -> anyhow::Result<()> {
-    let ReflogArgs { action } = args;
+    let ReflogArgs { max_count, action } = args;
+    let action = match action {
+        None => max_count.map(|n| ReflogAction::Show { reference: None, max_count: Some(n) }),
+        Some(ReflogAction::Show { reference, max_count: None }) => Some(ReflogAction::Show { reference, max_count }),
+        other => other,
+    };
     crate::references::reflog::reflog(action)?;
     Ok(())
 }

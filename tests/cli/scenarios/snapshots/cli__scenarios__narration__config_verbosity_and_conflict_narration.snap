@@ -83,7 +83,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000240 +0000
   
   main edit
-  
 worktree:
   conflict.txt
     | line1

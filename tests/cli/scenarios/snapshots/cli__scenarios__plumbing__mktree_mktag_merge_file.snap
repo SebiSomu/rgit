@@ -29,14 +29,15 @@ $ rgit commit -m 'third commit' -m 'With a body paragraph.'
  2 files changed, 2 insertions(+), 1 deletion(-)
  create mode 100644 b.txt
 $ rgit ls-tree HEAD
-[stderr]
-Error: Failed to read object file (does this hash exist?)
-[exit 1]
+100644 blob <H4>	a.txt
+100644 blob <H5>	b.txt
+040000 tree <H6>	src
 $ rgit mktree
 <stdin>
-
-[no newline at end]
-<H4>
+100644 blob <H4>	a.txt
+100644 blob <H5>	b.txt
+040000 tree <H6>	src
+<H7>
 $ write base (6 bytes)
 $ write ours (6 bytes)
 $ write theirs (6 bytes)
@@ -77,7 +78,7 @@ X
 B
 c
 $ rgit merge-tree --write-tree main main~1
-<H5>
+<H7>
 $ rgit stripspace
 $ rgit stripspace
 <stdin>
@@ -126,11 +127,11 @@ refs:
 git-dir entries:
   COMMIT_EDITMSG
 index (ls-files -s):
-  100644 <H6> 0	a.txt
-  100644 <H7> 0	b.txt
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
   100644 <H8> 0	src/lib.txt
 HEAD commit:
-  tree <H5>
+  tree <H7>
   parent <H2>
   author Test Author <author@example.com> 1700000300 +0000
   committer Test Committer <committer@example.com> 1700000300 +0000
@@ -138,7 +139,6 @@ HEAD commit:
   third commit
   
   With a body paragraph.
-  
 worktree:
   a.txt
     | one

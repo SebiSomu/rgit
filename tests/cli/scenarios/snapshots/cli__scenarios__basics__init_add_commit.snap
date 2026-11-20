@@ -64,7 +64,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000360 +0000
   
   second
-  
 worktree:
   a.txt
     | hello again

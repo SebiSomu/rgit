@@ -64,14 +64,11 @@ main work
 
 $ rgit revert HEAD --no-edit
 [stderr]
-error: unexpected argument '--no-edit' found
-
-  tip: a similar argument exists: '--no-commit'
-
-Usage: rgit revert --no-commit <COMMIT>
-
-For more information, try '--help'.
-[exit 2]
+error: Reverting is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'rgit add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: revert failed
+[exit 128]
 $ rgit log --format='%s'
 main work
 base
@@ -99,7 +96,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000300 +0000
   
   main work
-  
 worktree:
   base.txt
     | base

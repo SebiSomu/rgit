@@ -80,7 +80,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000420 +0000
   
   commit 6
-  
 worktree:
   n.txt
     | 6

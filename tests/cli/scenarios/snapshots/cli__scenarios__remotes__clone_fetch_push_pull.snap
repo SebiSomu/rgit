@@ -112,7 +112,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700001020 +0000
   
   clone change
-  
 worktree:
   a.txt
     | one

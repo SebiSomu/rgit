@@ -55,13 +55,8 @@ $ rgit reflog exists nothing
 $ rgit reset --hard HEAD~1
 HEAD is now at <H1:7> base
 $ rgit reflog -n 2
-[stderr]
-error: unexpected argument '-n' found
-
-Usage: rgit reflog [COMMAND]
-
-For more information, try '--help'.
-[exit 2]
+<H1:7> HEAD@{0}: update
+<H2:7> HEAD@{1}: update
 $ rgit rev-parse HEAD@{1}
 <H2>
 
@@ -80,7 +75,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000120 +0000
   
   base
-  
 worktree:
   base.txt
     | base

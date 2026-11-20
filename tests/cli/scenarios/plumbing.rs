@@ -12,6 +12,8 @@ fn objects_and_trees() {
     r.run("ls-tree HEAD").run("ls-tree --name-only HEAD").run("ls-tree -r HEAD").run("ls-tree HEAD d");
     r.run("cat-file -t HEAD").run("cat-file -s HEAD").run("cat-file -p HEAD").run("cat-file -p HEAD:d/g.txt").run("cat-file -e HEAD");
     r.run("cat-file -t 0000000000000000000000000000000000000000");
+    r.run("cat-file -e 0000000000000000000000000000000000000000").run("cat-file -e nope").run("cat-file -p HEAD^{tree}");
+    r.run("ls-tree HEAD d/").run("ls-tree -r --name-only HEAD");
     assert_snapshot!(r.finish());
 }
 

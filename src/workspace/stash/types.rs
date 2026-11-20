@@ -30,6 +30,9 @@ pub enum StashAction {
         stash: Option<String>,
     },
     Show {
+        // Accepted for git compatibility: `stash show` already prints the full patch.
+        #[arg(short = 'p', long = "patch")]
+        patch: bool,
         stash: Option<String>,
     },
     Clear,

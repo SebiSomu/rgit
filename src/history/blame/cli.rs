@@ -9,6 +9,8 @@
 pub struct BlameArgs {
     #[arg(short = 'L', value_name = "START,END")]
     line_range: Option<String>,
+    #[arg(short = 's')]
+    suppress: bool,
     #[arg(required = true, num_args = 1..=2)]
     args: Vec<String>,
 }
@@ -16,8 +18,8 @@ pub struct BlameArgs {
 /// Runs `rgit blame` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_blame(args: BlameArgs) -> anyhow::Result<()> {
-    let BlameArgs { line_range, args } = args;
-    crate::history::blame::blame(args, line_range)?;
+    let BlameArgs { line_range, suppress, args } = args;
+    crate::history::blame::blame(args, line_range, suppress)?;
     Ok(())
 }
 

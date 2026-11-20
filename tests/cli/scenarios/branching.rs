@@ -102,6 +102,13 @@ fn cherry_pick_and_revert() {
 }
 
 #[test]
+fn revert_no_edit() {
+    let mut r = three_commits();
+    r.run("revert --no-edit HEAD").run("log --format='%s'");
+    assert_snapshot!(r.finish());
+}
+
+#[test]
 fn cherry_pick_conflict() {
     let mut r = conflicting();
     r.run("cherry-pick topic").run("status").run("cherry-pick --abort").run("status --short");

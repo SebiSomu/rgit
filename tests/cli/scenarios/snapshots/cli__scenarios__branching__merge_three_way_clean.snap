@@ -73,7 +73,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000660 +0000
   
   Merge feature
-  
 worktree:
   base.txt
     | base

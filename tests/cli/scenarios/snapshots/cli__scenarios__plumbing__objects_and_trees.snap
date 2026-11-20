@@ -36,85 +36,47 @@ $ rgit commit -m tree
  create mode 100644 d/g.txt
  create mode 100644 f.txt
 $ rgit ls-tree HEAD
-[stderr]
-Error: Failed to read object file (does this hash exist?)
-[exit 1]
+040000 tree <H5>	d
+100644 blob <H1>	f.txt
 $ rgit ls-tree --name-only HEAD
-[stderr]
-Error: Failed to read object file (does this hash exist?)
-[exit 1]
+d
+f.txt
 $ rgit ls-tree -r HEAD
-[stderr]
-error: unexpected argument '-r' found
-
-  tip: to pass '-r' as a value, use '-- -r'
-
-Usage: rgit ls-tree [OPTIONS] <TREE_HASH>
-
-For more information, try '--help'.
-[exit 2]
+100644 blob <H3>	d/g.txt
+100644 blob <H1>	f.txt
 $ rgit ls-tree HEAD d
-[stderr]
-error: unexpected argument 'd' found
-
-Usage: rgit ls-tree [OPTIONS] <TREE_HASH>
-
-For more information, try '--help'.
-[exit 2]
+040000 tree <H5>	d
 $ rgit cat-file -t HEAD
-[stderr]
-error: unexpected argument '-t' found
-
-  tip: to pass '-t' as a value, use '-- -t'
-
-Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
-
-For more information, try '--help'.
-[exit 2]
+commit
 $ rgit cat-file -s HEAD
-[stderr]
-error: unexpected argument '-s' found
-
-  tip: to pass '-s' as a value, use '-- -s'
-
-Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
-
-For more information, try '--help'.
-[exit 2]
+175
 $ rgit cat-file -p HEAD
-[stderr]
-Error: Failed to read object file
+tree <H2>
+author Test Author <author@example.com> 1700000540 +0000
+committer Test Committer <committer@example.com> 1700000540 +0000
 
-Caused by:
-    Failed to read object file (does this hash exist?)
-[exit 1]
+tree
 $ rgit cat-file -p HEAD:d/g.txt
-[stderr]
-Error: Failed to read object file
-
-Caused by:
-    Failed to read object file (does this hash exist?)
-[exit 1]
+nested
 $ rgit cat-file -e HEAD
-[stderr]
-error: unexpected argument '-e' found
-
-  tip: to pass '-e' as a value, use '-- -e'
-
-Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
-
-For more information, try '--help'.
-[exit 2]
 $ rgit cat-file -t <X1>
 [stderr]
-error: unexpected argument '-t' found
-
-  tip: to pass '-t' as a value, use '-- -t'
-
-Usage: rgit cat-file [OPTIONS] <OBJECT_HASH>
-
-For more information, try '--help'.
-[exit 2]
+fatal: rgit cat-file: could not get object info
+[exit 128]
+$ rgit cat-file -e <X1>
+[exit 1]
+$ rgit cat-file -e nope
+[stderr]
+fatal: Not a valid object name nope
+[exit 128]
+$ rgit cat-file -p HEAD^{tree}
+040000 tree <H5>	d
+100644 blob <H1>	f.txt
+$ rgit ls-tree HEAD d/
+100644 blob <H3>	d/g.txt
+$ rgit ls-tree -r --name-only HEAD
+d/g.txt
+f.txt
 
 ==== final state ====
 HEAD: ref: refs/heads/main
@@ -131,7 +93,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000540 +0000
   
   tree
-  
 worktree:
   d/g.txt
     | nested

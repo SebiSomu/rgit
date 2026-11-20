@@ -41,15 +41,9 @@ $ rgit blame -L 2,3 a.txt
 <H2:8> (Test Author 2023-11-14 22:16:20 +0000 2) two
 <H4:8> (Test Author 2023-11-14 22:19:20 +0000 3) three
 $ rgit blame -s a.txt
-[stderr]
-error: unexpected argument '-s' found
-
-  tip: to pass '-s' as a value, use '-- -s'
-
-Usage: rgit blame [OPTIONS] <ARGS>...
-
-For more information, try '--help'.
-[exit 2]
+^<H1:7> 1) one
+<H2:8> 2) two
+<H4:8> 3) three
 $ rgit annotate a.txt
 <H1:8>	(Test Author	2023-11-14 22:15:20 +0000	1)one
 <H2:8>	(Test Author	2023-11-14 22:16:20 +0000	2)two
@@ -77,7 +71,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000360 +0000
   
   third line
-  
 worktree:
   a.txt
     | one

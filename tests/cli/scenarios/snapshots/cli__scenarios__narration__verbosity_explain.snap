@@ -71,7 +71,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000120 +0000
   
   first
-  
 worktree:
   .env
     | SECRET=1

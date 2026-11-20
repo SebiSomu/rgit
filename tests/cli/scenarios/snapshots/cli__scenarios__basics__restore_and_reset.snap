@@ -64,7 +64,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000180 +0000
   
   second commit
-  
 worktree:
   a.txt
     | one
@@ -98,7 +97,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000120 +0000
   
   first commit
-  
 worktree:
   a.txt
     | one
@@ -134,7 +132,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000180 +0000
   
   second commit
-  
 worktree:
   a.txt
     | one

@@ -77,7 +77,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000420 +0000
   
   ignore
-  
 worktree:
   .gitignore
     | *.log
@@ -114,7 +113,6 @@ HEAD commit:
   committer Test Committer <committer@example.com> 1700000420 +0000
   
   ignore
-  
 worktree:
   .gitignore
     | *.log

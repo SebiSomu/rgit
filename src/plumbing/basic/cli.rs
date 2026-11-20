@@ -28,16 +28,33 @@ pub fn dispatch_hash_object(args: HashObjectArgs) -> anyhow::Result<()> {
 // Used by command/helper: `cli::handle_commands` and `dispatch_cat_file`
 #[derive(clap::Args, Debug)]
 pub struct CatFileArgs {
-    #[arg(short = 'p')]
+    #[arg(short = 'p', conflicts_with_all = ["show_type", "show_size", "exists"])]
     pretty_print: bool,
+    #[arg(short = 't', conflicts_with_all = ["show_size", "exists"])]
+    show_type: bool,
+    #[arg(short = 's', conflicts_with = "exists")]
+    show_size: bool,
+    #[arg(short = 'e')]
+    exists: bool,
     object_hash: String
 }
 
 /// Runs `rgit cat-file` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_cat_file(args: CatFileArgs) -> anyhow::Result<()> {
-    let CatFileArgs { pretty_print, object_hash } = args;
-    crate::plumbing::basic::cat_file(pretty_print, object_hash)?;
+    let CatFileArgs { pretty_print, show_type, show_size, exists, object_hash } = args;
+    let mode = if show_type {
+        crate::plumbing::basic::CatFileMode::Type
+    } else if show_size {
+        crate::plumbing::basic::CatFileMode::Size
+    } else if exists {
+        crate::plumbing::basic::CatFileMode::Exists
+    } else if pretty_print {
+        crate::plumbing::basic::CatFileMode::Pretty
+    } else {
+        crate::plumbing::basic::CatFileMode::None
+    };
+    crate::plumbing::basic::cat_file(mode, object_hash)?;
     Ok(())
 }
 
@@ -49,13 +66,16 @@ pub fn dispatch_cat_file(args: CatFileArgs) -> anyhow::Result<()> {
 pub struct LsTreeArgs {
     #[arg(long)]
     name_only: bool,
-    tree_hash: String
+    #[arg(short = 'r')]
+    recursive: bool,
+    tree_hash: String,
+    paths: Vec<String>,
 }
 
 /// Runs `rgit ls-tree` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_ls_tree(args: LsTreeArgs) -> anyhow::Result<()> {
-    let LsTreeArgs { name_only, tree_hash } = args;
-    crate::plumbing::basic::ls_tree(name_only, tree_hash)?;
+    let LsTreeArgs { name_only, recursive, tree_hash, paths } = args;
+    crate::plumbing::basic::ls_tree(name_only, recursive, tree_hash, paths)?;
     Ok(())
 }

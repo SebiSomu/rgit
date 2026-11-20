@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use crate::remote::fetch::engine::local_has_object;
 use crate::core::object_store::read_object;
 use crate::core::reflog::{expire_reflog, list_reflog_refs, read_reflog, read_reflog_file, NULL_HASH};
@@ -310,12 +310,5 @@ pub fn format_byte_size(bytes: u64) -> String {
     } else {
         format!("{:.1} {}", value, UNITS[unit])
     }
-}
-
-/// The path of a loose object for a hash, as `list_loose_objects` would report it.
-// Used by the `gc` command's tests and diagnostics.
-#[allow(dead_code)]
-pub fn loose_object_path(hash: &str) -> PathBuf {
-    crate::core::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))
 }
 

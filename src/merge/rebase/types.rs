@@ -46,15 +46,6 @@ pub struct TodoItem {
     pub subject: String,
 }
 
-impl TodoItem {
-    // Unused before the refactor too (hidden while it lived in the `pub` objects.rs).
-    #[allow(dead_code)]
-    pub fn format_line(&self) -> String {
-        let short_hash = &self.hash[..self.hash.len().min(7)];
-        format!("{} {} {}", self.action.name(), short_hash, self.subject)
-    }
-}
-
 /// Execution outcome of applying a single todo item during the rebase replay cycle.
 // Used by: src/merge/rebase/engine.rs
 // Used by command/helper: `commit_item`, `rebase_continue`, and `process_rebase_todo` helpers

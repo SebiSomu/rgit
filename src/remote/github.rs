@@ -869,7 +869,6 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         PushStatus::NewBranch { .. } => {
             create_github_ref(&client, target, dest_branch, &final_remote_sha)?;
         }
-        _ => {}
     }
 
     let _ = crate::remote::push::engine::write_remote_tracking_ref(
@@ -901,7 +900,6 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         PushStatus::NewBranch { .. } => {
             println!(" * [new branch]      {} -> {}", src_name, dest_branch);
         }
-        _ => {}
     }
 
     Ok(())

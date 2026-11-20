@@ -31,3 +31,5 @@ commands-ideas-2.txt
 *.snap.new
 .*.pending-snap
 *.pending-snap
+
+rgit-known-issues.txt

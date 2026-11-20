@@ -33,13 +33,4 @@ impl ArchiveFormat {
         }
     }
 
-    // Unused before the refactor too (hidden while it lived in the `pub` objects.rs).
-    #[allow(dead_code)]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ArchiveFormat::Tar => "tar",
-            ArchiveFormat::TarGz => "tar.gz",
-            ArchiveFormat::Zip => "zip",
-        }
-    }
 }

@@ -234,7 +234,6 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
         PushStatus::NewBranch { .. } => {
             println!(" * [new branch]      {} -> {}", src_name, dest_branch);
         }
-        _ => {}
     }
 
     if set_upstream {

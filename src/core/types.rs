@@ -1,36 +1,5 @@
 use std::path::PathBuf;
 
-/// Represents an uncompressed Git database object holding its decoded payload.
-// Used by: src/core/types.rs
-// Used by command/helper: Object serialization and decoding helpers
-#[derive(Debug)]
-pub enum GitObject {
-    Blob(Vec<u8>),
-    Tree(Vec<TreeEntry>),
-    Commit(CommitData),
-}
-
-/// Represents a single file or directory record stored within a parsed Git tree object.
-// Used by: src/core/types.rs
-// Used by command/helper: Tree parsing and traversal helpers
-#[derive(Debug)]
-pub struct TreeEntry {
-    pub mode: String,
-    pub name: String,
-    pub hash: [u8; 20],
-}
-
-/// Represents the deserialized header fields and message body of a commit object.
-// Used by: src/core/types.rs
-// Used by command/helper: Commit parsing and resolution helpers
-#[derive(Debug)]
-pub struct CommitData {
-    pub tree_hash: String,
-    pub parent_hashes: Vec<String>,
-    pub author: String,
-    pub message: String,
-}
-
 /// An in-memory flattened map of relative file paths to their 20-byte object hash and mode.
 // Used by: src/core/types.rs, src/merge/banana_split.rs
 // Used by command/helper: `flatten_tree`, `resolve_tree_from_source`, `build_tree_from_map`, and the `banana_split` command

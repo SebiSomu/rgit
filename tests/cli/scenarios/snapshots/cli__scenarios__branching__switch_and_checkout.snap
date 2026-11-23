@@ -46,19 +46,18 @@ nothing to commit, working tree clean
 $ rgit switch -c new-branch
 Switched to a new branch 'new-branch'
 $ rgit switch -
-[stderr]
-Error: fatal: invalid reference: -
-[exit 1]
+Switched to branch 'feature'
 $ rgit checkout main
 Switched to branch 'main'
 $ rgit checkout -b via-checkout
-Switched to branch 'via-checkout'
+Switched to a new branch 'via-checkout'
 $ rgit checkout HEAD~1
+HEAD is now at <H1:7> (detached)
 [stderr]
-Error: fatal: 'HEAD~1' is not a valid object hash or branch name
-[exit 1]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
 $ rgit status
-On branch via-checkout
+HEAD detached at <H1:7>
 nothing to commit, working tree clean
 $ rgit switch --detach main
 HEAD is now at <H2:7> (detached)

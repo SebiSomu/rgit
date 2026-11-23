@@ -306,34 +306,42 @@ pub fn die_if_operation_in_progress() -> anyhow::Result<()> {
     crate::ui::exit(128);
 }
 
-pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow::Result<()> {
+pub fn switch(branch: String, create: bool, detach: bool, force: bool, start_point: Option<String>) -> anyhow::Result<()> {
+    // `-` is where you were before the last switch, like git's `@{-1}`.
+    let branch = if branch == "-" { previous_checkout()? } else { branch };
+    let mut created = create;
     if create {
-        let commit_hash = refs::resolve_head_commit()?.ok_or_else(|| {
-            anyhow::anyhow!("fatal: cannot create branch — no commits yet")
-        })?;
+        let commit_hash = match &start_point {
+            Some(start) => resolve_target_commit(start)?,
+            None => refs::resolve_head_commit()?.ok_or_else(|| {
+                anyhow::anyhow!("fatal: cannot create branch — no commits yet")
+            })?,
+        };
         refs::create_branch(&branch, &commit_hash)?;
+    } else if !detach && refs::read_ref(&format!("refs/heads/{}", branch))?.is_none() {
+        // git's guess: `switch feature` with only `origin/feature` creates a tracking branch.
+        if let Some((remote, hash)) = guess_remote_branch(&branch) {
+            refs::create_branch(&branch, &hash)?;
+            crate::workspace::branch::engine::set_branch_upstream(&branch, &remote, &format!("refs/heads/{}", branch))?;
+            println!("branch '{}' set up to track '{}/{}'.", branch, remote, branch);
+            created = true;
+        }
     }
 
     let target_commit = if detach {
-        let branch_ref = format!("refs/heads/{}", branch);
-        if let Some(hash) = refs::read_ref(&branch_ref)? {
-            hash
-        } else {
-            match read_object(&branch) {
-                Ok((obj_type, _)) if obj_type == "commit" => branch.clone(),
-                Ok((obj_type, _)) => {
-                    anyhow::bail!("fatal: '{}' is not a commit (it is a {})", branch, obj_type);
-                }
-                Err(_) => {
-                    anyhow::bail!("fatal: '{}' is not a valid object hash or branch name", branch);
-                }
-            }
-        }
+        resolve_target_commit(&branch)?
     } else {
         let target_ref = format!("refs/heads/{}", branch);
         match refs::read_ref(&target_ref)? {
             Some(hash) => hash,
-            None => anyhow::bail!("fatal: invalid reference: {}", branch),
+            None => {
+                if resolve_target_commit(&branch).is_ok() {
+                    eprintln!("fatal: a branch is expected, got commit '{}'", branch);
+                    eprintln!("hint: If you want to detach HEAD at the commit, try again with the --detach option.");
+                    crate::ui::exit(128);
+                }
+                anyhow::bail!("fatal: invalid reference: {}", branch)
+            }
         }
     };
 
@@ -389,12 +397,18 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool) -> anyhow
     sync_working_tree(&target_tree, &head_tree, &index_map)?;
     update_index_from_tree(&target_tree, &head_tree)?;
 
+    // git's HEAD reflog entry, which `checkout -` / `switch -` read back.
+    let from = match refs::resolve_head()? {
+        refs::HeadState::Branch(b) => b,
+        refs::HeadState::Detached(h) => h,
+    };
+    crate::core::reflog::set_reflog_action(&format!("checkout: moving from {} to {}", from, branch));
     if detach {
         refs::set_head_detached(&target_commit)?;
         println!("HEAD is now at {} (detached)", &target_commit[..7]);
         eprintln!("warning: You are in a detached HEAD state.");
         eprintln!("  You can look around, make experimental commits, or switch -c <branch> to keep them.");
-    } else if create {
+    } else if created {
         refs::set_head(&branch)?;
         println!("Switched to a new branch '{}'", branch);
     } else {
@@ -409,39 +423,81 @@ pub fn checkout(target: Option<String>, create_branch: Option<String>, detach: b
     if create_branch.is_none() && target.is_none() {
         anyhow::bail!("fatal: you must specify a branch or commit to checkout");
     }
+    let target = match target.as_deref() {
+        Some("-") => Some(previous_checkout()?),
+        _ => target,
+    };
 
     if let Some(new_branch) = create_branch {
-        let commit_hash = if let Some(start_point) = target {
-            let branch_ref = format!("refs/heads/{}", start_point);
-            if let Some(hash) = refs::read_ref(&branch_ref)? {
-                hash
-            } else {
-                match read_object(&start_point) {
-                    Ok((obj_type, _)) if obj_type == "commit" => start_point,
-                    Ok((obj_type, _)) => {
-                        anyhow::bail!("fatal: '{}' is not a commit (it is a {})", start_point, obj_type);
-                    }
-                    Err(_) => {
-                        anyhow::bail!("fatal: '{}' is not a valid object hash or branch name", start_point);
-                    }
-                }
-            }
-        } else {
-            refs::resolve_head_commit()?.ok_or_else(|| {
-                anyhow::anyhow!("fatal: cannot create branch — no commits yet")
-            })?
-        };
-
-        refs::create_branch(&new_branch, &commit_hash)?;
-        switch(new_branch, false, false, force)?;
-    } else if let Some(t) = target {
-        let is_branch = {
-            let branch_ref = format!("refs/heads/{}", t);
-            refs::read_ref(&branch_ref)?.is_some()
-        };
-        let should_detach = detach || !is_branch;
-        switch(t, false, should_detach, force)?;
+        // `-b <new> [<start-point>]`: the start point can be any revision.
+        return switch(new_branch, true, false, force, target);
     }
+    let Some(t) = target else { return Ok(()) };
+    let is_branch = refs::read_ref(&format!("refs/heads/{}", t))?.is_some();
+    if is_branch {
+        return switch(t, false, detach, force, None);
+    }
+    // `checkout HEAD` stays where it is, as in git.
+    if t == "HEAD" && !detach {
+        return Ok(());
+    }
+    // Any revision (tag, `HEAD~1`, short hash, `origin/main`, ...) is checked out detached;
+    // a name only a remote has becomes a new tracking branch.
+    match resolve_target_commit(&t) {
+        Ok(_) => switch(t, false, true, force, None),
+        Err(e) => {
+            if !detach && guess_remote_branch(&t).is_some() {
+                switch(t, false, false, force, None)
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
 
-    Ok(())
+/// Resolves what `checkout` / `switch --detach` / a start point names to a commit: a local
+/// branch first, then any revision rgit's revision parser understands (tags, `HEAD~1`,
+/// `main^2`, abbreviated hashes, `origin/main`, `@{1}`), peeling annotated tags.
+// Used by `switch` and `checkout`.
+fn resolve_target_commit(name: &str) -> anyhow::Result<String> {
+    if let Some(hash) = refs::read_ref(&format!("refs/heads/{}", name))? {
+        return Ok(hash);
+    }
+    let hash = crate::core::rev_parse::resolve_rev(name).map_err(|_| anyhow::anyhow!("fatal: '{}' is not a valid object hash or branch name", name))?;
+    match crate::core::rev_parse::peel_to_type(hash.clone(), "commit") {
+        Ok(commit) => Ok(commit),
+        Err(_) => {
+            let (obj_type, _) = read_object(&hash)?;
+            anyhow::bail!("fatal: '{}' is not a commit (it is a {})", name, obj_type)
+        }
+    }
+}
+
+/// The single remote-tracking branch `<remote>/<name>` (not `<remote>/HEAD`), for git's
+/// "checkout a branch only the remote has" guess; None when there is none or several.
+// Used by `switch` and `checkout`.
+fn guess_remote_branch(name: &str) -> Option<(String, String)> {
+    if name == "HEAD" {
+        return None;
+    }
+    let matches: Vec<(String, String)> = refs::list_all_refs()
+        .into_iter()
+        .filter_map(|(r, hash)| {
+            let rest = r.strip_prefix("refs/remotes/")?;
+            let (remote, branch) = rest.split_once('/')?;
+            (branch == name).then(|| (remote.to_string(), hash))
+        })
+        .collect();
+    if matches.len() == 1 { matches.into_iter().next() } else { None }
+}
+
+/// What `-` means for `checkout` / `switch`: the branch (or commit, if HEAD was detached) you
+/// were on before the last switch, read from HEAD's reflog like git's `@{-1}`.
+// Used by `switch` and `checkout`.
+fn previous_checkout() -> anyhow::Result<String> {
+    let entries = crate::core::reflog::read_reflog("HEAD").unwrap_or_default();
+    entries
+        .iter()
+        .find_map(|e| e.message.strip_prefix("checkout: moving from ")?.split_once(" to ").map(|(from, _)| from.to_string()))
+        .ok_or_else(|| anyhow::anyhow!("fatal: no previous branch to go back to ('-' means the branch you were on before the last switch)"))
 }

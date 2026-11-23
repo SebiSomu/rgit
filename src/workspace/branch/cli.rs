@@ -28,6 +28,9 @@ pub fn dispatch_branch(args: BranchArgs) -> anyhow::Result<()> {
 #[derive(clap::Args, Debug)]
 pub struct SwitchArgs {
     branch: String,
+    /// With `-c`: the commit (any revision) the new branch starts at; default HEAD.
+    #[arg(requires = "create")]
+    start_point: Option<String>,
     #[arg(short = 'c', long = "create", conflicts_with = "force")]
     create: bool,
     #[arg(long = "detach", conflicts_with = "create")]
@@ -39,9 +42,9 @@ pub struct SwitchArgs {
 /// Runs `rgit switch` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_switch(args: SwitchArgs) -> anyhow::Result<()> {
-    let SwitchArgs { branch, create, detach, force } = args;
+    let SwitchArgs { branch, start_point, create, detach, force } = args;
     crate::workspace::branch::die_if_operation_in_progress()?;
-    crate::workspace::branch::switch(branch, create, detach, force)?;
+    crate::workspace::branch::switch(branch, create, detach, force, start_point)?;
     Ok(())
 }
 

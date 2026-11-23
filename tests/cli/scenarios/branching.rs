@@ -165,3 +165,16 @@ fn worktree_basic() {
     r.run("log --all --format='%s'").run("worktree remove ../wt").run("worktree list");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn checkout_any_revision() {
+    let mut r = super::three_commits();
+    r.run("tag v1 HEAD~2").run("tag -a v2 -m annotated HEAD~1");
+    // Tags (lightweight and annotated), ancestry, `-`, and a non-commit.
+    r.run("checkout v1").run("checkout -").run("checkout v2").run("checkout main").run("checkout main~1").run("checkout -");
+    r.run("checkout HEAD").run("checkout nope").run("checkout v2^{tree}");
+    // switch wants a branch; start points take any revision.
+    r.run("switch v1").run("switch --detach v1").run("switch -").run("switch -c from-tag v1").run("checkout -b from-rev main^");
+    r.run("reflog -n 4").run("branch -v");
+    assert_snapshot!(r.finish());
+}

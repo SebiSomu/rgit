@@ -1327,18 +1327,19 @@ rgit branch -d topic2
 
 Switch to another branch (or detach HEAD).
 
-**Syntax:** `rgit switch [-c] [--detach] [-f] <branch>`
+**Syntax:** `rgit switch [-c <new> [<start-point>]] [--detach] [-f] <branch>`
 
-Switches to a branch. `-c` creates it from the current commit first, `--detach` detaches `HEAD` (give a branch name or a full commit hash; revision expressions such as `HEAD~1` are not accepted here, use `rev-parse` or `checkout` for that), `-f` discards local changes. Refuses in the middle of a merge, rebase, cherry-pick, revert or bisect, and on an unmerged index unless `-f`.
+Switches to a branch. `-c` creates it first, at `<start-point>` (any revision) or the current commit. `--detach` detaches `HEAD` at any revision: a branch, a tag, `HEAD~1`, `main^2`, an abbreviated hash, `origin/main`. A commit without `--detach` is refused like git does (`a branch is expected, got commit`). `rgit switch -` goes back to where you were before the last switch, read from HEAD's reflog like git's `@{-1}`. A name only a remote has (`switch feature` with just `origin/feature`) creates a local branch tracking it, as git guesses. Every switch writes git's `checkout: moving from <a> to <b>` reflog entry. `-f` discards local changes. Refuses in the middle of a merge, rebase, cherry-pick, revert or bisect, and on an unmerged index unless `-f`.
 
 <details>
 <summary>Options as printed by <code>rgit switch -h</code></summary>
 
 ```text
-Usage: rgit switch [OPTIONS] <BRANCH>
+Usage: rgit switch [OPTIONS] <BRANCH> [START_POINT]
 
 Arguments:
-  <BRANCH>  
+  <BRANCH>       
+  [START_POINT]  With `-c`: the commit (any revision) the new branch starts at; default HEAD
 
 Options:
   -c, --create  
@@ -1364,7 +1365,7 @@ Switch branches, or restore files from a commit or the index.
 
 **Arguments and flags:** `<branch|commit>`, `-b`, `--detach`, `-f`; `[<tree-ish>] [--ours|--theirs|-m|--conflict=<style>] -- <paths>`
 
-Classic branch, commit, and revision switching interface. With paths after `--` it restores them instead: from a tree-ish into index and working tree (resolving conflicts), or from the index, where a conflicted path needs `--ours`/`--theirs` (an error if that side lacks it) or `-m`.
+Classic branch, commit, and revision switching interface. A local branch name switches to that branch. Anything else rgit's revision parser understands (a tag, lightweight or annotated, `HEAD~1`, `main^`, an abbreviated hash, `origin/main`, `@{1}`) is checked out on a detached `HEAD`. `checkout -` returns to where you were before. `checkout HEAD` stays put. A name only one remote has becomes a new branch tracking it (`branch 'x' set up to track 'origin/x'.`). `-b <new> [<start-point>]` creates a branch at any revision. With paths after `--` it restores them instead: from a tree-ish into index and working tree (resolving conflicts), or from the index, where a conflicted path needs `--ours`/`--theirs` (an error if that side lacks it) or `-m`.
 
 **Patch mode (`checkout -p [<tree-ish>]`).** Same prompts as `add -p`; each accepted hunk is discarded from the working tree (restored from the index or the given tree-ish).
 

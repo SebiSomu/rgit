@@ -1,0 +1,114 @@
+---
+source: tests/cli/scenarios/branching.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit tag v1 HEAD~2
+$ rgit tag -a v2 -m annotated HEAD~1
+$ rgit checkout v1
+HEAD is now at <H1:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit checkout -
+Switched to branch 'main'
+$ rgit checkout v2
+HEAD is now at <H2:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit checkout main
+Switched to branch 'main'
+$ rgit checkout main~1
+HEAD is now at <H2:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit checkout -
+Switched to branch 'main'
+$ rgit checkout HEAD
+$ rgit checkout nope
+[stderr]
+Error: fatal: 'nope' is not a valid object hash or branch name
+[exit 1]
+$ rgit checkout v2^{tree}
+[stderr]
+Error: fatal: 'v2^{tree}' is not a commit (it is a tree)
+[exit 1]
+$ rgit switch v1
+[stderr]
+fatal: a branch is expected, got commit 'v1'
+hint: If you want to detach HEAD at the commit, try again with the --detach option.
+[exit 128]
+$ rgit switch --detach v1
+HEAD is now at <H1:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit switch -
+Switched to branch 'main'
+$ rgit switch -c from-tag v1
+Switched to a new branch 'from-tag'
+$ rgit checkout -b from-rev main^
+Switched to a new branch 'from-rev'
+$ rgit reflog -n 4
+<H2:7> HEAD@{0}: checkout: moving from from-tag to from-rev
+<H1:7> HEAD@{1}: checkout: moving from main to from-tag
+<H3:7> HEAD@{2}: checkout: moving from <H1> to main
+<H1:7> HEAD@{3}: checkout: moving from main to v1
+$ rgit branch -v
+* from-rev <H2:7> second commit
+  from-tag <H1:7> first commit
+  main     <H3:7> third commit
+
+==== final state ====
+HEAD: ref: refs/heads/from-rev
+refs:
+  refs/heads/from-rev <H2>
+  refs/heads/from-tag <H1>
+  refs/heads/main <H3>
+  refs/tags/v1 <H1>
+  refs/tags/v2 <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000180 +0000
+  committer Test Committer <committer@example.com> 1700000180 +0000
+  
+  second commit
+worktree:
+  a.txt
+    | one
+    | two
+  src/lib.txt
+    | lib v1

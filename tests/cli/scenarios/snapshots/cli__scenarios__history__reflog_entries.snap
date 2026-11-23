@@ -39,10 +39,10 @@ $ rgit commit -a -m 'more feature work'
 $ rgit switch main
 Switched to branch 'main'
 $ rgit reflog
-<H2:7> HEAD@{0}: update
+<H2:7> HEAD@{0}: checkout: moving from feature to main
 <H4:7> HEAD@{1}: commit: more feature work
 <H3:7> HEAD@{2}: commit: feature work
-<H1:7> HEAD@{3}: update
+<H1:7> HEAD@{3}: checkout: moving from main to feature
 <H2:7> HEAD@{4}: commit: main work
 <H1:7> HEAD@{5}: commit (initial): base
 $ rgit reflog show feature
@@ -56,7 +56,7 @@ $ rgit reset --hard HEAD~1
 HEAD is now at <H1:7> base
 $ rgit reflog -n 2
 <H1:7> HEAD@{0}: update
-<H2:7> HEAD@{1}: update
+<H2:7> HEAD@{1}: checkout: moving from feature to main
 $ rgit rev-parse HEAD@{1}
 <H2>
 

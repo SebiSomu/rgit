@@ -195,6 +195,10 @@ pub enum Commands {
     SparseCheckout(crate::workspace::sparse_checkout::cli::SparseCheckoutArgs),
     #[command(disable_help_flag = true)]
     Submodule(crate::workspace::submodule::cli::SubmoduleArgs),
+    /// Undo the last rgit operation (commit, merge, reset --hard, rebase, ...); `--list` shows the log.
+    Undo(crate::workspace::undo::cli::UndoArgs),
+    /// Bring back the operation most recently undone.
+    Redo(crate::workspace::undo::cli::RedoArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -213,6 +217,7 @@ pub fn handle_commands() -> Result<()> {
     use crate::ui::types::Verbosity;
     crate::ui::init(if cli.plain { Some(Verbosity::Quiet) } else if cli.teach { Some(Verbosity::Teach) } else if cli.explain { Some(Verbosity::Explain) } else { None });
     crate::ui::begin();
+    crate::workspace::undo::engine::begin_recording();
 
     // These commands copy, verify or delete objects by hash, so they must not see replacements.
     if matches!(
@@ -341,6 +346,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::FastImport(args) => crate::export::fast_import::cli::dispatch_fast_import(args)?,
         Commands::SparseCheckout(args) => crate::workspace::sparse_checkout::cli::dispatch_sparse_checkout(args)?,
         Commands::Submodule(args) => crate::workspace::submodule::cli::dispatch_submodule(args)?,
+        Commands::Undo(args) => crate::workspace::undo::cli::dispatch_undo(args)?,
+        Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
     }
 
     Ok(())

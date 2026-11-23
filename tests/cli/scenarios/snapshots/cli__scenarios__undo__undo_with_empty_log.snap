@@ -1,0 +1,20 @@
+---
+source: tests/cli/scenarios/undo.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit undo
+Nothing to undo: rgit hasn't recorded any operation here yet.
+(Recording starts with the first state-changing rgit command; `rgit undo --list` shows the log.)
+$ rgit redo
+Nothing to redo: no operation has been undone since the last command.
+$ rgit undo --list
+The operation log is empty: nothing to undo yet.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+git-dir entries:
+  
+worktree:

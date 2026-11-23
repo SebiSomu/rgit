@@ -1,0 +1,98 @@
+---
+source: tests/cli/scenarios/undo.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (5 bytes)
+$ rgit add a.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 a.txt
+$ rgit switch -c feat
+Switched to a new branch 'feat'
+$ write a.txt (5 bytes)
+$ rgit commit -a -m feat
+[feat <H2:7>] feat
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ write a.txt (5 bytes)
+$ rgit commit -a -m main
+[main <H3:7>] main
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit branch -D feat
+Deleted branch feat (was <H2:7>).
+$ rgit undo
+Undoing #7: rgit branch -D feat  (just now)
+  - branch 'feat': recreated at <H2:7> "feat"
+Done. `rgit redo` brings it back.
+$ rgit branch
+  feat
+* main
+$ rgit merge feat
+Auto-merging a.txt
+CONFLICT (content): Merge conflict in a.txt
+Automatic merge failed; fix conflicts and then commit the result.
+[exit 1]
+
+==== state: conflicted merge ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feat <H2>
+  refs/heads/main <H3>
+git-dir entries:
+  AUTO_MERGE COMMIT_EDITMSG MERGE_HEAD MERGE_MODE MERGE_MSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H4> 1	a.txt
+  100644 <H5> 2	a.txt
+  100644 <H6> 3	a.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
+  
+  main
+worktree:
+  a.txt
+    | <<<<<<< HEAD
+    | main
+    | =======
+    | feat
+    | >>>>>>> feat
+
+$ rgit undo
+Undoing #9: rgit merge feat  (just now)
+  - files restored: a.txt
+  - index (staging area): put back as it was
+  - the in-progress merge is cancelled (its state files are removed)
+Done. `rgit redo` brings it back.
+$ rgit status
+On branch main
+nothing to commit, working tree clean
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feat <H2>
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+HEAD commit:
+  tree <H7>
+  parent <H1>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
+  
+  main
+worktree:
+  a.txt
+    | main

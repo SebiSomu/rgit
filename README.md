@@ -12,12 +12,12 @@ It started as a way to learn how version control works inside, and it has grown 
 
 ## Highlights
 
-- **114 commands**, from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
+- **116 commands**, from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
 - **Git-compatible storage.** Zlib objects, SHA-1 ids, index v2/v3, packfiles with offset and ref deltas, `packed-refs`, reflogs, `.git` worktree files.
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
 - **Two remote transports.** Local paths, and GitHub through its REST API with a personal access token.
-- **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected). `rgit conflicts` lists unresolved conflicts in plain words.
-- **A safety net.** 25 unit tests and 67 end-to-end scenario snapshots that pin down the output of the commands.
+- **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected). `rgit conflicts` lists unresolved conflicts in plain words, and `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change.
+- **A safety net.** 25 unit tests and 74 end-to-end scenario snapshots that pin down the output of the commands.
 
 ## Install
 
@@ -77,7 +77,7 @@ rgit --explain merge feature
 | **History and inspection** | `log`, `show`, `diff`, `blame`, `annotate`, `whatchanged`, `shortlog`, `grep`, `describe`, `name-rev`, `show-branch`, `last-modified`, `range-diff`, `cherry`, `repo` |
 | **Branches, tags and working trees** | `branch`, `switch`, `checkout`, `tag`, `worktree`, `sparse-checkout`, `submodule` |
 | **Merging, rebasing and replaying** | `merge`, `conflicts`, `merge-base`, `rebase`, `cherry-pick`, `revert`, `replay`, `rerere`, `banana-split`, `merge-tree`, `merge-file` |
-| **Undo, recovery and health** | `reset`, `stash`, `reflog`, `bisect`, `fsck`, `gc`, `prune` |
+| **Undo, recovery and health** | `undo`, `redo`, `reset`, `stash`, `reflog`, `bisect`, `fsck`, `gc`, `prune` |
 | **Remotes and collaboration** | `remote`, `fetch`, `push`, `pull`, `bundle`, `request-pull`, `fmt-merge-msg` |
 | **Patches and email** | `apply`, `format-patch`, `am`, `mailsplit`, `mailinfo`, `interpret-trailers`, `check-mailmap`, `patch-id` |
 | **Export and import** | `archive`, `get-tar-commit-id`, `fast-export`, `fast-import` |

@@ -278,6 +278,8 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 
 | Command | What it does |
 |---|---|
+| [`undo`](#rgit-undo) | Undo the last rgit operation: commit, merge, reset --hard, rebase, ... (rgit only). |
+| [`redo`](#rgit-redo) | Bring back the operation most recently undone (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
@@ -1924,6 +1926,74 @@ rgit merge-file -p ours.txt base.txt theirs.txt
 ## 6. Undo, recovery and health
 
 Go back, set work aside, find a bug, and check the repository is sound.
+
+
+### `rgit undo`
+
+Undo the last rgit operation: commit, merge, reset --hard, rebase, ... (rgit only).
+
+**Syntax:** `rgit undo [--list | -n|--dry-run] [-f|--force]`
+
+An rgit-only command, inspired by Jujutsu's operation log. Every rgit command that changes the repository is recorded automatically in `.git/rgit/oplog` with what it changed: where `HEAD` points, local branches and tags, the index, the stash list, in-progress operation files (`MERGE_HEAD`, `rebase-merge/`, `sequencer/`, `BISECT_*`, ...) and, for commands that can rewrite files (`reset`, `checkout`, `switch`, `restore`, `merge`, `pull`, `rebase`, `cherry-pick`, `revert`, `stash`, `clean`, `rm`, `mv`, `am`, `apply`, ...), a snapshot of the working tree, including uncommitted edits and untracked files. `undo` first prints which operation it is undoing and every change it will make, then puts back exactly those things and nothing else. So undoing `reset --hard` brings back the uncommitted work it discarded, undoing `branch -D` recreates the branch, undoing a conflicted `merge` cancels it, and undoing `commit` moves the branch back while keeping the changes staged.
+
+Before touching anything, `undo` checks that what the operation changed still looks the way the operation left it. If something was changed again since (a file edited, a branch moved by real git), it stops with exit code 1, lists what changed, and suggests `rgit stash` first or `--force`, which overwrites those changes. `-n`/`--dry-run` only prints the preview. `--list` shows the operations `undo` can take back (newest first) and those `redo` can bring back. Repeating `undo` steps further back. Running any new command after an undo forgets what could be redone, as in an editor.
+
+Not recorded: read-only commands; `config`; `push`/`fetch` and remote-tracking refs (they mirror the remote, so undo never moves them and never un-pushes anything); `init`/`clone`; and work done with real git or rgit versions older than this command. Untracked files over 64 MiB and ignored files are not snapshotted. Saved data lives in its own store under `.git/rgit/objects`, so `fsck`, `count-objects` and `gc` see exactly the objects real git would. `gc` treats commits the log refers to like reflog entries. The log keeps the last 1000 operations.
+
+<details>
+<summary>Options as printed by <code>rgit undo -h</code></summary>
+
+```text
+Undo the last rgit operation (commit, merge, reset --hard, rebase, ...); `--list` shows the log
+
+Usage: rgit undo [OPTIONS]
+
+Options:
+      --list     List the recorded operations instead of undoing one
+  -n, --dry-run  Show what would be undone without changing anything
+  -f, --force    Undo even if something the operation touched has changed since (overwrites it)
+  -h, --help     Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit reset --hard HEAD~2
+HEAD is now at 1d64c7b first commit
+$ rgit undo
+Undoing #6: rgit reset --hard HEAD~2  (just now)
+  - files restored: a.txt, b.txt, src/lib.txt
+  - index (staging area): put back as it was
+  - branch 'main': 1d64c7b -> 8055fcc "third commit"
+Done. `rgit redo` brings it back.
+```
+
+
+### `rgit redo`
+
+Bring back the operation most recently undone (rgit only).
+
+**Syntax:** `rgit redo [-n|--dry-run] [-f|--force]`
+
+Re-applies the operation the last `rgit undo` took back, with the same preview and the same safety check as `undo` (`--force` overrides it). Available until another state-changing command runs.
+
+<details>
+<summary>Options as printed by <code>rgit redo -h</code></summary>
+
+```text
+Bring back the operation most recently undone
+
+Usage: rgit redo [OPTIONS]
+
+Options:
+  -n, --dry-run  Show what would be redone without changing anything
+  -f, --force    Redo even if something the operation touched has changed since (overwrites it)
+  -h, --help     Print help
+```
+
+</details>
 
 
 ### `rgit reset`

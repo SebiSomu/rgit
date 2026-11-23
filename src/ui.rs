@@ -210,6 +210,7 @@ pub fn narration_replaces_hints() -> bool {
 /// knows whether the command succeeded. Every early exit in rgit goes through here.
 pub fn exit(code: i32) -> ! {
     set_outcome(code == 0);
+    crate::workspace::undo::engine::finish_recording();
     // Report now instead of relying on the `atexit` hook: on Windows `std::process::exit` is
     // `ExitProcess`, which skips CRT atexit handlers. `finish` takes the pending report, so the
     // hook finds nothing left to do on platforms where it does run.

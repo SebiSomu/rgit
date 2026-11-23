@@ -138,6 +138,9 @@ pub fn collect_lenient_gc_roots(reflog_cutoff: Option<u64>) -> Result<Vec<String
         }
     }
 
+    // What `rgit undo` needs (saved indexes, working-tree snapshots, old ref targets).
+    roots.extend(crate::workspace::undo::engine::oplog_object_ids());
+
     for entries in reflogs {
         for entry in entries {
             if reflog_cutoff.is_some_and(|cutoff| entry.timestamp < cutoff) {

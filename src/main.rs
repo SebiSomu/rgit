@@ -25,6 +25,8 @@ fn main() -> Result<()> {
     let handler = builder.spawn(|| {
         // After a command that rewrote the working tree, a sparse checkout is applied again.
         let result = cli::handle_commands().and_then(|_| crate::workspace::sparse_checkout::engine::reapply_after_command());
+        // Logs the operation for `rgit undo` (early exits do this in `ui::exit`).
+        crate::workspace::undo::engine::finish_recording();
         ui::set_outcome(result.is_ok());
         result
     }).expect("failed to spawn main thread");

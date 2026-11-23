@@ -19,5 +19,6 @@ pub mod state_files;
 pub mod status;
 pub mod submodule;
 pub mod types;
+pub mod undo;
 pub mod update_index;
 pub mod worktree;

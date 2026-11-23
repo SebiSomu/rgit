@@ -30,8 +30,7 @@ pub fn clone(repository: String, directory: Option<String>, branch: Option<Strin
     let source = classify_clone_source(&repository)?;
     let remote_default = remote_default_branch(&source, &remote_name)?;
     let dir_name = directory.unwrap_or_else(|| source.default_dir_name());
-    let target_dir = std::path::absolute(&dir_name)
-        .with_context(|| format!("Cannot resolve destination path '{}'", dir_name))?;
+    let target_dir = std::path::absolute(&dir_name).with_context(|| format!("Cannot resolve destination path '{}'", dir_name))?;
     let original_dir = std::env::current_dir().context("Cannot determine the current directory")?;
 
     let created = prepare_clone_directory(&target_dir, &dir_name)?;

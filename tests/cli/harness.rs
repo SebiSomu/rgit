@@ -233,7 +233,7 @@ impl Repo {
             let mut names: Vec<String> = fs::read_dir(&git).unwrap().flatten().map(|e| {
                 let n = e.file_name().to_string_lossy().to_string();
                 if e.path().is_dir() { format!("{}/", n) } else { n }
-            }).filter(|n| !matches!(n.as_str(), "objects/" | "refs/" | "HEAD" | "index" | "packed-refs" | "logs/" | "description" | "hooks/" | "info/")).collect();
+            }).filter(|n| !matches!(n.as_str(), "objects/" | "refs/" | "HEAD" | "index" | "packed-refs" | "logs/" | "description" | "hooks/" | "info/" | "rgit/")).collect();
             names.sort();
             out.push_str(&format!("  {}\n", names.join(" ")));
 

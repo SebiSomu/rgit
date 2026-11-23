@@ -13,6 +13,7 @@ mod oops;
 mod undo;
 mod wip;
 mod fixup;
+mod sync;
 
 use crate::harness::Repo;
 

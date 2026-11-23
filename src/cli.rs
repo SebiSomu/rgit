@@ -206,6 +206,8 @@ pub enum Commands {
     Wip(crate::workspace::wip::cli::WipArgs),
     /// Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top.
     Fixup(crate::workspace::fixup::cli::FixupArgs),
+    /// Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push).
+    Sync(crate::remote::sync::cli::SyncArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -358,6 +360,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
         Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
         Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
+        Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,
     }
 
     Ok(())

@@ -283,6 +283,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
 | [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
+| [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
@@ -2169,6 +2170,57 @@ Fix up which commit?
    3  d02f9e1  initial import  [pushed: origin/main]
 Number (Enter cancels): 2
 Fixed up 41ab7f0 parser: handle empty input (now 7e3a0b2), 1 later commit rewritten.
+```
+
+
+### `rgit sync`
+
+Bring the current branch level with its upstream (and push), in one command with a plan (rgit only).
+
+**Syntax:** `rgit sync [-p] [--rebase | --merge] [-n] [--no-fetch]`
+
+git's version is `git fetch`, then `git rebase @{upstream}` (or `git pull --rebase`), stashing around it when the tree is dirty, then `git push`. `rgit sync` fetches the branch's upstream (`branch.<name>.remote` / `.merge`), prints where the branch stands and what it will do, then does it:
+
+- **Up to date / only ahead:** nothing to bring in; with `-p`/`--push` the local commits are pushed, otherwise it says how many are not pushed yet.
+- **Only behind:** a fast-forward.
+- **Diverged:** the local commits are rebased onto the upstream (the default), or with `--merge` the upstream is merged in. Without either flag `branch.<name>.rebase`, then `pull.rebase` decide (`false` = merge). Either way the branch then contains the upstream, so `--push` is a plain fast-forward push, never a force push.
+- **No upstream yet:** `--push` publishes the branch to `branch.<name>.remote` (else `origin`) and tracks it; without `--push` it only says so. The same goes for an upstream deleted on the remote.
+
+Staged and unstaged changes are stashed around the fast-forward, rebase or merge and popped afterwards (untracked files stay put). `-n`/`--dry-run` fetches and prints the plan without changing anything else; `--no-fetch` plans against the remote-tracking branch as it is. On a conflict it stops like `rebase`/`merge` do and prints how to go on, or `rgit undo` goes back to before the sync (a push already made stays on the remote). It refuses on a detached HEAD and while a merge, rebase, cherry-pick, revert or `am` is in progress.
+
+<details>
+<summary>Options as printed by <code>rgit sync -h</code></summary>
+
+```text
+Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push)
+
+Usage: rgit sync [OPTIONS]
+
+Options:
+  -p, --push      Also push the result to the upstream (publishing the branch if it has none yet)
+      --rebase    Rebase local commits onto the upstream (the default, unless pull.rebase=false)
+      --merge     Merge the upstream into the branch instead of rebasing
+  -n, --dry-run   Fetch and print the plan, change nothing else
+      --no-fetch  Skip the fetch: plan against the remote-tracking branch as it is
+  -h, --help      Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit sync --push
+From https://github.com/you/project
+   4f1f653..9228448  main             -> origin/main
+'main' and origin/main have diverged: 1 commit here, 1 commit there.
+Plan:
+  - rebase the local commit onto origin/main
+  - push to origin/main
+Successfully rebased and updated refs/heads/main.
+To https://github.com/you/project
+   9228448..8005fed  main -> main
+'main' is in sync with origin/main.
 ```
 
 

@@ -120,8 +120,8 @@ fn quiet_commit(messages: Vec<String>, amend: bool) -> crate::workspace::commit:
 }
 
 /// Refuses while a merge, rebase, cherry-pick, revert or am is in progress.
-// Used by `fixup`.
-fn refuse_if_busy() {
+// Used by `fixup` and `sync`.
+pub(crate) fn refuse_if_busy() {
     let state = |p: &str| crate::core::repo::path(p).exists();
     let busy = if crate::merge::rebase::engine::rebase_in_progress() {
         Some("rebase")

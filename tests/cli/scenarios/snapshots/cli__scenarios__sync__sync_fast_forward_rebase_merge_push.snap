@@ -1,0 +1,174 @@
+---
+source: tests/cli/scenarios/sync.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+(../clone) $ rgit sync
+From <REPO>
+ = [up to date]      main                 -> origin/main
+'main' is up to date with origin/main.
+$ write up.txt (3 bytes)
+$ rgit add up.txt
+Staged files to index (1 new).
+$ rgit commit -m 'upstream one'
+[main <H4:7>] upstream one
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 up.txt
+$ write ../clone/a.txt (19 bytes)
+(../clone) $ rgit sync
+From <REPO>
+   <H3:7>..<H4:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+'main' is 1 commit behind origin/main.
+Plan:
+  - fast-forward to origin/main
+Saved working directory and index state On main: rgit sync: local changes
+Updating <H3:7>..<H4:7>
+Fast-forward
+ up.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 up.txt
+Dropped stash@{0} (On main: rgit sync: local changes)
+'main' is in sync with origin/main.
+(../clone) $ rgit status --short
+ M a.txt
+$ write up.txt (3 bytes)
+$ rgit commit -a -m 'upstream two'
+[main <H5:7>] upstream two
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write ../clone/c.txt (2 bytes)
+(../clone) $ rgit add c.txt
+Staged files to index (1 new).
+(../clone) $ rgit commit -m 'clone work'
+[main 3cc9bcb] clone work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+(../clone) $ rgit sync --dry-run
+From <REPO>
+   <H4:7>..<H5:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+'main' and origin/main have diverged: 1 commit here, 1 commit there.
+Plan:
+  - rebase the local commit onto origin/main
+(dry run: nothing changed except the fetch)
+(../clone) $ rgit sync --push
+From <REPO>
+ = [up to date]      main                 -> origin/main
+'main' and origin/main have diverged: 1 commit here, 1 commit there.
+Plan:
+  - rebase the local commit onto origin/main
+  - push to origin/main
+Saved working directory and index state On main: rgit sync: local changes
+Dropped stash@{0} (On main: rgit sync: local changes)
+Enumerating objects: 3, done.
+Writing objects: 100% (3/3), done.
+Total 3 (delta 0), reused 0 (delta 0)
+To <REPO>
+   <H5:7>..<H6:7>  main -> main
+'main' is in sync with origin/main.
+[stderr]
+Rebasing (1/1)[KSuccessfully rebased and updated refs/heads/main.
+(../clone) $ rgit log --oneline -3
+<H6:7> clone work
+<H5:7> upstream two
+<H4:7> upstream one
+$ rgit branch -v
+* main <H6:7> clone work
+$ write ../clone/d.txt (2 bytes)
+(../clone) $ rgit add d.txt
+Staged files to index (1 new).
+(../clone) $ rgit commit -m 'clone more'
+[main 046ad47] clone more
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 d.txt
+(../clone) $ rgit sync --no-fetch
+'main' is 1 commit ahead of origin/main.
+Not pushed yet: 1 commit (`rgit sync --push`).
+$ rgit reset --hard
+HEAD is now at <H6:7> clone work
+$ write up.txt (3 bytes)
+$ rgit commit -a -m 'upstream three'
+[main <H7:7>] upstream three
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+(../clone) $ rgit sync --merge
+From <REPO>
+   <H6:7>..<H7:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+'main' and origin/main have diverged: 1 commit here, 1 commit there.
+Plan:
+  - merge origin/main into 'main'
+Saved working directory and index state On main: rgit sync: local changes
+Merge made by the 'ort' strategy.
+ up.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+Dropped stash@{0} (On main: rgit sync: local changes)
+'main' now contains origin/main; not pushed yet: 2 commits (`rgit sync --push`).
+(../clone) $ rgit log --oneline -1
+86e453e Merge remote-tracking branch 'origin/main'
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H8> 0	a.txt
+  100644 <H9> 0	b.txt
+  100644 <H10> 0	c.txt
+  100644 <H11> 0	src/lib.txt
+  100644 <H12> 0	up.txt
+HEAD commit:
+  tree <H13>
+  parent <H6>
+  author Test Author <author@example.com> 1700001380 +0000
+  committer Test Committer <committer@example.com> 1700001380 +0000
+  
+  upstream three
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  c.txt
+    | c
+  src/lib.txt
+    | lib v2
+  up.txt
+    | u3

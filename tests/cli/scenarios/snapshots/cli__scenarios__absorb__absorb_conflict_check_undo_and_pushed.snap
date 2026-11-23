@@ -1,0 +1,111 @@
+---
+source: tests/cli/scenarios/absorb.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (14 bytes)
+$ rgit commit -a -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write a.txt (14 bytes)
+$ write src/lib.txt (8 bytes)
+$ rgit add a.txt src/lib.txt
+Staged files to index (2 modified).
+$ rgit absorb
+Absorbing 1 of 2 staged hunks into 1 commit (rewriting the last 2 commits):
+  src/lib.txt:1  -> <H3:7> third commit
+Staying staged:
+  a.txt:2        would conflict with a later change next to it (last changed in <H2:7>)
+[detached <H5:7>] fixup! third commit (fixup into previous)
+Absorbed 1 hunk into 1 commit; 1 hunk still staged.
+[stderr]
+Rebasing (1/3)Rebasing (2/3)Rebasing (3/3)[KSuccessfully rebased and updated refs/heads/main.
+$ rgit status --short
+M  a.txt
+$ rgit log --oneline -2
+<H6:7> fourth commit
+<H5:7> third commit
+$ rgit undo
+Undoing #8: rgit absorb  (just now)
+  - branch 'main': <H6:7> -> <H4:7> "fourth commit"
+Done. `rgit redo` brings it back.
+$ rgit status --short
+M  a.txt
+M  src/lib.txt
+$ rgit log --oneline -2
+<H4:7> fourth commit
+<H3:7> third commit
+$ rgit stash list
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (16/16), done.
+$ write ../clone/src/lib.txt (7 bytes)
+(../clone) $ rgit add src/lib.txt
+Staged files to index (1 modified).
+(../clone) $ rgit absorb
+Nothing to absorb; everything stays staged:
+  src/lib.txt:1  its lines come from <H3:7>, which origin/main already has (--force rewrites it)
+(../clone) $ rgit absorb -f
+Absorbing 1 of 1 staged hunk into 1 commit (rewriting the last 2 commits):
+  src/lib.txt:1  -> <H3:7> third commit
+[detached 1cb28f4] fixup! third commit (fixup into previous)
+Absorbed 1 hunk into 1 commit.
+[stderr]
+Rebasing (1/3)Rebasing (2/3)Rebasing (3/3)[KSuccessfully rebased and updated refs/heads/main.
+(../clone) $ rgit show HEAD:src/lib.txt
+lib v3
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H7> 0	a.txt
+  100644 <H8> 0	b.txt
+  100644 <H9> 0	src/lib.txt
+HEAD commit:
+  tree <H10>
+  parent <H3>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | TWO
+    | three
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2!

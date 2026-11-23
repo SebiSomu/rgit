@@ -14,6 +14,7 @@ mod undo;
 mod wip;
 mod fixup;
 mod sync;
+mod absorb;
 
 use crate::harness::Repo;
 

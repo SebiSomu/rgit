@@ -283,6 +283,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
 | [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
+| [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2170,6 +2171,54 @@ Fix up which commit?
    3  d02f9e1  initial import  [pushed: origin/main]
 Number (Enter cancels): 2
 Fixed up 41ab7f0 parser: handle empty input (now 7e3a0b2), 1 later commit rewritten.
+```
+
+
+### `rgit absorb`
+
+Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only, like the `git-absorb` tool).
+
+**Syntax:** `rgit absorb [-n] [-f]`
+
+Where `rgit fixup` asks which commit a fix belongs to, `absorb` works it out. The staged changes are split into hunks against HEAD (no context lines); for each hunk, `blame` names the commit that last changed the lines it replaces. If that is one commit that can be rewritten (on the first-parent chain from HEAD, before any merge, the root commit, or a commit a remote-tracking branch has), the hunk goes into it. One `fixup!` commit is made per target and all are squashed in a single rewrite of the commits from the oldest target up to HEAD.
+
+A hunk stays staged, with the reason printed, when:
+
+- it only adds lines (nothing to blame), or it is a new, deleted or binary file, or a mode change;
+- it changes lines that come from several commits;
+- its lines come from a pushed commit (`-f`/`--force` rewrites those too), or from before a merge or the root commit;
+- folding it in would conflict: a later commit changed the lines right next to it. This is checked with a three-way merge before anything is rewritten.
+
+The plan is printed first; `-n`/`--dry-run` stops there. Unstaged changes and the hunks that stay staged are kept exactly as they were (they are parked in the stash during the rewrite). It is one `rgit undo` step; if the rewrite still stops on a conflict, the printed note says how to continue or go back. It refuses while a merge, rebase, cherry-pick, revert or `am` is in progress.
+
+<details>
+<summary>Options as printed by <code>rgit absorb -h</code></summary>
+
+```text
+Fold each staged hunk into the commit that last changed those lines (blame), in one rewrite
+
+Usage: rgit absorb [OPTIONS]
+
+Options:
+  -n, --dry-run  Print which hunk goes into which commit, change nothing
+  -f, --force    Also rewrite commits a remote-tracking branch already has
+  -h, --help     Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit add a.txt src/lib.txt new.txt
+$ rgit absorb
+Absorbing 2 of 3 staged hunks into 2 commits (rewriting the last 3 commits):
+  a.txt:2        -> 41ab7f0 second commit
+  src/lib.txt:1  -> d02f9e1 third commit
+Staying staged:
+  new.txt        new file (nothing to blame)
+Successfully rebased and updated refs/heads/main.
+Absorbed 2 hunks into 2 commits; 1 hunk still staged.
 ```
 
 

@@ -6,6 +6,7 @@ $ rgit help
 usage: rgit <command> [<args>]
 
 Available commands:
+   absorb              fsck-objects        remote
    add                 gc                  repack
    am                  get-tar-commit-id   replace
    annotate            grep                replay
@@ -47,7 +48,6 @@ Available commands:
    for-each-repo       redo                worktree
    format-patch        reflog              write-tree
    fsck                refs
-   fsck-objects        remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -110,6 +110,7 @@ $ rgit help -a
 usage: rgit <command> [<args>]
 
 Available commands:
+   absorb              fsck-objects        remote
    add                 gc                  repack
    am                  get-tar-commit-id   replace
    annotate            grep                replay
@@ -151,7 +152,6 @@ Available commands:
    for-each-repo       redo                worktree
    format-patch        reflog              write-tree
    fsck                refs
-   fsck-objects        remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -278,6 +278,7 @@ Commands:
   wip                 Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back [alias: save]
   fixup               Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top
   sync                Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push)
+  absorb              Fold each staged hunk into the commit that last changed those lines (blame), in one rewrite
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

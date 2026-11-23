@@ -1,0 +1,124 @@
+---
+source: tests/cli/scenarios/absorb.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write b.txt (9 bytes)
+$ rgit commit -a -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit absorb
+[stderr]
+fatal: nothing staged to absorb
+hint: stage the fixes with `rgit add <path>` (or `rgit add -p`)
+[exit 128]
+$ write a.txt (14 bytes)
+$ write src/lib.txt (13 bytes)
+$ write new.txt (2 bytes)
+$ rgit add a.txt src/lib.txt new.txt
+Staged files to index (1 new, 2 modified).
+$ write b.txt (18 bytes)
+$ rgit absorb --dry-run
+Absorbing 2 of 3 staged hunks into 2 commits (rewriting the last 3 commits):
+  a.txt:2        -> <H2:7> second commit
+  src/lib.txt:1  -> <H3:7> third commit
+Staying staged:
+  new.txt        new file (nothing to blame)
+(dry run: nothing changed)
+$ rgit absorb
+Absorbing 2 of 3 staged hunks into 2 commits (rewriting the last 3 commits):
+  a.txt:2        -> <H2:7> second commit
+  src/lib.txt:1  -> <H3:7> third commit
+Staying staged:
+  new.txt        new file (nothing to blame)
+[detached <H5:7>] fixup! second commit (fixup into previous)
+[detached <H6:7>] fixup! third commit (fixup into previous)
+Absorbed 2 hunks into 2 commits; 1 hunk still staged.
+[stderr]
+Rebasing (1/5)Rebasing (2/5)Rebasing (3/5)Rebasing (4/5)Rebasing (5/5)[KSuccessfully rebased and updated refs/heads/main.
+$ rgit log --oneline
+<H7:7> fourth commit
+<H6:7> third commit
+<H5:7> second commit
+<H1:7> first commit
+$ rgit show HEAD~2 --stat
+commit <H5>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:16:20 2023 +0000
+
+    second commit
+
+ a.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+$ rgit show HEAD~1:src/lib.txt
+lib v2 fixed
+$ rgit status --short
+ M b.txt
+A  new.txt
+$ rgit diff --cached
+diff --git a/new.txt b/new.txt
+new file mode 100644
+index 0000000..<H8:7>
+--- /dev/null
++++ b/new.txt
+@@ -0,0 +1 @@
++n
+$ rgit stash list
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H9> 0	a.txt
+  100644 <H10> 0	b.txt
+  100644 <H8> 0	new.txt
+  100644 <H11> 0	src/lib.txt
+HEAD commit:
+  tree <H12>
+  parent <H6>
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000600 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | TWO
+    | three
+  b.txt
+    | bee
+    | buzz
+    | unstaged
+  new.txt
+    | n
+  src/lib.txt
+    | lib v2 fixed

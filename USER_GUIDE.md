@@ -1267,9 +1267,11 @@ Move around the history and keep several lines of work apart.
 
 List, create, rename, copy and delete branches.
 
-**Arguments and flags:** [<name> [<start-point>]] | -a | -r | -v | -d/-D | -m/-M | -c/-C | -u <upstream> | --show-current | --merged/--no-merged/--contains/--no-contains/--points-at <commit>
+**Arguments and flags:** [<name> [<start-point>]] | -a | -r | -v | -d/-D | -m/-M [--push[=<remote>]] | -c/-C | -u <upstream> | --show-current | --merged/--no-merged/--contains/--no-contains/--points-at <commit>
 
 Without arguments, lists local branches (`*` marks the current one). With a name, creates a branch at `HEAD` or at `<start-point>`. `-a` also lists remote-tracking branches, `-r` lists only those, `-v` adds hash and subject (`-vv` adds upstream). `-d` deletes a fully merged branch, `-D` deletes regardless, `-m`/`-M` rename, `-c`/`-C` copy, `-u` sets the upstream, `--show-current` prints the current branch name. Filters (`--merged`, `--contains`, `--points-at`...) narrow the list. Refuses to delete or rename a branch checked out in another worktree.
+
+**Rename on the remote too (`-m --push[=<remote>]`, rgit only).** `rgit branch -m <old> <new> --push` renames the branch here (reflog and `branch.*` config included), pushes `<new>` to the branch's remote (`branch.<old>.remote`, or the one named with `--push=<remote>`), makes `<remote>/<new>` its upstream and deletes the old name there (the upstream's name, usually `<old>`; skipped when rgit knows of no such remote branch). The plan is printed first. The new name is pushed before the old one is deleted, so the remote never loses the branch; if a remote step fails, the local rename stays and the commands still to run are printed (exit 1). `rgit undo` renames it back locally only. Without `--push`, `-m` behaves exactly like git's.
 
 <details>
 <summary>Options as printed by <code>rgit branch -h</code></summary>

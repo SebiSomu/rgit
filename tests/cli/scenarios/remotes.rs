@@ -24,3 +24,20 @@ fn remote_management() {
     r.run("remote set-url origin ../moved").run("remote rename origin upstream").run("remote -v").run("remote remove upstream").run("remote");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn branch_rename_push() {
+    let mut r = three_commits();
+    r.run("branch feature").run_in("..", "clone repo clone");
+    r.run_in("../clone", "switch feature");
+    // Rename here and on the remote: push the new name, track it, delete the old one.
+    r.run_in("../clone", "branch -m feature feat-x --push").run_in("../clone", "branch -a").run_in("../clone", "config branch.feat-x.merge");
+    r.run("branch");
+    // A branch without an upstream needs the remote named; then there is nothing to delete.
+    r.run_in("../clone", "branch solo").run_in("../clone", "branch -m solo duo --push").run_in("../clone", "branch -m solo duo --push=origin");
+    r.run("branch");
+    r.run_in("../clone", "branch -m duo trio --push=nope").run_in("../clone", "branch --push").run_in("../clone", "branch -c duo trio --push");
+    // Undo only renames it back locally.
+    r.run_in("../clone", "undo").run_in("../clone", "branch");
+    assert_snapshot!(r.finish());
+}

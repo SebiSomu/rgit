@@ -120,6 +120,8 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
                 "set-upstream-to" => opts.set_upstream = Some(take_value(&mut i)),
                 "unset-upstream" => opts.unset_upstream = true,
                 "show-current" => opts.show_current = true,
+                // rgit-only; the value only inline (`--push=origin`), so it never eats a branch name.
+                "push" => opts.push = Some(inline.clone()),
                 "points-at" => {
                     let v = take_value(&mut i);
                     match crate::core::rev_parse::resolve_rev(&v) {

@@ -21,6 +21,9 @@ pub struct BranchOptions {
     pub set_upstream: Option<String>,
     pub unset_upstream: bool,
     pub show_current: bool,
+    /// rgit's `--push[=<remote>]` with `-m`: also rename the branch on the remote (Some(None):
+    /// the branch's own remote).
+    pub push: Option<Option<String>>,
     pub merged: Vec<String>,
     pub no_merged: Vec<String>,
     pub contains: Vec<String>,
@@ -45,4 +48,15 @@ pub struct BranchListEntry {
     pub other_worktree: Option<String>,
     /// Target of a symbolic remote-tracking ref (`origin/HEAD -> origin/main`).
     pub symref: Option<String>,
+}
+
+/// What `branch -m <old> <new> --push` does on the remote: which remote, the name the branch
+/// has there now (its upstream's name, usually `<old>`), and whether there is one to delete.
+// Used by: src/workspace/branch.rs, src/workspace/branch/types.rs
+// Used by command/helper: `plan_remote_rename`, `rename_on_remote`
+#[derive(Debug, Clone)]
+pub struct RemoteRename {
+    pub remote: String,
+    pub old_remote_branch: String,
+    pub delete_old: bool,
 }

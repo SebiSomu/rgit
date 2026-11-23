@@ -17,7 +17,7 @@ It started as a way to learn how version control works inside, and it has grown 
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
 - **Two remote transports.** Local paths, and GitHub through its REST API with a personal access token.
 - **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected). `rgit conflicts` lists unresolved conflicts in plain words, `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change, `rgit oops` suggests the most likely fix right after a mistake, and `rgit wip` saves unfinished work per branch in one word.
-- **A safety net.** 25 unit tests and 80 end-to-end scenario snapshots that pin down the output of the commands.
+- **A safety net.** 25 unit tests and 81 end-to-end scenario snapshots that pin down the output of the commands.
 
 ## Install
 

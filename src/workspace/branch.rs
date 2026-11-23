@@ -30,6 +30,9 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
         upstream_for,
     };
     let opts = parse_branch_args(&args);
+    if opts.push.is_some() && !opts.rename {
+        crate::ui::die_fatal("--push only goes with -m/-M (rename a branch here and on its remote)");
+    }
     let has_filter = !(opts.merged.is_empty() && opts.no_merged.is_empty() && opts.contains.is_empty() && opts.no_contains.is_empty() && opts.points_at.is_empty());
     let mut list = opts.list || has_filter;
     if !opts.delete && !opts.rename && !opts.copy && opts.set_upstream.is_none() && !opts.unset_upstream && !opts.show_current && opts.args.is_empty() {
@@ -271,6 +274,11 @@ fn rename_or_copy(opts: &crate::workspace::branch::types::BranchOptions, current
     if old == new && !opts.copy {
         return Ok(());
     }
+    // `--push`: work out (and show) the remote side before the config moves to the new name.
+    let remote_plan = match &opts.push {
+        Some(remote) => Some(plan_remote_rename(&old, &new, remote.as_deref())?),
+        None => None,
+    };
     if opts.copy {
         if old != new {
             refs::write_ref(&new_ref, &tip)?;
@@ -279,6 +287,75 @@ fn rename_or_copy(opts: &crate::workspace::branch::types::BranchOptions, current
         refs::rename_branch(&old, &new)?;
     }
     move_branch_config(&old, Some(&new), opts.copy)?;
+    if let Some(plan) = remote_plan {
+        rename_on_remote(&old, &new, &plan)?;
+    }
+    Ok(())
+}
+
+/// Picks the remote (`--push=<remote>`, else `branch.<old>.remote`) and the remote branch to
+/// delete (the upstream when it is on that remote, else `<old>`; only when rgit knows it exists:
+/// an upstream is configured or a remote-tracking ref is there), then prints the plan.
+// Used by `rename_or_copy` (`-m --push`).
+fn plan_remote_rename(old: &str, new: &str, remote: Option<&str>) -> anyhow::Result<crate::workspace::branch::types::RemoteRename> {
+    use crate::core::config::get_config_value;
+    let configured = get_config_value(&format!("branch.{}.remote", old))?;
+    let remote = match remote.map(str::to_string).or_else(|| configured.clone()) {
+        Some(r) => r,
+        None => crate::ui::die_fatal(format!("branch '{}' has no upstream to rename it on\nhint: name the remote: rgit branch -m {} {} --push=<remote>", old, old, new)),
+    };
+    if get_config_value(&format!("remote.{}.url", remote))?.is_none() {
+        crate::ui::die_fatal(format!("'{}' is not a remote (see `rgit remote -v`)", remote));
+    }
+    let upstream = (configured.as_deref() == Some(remote.as_str()))
+        .then(|| get_config_value(&format!("branch.{}.merge", old)).ok().flatten())
+        .flatten()
+        .and_then(|m| m.strip_prefix("refs/heads/").map(str::to_string));
+    let old_remote_branch = upstream.clone().unwrap_or_else(|| old.to_string());
+    let tracked = refs::read_ref(&format!("refs/remotes/{}/{}", remote, old_remote_branch))?.is_some();
+    let delete_old = (upstream.is_some() || tracked) && old_remote_branch != new;
+
+    println!("Renaming '{}' to '{}' here and on '{}':", old, new, remote);
+    println!("  1. rename the local branch (its reflog and config come along)");
+    println!("  2. push '{}' to {} and track {}/{}", new, remote, remote, new);
+    if delete_old {
+        println!("  3. delete '{}' on {}", old_remote_branch, remote);
+    } else {
+        println!("  ({} has no '{}' that rgit knows of: nothing to delete there)", remote, old_remote_branch);
+    }
+    Ok(crate::workspace::branch::types::RemoteRename { remote, old_remote_branch, delete_old })
+}
+
+/// The remote half of `branch -m --push`, after the local rename: push the new name, track it,
+/// delete the old name. The new name goes first, so a failure never leaves the remote without
+/// the branch; on a failure the commands that are left are printed.
+// Used by `rename_or_copy` (`-m --push`).
+fn rename_on_remote(old: &str, new: &str, plan: &crate::workspace::branch::types::RemoteRename) -> anyhow::Result<()> {
+    let left = |from: usize| {
+        let mut steps = vec![format!("rgit push -u {} {}", plan.remote, new)];
+        if plan.delete_old {
+            steps.push(format!("rgit push {} :{}", plan.remote, plan.old_remote_branch));
+        }
+        eprintln!("The local branch is renamed to '{}'; to finish on '{}', run:", new, plan.remote);
+        for step in &steps[from..] {
+            eprintln!("  {}", step);
+        }
+    };
+    if let Err(e) = crate::remote::push::push(Some(plan.remote.clone()), Some(format!("{}:{}", new, new)), false, false) {
+        eprintln!("{}", e);
+        left(0);
+        crate::ui::exit(1);
+    }
+    crate::remote::push::engine::set_upstream_branch(new, &plan.remote, new)?;
+    println!("branch '{}' set up to track '{}/{}'.", new, plan.remote, new);
+    if plan.delete_old
+        && let Err(e) = crate::remote::push::push(Some(plan.remote.clone()), Some(format!(":{}", plan.old_remote_branch)), false, false)
+    {
+        eprintln!("{}", e);
+        left(1);
+        crate::ui::exit(1);
+    }
+    println!("Renamed '{}' to '{}' here and on '{}'. (`rgit undo` only renames it back here.)", old, new, plan.remote);
     Ok(())
 }
 

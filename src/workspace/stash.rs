@@ -35,7 +35,7 @@ use crate::core::object_store::{
 };
 use crate::core::index::{read_index, write_index};
 use crate::core::refs;
-use crate::workspace::stash::types::StashAction;
+use crate::workspace::stash::types::{StashAction, StashSnapshot};
 
 /// `rgit stash` / `rgit stash push [-m <message>]`
 ///
@@ -45,6 +45,33 @@ use crate::workspace::stash::types::StashAction;
 /// `-a`: Some(true), ignored files included) the untracked files go into a third,
 /// parentless commit and are removed from the working tree, like git.
 pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::Result<()> {
+    let Some(snap) = capture_snapshot(untracked)? else {
+        println!("No local changes to save");
+        return Ok(());
+    };
+
+    let stash_message = match &message {
+        Some(m) => format!("On {}: {}", snap.branch_label, m),
+        None => format!("WIP on {}: {} {}", snap.branch_label, &snap.head[..7], snap.head_subject),
+    };
+    let w_commit_hash = match &snap.untracked_commit {
+        None => build_merge_commit(snap.working_tree.clone(), &snap.head, &snap.index_commit, &stash_message)?,
+        Some(u_commit) => crate::workspace::state_files::build_stash_commit(&snap.working_tree, &[&snap.head, &snap.index_commit, u_commit], &stash_message)?,
+    };
+
+    append_stash_entry(&w_commit_hash, &stash_message)?;
+    clear_saved_changes(&snap)?;
+
+    println!("Saved working directory and index state {}", stash_message);
+
+    Ok(())
+}
+
+/// Snapshots the index (as a commit on HEAD), the tracked working tree (as a tree) and, with
+/// `untracked` (Some(false): untracked files, Some(true): untracked and ignored files), the
+/// untracked files (as a parentless commit). Returns None when there is nothing to save.
+// Used by `stash push` and `rgit wip`.
+pub(crate) fn capture_snapshot(untracked: Option<bool>) -> anyhow::Result<Option<StashSnapshot>> {
     let head_commit = refs::resolve_head_commit()?
         .ok_or_else(|| anyhow::anyhow!("fatal: You do not have the initial commit yet"))?;
 
@@ -89,8 +116,7 @@ pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::R
     };
 
     if index_tree_hash == head_tree_hash && working_tree_hash == head_tree_hash && untracked_files.is_empty() {
-        println!("No local changes to save");
-        return Ok(());
+        return Ok(None);
     }
 
     let branch_label = current_branch_label()?;
@@ -99,12 +125,8 @@ pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::R
     let index_message = format!("index on {}: {} {}", branch_label, short_head, subject);
     let i_commit_hash = build_commit(index_tree_hash, Some(head_commit.clone()), &index_message)?;
 
-    let stash_message = match &message {
-        Some(m) => format!("On {}: {}", branch_label, m),
-        None => format!("WIP on {}: {} {}", branch_label, short_head, subject),
-    };
-    let w_commit_hash = if untracked_files.is_empty() {
-        build_merge_commit(working_tree_hash, &head_commit, &i_commit_hash, &stash_message)?
+    let untracked_commit = if untracked_files.is_empty() {
+        None
     } else {
         let mut untracked_tree: BTreeMap<String, ([u8; 20], u32)> = BTreeMap::new();
         for path in &untracked_files {
@@ -123,25 +145,36 @@ pub fn stash_push(message: Option<String>, untracked: Option<bool>) -> anyhow::R
         }
         let u_tree = build_tree_from_map(&untracked_tree)?;
         let u_message = format!("untracked files on {}: {} {}", branch_label, short_head, subject);
-        let u_commit = crate::workspace::state_files::build_stash_commit(&u_tree, &[], &u_message)?;
-        crate::workspace::state_files::build_stash_commit(&working_tree_hash, &[&head_commit, &i_commit_hash, &u_commit], &stash_message)?
+        Some(crate::workspace::state_files::build_stash_commit(&u_tree, &[], &u_message)?)
     };
-
-    append_stash_entry(&w_commit_hash, &stash_message)?;
 
     let mut tracked_paths: BTreeSet<String> = index_entries.iter().map(|e| e.path.clone()).collect();
     tracked_paths.extend(head_tree.keys().cloned());
     tracked_paths.extend(working_tree.keys().cloned());
 
-    hard_reset_working_tree(&head_tree, &tracked_paths)?;
-    let mut new_entries = build_index_entries_for_tree(&head_tree, true)?;
+    Ok(Some(StashSnapshot {
+        head: head_commit,
+        head_subject: subject,
+        head_tree,
+        branch_label,
+        index_commit: i_commit_hash,
+        working_tree: working_tree_hash,
+        untracked_commit,
+        untracked_files,
+        tracked_paths,
+    }))
+}
+
+/// Takes the saved changes out of the working tree and index: both are reset to HEAD and the
+/// saved untracked files are deleted (with the directories they leave empty).
+// Used by `stash push` and `rgit wip`.
+pub(crate) fn clear_saved_changes(snap: &StashSnapshot) -> anyhow::Result<()> {
+    hard_reset_working_tree(&snap.head_tree, &snap.tracked_paths)?;
+    let mut new_entries = build_index_entries_for_tree(&snap.head_tree, true)?;
     write_index(&mut new_entries)?;
-    for path in &untracked_files {
+    for path in &snap.untracked_files {
         crate::workspace::state_files::remove_file_and_empty_parents(path);
     }
-
-    println!("Saved working directory and index state {}", stash_message);
-
     Ok(())
 }
 

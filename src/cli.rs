@@ -201,6 +201,9 @@ pub enum Commands {
     Redo(crate::workspace::undo::cli::RedoArgs),
     /// "I just did something wrong": lists the most likely fixes; `rgit oops <n>` runs one.
     Oops(crate::workspace::oops::cli::OopsArgs),
+    /// Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back.
+    #[command(visible_alias = "save")]
+    Wip(crate::workspace::wip::cli::WipArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -351,6 +354,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Undo(args) => crate::workspace::undo::cli::dispatch_undo(args)?,
         Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
         Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
+        Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
     }
 
     Ok(())

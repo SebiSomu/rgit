@@ -11,6 +11,7 @@ mod remotes;
 mod misc;
 mod oops;
 mod undo;
+mod wip;
 
 use crate::harness::Repo;
 

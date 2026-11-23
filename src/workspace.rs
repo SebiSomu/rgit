@@ -22,4 +22,5 @@ pub mod submodule;
 pub mod types;
 pub mod undo;
 pub mod update_index;
+pub mod wip;
 pub mod worktree;

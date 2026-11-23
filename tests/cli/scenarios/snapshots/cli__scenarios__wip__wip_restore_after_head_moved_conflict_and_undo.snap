@@ -1,0 +1,116 @@
+---
+source: tests/cli/scenarios/wip.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (12 bytes)
+$ rgit wip
+Saved wip@{0} (WIP on main: <H3:7> third commit)
+The working tree is clean; `rgit wip --restore` brings the changes back.
+$ write a.txt (18 bytes)
+$ rgit commit -a -m moved-on
+[main <H4:7>] moved-on
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+$ rgit wip --restore
+Auto-merging a.txt
+CONFLICT (content): Merge conflict in a.txt
+[stderr]
+The WIP save is kept: resolve the conflicts, then `rgit wip --drop`.
+[exit 1]
+$ rgit status --short
+UU a.txt
+$ rgit wip --list
+wip@{0}: WIP on main: <H3:7> third commit (just now)
+$ rgit reset --hard
+HEAD is now at <H4:7> moved-on
+$ rgit wip --drop
+Dropped wip@{0} (WIP on main: <H3:7> third commit)
+$ rgit wip --list
+No WIP saved on 'main'.
+$ rgit undo
+Undoing #10: rgit wip --drop  (just now)
+  - refs/rgit/wip/main: recreated at <H5:7> "WIP on main: <H3:7> third commit"
+Done. `rgit redo` brings it back.
+$ rgit wip --list
+wip@{0}: WIP on main: <H3:7> third commit (just now)
+$ rgit switch --detach HEAD
+HEAD is now at <H4:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit wip
+[stderr]
+fatal: rgit wip saves per branch, and HEAD is detached
+hint: switch to a branch first, or use `rgit stash`
+[exit 128]
+$ rgit wip --list --all
+main:
+  wip@{0}: WIP on main: <H3:7> third commit (just now)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit wip --drop 3
+[stderr]
+fatal: wip@{3} does not exist ('main' has 1 WIP save)
+[exit 128]
+$ rgit switch -c empty
+Switched to a new branch 'empty'
+$ rgit wip --list
+No WIP saved on 'empty'.
+(Saved on other branches: main; `rgit wip --list --all` shows them.)
+$ rgit wip --restore
+No WIP saved on 'empty'.
+(Saved on other branches: main; `rgit wip --list --all` shows them.)
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/empty
+refs:
+  refs/heads/empty <H4>
+  refs/heads/main <H4>
+  refs/rgit/wip/main <H5>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	b.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H9>
+  parent <H3>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  moved-on
+worktree:
+  a.txt
+    | committed version
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

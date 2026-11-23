@@ -150,33 +150,38 @@ pub fn build_tree_from_map(map: &BTreeMap<String, ([u8; 20], u32)>) -> anyhow::R
     crate::core::object_store::write_tree_from_index_prefix(&entries, "")
 }
 
+/// A flattened tree: path -> (blob hash, mode).
+type PathMap = BTreeMap<String, ([u8; 20], u32)>;
+
 /// Given a stash index, reads its `w_commit`/`i_commit` pair and flattens
 /// both into path -> (hash, mode) maps: `(working_tree, index_tree)`.
 pub fn load_stash_trees(idx: usize, list: &[StashEntry]) -> anyhow::Result<(BTreeMap<String, ([u8; 20], u32)>, BTreeMap<String, ([u8; 20], u32)>)> {
-    let w_hash = &list[idx].hash;
+    load_commit_trees(&list[idx].hash)?.ok_or_else(|| anyhow::anyhow!("fatal: corrupted stash entry stash@{{{}}}", idx))
+}
 
+/// Reads a stash-shaped commit (`w`: tree = working tree, second parent = index commit) and
+/// flattens both trees into path -> (hash, mode) maps: `(working_tree, index_tree)`. None when
+/// the object is not such a commit.
+// Used by `load_stash_trees` and `rgit wip --restore`.
+pub(crate) fn load_commit_trees(w_hash: &str) -> anyhow::Result<Option<(PathMap, PathMap)>> {
     let (obj_type, content) = read_object(w_hash)?;
     if obj_type != "commit" {
-        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+        return Ok(None);
     }
-    let text = String::from_utf8_lossy(&content).to_string();
-    let parents = commit_parents(&text);
+    let parents = commit_parents(&String::from_utf8_lossy(&content));
     if parents.len() < 2 {
-        anyhow::bail!("fatal: corrupted stash entry stash@{{{}}}", idx);
+        return Ok(None);
     }
-    let head_at_stash = &parents[0];
-    let i_hash = &parents[1];
 
     let w_tree_hash = tree_hash_of_commit(w_hash)?;
     let mut w_tree = BTreeMap::new();
     flatten_tree(&w_tree_hash, "", &mut w_tree)?;
 
-    let i_tree_hash = tree_hash_of_commit(i_hash)?;
+    let i_tree_hash = tree_hash_of_commit(&parents[1])?;
     let mut i_tree = BTreeMap::new();
     flatten_tree(&i_tree_hash, "", &mut i_tree)?;
 
-    let _ = head_at_stash; // only needed by `stash show`, kept here for symmetry
-    Ok((w_tree, i_tree))
+    Ok(Some((w_tree, i_tree)))
 }
 
 /// Shared implementation of `stash apply` and `stash pop`.
@@ -194,12 +199,41 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
     ensure_working_tree_clean(action)?;
 
     let (w_tree, i_tree) = load_stash_trees(idx, &list)?;
-    let stash_parents = read_object(&list[idx].hash).map(|(_, c)| commit_parents(&String::from_utf8_lossy(&c))).unwrap_or_default();
+    crate::ui::narrate::clear_stash_conflict();
+    if !apply_stash_trees(&list[idx].hash, &w_tree, &i_tree, "Stashed changes", "apply stash")? {
+        let _ = fs::write(crate::core::repo::path(crate::ui::narrate::STASH_CONFLICT_PATH), format!("stash@{{{}}}\n", idx));
+        if drop_after {
+            eprintln!("The stash entry is kept in case you need it again.");
+        }
+        crate::ui::exit(1);
+    }
+
+    let message = list[idx].message.clone();
+    if drop_after {
+        let mut remaining: Vec<StashEntry> = list;
+        remaining.remove(idx);
+        write_stash_list(&remaining)?;
+        println!("Dropped stash@{{{}}} ({})", idx, message);
+    } else {
+        println!("Applied stash@{{{}}} ({})", idx, message);
+    }
+
+    Ok(())
+}
+
+/// Puts a stash-shaped commit's changes back: its untracked files (third parent) first, then,
+/// when HEAD is still the commit it was made on, its working tree and index exactly; otherwise a
+/// three-way merge onto HEAD (base = HEAD at save time; markers "Updated upstream" /
+/// `theirs_label`). After a clean merge the changes are left unstaged and new files staged.
+/// Returns false when the merge left conflicts (cleanly merged files staged, conflicted ones at
+/// stages 1-3, messages printed). The caller has checked the working tree is clean.
+// Used by `stash apply` / `stash pop` and `rgit wip --restore`.
+pub(crate) fn apply_stash_trees(w_hash: &str, w_tree: &BTreeMap<String, ([u8; 20], u32)>, i_tree: &BTreeMap<String, ([u8; 20], u32)>, theirs_label: &str, action: &str) -> anyhow::Result<bool> {
+    let stash_parents = read_object(w_hash).map(|(_, c)| commit_parents(&String::from_utf8_lossy(&c))).unwrap_or_default();
     // A stash made with `-u`/`-a` keeps the untracked files in the `w` commit's third parent.
     if let Some(untracked) = stash_parents.get(2) {
         restore_untracked_files(untracked)?;
     }
-    crate::ui::narrate::clear_stash_conflict();
 
     let head_tree: BTreeMap<String, ([u8; 20], u32)> = match refs::resolve_head_commit()? {
         Some(commit_hash) => {
@@ -215,7 +249,24 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
     // (base = HEAD at stash time), like git, instead of overwriting the newer commits.
     let head_now = refs::resolve_head_commit()?;
     if let Some(base) = stash_parents.first().filter(|b| head_now.as_deref() != Some(b.as_str())) {
-        return apply_stash_by_merge(base, &head_tree, &w_tree, idx, list, drop_after);
+        let base_tree = crate::core::commit::resolve_tree_from_source(base)?;
+        let result = crate::merge::merge::engine::merge_into_worktree(&base_tree, &head_tree, w_tree, "Updated upstream", theirs_label, action)?;
+        for m in &result.messages {
+            println!("{}", m.text);
+        }
+        if !result.conflicted.is_empty() {
+            return Ok(false);
+        }
+        // Clean: back to HEAD in the index, except files the stash adds, which stay staged.
+        let mut staged = head_tree.clone();
+        for (path, entry) in &result.tree {
+            if !head_tree.contains_key(path) {
+                staged.insert(path.clone(), *entry);
+            }
+        }
+        let mut entries = build_index_entries_for_tree(&staged, true)?;
+        write_index(&mut entries)?;
+        return Ok(true);
     }
 
     // Remove tracked files that existed at HEAD but were deleted in the
@@ -230,7 +281,7 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
     }
 
     // Write the stash's working-tree snapshot to disk.
-    for (path, (hash, _mode)) in &w_tree {
+    for (path, (hash, _mode)) in w_tree {
         let (_, content) = read_object(&hex::encode(hash))?;
         if let Some(parent) = Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
@@ -249,58 +300,9 @@ pub fn stash_apply_or_pop(stash_ref: Option<String>, drop_after: bool) -> anyhow
 
     // Rebuild the index to match the stash's index snapshot (preserving the
     // staged vs. unstaged distinction that existed when the stash was made).
-    let mut new_entries = build_index_entries_for_tree(&i_tree, true)?;
+    let mut new_entries = build_index_entries_for_tree(i_tree, true)?;
     write_index(&mut new_entries)?;
-
-    let message = list[idx].message.clone();
-
-    if drop_after {
-        let mut remaining: Vec<StashEntry> = list;
-        remaining.remove(idx);
-        write_stash_list(&remaining)?;
-        println!("Dropped stash@{{{}}} ({})", idx, message);
-    } else {
-        println!("Applied stash@{{{}}} ({})", idx, message);
-    }
-
-    Ok(())
-}
-/// `stash apply` when HEAD is no longer the commit the stash was made on: merges the stash's
-/// working tree onto HEAD (markers labelled "Updated upstream" / "Stashed changes", as in git).
-/// Clean result: the changes are left unstaged, new files staged. Conflicts: cleanly merged
-/// files stay staged, conflicted ones get stages 1-3, the entry is kept and the exit code is 1.
-fn apply_stash_by_merge(base: &str, head_tree: &BTreeMap<String, ([u8; 20], u32)>, w_tree: &BTreeMap<String, ([u8; 20], u32)>, idx: usize, list: Vec<StashEntry>, drop_after: bool) -> anyhow::Result<()> {
-    let base_tree = crate::core::commit::resolve_tree_from_source(base)?;
-    let result = crate::merge::merge::engine::merge_into_worktree(&base_tree, head_tree, w_tree, "Updated upstream", "Stashed changes", "apply stash")?;
-    for m in &result.messages {
-        println!("{}", m.text);
-    }
-    if !result.conflicted.is_empty() {
-        let _ = fs::write(crate::core::repo::path(crate::ui::narrate::STASH_CONFLICT_PATH), format!("stash@{{{}}}\n", idx));
-        if drop_after {
-            eprintln!("The stash entry is kept in case you need it again.");
-        }
-        crate::ui::exit(1);
-    }
-    // Clean: back to HEAD in the index, except files the stash adds, which stay staged.
-    let mut staged = head_tree.clone();
-    for (path, entry) in &result.tree {
-        if !head_tree.contains_key(path) {
-            staged.insert(path.clone(), *entry);
-        }
-    }
-    let mut entries = build_index_entries_for_tree(&staged, true)?;
-    write_index(&mut entries)?;
-    let message = list[idx].message.clone();
-    if drop_after {
-        let mut remaining = list;
-        remaining.remove(idx);
-        write_stash_list(&remaining)?;
-        println!("Dropped stash@{{{}}} ({})", idx, message);
-    } else {
-        println!("Applied stash@{{{}}} ({})", idx, message);
-    }
-    Ok(())
+    Ok(true)
 }
 
 /// Writes a stash commit object with any number of parents (the `w` commit has HEAD, the

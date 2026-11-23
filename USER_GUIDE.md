@@ -281,6 +281,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`undo`](#rgit-undo) | Undo the last rgit operation: commit, merge, reset --hard, rebase, ... (rgit only). |
 | [`redo`](#rgit-redo) | Bring back the operation most recently undone (rgit only). |
 | [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
+| [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
@@ -2060,6 +2061,62 @@ $ rgit oops 2
 Fix 2: Bring back the deleted branch 'topic' (it was at 8e2f1a4 "topic work")
 $ rgit branch topic 8e2f1a4c03b7
 Done. `rgit undo` takes it back.
+```
+
+
+### `rgit wip`
+
+Save everything uncommitted on a hidden per-branch ref, leave a clean tree, bring it back later (rgit only).
+
+**Syntax:** `rgit wip [<message>...]`, `rgit wip --list [--all]`, `rgit wip --restore [<n>]`, `rgit wip --drop [<n>]` (`rgit save` is the same command)
+
+A one-word stash for "I'm halfway through this and need a clean tree". `rgit wip halfway through parser` (no quotes needed) saves the staged changes, the unstaged changes and the untracked files (not ignored ones) as one WIP commit, then resets the working tree and index to HEAD and deletes the saved untracked files. Unlike `stash`, untracked files are included by default and the saves belong to the branch: each branch has its own stack on `refs/rgit/wip/<branch>`, newest first (`wip@{0}`).
+
+- `--list` (`-l`) lists the current branch's saves with their message and age; `--all` lists every branch's (also the default on a detached HEAD).
+- `--restore [<n>]` (`-r`) puts save `n` (default 0) back: staged changes staged again, unstaged ones unstaged, untracked files untracked. It needs a clean working tree. If HEAD moved since the save, the changes are three-way merged onto it ("Updated upstream" / "WIP changes" conflict markers); on a conflict the save is kept, the exit code is 1, and `rgit wip --drop` removes it once you're done. It refuses before writing anything if a saved untracked file already exists.
+- `--drop [<n>]` throws save `n` away.
+
+Without changes it prints `No local changes to save`. On a detached HEAD, saving and restoring stop with `fatal: rgit wip saves per branch` (use `stash` there). Every `wip` action can be taken back with `rgit undo`.
+
+A save is a stash-shaped commit (tree = the working tree; parents: the commit it was made on, the index commit, the untracked-files commit, then the save below it), so the whole stack stays reachable from one ref: `gc` keeps it and real git sees it too (`git log refs/rgit/wip/main`). Restoring or dropping a save in the middle rewrites the saves above it (same contents, new hashes). Saves stay under the branch name they were made on, so renaming a branch leaves them under the old name.
+
+<details>
+<summary>Options as printed by <code>rgit wip -h</code></summary>
+
+```text
+Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back
+
+Usage: rgit wip [OPTIONS] [MESSAGE]...
+
+Arguments:
+  [MESSAGE]...  What you were in the middle of (the words are joined; no quotes needed)
+
+Options:
+  -l, --list           List this branch's WIP saves, newest first
+      --all            With --list: every branch's saves
+  -r, --restore [<N>]  Bring a save back (default: the newest, wip@{0}) and take it off the stack
+      --drop [<N>]     Throw a save away (default: the newest)
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit wip halfway through parser
+Saved wip@{0} (WIP on main: halfway through parser)
+The working tree is clean; `rgit wip --restore` brings the changes back.
+$ rgit status --short
+$ rgit save
+No local changes to save
+$ rgit wip --list
+wip@{0}: WIP on main: halfway through parser (2 minutes ago)
+$ rgit wip --restore
+Restored wip@{0} (WIP on main: halfway through parser)
+$ rgit status --short
+MM a.txt
+?? notes/
 ```
 
 
@@ -4359,6 +4416,7 @@ rgit switch other-branch
 # ...fix something, commit...
 rgit switch feature                    # back to the branch you were on
 rgit stash pop                         # bring the work back
+# rgit-only, per branch and with untracked files: rgit wip "what I was doing" ... rgit wip --restore
 ```
 
 ## Resolve a merge conflict

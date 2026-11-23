@@ -1,0 +1,103 @@
+---
+source: tests/cli/scenarios/wip.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write .gitignore (6 bytes)
+$ rgit add .gitignore
+Staged files to index (1 new).
+$ rgit commit -m ignore-logs
+[main <H4:7>] ignore-logs
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 .gitignore
+$ write a.txt (12 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ write a.txt (26 bytes)
+$ write notes/todo.md (7 bytes)
+$ write build.log (6 bytes)
+$ rgit wip halfway through parser
+Saved wip@{0} (WIP on main: halfway through parser)
+The working tree is clean; `rgit wip --restore` brings the changes back.
+$ rgit status --short
+$ rgit wip
+No local changes to save
+$ write b.txt (12 bytes)
+$ rgit save
+Saved wip@{0} (WIP on main: <H4:7> ignore-logs)
+The working tree is clean; `rgit wip --restore` brings the changes back.
+$ rgit wip --list
+wip@{0}: WIP on main: <H4:7> ignore-logs (just now)
+wip@{1}: WIP on main: halfway through parser (just now)
+$ rgit wip --restore 1
+Restored wip@{1} (WIP on main: halfway through parser)
+$ rgit status --short
+MM a.txt
+?? notes/
+$ rgit wip --list
+wip@{0}: WIP on main: <H4:7> ignore-logs (just now)
+$ rgit wip --restore
+[stderr]
+Error: error: cannot restore WIP: you have staged changes.
+Please commit or reset them first.
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+  refs/rgit/wip/main <H5>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	.gitignore
+  100644 <H7> 0	a.txt
+  100644 <H8> 0	b.txt
+  100644 <H9> 0	src/lib.txt
+HEAD commit:
+  tree <H10>
+  parent <H3>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  ignore-logs
+worktree:
+  .gitignore
+    | *.log
+  a.txt
+    | staged edit
+    | plus unstaged
+  b.txt
+    | bee
+  build.log
+    | noise
+  notes/todo.md
+    | parser
+  src/lib.txt
+    | lib v2

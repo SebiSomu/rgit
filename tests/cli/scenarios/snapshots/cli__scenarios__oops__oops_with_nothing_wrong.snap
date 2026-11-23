@@ -1,0 +1,21 @@
+---
+source: tests/cli/scenarios/oops.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit oops
+Nothing looks wrong: no operation is half-done, no branch was deleted, no commits were left behind,
+and there's no recent command to take back.
+(`rgit undo --list` shows everything that can still be undone; `rgit reflog` shows where HEAD has been.)
+$ rgit oops 1
+[stderr]
+error: there is no fix 1: nothing looks wrong right now.
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+git-dir entries:
+  
+worktree:

@@ -9,6 +9,7 @@ mod mail;
 mod maintenance;
 mod remotes;
 mod misc;
+mod oops;
 mod undo;
 
 use crate::harness::Repo;

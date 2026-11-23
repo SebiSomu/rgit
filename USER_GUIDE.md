@@ -280,6 +280,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 |---|---|
 | [`undo`](#rgit-undo) | Undo the last rgit operation: commit, merge, reset --hard, rebase, ... (rgit only). |
 | [`redo`](#rgit-redo) | Bring back the operation most recently undone (rgit only). |
+| [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
@@ -1994,6 +1995,71 @@ Options:
 ```
 
 </details>
+
+
+### `rgit oops`
+
+"I just did something wrong": the most likely fixes, ready to run (rgit only).
+
+**Syntax:** `rgit oops [--all | <number>]`
+
+An rgit-only command for the moment right after a mistake, when you don't know which command takes it back. `oops` looks at the operation log (see `rgit undo`), HEAD's reflog and the repository's state, and lists the three most likely fixes, best guess first, each with a one-line explanation and the exact commands. `rgit oops <number>` runs one: each step is a normal rgit command, printed before it runs, logged, and undoable on its own with `rgit undo`. Without anything to fix it prints `Nothing looks wrong: ...`. `--all` lists every suggestion.
+
+What it recognizes:
+
+- **An operation stopped halfway** (merge, rebase, cherry-pick, revert, bisect): cancel it (`merge --abort`, `rebase --abort`, ..., `bisect reset`).
+- **A command just ran that you may regret** (`reset --hard`, `branch -D`, `clean`, `restore`, `commit --amend`, `rebase`, `merge`, `stash drop`, ...): `rgit undo`, with what it will put back. Riskier and more recent commands rank higher. A command whose commits are already pushed ranks lower and says the remote keeps them.
+- **The last thing you did was `rgit undo`**: `rgit redo`.
+- **A commit made too early**: `reset --soft HEAD~1` (changes stay staged); an amend: back to the commit before the amend. When the commit is already on the upstream: `revert --no-edit HEAD` instead of rewriting shared history.
+- **Commits made directly on `main`/`master`** (or `init.defaultBranch`) that the upstream doesn't have, or without an upstream, commits made in a row in the last two hours: move them to a new branch named after the last commit's subject and put the default branch back. Uncommitted changes are stashed around the move and come along.
+- **A deleted branch**: recreate it at the commit it was at (exact from the operation log; from HEAD's reflog for branches deleted with real git, when their commits are on no other ref).
+- **Commits no ref reaches any more** (after a reset, an amend, a rebase, or a branch deleted outside rgit): put a `rescued-<hash>` branch on them before the reflog expires.
+- **A detached HEAD**: with new commits on it, `switch -c <name>` keeps them on a branch; without, `switch` back to the branch you came from.
+
+Every suggestion only adds refs or is undoable, so following one never loses work. `oops` never suggests `undo --force`: when something changed since the last command, that fix is left out.
+
+<details>
+<summary>Options as printed by <code>rgit oops -h</code></summary>
+
+```text
+"I just did something wrong": lists the most likely fixes; `rgit oops <n>` runs one
+
+Usage: rgit oops [OPTIONS] [NUMBER]
+
+Arguments:
+  [NUMBER]  Run this suggestion (its number in the list) instead of listing them
+
+Options:
+      --all   List every suggestion, not just the three most likely
+  -h, --help  Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit branch -D topic
+Deleted branch topic (was 8e2f1a4).
+$ rgit add a.txt
+$ rgit oops
+Most likely fixes, best guess first:
+
+  1) Undo your last command: `rgit add a.txt` (just now)
+     Puts back what it changed: index (staging area): put back as it was.
+     $ rgit undo
+
+  2) Bring back the deleted branch 'topic' (it was at 8e2f1a4 "topic work")
+     It was deleted just now and its last commits are on no other branch; this recreates it at
+     the same commit.
+     $ rgit branch topic 8e2f1a4c03b7
+
+Run one with `rgit oops <number>` (it can be taken back with `rgit undo`).
+$ rgit oops 2
+Fix 2: Bring back the deleted branch 'topic' (it was at 8e2f1a4 "topic work")
+$ rgit branch topic 8e2f1a4c03b7
+Done. `rgit undo` takes it back.
+```
 
 
 ### `rgit reset`

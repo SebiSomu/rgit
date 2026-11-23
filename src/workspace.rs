@@ -7,6 +7,7 @@ pub mod commit;
 pub mod commit_summary;
 pub mod gitignore;
 pub mod index_plumbing;
+pub mod oops;
 pub mod ls_files;
 pub mod patch;
 pub mod read_tree;

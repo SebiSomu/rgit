@@ -48,7 +48,7 @@ const READ_ONLY: &[&str] = &[
     "diff-files", "show-index", "verify-pack", "conflicts", "archive", "format-patch", "get-tar-commit-id",
     "unpack-file", "merge-tree", "hash-object", "write-tree", "config", "clone", "init", "init-db", "push", "fetch",
     "gc", "prune", "repack", "pack-objects", "prune-packed", "index-pack", "unpack-objects", "commit-graph",
-    "multi-pack-index", "maintenance", "for-each-repo", "fast-export", "bundle", "undo", "redo",
+    "multi-pack-index", "maintenance", "for-each-repo", "fast-export", "bundle", "undo", "redo", "oops",
 ];
 
 /// Commands that can rewrite files in the working tree: their operations carry a snapshot.
@@ -550,6 +550,15 @@ pub fn plan_restore(from: &RepoState, to: &RepoState, current: &RepoState) -> Re
     if from.head != to.head {
         if current.head != from.head {
             plan.conflicts.push(format!("HEAD is now {}, not {}", head_label(&current.head), head_label(&from.head)));
+        }
+        // HEAD would go back to a branch that was deleted since (and that this plan doesn't
+        // recreate): that would leave HEAD on a branch with no commits.
+        if let Some(target) = to.head.strip_prefix("ref: ")
+            && to.refs.contains_key(target)
+            && !current.refs.contains_key(target)
+            && !plan.changes.iter().any(|c| matches!(c, Change::Ref { name, to: Some(_), .. } if name == target))
+        {
+            plan.conflicts.push(format!("{} was deleted after the operation", ref_label(target)));
         }
         plan.changes.push(Change::Head { from: from.head.clone(), to: to.head.clone() });
     }

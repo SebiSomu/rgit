@@ -1,0 +1,101 @@
+---
+source: tests/cli/scenarios/oops.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (5 bytes)
+$ rgit add a.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 a.txt
+$ rgit switch -c feat
+Switched to a new branch 'feat'
+$ write a.txt (5 bytes)
+$ rgit commit -a -m feat
+[feat <H2:7>] feat
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ write a.txt (5 bytes)
+$ rgit commit -a -m main
+[main <H3:7>] main
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit merge feat
+Auto-merging a.txt
+CONFLICT (content): Merge conflict in a.txt
+Automatic merge failed; fix conflicts and then commit the result.
+[exit 1]
+$ rgit oops
+Most likely fixes, best guess first:
+
+  1) Cancel the merge that's in progress
+     A merge stopped halfway (usually on conflicts); cancelling it puts every file back the way
+     it was before the merge. To finish it instead: `rgit conflicts`.
+     $ rgit merge --abort
+
+  2) Undo your last command: `rgit merge feat` (just now)
+     Puts back what it changed: files restored: a.txt; index (staging area): put back as it was;
+     the in-progress merge is cancelled (its state files are removed).
+     $ rgit undo
+
+Run one with `rgit oops <number>` (it can be taken back with `rgit undo`).
+$ rgit oops 1
+Fix 1: Cancel the merge that's in progress
+$ rgit merge --abort
+Done. `rgit undo` takes it back.
+$ rgit status --short
+$ rgit switch --detach main
+HEAD is now at <H3:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ write d.txt (2 bytes)
+$ rgit add d.txt
+Staged files to index (1 new).
+$ rgit commit -m experiment
+[detached HEAD <H4:7>] experiment
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 d.txt
+$ rgit oops
+Most likely fixes, best guess first:
+
+  1) Keep the 1 commit you made on a detached HEAD on a new branch 'experiment'
+     HEAD isn't on a branch, so switching away would leave these commits behind; this gives them
+     a branch and puts you on it.
+     $ rgit switch -c experiment
+
+  2) Undo your last command: `rgit commit -m experiment` (just now)
+     Puts back what it changed: HEAD: detached at <H4:7> -> detached at <H3:7>.
+     $ rgit undo
+
+Run one with `rgit oops <number>` (it can be taken back with `rgit undo`).
+
+==== final state ====
+HEAD: <H4>
+refs:
+  refs/heads/feat <H2>
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	d.txt
+HEAD commit:
+  tree <H7>
+  parent <H3>
+  author Test Author <author@example.com> 1700000780 +0000
+  committer Test Committer <committer@example.com> 1700000780 +0000
+  
+  experiment
+worktree:
+  a.txt
+    | main
+  d.txt
+    | d

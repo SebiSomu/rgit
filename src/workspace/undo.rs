@@ -130,7 +130,7 @@ fn step(op: &Operation, dir: Direction, dry_run: bool, force: bool) -> Result<()
 }
 
 /// One or more preview lines for a planned change.
-fn describe_change(change: &Change) -> Vec<String> {
+pub(crate) fn describe_change(change: &Change) -> Vec<String> {
     let commit = |h: &str| {
         let subject = crate::core::commit::commit_subject_line(h).unwrap_or_default();
         if subject.is_empty() { h[..7].to_string() } else { format!("{} \"{}\"", &h[..7], truncate(&subject, 50)) }
@@ -210,7 +210,7 @@ fn summary(before: &RepoState, after: &RepoState) -> String {
 }
 
 /// "just now", "5 minutes ago", "3 days ago".
-fn ago(time: i64) -> String {
+pub(crate) fn ago(time: i64) -> String {
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(time);
     let s = (now - time).max(0);
     match s {

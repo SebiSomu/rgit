@@ -1,0 +1,91 @@
+---
+source: tests/cli/scenarios/oops.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (17 bytes)
+$ rgit reset --hard HEAD~2
+HEAD is now at <H1:7> first commit
+$ rgit oops
+Most likely fixes, best guess first:
+
+  1) Undo your last command: `rgit reset --hard HEAD~2` (just now)
+     Puts back what it changed: files restored: a.txt, b.txt, src/lib.txt; index (staging area):
+     put back as it was; branch 'main': <H1:7> -> <H3:7> "third commit".
+     $ rgit undo
+
+Run one with `rgit oops <number>` (it can be taken back with `rgit undo`).
+$ rgit oops 1
+Fix 1: Undo your last command: `rgit reset --hard HEAD~2` (just now)
+$ rgit undo
+Undoing #6: rgit reset --hard HEAD~2  (just now)
+  - files restored: a.txt, b.txt, src/lib.txt
+  - index (staging area): put back as it was
+  - branch 'main': <H1:7> -> <H3:7> "third commit"
+Done. `rgit redo` brings it back.
+$ rgit log --oneline
+<H3:7> third commit
+<H2:7> second commit
+<H1:7> first commit
+$ rgit status --short
+ M a.txt
+$ rgit oops
+Most likely fixes, best guess first:
+
+  1) Take back your undo of `rgit reset --hard HEAD~2`
+     You ran `rgit undo` just now; `rgit redo` re-applies what it took back.
+     $ rgit redo
+
+Run one with `rgit oops <number>` (it can be taken back with `rgit undo`).
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | uncommitted edit
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

@@ -199,6 +199,8 @@ pub enum Commands {
     Undo(crate::workspace::undo::cli::UndoArgs),
     /// Bring back the operation most recently undone.
     Redo(crate::workspace::undo::cli::RedoArgs),
+    /// "I just did something wrong": lists the most likely fixes; `rgit oops <n>` runs one.
+    Oops(crate::workspace::oops::cli::OopsArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -348,6 +350,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Submodule(args) => crate::workspace::submodule::cli::dispatch_submodule(args)?,
         Commands::Undo(args) => crate::workspace::undo::cli::dispatch_undo(args)?,
         Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
+        Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
     }
 
     Ok(())

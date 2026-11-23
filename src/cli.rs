@@ -210,6 +210,8 @@ pub enum Commands {
     Sync(crate::remote::sync::cli::SyncArgs),
     /// Fold each staged hunk into the commit that last changed those lines (blame), in one rewrite.
     Absorb(crate::workspace::absorb::cli::AbsorbArgs),
+    /// Split one commit into several by hunk, picking each new commit's hunks and message.
+    Split(crate::merge::split::cli::SplitArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -364,6 +366,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
         Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,
         Commands::Absorb(args) => crate::workspace::absorb::cli::dispatch_absorb(args)?,
+        Commands::Split(args) => crate::merge::split::cli::dispatch_split(args)?,
     }
 
     Ok(())

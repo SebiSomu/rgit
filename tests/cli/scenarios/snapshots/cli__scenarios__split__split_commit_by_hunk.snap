@@ -1,0 +1,171 @@
+---
+source: tests/cli/scenarios/split.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write a.txt (14 bytes)
+$ write b.txt (5 bytes)
+$ write c.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 2 modified, 1 unchanged).
+$ rgit commit -m 'mixed bag' -m 'Several unrelated changes.'
+[main <H4:7>] mixed bag
+ Author: Test Author <author@example.com>
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+ create mode 100644 c.txt
+$ write src/lib.txt (7 bytes)
+$ rgit commit -a -m 'on top'
+[main <H5:7>] on top
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write src/lib.txt (16 bytes)
+$ rgit split HEAD~1
+<stdin>
+y
+n
+n
+y
+Uppercase one, add c
+y
+n
+
+
+Splitting <H4:7> mixed bag (4 hunks).
+Pick the hunks of each new commit; the ones you leave go on to the next commit.
+
+Commit 1: y = take the hunk, n = leave it, a = take it and the rest, d = leave it and the rest, q = quit (nothing changes)
+
+a.txt:1
+-one
++ONE
+ two
+Into commit 1 [y,n,a,d,q]? 
+a.txt:+2
+ one
+ two
++three
+Into commit 1 [y,n,a,d,q]? 
+b.txt:1
+-bee
++bee!
+Into commit 1 [y,n,a,d,q]? 
+c.txt  (new file)
+Into commit 1 [y,n,a,d,q]? Message for commit 1 (Enter: "mixed bag (part 1)"): 
+Commit 2: y = take the hunk, n = leave it, a = take it and the rest, d = leave it and the rest, q = quit (nothing changes)
+
+a.txt:+2
+ one
+ two
++three
+Into commit 2 [y,n,a,d,q]? 
+b.txt:1
+-bee
++bee!
+Into commit 2 [y,n,a,d,q]? Message for commit 2 (Enter: "mixed bag (part 2)"): 
+The last hunk goes into commit 3.
+Message for commit 3 (Enter: "mixed bag"): 
+Split <H4:7> into 3 commits:
+  <H6:7> Uppercase one, add c
+  <H7:7> mixed bag (part 2)
+  <H8:7> mixed bag
+Rewrote the commit on top; the files are unchanged.
+$ rgit log --oneline
+<H9:7> on top
+<H8:7> mixed bag
+<H7:7> mixed bag (part 2)
+<H6:7> Uppercase one, add c
+<H3:7> third commit
+<H2:7> second commit
+<H1:7> first commit
+$ rgit show HEAD~3 --stat
+commit <H6>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:20:20 2023 +0000
+
+    Uppercase one, add c
+
+ a.txt | 2 +-
+ c.txt | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+$ rgit show HEAD~2 --stat
+commit <H7>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:20:20 2023 +0000
+
+    mixed bag (part 2)
+
+ a.txt | 1 +
+ 1 file changed, 1 insertion(+)
+$ rgit show HEAD~1
+commit <H8>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:20:20 2023 +0000
+
+    mixed bag
+    
+    Several unrelated changes.
+
+diff --git a/b.txt b/b.txt
+index <H10:7>..<H11:7> 100644
+--- a/b.txt
++++ b/b.txt
+@@ -1 +1 @@
+-bee
++bee!
+$ rgit status --short
+ M src/lib.txt
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H9>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H12> 0	a.txt
+  100644 <H11> 0	b.txt
+  100644 <H13> 0	c.txt
+  100644 <H14> 0	src/lib.txt
+HEAD commit:
+  tree <H15>
+  parent <H8>
+  author Test Author <author@example.com> 1700000480 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  on top
+worktree:
+  a.txt
+    | ONE
+    | two
+    | three
+  b.txt
+    | bee!
+  c.txt
+    | sea
+  src/lib.txt
+    | lib v3 unstaged

@@ -26,28 +26,28 @@ Available commands:
    cherry              maintenance         show-index
    cherry-pick         merge               show-ref
    clean               merge-base          sparse-checkout
-   clone               merge-file          stage
-   column              merge-tree          stash
-   commit              mktag               status
-   commit-graph        mktree              stripspace
-   commit-tree         multi-pack-index    submodule
-   config              mv                  switch
-   conflicts           name-rev            symbolic-ref
-   count-objects       notes               sync
-   describe            oops                tag
-   diff                pack-objects        undo
-   diff-files          pack-refs           unpack-file
-   diff-index          patch-id            unpack-objects
-   diff-tree           prune               update-index
-   fast-export         prune-packed        update-ref
-   fast-import         pull                var
-   fetch               push                verify-pack
-   fixup               range-diff          version
-   fmt-merge-msg       read-tree           whatchanged
-   for-each-ref        rebase              wip
-   for-each-repo       redo                worktree
-   format-patch        reflog              write-tree
-   fsck                refs
+   clone               merge-file          split
+   column              merge-tree          stage
+   commit              mktag               stash
+   commit-graph        mktree              status
+   commit-tree         multi-pack-index    stripspace
+   config              mv                  submodule
+   conflicts           name-rev            switch
+   count-objects       notes               symbolic-ref
+   describe            oops                sync
+   diff                pack-objects        tag
+   diff-files          pack-refs           undo
+   diff-index          patch-id            unpack-file
+   diff-tree           prune               unpack-objects
+   fast-export         prune-packed        update-index
+   fast-import         pull                update-ref
+   fetch               push                var
+   fixup               range-diff          verify-pack
+   fmt-merge-msg       read-tree           version
+   for-each-ref        rebase              whatchanged
+   for-each-repo       redo                wip
+   format-patch        reflog              worktree
+   fsck                refs                write-tree
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -130,28 +130,28 @@ Available commands:
    cherry              maintenance         show-index
    cherry-pick         merge               show-ref
    clean               merge-base          sparse-checkout
-   clone               merge-file          stage
-   column              merge-tree          stash
-   commit              mktag               status
-   commit-graph        mktree              stripspace
-   commit-tree         multi-pack-index    submodule
-   config              mv                  switch
-   conflicts           name-rev            symbolic-ref
-   count-objects       notes               sync
-   describe            oops                tag
-   diff                pack-objects        undo
-   diff-files          pack-refs           unpack-file
-   diff-index          patch-id            unpack-objects
-   diff-tree           prune               update-index
-   fast-export         prune-packed        update-ref
-   fast-import         pull                var
-   fetch               push                verify-pack
-   fixup               range-diff          version
-   fmt-merge-msg       read-tree           whatchanged
-   for-each-ref        rebase              wip
-   for-each-repo       redo                worktree
-   format-patch        reflog              write-tree
-   fsck                refs
+   clone               merge-file          split
+   column              merge-tree          stage
+   commit              mktag               stash
+   commit-graph        mktree              status
+   commit-tree         multi-pack-index    stripspace
+   config              mv                  submodule
+   conflicts           name-rev            switch
+   count-objects       notes               symbolic-ref
+   describe            oops                sync
+   diff                pack-objects        tag
+   diff-files          pack-refs           undo
+   diff-index          patch-id            unpack-file
+   diff-tree           prune               unpack-objects
+   fast-export         prune-packed        update-index
+   fast-import         pull                update-ref
+   fetch               push                var
+   fixup               range-diff          verify-pack
+   fmt-merge-msg       read-tree           version
+   for-each-ref        rebase              whatchanged
+   for-each-repo       redo                wip
+   format-patch        reflog              worktree
+   fsck                refs                write-tree
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -279,6 +279,7 @@ Commands:
   fixup               Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top
   sync                Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push)
   absorb              Fold each staged hunk into the commit that last changed those lines (blame), in one rewrite
+  split               Split one commit into several by hunk, picking each new commit's hunks and message
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

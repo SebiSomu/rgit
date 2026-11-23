@@ -284,6 +284,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
+| [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2219,6 +2220,70 @@ Staying staged:
   new.txt        new file (nothing to blame)
 Successfully rebased and updated refs/heads/main.
 Absorbed 2 hunks into 2 commits; 1 hunk still staged.
+```
+
+
+### `rgit split`
+
+Split one commit into several by hunk, picking each new commit's hunks and message (rgit only).
+
+**Syntax:** `rgit split [<commit>] [-f]`
+
+`rgit banana-split` splits a commit by path or directory; `split` goes down to hunks, so two changes in the same file can end up in different commits. git's way is `git rebase -i` with `edit` on the commit, `git reset HEAD~`, then `git add -p` and `git commit` once per new commit, then `git rebase --continue`.
+
+The commit (default: HEAD) is cut into pieces: one per hunk of a changed text file (no context lines), and one whole-file piece for each new, deleted or binary file and each mode change. Then, commit by commit, each remaining piece is shown and you answer `y` (take it into this commit), `n` (leave it for a later one), `a` / `d` (take / leave it and all the rest) or `q` (quit, nothing changes). Each new commit asks for its message: Enter gives `<subject> (part N)`, or for the last commit the original message. The last piece left goes into the last commit without asking. The first commit must take at least one piece and leave at least one.
+
+The new commits keep the original author. The last one ends at the original tree, so the commits on top keep their trees too and are only re-parented: no replay, no conflicts, and the working tree and index (including uncommitted changes) are never touched. It is one `rgit undo` step. It refuses a merge commit, the root commit, a commit with a merge between it and HEAD, a commit a remote-tracking branch has (unless `-f`/`--force`), and runs while a merge, rebase, cherry-pick, revert or `am` is in progress.
+
+<details>
+<summary>Options as printed by <code>rgit split -h</code></summary>
+
+```text
+Split one commit into several by hunk, picking each new commit's hunks and message
+
+Usage: rgit split [OPTIONS] [COMMIT]
+
+Arguments:
+  [COMMIT]  The commit to split (default: HEAD)
+
+Options:
+  -f, --force  Also split a commit a remote-tracking branch already has
+  -h, --help   Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit split HEAD~1
+Splitting 8c41d2e mixed bag (4 hunks).
+Pick the hunks of each new commit; the ones you leave go on to the next commit.
+
+Commit 1: y = take the hunk, n = leave it, a = take it and the rest, d = leave it and the rest, q = quit (nothing changes)
+
+a.txt:1
+-one
++ONE
+ two
+Into commit 1 [y,n,a,d,q]? y
+
+a.txt:+2
+ one
+ two
++three
+Into commit 1 [y,n,a,d,q]? n
+...
+Message for commit 1 (Enter: "mixed bag (part 1)"): Uppercase one, add c
+...
+The last hunk goes into commit 3.
+Message for commit 3 (Enter: "mixed bag"):
+
+Split 8c41d2e into 3 commits:
+  5e0b7a3 Uppercase one, add c
+  a91f4c2 mixed bag (part 2)
+  0d6e8b1 mixed bag
+Rewrote the commit on top; the files are unchanged.
 ```
 
 

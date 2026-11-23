@@ -12,6 +12,7 @@ mod misc;
 mod oops;
 mod undo;
 mod wip;
+mod fixup;
 
 use crate::harness::Repo;
 

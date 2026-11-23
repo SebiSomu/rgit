@@ -282,6 +282,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`redo`](#rgit-redo) | Bring back the operation most recently undone (rgit only). |
 | [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
 | [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
+| [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
@@ -2119,6 +2120,55 @@ Restored wip@{0} (WIP on main: halfway through parser)
 $ rgit status --short
 MM a.txt
 ?? notes/
+```
+
+
+### `rgit fixup`
+
+Fold the staged changes into an earlier commit, in one step (rgit only).
+
+**Syntax:** `rgit fixup [<commit>] [-a] [-f]`
+
+git needs three commands for this (`commit --fixup=<commit>`, `rebase -i --autosquash <commit>~1`, and a stash around it when the tree is dirty). `rgit fixup <commit>` takes any revision (`HEAD~2`, a hash, a tag); without one it lists the last 10 commits of the branch, numbered, and asks which (Enter cancels). Then:
+
+- **HEAD** is simply amended (`commit --amend --no-edit`); nothing else is rewritten.
+- **An older commit** gets a `fixup! <subject>` commit that is squashed into it right away: the commits from it up to HEAD are replayed with the fix folded in (new hashes, same messages and authors). Unstaged changes are stashed for the rewrite and popped afterwards.
+- `-a` stages modified and deleted tracked files first, like `commit -a`. Without anything staged it stops: `nothing staged to fix up with`.
+- **Pushed commits** (a remote-tracking branch already has them; the list marks them `[pushed: origin/main]`) are refused unless `-f`/`--force`, since rewriting them makes the branch diverge from the remote (you'd need `rgit push --force`).
+- **Conflicts:** if the fix clashes with a later commit, the rewrite stops like a rebase does. Resolve, `rgit add`, `rgit rebase --continue` (then `rgit stash pop` if unstaged changes were stashed), or `rgit undo` to go back to before the fixup with your fix staged again.
+
+The whole command is one `rgit undo` step. It can't fix up across a merge commit, the root commit (unless it is HEAD), or while a merge, rebase, cherry-pick, revert or `am` is in progress.
+
+<details>
+<summary>Options as printed by <code>rgit fixup -h</code></summary>
+
+```text
+Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top
+
+Usage: rgit fixup [OPTIONS] [COMMIT]
+
+Arguments:
+  [COMMIT]  The commit to fix (any revision); without it, pick from a list of recent commits
+
+Options:
+  -a, --all    Stage modified and deleted tracked files first, like `commit -a`
+  -f, --force  Rewrite the commit even if a remote-tracking branch already has it
+  -h, --help   Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit add parser.rs
+$ rgit fixup
+Fix up which commit?
+   1  9c1e2d4  docs: parser usage
+   2  41ab7f0  parser: handle empty input
+   3  d02f9e1  initial import  [pushed: origin/main]
+Number (Enter cancels): 2
+Fixed up 41ab7f0 parser: handle empty input (now 7e3a0b2), 1 later commit rewritten.
 ```
 
 

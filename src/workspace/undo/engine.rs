@@ -55,7 +55,7 @@ const READ_ONLY: &[&str] = &[
 const TOUCHES_WORKTREE: &[&str] = &[
     "reset", "checkout", "switch", "restore", "merge", "pull", "rebase", "cherry-pick", "revert", "stash", "clean",
     "rm", "mv", "am", "apply", "banana-split", "read-tree", "checkout-index", "sparse-checkout", "bisect", "merge-file",
-    "rerere", "submodule", "fast-import", "wip", "save",
+    "rerere", "submodule", "fast-import", "wip", "save", "fixup",
 ];
 
 /// The command being recorded: its command line, working directory and the state before it.

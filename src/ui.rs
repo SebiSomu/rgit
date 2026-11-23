@@ -209,6 +209,11 @@ pub fn narration_replaces_hints() -> bool {
 /// Ends the process like `std::process::exit`, recording the outcome first so the exit hook
 /// knows whether the command succeeded. Every early exit in rgit goes through here.
 pub fn exit(code: i32) -> ! {
+    if code != 0
+        && let Some(note) = FAILURE_NOTE.lock().ok().and_then(|mut n| n.take())
+    {
+        eprintln!("{}", note);
+    }
     set_outcome(code == 0);
     crate::workspace::undo::engine::finish_recording();
     // Report now instead of relying on the `atexit` hook: on Windows `std::process::exit` is
@@ -216,6 +221,20 @@ pub fn exit(code: i32) -> ! {
     // hook finds nothing left to do on platforms where it does run.
     let _ = std::panic::catch_unwind(finish);
     std::process::exit(code)
+}
+
+/// A note `exit` prints when the command fails from deep inside code it called (set by
+/// `note_on_failure`).
+static FAILURE_NOTE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Sets (Some) or clears (None) a note printed to stderr if the process then exits non-zero,
+/// for commands that call into code which stops the process itself (the rebase engine on a
+/// conflict).
+// Used by `fixup`.
+pub fn note_on_failure(note: Option<String>) {
+    if let Ok(mut slot) = FAILURE_NOTE.lock() {
+        *slot = note;
+    }
 }
 
 /// Prints `message` to stderr with a newline and ends the process with `code`. Commands use it

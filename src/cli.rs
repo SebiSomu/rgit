@@ -204,6 +204,8 @@ pub enum Commands {
     /// Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back.
     #[command(visible_alias = "save")]
     Wip(crate::workspace::wip::cli::WipArgs),
+    /// Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top.
+    Fixup(crate::workspace::fixup::cli::FixupArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -355,6 +357,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
         Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
         Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
+        Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
     }
 
     Ok(())

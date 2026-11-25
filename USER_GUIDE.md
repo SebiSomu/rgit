@@ -298,6 +298,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
 | [`pr-summary`](#rgit-pr-summary) | A Markdown pull request description: title, commits, files, and whether it merges cleanly (rgit only). |
 | [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
+| [`changelog`](#rgit-changelog) | A Markdown changelog from conventional commits, per version (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -3001,6 +3002,70 @@ $ rgit open pr
 https://github.com/sebi/rgit/compare/main...feature/add-parser?expand=1
 $ rgit open -p --remote lab '#7'
 https://gitlab.com/group/sub/proj/-/merge_requests/7
+```
+
+
+### `rgit changelog`
+
+A Markdown changelog from conventional-commit messages, one section per version (rgit only).
+
+**Syntax:** `rgit changelog [<a>..<b>] [--version <name>] [--all] [--prepend <file>]`
+
+Commit subjects of the form `type(scope)!: description` ([Conventional Commits](https://www.conventionalcommits.org)) are grouped by type, in this order: **Breaking changes** first (a `!` after the type, or a `BREAKING CHANGE:` footer, whose text is added), then Features (`feat`), Bug fixes (`fix`), Performance (`perf`), Refactoring, Documentation (`docs`), Tests, Build and CI (`build`, `ci`), Style, Chores, Reverts, and **Other changes** for every subject that doesn't follow the convention. Each entry shows its scope in bold and its short hash; each section ends with the contributors. Merge commits are left out.
+
+- **Which commits:** by default, those since the latest tag HEAD has, headed `Unreleased`; when HEAD is tagged, that tag's own section (since the tag before it). `<a>..<b>` picks the range; `--version` names the heading (default `Unreleased`, or the tag the range ends at).
+- **The date** in the heading is the newest commit's author date.
+- `--all`: one section per tag over the whole history, newest first (and `Unreleased` on top for commits after the last tag).
+- `--prepend <file>`: writes the result at the top of the file instead (below its `# ` title; a new file gets `# Changelog`), and refuses when the file already has that version's heading.
+
+<details>
+<summary>Options as printed by <code>rgit changelog -h</code></summary>
+
+```text
+A Markdown changelog from conventional commits: breaking changes, features, fixes... per version
+
+Usage: rgit changelog [OPTIONS] [RANGE]
+
+Arguments:
+  [RANGE]  The commits to cover, as `<a>..<b>` (default: since the latest tag, or everything)
+
+Options:
+      --version <NAME>  The heading's version name (default: `Unreleased`, or the tag the range ends at)
+      --all             One section per tag, for the whole history (newest first)
+      --prepend <FILE>  Add the result at the top of this file (after its first `# ` title, if it has one) instead of printing it
+  -h, --help            Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit changelog --version v0.2.0
+## v0.2.0 (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`5d1c0aa`)
+
+### Features
+
+- **api:** rename run() to start() (`5d1c0aa`)
+- **cli:** add --json output (`41ab7f0`)
+
+### Documentation
+
+- explain --json (`9c2e0d4`)
+
+### Build and CI
+
+- cache cargo builds (`8e2f913`)
+
+### Other changes
+
+- Tweak the README wording (`2f0a6d1`)
+
+Contributors: Ana, Bob, Cy
 ```
 
 

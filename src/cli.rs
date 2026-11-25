@@ -238,6 +238,8 @@ pub enum Commands {
     PrSummary(crate::remote::pr_summary::cli::PrSummaryArgs),
     /// Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket.
     Open(crate::remote::open::cli::OpenArgs),
+    /// A Markdown changelog from conventional commits: breaking changes, features, fixes... per version.
+    Changelog(crate::history::changelog::cli::ChangelogArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -415,6 +417,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Backup(args) => crate::remote::backup::cli::dispatch_backup(args)?,
         Commands::PrSummary(args) => crate::remote::pr_summary::cli::dispatch_pr_summary(args)?,
         Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
+        Commands::Changelog(args) => crate::history::changelog::cli::dispatch_changelog(args)?,
     }
 
     Ok(())

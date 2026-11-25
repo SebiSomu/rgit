@@ -1,0 +1,250 @@
+---
+source: tests/cli/scenarios/changelog.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export GIT_AUTHOR_NAME=Ana
+$ write a.txt (3 bytes)
+$ rgit add a.txt
+Staged files to index (1 new).
+$ rgit commit -m "feat: first release"
+[main (root-commit) <H1:7>] feat: first release
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 a.txt
+$ export GIT_AUTHOR_NAME=Ana
+$ write a.txt (3 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit commit -m "fix(parser): handle empty input"
+[main <H2:7>] fix(parser): handle empty input
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit tag v0.1.0
+$ export GIT_AUTHOR_NAME=Bob
+$ write b.txt (3 bytes)
+$ rgit add b.txt
+Staged files to index (1 new).
+$ rgit commit -m "feat(cli): add --json output"
+[main <H3:7>] feat(cli): add --json output
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 b.txt
+$ export GIT_AUTHOR_NAME=Bob
+$ write b.txt (3 bytes)
+$ rgit add b.txt
+Staged files to index (1 modified).
+$ rgit commit -m "docs: explain --json"
+[main <H4:7>] docs: explain --json
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ export GIT_AUTHOR_NAME=Ana
+$ write c.txt (3 bytes)
+$ rgit add c.txt
+Staged files to index (1 new).
+$ rgit commit -m "feat(api)!: rename run() to start()"
+[main <H5:7>] feat(api)!: rename run() to start()
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+$ export GIT_AUTHOR_NAME=Cy
+$ write c.txt (3 bytes)
+$ rgit add c.txt
+Staged files to index (1 modified).
+$ rgit commit -m "ci: cache cargo builds"
+[main <H6:7>] ci: cache cargo builds
+ Author: Cy <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ export GIT_AUTHOR_NAME=Cy
+$ write d.txt (3 bytes)
+$ rgit add d.txt
+Staged files to index (1 new).
+$ rgit commit -m "Tweak the README wording"
+[main <H7:7>] Tweak the README wording
+ Author: Cy <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 d.txt
+$ rgit changelog
+## Unreleased (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`<H5:7>`)
+
+### Features
+
+- **api:** rename run() to start() (`<H5:7>`)
+- **cli:** add --json output (`<H3:7>`)
+
+### Documentation
+
+- explain --json (`<H4:7>`)
+
+### Build and CI
+
+- cache cargo builds (`<H6:7>`)
+
+### Other changes
+
+- Tweak the README wording (`<H7:7>`)
+
+Contributors: Ana, Bob, Cy
+$ rgit changelog --version v0.2.0
+## v0.2.0 (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`<H5:7>`)
+
+### Features
+
+- **api:** rename run() to start() (`<H5:7>`)
+- **cli:** add --json output (`<H3:7>`)
+
+### Documentation
+
+- explain --json (`<H4:7>`)
+
+### Build and CI
+
+- cache cargo builds (`<H6:7>`)
+
+### Other changes
+
+- Tweak the README wording (`<H7:7>`)
+
+Contributors: Ana, Bob, Cy
+$ rgit changelog v0.1.0..HEAD~3
+## Unreleased (2023-11-14)
+
+### Features
+
+- **cli:** add --json output (`<H3:7>`)
+
+### Documentation
+
+- explain --json (`<H4:7>`)
+
+Contributors: Bob
+$ rgit changelog --all
+## Unreleased (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`<H5:7>`)
+
+### Features
+
+- **api:** rename run() to start() (`<H5:7>`)
+- **cli:** add --json output (`<H3:7>`)
+
+### Documentation
+
+- explain --json (`<H4:7>`)
+
+### Build and CI
+
+- cache cargo builds (`<H6:7>`)
+
+### Other changes
+
+- Tweak the README wording (`<H7:7>`)
+
+Contributors: Ana, Bob, Cy
+
+## v0.1.0 (2023-11-14)
+
+### Features
+
+- first release (`<H1:7>`)
+
+### Bug fixes
+
+- **parser:** handle empty input (`<H2:7>`)
+
+Contributors: Ana
+$ rgit tag v0.2.0
+$ rgit changelog
+## v0.2.0 (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`<H5:7>`)
+
+### Features
+
+- **api:** rename run() to start() (`<H5:7>`)
+- **cli:** add --json output (`<H3:7>`)
+
+### Documentation
+
+- explain --json (`<H4:7>`)
+
+### Build and CI
+
+- cache cargo builds (`<H6:7>`)
+
+### Other changes
+
+- Tweak the README wording (`<H7:7>`)
+
+Contributors: Ana, Bob, Cy
+$ rgit changelog --all --prepend CHANGELOG.md
+Added 'v0.2.0 (2023-11-14)' to CHANGELOG.md.
+$ rgit changelog --all --prepend CHANGELOG.md
+[stderr]
+fatal: CHANGELOG.md already has a section 'v0.2.0 (2023-11-14)'; nothing written
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+  refs/tags/v0.1.0 <H2>
+  refs/tags/v0.2.0 <H7>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H8> 0	a.txt
+  100644 <H9> 0	b.txt
+  100644 <H10> 0	c.txt
+  100644 <H11> 0	d.txt
+HEAD commit:
+  tree <H12>
+  parent <H6>
+  author Cy <author@example.com> 1700000900 +0000
+  committer Test Committer <committer@example.com> 1700000900 +0000
+  
+  Tweak the README wording
+worktree:
+  CHANGELOG.md
+    | # Changelog
+    | 
+    | ## v0.2.0 (2023-11-14)
+    | 
+    | ### Breaking changes
+    | 
+    | - **api:** rename run() to start() (`<H5:7>`)
+    | 
+    | ### Features
+    | 
+    | - **api:** rename run() to start() (`<H5:7>`)
+    | - **cli:** add --json output (`<H3:7>`)
+    | 
+    | ### Documentation
+    | 
+    | - explain --json (`<H4:7>`)
+    | 
+    | ### Build and CI
+    | 
+    | - cache cargo builds (`<H6:7>`)
+    | ... 18 more lines
+  a.txt
+    | 31
+  b.txt
+    | 20
+  c.txt
+    | 22
+  d.txt
+    | 24

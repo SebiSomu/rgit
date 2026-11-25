@@ -6,19 +6,20 @@ $ rgit help
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   replace
-   add                 grep                replay
-   am                  hash-object         repo
-   annotate            help                request-pull
-   apply               hook                rerere
-   archive             hotspots            reset
-   backup              ignore              restore
-   banana-split        index-pack          rev-list
-   bisect              init                rev-parse
-   blame               init-db             revert
-   branch              interpret-trailers  rm
-   bundle              last-modified       save
-   cat-file            log                 secrets
+   absorb              gc                  repack
+   add                 get-tar-commit-id   replace
+   am                  grep                replay
+   annotate            hash-object         repo
+   apply               help                request-pull
+   archive             hook                rerere
+   backup              hotspots            reset
+   banana-split        ignore              restore
+   bisect              index-pack          rev-list
+   blame               init                rev-parse
+   branch              init-db             revert
+   bundle              interpret-trailers  rm
+   cat-file            last-modified       save
+   changelog           log                 secrets
    check-ignore        ls-files            shortlog
    check-mailmap       ls-tree             show
    check-ref-format    mailinfo            show-branch
@@ -52,7 +53,6 @@ Available commands:
    format-patch        reflog              worktree
    fsck                refs                write-tree
    fsck-objects        remote
-   gc                  repack
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -115,19 +115,20 @@ $ rgit help -a
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   replace
-   add                 grep                replay
-   am                  hash-object         repo
-   annotate            help                request-pull
-   apply               hook                rerere
-   archive             hotspots            reset
-   backup              ignore              restore
-   banana-split        index-pack          rev-list
-   bisect              init                rev-parse
-   blame               init-db             revert
-   branch              interpret-trailers  rm
-   bundle              last-modified       save
-   cat-file            log                 secrets
+   absorb              gc                  repack
+   add                 get-tar-commit-id   replace
+   am                  grep                replay
+   annotate            hash-object         repo
+   apply               help                request-pull
+   archive             hook                rerere
+   backup              hotspots            reset
+   banana-split        ignore              restore
+   bisect              index-pack          rev-list
+   blame               init                rev-parse
+   branch              init-db             revert
+   bundle              interpret-trailers  rm
+   cat-file            last-modified       save
+   changelog           log                 secrets
    check-ignore        ls-files            shortlog
    check-mailmap       ls-tree             show
    check-ref-format    mailinfo            show-branch
@@ -161,7 +162,6 @@ Available commands:
    format-patch        reflog              worktree
    fsck                refs                write-tree
    fsck-objects        remote
-   gc                  repack
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -303,6 +303,7 @@ Commands:
   backup              Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one
   pr-summary          A Markdown pull request description: title, commits, files with their lines, and whether it merges cleanly
   open                Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket
+  changelog           A Markdown changelog from conventional commits: breaking changes, features, fixes... per version
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

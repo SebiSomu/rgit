@@ -1,5 +1,6 @@
 pub mod bisect;
 pub mod blame;
+pub mod changelog;
 pub mod cherry;
 pub mod compare;
 pub mod follow;

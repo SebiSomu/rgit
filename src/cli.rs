@@ -238,7 +238,16 @@ pub(crate) fn raw_args_after(subcommand: &str, parsed: Vec<String>) -> Vec<Strin
 }
 
 pub fn handle_commands() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = Cli::try_parse().unwrap_or_else(|err| {
+        // `rgit comit`: the first argument that is not a global flag names the command.
+        let first = std::env::args_os().skip(1).find(|a| !a.to_string_lossy().starts_with('-'));
+        if let Some(name) = first.and_then(|a| a.into_string().ok())
+            && !crate::plumbing::help::engine::all_command_names().contains(&name)
+        {
+            crate::plumbing::help::unknown_command(&name);
+        }
+        err.exit()
+    });
     use crate::ui::types::Verbosity;
     crate::ui::init(if cli.plain { Some(Verbosity::Quiet) } else if cli.teach { Some(Verbosity::Teach) } else if cli.explain { Some(Verbosity::Explain) } else { None });
     crate::ui::begin();

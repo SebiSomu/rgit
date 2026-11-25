@@ -1,0 +1,61 @@
+---
+source: tests/cli/scenarios/misc.rs
+expression: r.finish()
+---
+$ rgit comit
+[stderr]
+rgit: 'comit' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	commit
+[exit 1]
+$ rgit stauts
+[stderr]
+rgit: 'stauts' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	status
+[exit 1]
+$ rgit stat
+[stderr]
+rgit: 'stat' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	status
+[exit 1]
+$ rgit psuh
+[stderr]
+rgit: 'psuh' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	push
+[exit 1]
+$ rgit chekout
+[stderr]
+rgit: 'chekout' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	checkout
+[exit 1]
+$ rgit nosuchcommand
+[stderr]
+rgit: 'nosuchcommand' is not a rgit command. See 'rgit help'.
+[exit 1]
+$ rgit --plain brnach
+[stderr]
+rgit: 'brnach' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	branch
+[exit 1]
+$ rgit help rebsae
+[stderr]
+rgit: 'rebsae' is not a rgit command. See 'rgit help'.
+
+The most similar command is
+	rebase
+[exit 1]
+
+==== final state ====
+(no .git)
+worktree:

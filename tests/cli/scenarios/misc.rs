@@ -39,6 +39,15 @@ fn rerere_replay_fmt_merge_msg() {
 }
 
 #[test]
+fn unknown_command_suggestions() {
+    let mut r = Repo::new();
+    for cmd in ["comit", "stauts", "stat", "psuh", "chekout", "nosuchcommand", "--plain brnach", "help rebsae"] {
+        r.run(cmd);
+    }
+    assert_snapshot!(r.finish());
+}
+
+#[test]
 fn help_output() {
     let mut r = Repo::new();
     r.run("help").run("help commit").run("help -a").run("--help").run("commit --help");

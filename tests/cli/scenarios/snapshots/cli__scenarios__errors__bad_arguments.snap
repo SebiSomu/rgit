@@ -30,12 +30,8 @@ $ rgit commit -m 'third commit' -m 'With a body paragraph.'
  create mode 100644 b.txt
 $ rgit nosuchcommand
 [stderr]
-error: unrecognized subcommand 'nosuchcommand'
-
-Usage: rgit [OPTIONS] <COMMAND>
-
-For more information, try '--help'.
-[exit 2]
+rgit: 'nosuchcommand' is not a rgit command. See 'rgit help'.
+[exit 1]
 $ rgit log --no-such-flag
 [stderr]
 usage: rgit rev-list [<options>] <commit>... [--] [<path>...]

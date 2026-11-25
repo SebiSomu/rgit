@@ -7,7 +7,7 @@ use std::process::Command;
 use anyhow::Result;
 
 use crate::plumbing::column::engine::{default_column_options, render_columns};
-use crate::plumbing::help::engine::{all_command_names, command_help};
+use crate::plumbing::help::engine::{all_command_names, command_help, similar_commands};
 use crate::plumbing::{column::types::ColumnEnable, help::types::CommandHelp};
 
 /// `rgit help [-a | --all] [<command>]`
@@ -59,12 +59,25 @@ pub fn help(args: Vec<String>) -> Result<()> {
             let text: String = text.split_inclusive('\n').filter(|line| !line.starts_with("error: unknown switch `h'")).collect();
             show(&text);
         }
-        None => {
-            eprintln!("rgit: '{}' is not a rgit command. See 'rgit help'.", topic);
-            crate::ui::exit(1);
-        }
+        None => unknown_command(topic),
     }
     Ok(())
+}
+
+/// Reports that `name` is not an rgit command, suggests the most similar ones (like git's
+/// "The most similar command is ..."), and exits with status 1.
+// Used by `cli::handle_commands` (`rgit <unknown>`) and `help <unknown>`.
+pub fn unknown_command(name: &str) -> ! {
+    let mut message = format!("rgit: '{}' is not a rgit command. See 'rgit help'.", name);
+    let similar = similar_commands(name);
+    if !similar.is_empty() {
+        message.push_str(if similar.len() == 1 { "\n\nThe most similar command is" } else { "\n\nThe most similar commands are" });
+        for command in &similar {
+            message.push_str("\n\t");
+            message.push_str(command);
+        }
+    }
+    crate::ui::die(1, &message)
 }
 
 /// Writes help text to standard output; a closed pipe (`rgit help | head`) is not an error.

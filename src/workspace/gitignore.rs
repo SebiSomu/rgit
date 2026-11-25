@@ -152,7 +152,7 @@ pub fn ignore_rule_matches(rule: &GitIgnoreRule, rel_path: &str, is_dir: bool) -
 /// and ignoring the `.git/` folder.
 // Used by index staging (`add`), status, and working tree safety checks.
 pub fn collect_files(path: &Path, out: &mut Vec<PathBuf>) -> anyhow::Result<()> {
-    let mut rules = Vec::new();
+    let mut rules = base_exclude_rules();
     collect_files_internal(path, &mut rules, out)
 }
 
@@ -208,6 +208,49 @@ fn collect_files_internal(path: &Path, rules: &mut Vec<GitIgnoreRule>, out: &mut
     }
 
     Ok(())
+}
+
+/// The global ignore file: `core.excludesFile` (a leading `~/` is the home directory), else
+/// `$XDG_CONFIG_HOME/git/ignore`, else `~/.config/git/ignore` (git's default, shared with it).
+// Used by `exclude_files` and `rgit ignore --global`.
+pub fn global_excludes_path() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
+    if let Ok(Some(configured)) = crate::core::config::get_config_value("core.excludesfile") {
+        return match configured.strip_prefix("~/") {
+            Some(rest) => home.map(|h| h.join(rest)),
+            None => Some(PathBuf::from(configured)),
+        };
+    }
+    match std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
+        Some(xdg) => Some(PathBuf::from(xdg).join("git").join("ignore")),
+        None => home.map(|h| h.join(".config").join("git").join("ignore")),
+    }
+}
+
+/// The ignore files that apply below every `.gitignore`, lowest priority first: the global
+/// one, then `.git/info/exclude`. Each as the name to show for it and its path.
+// Used by `base_exclude_rules` and `check-ignore`.
+pub fn exclude_files() -> Vec<(String, PathBuf)> {
+    let mut out = Vec::new();
+    if let Some(global) = global_excludes_path() {
+        out.push((global.to_string_lossy().replace('\\', "/"), global));
+    }
+    out.push((".git/info/exclude".to_string(), crate::core::repo::path(".git/info/exclude")));
+    out
+}
+
+/// The rules of the global ignore file and `.git/info/exclude` (they match from the top of the
+/// working tree, like the top-level `.gitignore`, which comes after them and so wins).
+// Used by every working-tree walk that honors ignore rules (`collect_files`, `clean`,
+// untracked-file listing, `ls-files --exclude-standard`).
+pub fn base_exclude_rules() -> Vec<GitIgnoreRule> {
+    let mut rules = Vec::new();
+    for (_, path) in exclude_files() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            rules.extend(content.lines().filter_map(|line| parse_gitignore_line(line, "")));
+        }
+    }
+    rules
 }
 
 /// Normalizes a file path into a relative, forward-slash separated path string.

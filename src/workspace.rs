@@ -8,6 +8,7 @@ pub mod commit;
 pub mod commit_summary;
 pub mod fixup;
 pub mod gitignore;
+pub mod ignore;
 pub mod index_plumbing;
 pub mod oops;
 pub mod ls_files;

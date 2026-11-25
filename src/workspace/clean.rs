@@ -54,7 +54,7 @@ pub fn clean(dry_run: bool, force: bool, dirs: bool, ignored: bool, only_ignored
 
     let mut files_out: Vec<String> = Vec::new();
     let mut dirs_out: Vec<String> = Vec::new();
-    let mut rules: Vec<GitIgnoreRule> = Vec::new();
+    let mut rules: Vec<GitIgnoreRule> = crate::workspace::gitignore::base_exclude_rules();
 
     collect_clean_candidates(
         Path::new("."),

@@ -339,7 +339,7 @@ pub fn collect_untracked_files(tracked: &std::collections::BTreeSet<String>, inc
         }
     }
     let mode = if include_ignored { crate::workspace::clean::types::CleanMode::IncludeIgnored } else { crate::workspace::clean::types::CleanMode::Normal };
-    let (mut files, mut dirs, mut rules) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut files, mut dirs, mut rules) = (Vec::new(), Vec::new(), crate::workspace::gitignore::base_exclude_rules());
     crate::workspace::clean::engine::collect_clean_candidates(Path::new("."), &mut rules, tracked, &tracked_dirs, &mode, false, &mut files, &mut dirs)?;
     files.sort();
     Ok(files)

@@ -57,7 +57,7 @@ pub fn tracked_ancestor_dirs(tracked_paths: &BTreeSet<String>) -> BTreeSet<Strin
 pub fn collect_untracked_paths(tracked_paths: &BTreeSet<String>, descend_ignored: bool) -> anyhow::Result<Vec<UntrackedPath>> {
     let tracked_dirs = tracked_ancestor_dirs(tracked_paths);
     let mut out = Vec::new();
-    walk_untracked(Path::new("."), "", &[], false, tracked_paths, &tracked_dirs, descend_ignored, &mut out)?;
+    walk_untracked(Path::new("."), "", &crate::workspace::gitignore::base_exclude_rules(), false, tracked_paths, &tracked_dirs, descend_ignored, &mut out)?;
     out.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(out)
 }
@@ -129,7 +129,7 @@ fn rules_for_dir(dir_rel: &str, cache: &mut HashMap<String, Vec<GitIgnoreRule>>)
         return rules.clone();
     }
     let mut rules = if dir_rel.is_empty() {
-        Vec::new()
+        crate::workspace::gitignore::base_exclude_rules()
     } else {
         let parent = dir_rel.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
         rules_for_dir(parent, cache)

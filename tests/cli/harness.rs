@@ -119,7 +119,7 @@ impl Repo {
         cmd.args(&argv).current_dir(&cwd);
         for (key, _) in std::env::vars_os() {
             let key = key.to_string_lossy().to_string();
-            if key.starts_with("GIT_") || key.starts_with("RGIT_") || key.starts_with("RUST_") || key == "EDITOR" || key == "VISUAL" || key == "PAGER" {
+            if key.starts_with("GIT_") || key.starts_with("RGIT_") || key.starts_with("RUST_") || key == "EDITOR" || key == "VISUAL" || key == "PAGER" || key == "XDG_CONFIG_HOME" {
                 cmd.env_remove(&key);
             }
         }
@@ -286,6 +286,7 @@ impl Repo {
             .args(args)
             .env_remove("RUST_BACKTRACE")
             .env_remove("RUST_LIB_BACKTRACE")
+            .env_remove("XDG_CONFIG_HOME")
             .current_dir(&self.root)
             .env("HOME", &self.home)
             .env("USERPROFILE", &self.home)

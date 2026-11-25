@@ -38,7 +38,17 @@ fn sourced_rules_for_dir(dir_rel: &str, cache: &mut HashMap<String, Vec<SourcedI
         return rules.clone();
     }
     let mut rules = if dir_rel.is_empty() {
-        Vec::new()
+        let mut base = Vec::new();
+        for (source, path) in crate::workspace::gitignore::exclude_files() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                for (idx, line) in content.lines().enumerate() {
+                    if let Some(rule) = parse_gitignore_line(line, "") {
+                        base.push(SourcedIgnoreRule { rule, source: source.clone(), line_number: idx + 1, pattern_text: line.trim().to_string() });
+                    }
+                }
+            }
+        }
+        base
     } else {
         let parent = dir_rel.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
         sourced_rules_for_dir(parent, cache)

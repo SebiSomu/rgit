@@ -287,6 +287,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
 | [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
+| [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2392,6 +2393,54 @@ Dropped them from 'two' (now 9c2e0d4).
 ```
 
 
+### `rgit ignore`
+
+Add patterns to `.gitignore` (or the global ignore file) and stop tracking the files they now ignore (rgit only).
+
+**Syntax:** `rgit ignore <pattern>... [--global] [--keep-tracked] [-n]`
+
+git's way is `echo 'build/' >> .gitignore`, then `git rm -r --cached build/` for files already committed (an ignore rule alone never untracks anything), then `git add .gitignore`. `rgit ignore` does all three:
+
+- **The file:** each pattern is added at the end of the top-level `.gitignore` (created if missing), or with `--global` the global ignore file (`core.excludesFile`, default `~/.config/git/ignore`, the same file git reads). Patterns the file already has are skipped, and so are repeats. The existing lines are never reordered, since order matters for `!` rules. Patterns are .gitignore syntax: quote them so the shell doesn't expand `*`; one starting with `#` is refused (it would be a comment).
+- **Tracked files:** tracked files the patterns match, and that the rules as a whole now ignore, are removed from the index (`rm --cached`: they stay on disk), unless `--keep-tracked`.
+- **Staging:** `.gitignore` is staged with the removals, so one `rgit commit` records it all, unless the file had unstaged edits of its own (then only the removals are staged, and it says so).
+- **Typos:** a pattern that matches no file, tracked or untracked, gets a note.
+
+`-n`/`--dry-run` prints the plan. It is one `rgit undo` step (the global file is outside the repository, so undo doesn't restore it).
+
+rgit's ignore rules include the global ignore file and `.git/info/exclude`, like git (lowest priority first: global file, `.git/info/exclude`, then the `.gitignore` files), in `add`, `status`, `clean`, `stash -u`, `ls-files --exclude-standard` and `check-ignore`.
+
+<details>
+<summary>Options as printed by <code>rgit ignore -h</code></summary>
+
+```text
+Add patterns to .gitignore (or the global ignore file) and stop tracking the files they now ignore
+
+Usage: rgit ignore [OPTIONS] <PATTERN>...
+
+Arguments:
+  <PATTERN>...  Patterns, in .gitignore syntax (quote them so the shell doesn't expand `*`)
+
+Options:
+      --global        Add them to the global ignore file (core.excludesFile, default ~/.config/git/ignore) instead of .gitignore
+      --keep-tracked  Keep tracking files that the patterns match (by default they are untracked, kept on disk)
+  -n, --dry-run       Print what would change, change nothing
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit ignore '*.log' build/ '*.lgo'
+Added to .gitignore: *.log, build/, *.lgo
+  note: '*.lgo' matches no file yet (a typo?)
+Stopped tracking 2 files that are now ignored (kept on disk): build/out.o, debug.log
+Staged .gitignore and the removals; `rgit commit` records them.
+```
+
+
 ### `rgit sync`
 
 Bring the current branch level with its upstream (and push), in one command with a plan (rgit only).
@@ -3733,7 +3782,7 @@ Tell which paths are ignored, and by which rule.
 
 **Arguments and flags:** `-q`, `-v`, `-n`, `--no-index`, `--stdin`, `-z`, `<pathname>...`
 
-Reports which paths are excluded by `.gitignore` rules; `-v` shows the deciding rule as `<source>:<line>:<pattern>`. Exits 0 if any path is ignored, 1 if none, 128 on usage errors.
+Reports which paths are excluded by `.gitignore` rules (and `.git/info/exclude` and the global ignore file, `core.excludesFile` or `~/.config/git/ignore`); `-v` shows the deciding rule as `<source>:<line>:<pattern>`. Exits 0 if any path is ignored, 1 if none, 128 on usage errors.
 
 <details>
 <summary>Options as printed by <code>rgit check-ignore -h</code></summary>

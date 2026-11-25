@@ -1,0 +1,186 @@
+---
+source: tests/cli/scenarios/stats.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-09-04T10:00:00 +0300
+$ write src/main.rs (25 bytes)
+$ rgit add src/main.rs
+Staged files to index (1 new).
+$ rgit commit -m 'Start'
+[main (root-commit) <H1:7>] Start
+ Author: Ana <author@example.com>
+ 1 file changed, 3 insertions(+)
+ create mode 100644 src/main.rs
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-09-05T23:30:00 -0500
+$ write README.md (17 bytes)
+$ rgit add README.md
+Staged files to index (1 new).
+$ rgit commit -m 'Readme'
+[main <H2:7>] Readme
+ Author: Ana <author@example.com>
+ 1 file changed, 3 insertions(+)
+ create mode 100644 README.md
+$ export GIT_AUTHOR_NAME=Bob
+$ export GIT_AUTHOR_DATE=2023-10-02T09:00:00 +0000
+$ write src/lib.rs (58 bytes)
+$ rgit add src/lib.rs
+Staged files to index (1 new).
+$ rgit commit -m 'Library'
+[main <H3:7>] Library
+ Author: Bob <author@example.com>
+ 1 file changed, 4 insertions(+)
+ create mode 100644 src/lib.rs
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-10-03T09:00:00 +0000
+$ write src/main.rs (30 bytes)
+$ rgit add src/main.rs
+Staged files to index (1 modified).
+$ rgit commit -m 'Use lib'
+[main <H4:7>] Use lib
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ export GIT_AUTHOR_NAME=Cy
+$ export GIT_AUTHOR_DATE=2023-11-11T12:00:00 +0000
+$ write web/app.ts (20 bytes)
+$ rgit add web/app.ts
+Staged files to index (1 new).
+$ rgit commit -m 'Web app'
+[main <H5:7>] Web app
+ Author: Cy <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 web/app.ts
+$ export GIT_AUTHOR_NAME=Bob
+$ export GIT_AUTHOR_DATE=2023-11-13T08:00:00 +0000
+$ write src/lib.rs (16 bytes)
+$ rgit add src/lib.rs
+Staged files to index (1 modified).
+$ rgit commit -m 'Trim lib'
+[main <H6:7>] Trim lib
+ Author: Bob <author@example.com>
+ 1 file changed, 3 deletions(-)
+$ rgit stats
+6 commits by 3 authors, 2023-09-04 to 2023-11-13
+8 lines in 4 files today; +12 -4 lines over all commits (2 changed per commit on average)
+
+Activity, last 12 weeks to 2023-11-13 (busiest week: 2 commits)
+  | ▄▄   █    █|
+
+By weekday
+  Mon      3  ██████████████████████████████
+  Tue      2  ████████████████████
+  Wed      0  
+  Thu      0  
+  Fri      0  
+  Sat      1  ██████████
+  Sun      0  
+
+Authors
+  Ana         3 commits   50%  +7 -1            2023-09-04 to 2023-10-03
+  Bob         2 commits   33%  +4 -3            2023-10-02 to 2023-11-13
+  Cy          1 commit    16%  +1 -0            2023-11-11 to 2023-11-11
+
+Languages (lines today)
+  Rust              4 lines   50%     2 files  ████████████████████
+  Markdown          3 lines   37%     1 file   ███████████████
+  TypeScript        1 lines   12%     1 file   █████
+
+Biggest commits
+  <H3:7>  2023-10-02  +4 -0            1 file   Library (Bob)
+  <H6:7>  2023-11-13  +0 -3            1 file   Trim lib (Bob)
+  <H2:7>  2023-09-05  +3 -0            1 file   Readme (Ana)
+  <H1:7>  2023-09-04  +3 -0            1 file   Start (Ana)
+  <H4:7>  2023-10-03  +1 -1            1 file   Use lib (Ana)
+$ rgit stats --weeks 4 src
+4 commits by 2 authors, 2023-09-04 to 2023-11-13
+4 lines in 2 files today; +8 -4 lines over all commits (3 changed per commit on average)
+
+Activity, last 4 weeks to 2023-11-13 (busiest week: 1 commit)
+  |   █|
+
+By weekday
+  Mon      3  ██████████████████████████████
+  Tue      1  ██████████
+  Wed      0  
+  Thu      0  
+  Fri      0  
+  Sat      0  
+  Sun      0  
+
+Authors
+  Ana         2 commits   50%  +4 -1            2023-09-04 to 2023-10-03
+  Bob         2 commits   50%  +4 -3            2023-10-02 to 2023-11-13
+
+Languages (lines today)
+  Rust        4 lines  100%     2 files  ████████████████████
+
+Biggest commits
+  <H3:7>  2023-10-02  +4 -0            1 file   Library (Bob)
+  <H6:7>  2023-11-13  +0 -3            1 file   Trim lib (Bob)
+  <H1:7>  2023-09-04  +3 -0            1 file   Start (Ana)
+  <H4:7>  2023-10-03  +1 -1            1 file   Use lib (Ana)
+$ rgit stats --since 2023-11-01
+2 commits by 2 authors, 2023-11-11 to 2023-11-13
+8 lines in 4 files today; +1 -3 lines over all commits (2 changed per commit on average)
+
+Activity, last 12 weeks to 2023-11-13 (busiest week: 2 commits)
+  |           █|
+
+By weekday
+  Mon      1  ██████████████████████████████
+  Tue      0  
+  Wed      0  
+  Thu      0  
+  Fri      0  
+  Sat      1  ██████████████████████████████
+  Sun      0  
+
+Authors
+  Bob         1 commit    50%  +0 -3            2023-11-13 to 2023-11-13
+  Cy          1 commit    50%  +1 -0            2023-11-11 to 2023-11-11
+
+Languages (lines today)
+  Rust              4 lines   50%     2 files  ████████████████████
+  Markdown          3 lines   37%     1 file   ███████████████
+  TypeScript        1 lines   12%     1 file   █████
+
+Biggest commits
+  <H6:7>  2023-11-13  +0 -3            1 file   Trim lib (Bob)
+  <H5:7>  2023-11-11  +1 -0            1 file   Web app (Cy)
+$ rgit stats --since 2030-01-01
+No commits in that time.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H6>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H7> 0	README.md
+  100644 <H8> 0	src/lib.rs
+  100644 <H9> 0	src/main.rs
+  100644 <H10> 0	web/app.ts
+HEAD commit:
+  tree <H11>
+  parent <H5>
+  author Bob <author@example.com> 1699862400 +0000
+  committer Test Committer <committer@example.com> 1700000720 +0000
+  
+  Trim lib
+worktree:
+  README.md
+    | # Demo
+    | 
+    | It runs.
+  src/lib.rs
+    | pub fn run() {}
+  src/main.rs
+    | fn main() {
+    |     lib::run();
+    | }
+  web/app.ts
+    | export const x = 1;

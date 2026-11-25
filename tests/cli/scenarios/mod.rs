@@ -20,6 +20,7 @@ mod hotspots;
 mod ignore;
 mod move_commit;
 mod split;
+mod stats;
 mod story;
 mod whereami;
 

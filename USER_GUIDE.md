@@ -291,6 +291,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
 | [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
 | [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
+| [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2614,6 +2615,74 @@ warning  user.email is not set: commits will say 'rgit@example.com'
 fixed    removed .git/index.lock
 fixed    pruned worktree 'ghost'
 Checked 8 areas (objects skipped: --quick): 2 fixed, 1 warning.
+```
+
+
+### `rgit stats`
+
+Numbers on the current branch's history: activity, weekdays, authors, languages and the biggest commits (rgit only).
+
+**Syntax:** `rgit stats [<path>...] [--since <date>] [--weeks <N>]`
+
+Over the non-merge commits (each against its first parent; paths and `--since` narrow them, `--since` taking `log --since` dates and looking at the author date):
+
+- **Totals:** commits, authors, the first and last commit day, lines and files at HEAD, lines added and removed over all commits.
+- **Activity:** commits per week as a sparkline over the last `--weeks` weeks (default 12). The last week is the newest commit's, not today's, so an old repository still shows its active period.
+- **By weekday:** commits per day of the week, in each author's local time.
+- **Authors:** commits, share, lines added and removed, first and last commit (top 10).
+- **Languages:** lines and files per language at HEAD, from the file extension (top 10; binary files skipped; unknown extensions show as `Other (.ext)`).
+- **Biggest commits:** the 5 with the most lines changed.
+
+Days are UTC except in the biggest-commits list, which uses the author's local date. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit stats -h</code></summary>
+
+```text
+Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits
+
+Usage: rgit stats [OPTIONS] [PATH]...
+
+Arguments:
+  [PATH]...  Only commits and files under these paths
+
+Options:
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --weeks <N>     How many weeks the activity line covers (ending at the newest commit) [default: 12]
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit stats
+6 commits by 3 authors, 2023-09-04 to 2023-11-13
+8 lines in 4 files today; +12 -4 lines over all commits (2 changed per commit on average)
+
+Activity, last 12 weeks to 2023-11-13 (busiest week: 2 commits)
+  | ▄▄   █    █|
+
+By weekday
+  Mon      3  ██████████████████████████████
+  Tue      2  ████████████████████
+  Wed      0
+  ...
+
+Authors
+  Ana         3 commits   50%  +7 -1            2023-09-04 to 2023-10-03
+  Bob         2 commits   33%  +4 -3            2023-10-02 to 2023-11-13
+  Cy          1 commit    16%  +1 -0            2023-11-11 to 2023-11-11
+
+Languages (lines today)
+  Rust              4 lines   50%     2 files  ████████████████████
+  Markdown          3 lines   37%     1 file   ███████████████
+  TypeScript        1 lines   12%     1 file   █████
+
+Biggest commits
+  41ab7f0  2023-10-02  +4 -0            1 file   Library (Bob)
+  ...
 ```
 
 

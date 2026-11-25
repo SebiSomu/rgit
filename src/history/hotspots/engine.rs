@@ -16,8 +16,8 @@ pub const COUPLING_MAX_FILES: usize = 30;
 type Tree = BTreeMap<String, ([u8; 20], u32)>;
 
 /// Lines added and removed between two blobs (0 / 0 for binary content).
-// Used by `collect`.
-fn line_changes(old: Option<[u8; 20]>, new: Option<[u8; 20]>) -> Result<(usize, usize)> {
+// Used by `collect` and `rgit stats`.
+pub fn line_changes(old: Option<[u8; 20]>, new: Option<[u8; 20]>) -> Result<(usize, usize)> {
     let read = |h: Option<[u8; 20]>| -> Result<Option<String>> {
         match h {
             None => Ok(Some(String::new())),

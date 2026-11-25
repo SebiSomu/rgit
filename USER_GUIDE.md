@@ -293,6 +293,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
 | [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
 | [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
+| [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2732,6 +2733,65 @@ Thu 2023-11-09  5 commits by Bob (3), Ana (2) on feature/x (4), main  +5 -0
                 (quiet for 2 days)
 Mon 2023-11-06  1 commit by Ana on main  +1 -0
                 Start
+```
+
+
+### `rgit compare`
+
+Where two branches or commits stand against each other, in one answer (rgit only).
+
+**Syntax:** `rgit compare [<a> [<b>]] [-n <N>]`
+
+With two arguments it compares `a` with `b`; with one, HEAD with it; with none, HEAD with its upstream (as of the last fetch). git's way is `git rev-list --left-right --count a...b`, `git log b..a` and `a..b`, `git merge-base`, `git diff --stat`, `git cherry` and a trial merge. `rgit compare` prints:
+
+- **Where they stand:** the same commit, `a` ahead (`b` can fast-forward to it), `a` behind, diverged (since which merge base), or no shared history. When diverged, how many commits each side has that the other doesn't, and how many of those the other side already has as a copy (same patch: cherry-picked or rebased).
+- **The commits** only each side has (`-n` per side, default 10).
+- **The files that differ** between the tips, each with how each side changed it since the merge base (`changed on both sides`, `added on feature`, `changed on main, deleted on feature`, ...).
+- **Merging:** for diverged branches, whether a merge would be clean or which files would conflict (worked out in memory, nothing is touched), and the next command (`rgit merge` / `rgit rebase`, or `rgit sync` against the upstream; `rgit push` or a fast-forward when one side is simply ahead).
+
+It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit compare -h</code></summary>
+
+```text
+Where two branches stand: ahead, behind or diverged, the commits and files on each side, and whether merging would conflict
+
+Usage: rgit compare [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Two branches or commits; with one, HEAD against it; with none, HEAD against its upstream
+
+Options:
+  -n, --max-count <N>  How many commits each side's list shows [default: 10]
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit compare main
+feature and main have diverged since 9c2e0d4 "third commit" (2023-11-14):
+  feature:  2 commits main doesn't have (1 of them is on main too, as a copy)
+  main:     3 commits feature doesn't have (1 of them is on feature too, as a copy)
+
+Only on feature
+  5d1c0aa 2023-11-14 Add x (Ana)
+  41ab7f0 2023-11-14 Feature edit (Ana)
+
+Only on main
+  8e2f913 2023-11-14 Add x (Ana)
+  2f0a6d1 2023-11-14 Main b (Bob)
+  7b3e0c2 2023-11-14 Main edit (Bob)
+
+2 files differ
+  a.txt  changed on both sides
+  b.txt  changed on main
+
+Merging would conflict in 1 file: a.txt.
+Next: `rgit merge main` or `rgit rebase main`.
 ```
 
 

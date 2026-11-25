@@ -1,0 +1,101 @@
+---
+source: tests/cli/scenarios/compare.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+$ write b.txt (13 bytes)
+$ rgit commit -a -m 'Upstream b'
+[main <H4:7>] Upstream b
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write ../clone/c.txt (2 bytes)
+(../clone) $ rgit add c.txt
+Staged files to index (1 new).
+(../clone) $ rgit commit -m 'Local c'
+[main 7233722] Local c
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+(../clone) $ rgit fetch
+From <REPO>
+   <H3:7>..<H4:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+(../clone) $ rgit compare
+main and origin/main have diverged since <H3:7> "third commit" (2023-11-14):
+  main:         1 commit origin/main doesn't have
+  origin/main:  1 commit main doesn't have
+
+Only on main
+  7233722 2023-11-14 Local c (Test Author)
+
+Only on origin/main
+  <H4:7> 2023-11-14 Upstream b (Test Author)
+
+2 files differ
+  b.txt  changed on origin/main
+  c.txt  added on main
+
+Merging would be clean.
+Next: `rgit sync` (rebases your commits onto it; `--merge` merges instead).
+$ rgit compare
+[stderr]
+fatal: the current branch has no upstream to compare with
+hint: name what to compare: `rgit compare <branch>` (HEAD against it) or `rgit compare <a> <b>`
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H3>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  Upstream b
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+    | upstream
+  src/lib.txt
+    | lib v2

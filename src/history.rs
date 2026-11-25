@@ -1,6 +1,7 @@
 pub mod bisect;
 pub mod blame;
 pub mod cherry;
+pub mod compare;
 pub mod follow;
 pub mod graph;
 pub mod hotspots;

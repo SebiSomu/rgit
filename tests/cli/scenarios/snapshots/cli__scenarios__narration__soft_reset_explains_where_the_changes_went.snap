@@ -1,0 +1,105 @@
+---
+source: tests/cli/scenarios/narration.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ export RGIT_VERBOSITY=explain
+$ write a.txt (17 bytes)
+$ rgit reset --soft HEAD~1
+[stderr]
+rgit: Uncommitted <H3:7> "third commit" from main; HEAD is now <H2:7> "second commit".
+      Its changes are staged, ready to commit again: b.txt (new), src/lib.txt (modified).
+      Your files are untouched; unstaged changes stay unstaged: a.txt.
+      A soft reset only moves the branch: the index and the files keep the old commit's content, so `rgit diff --cached` shows exactly what it contained.
+  next: `rgit commit -C ORIG_HEAD` to commit again with the same message (`-c` to edit it), or `rgit commit` for a new one; `rgit undo` puts the commit back.
+$ rgit status --short
+ M a.txt
+A  b.txt
+M  src/lib.txt
+$ rgit commit -C ORIG_HEAD
+[main <H4:7>] third commit
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:18:20 2023 +0000
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+[stderr]
+rgit: Recorded <H4:7> on main: 2 files, +2 -1.
+      new:     b.txt
+      changed: src/lib.txt
+      Not pushed anywhere yet: this branch has no upstream (`rgit push -u` sets one).
+$ rgit log --oneline -1
+<H4:7> third commit
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+[stderr]
+rgit: Cloned 3 commits into 'clone'; checked out 'main' (3 files).
+  next: `cd clone` to start working.
+(../clone) $ rgit reset --soft HEAD~2
+[stderr]
+rgit: Uncommitted 2 commits (newest: <H4:7> "third commit") from main; HEAD is now <H1:7> "first commit".
+      Their changes are staged, ready to commit again: a.txt (modified), b.txt (new), src/lib.txt (modified).
+      Your files are untouched.
+      A soft reset only moves the branch: the index and the files keep the old commit's content, so `rgit diff --cached` shows exactly what it contained.
+rgit: warning: Those commits are already on origin/main: once you commit again, the branch diverges from it and needs `rgit push --force`.
+  next: `rgit commit` to make them one commit (a squash); `rgit undo` puts the commits back.
+(../clone) $ rgit status --short
+M  a.txt
+A  b.txt
+M  src/lib.txt
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000480 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+    | unstaged
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

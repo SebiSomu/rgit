@@ -2399,6 +2399,16 @@ Move HEAD and optionally reset the index and working tree.
 
 Moves HEAD, restores the index, and synchronizes the working tree. A mixed or path reset prints git's `Unstaged changes after reset:` list (`M`/`D`, and `U` for paths still unmerged); `--mixed`/`--hard` clear conflicts and end a merge, cherry-pick or revert; `--soft` refuses in the middle of a merge.
 
+**Taking commits back with `--soft`.** `rgit reset --soft HEAD~1` is the "uncommit": the branch moves back, and the commit's changes stay staged with the files untouched. When narrating (in a terminal, or `--explain`), rgit says where everything went: which commit(s) left the branch, the staged files (new / modified / deleted), what you had staged before, the unstaged changes that stay unstaged, a warning when the commits were already pushed (committing again then needs `rgit push --force`), and the next step: `rgit commit -C ORIG_HEAD` to commit again with the same message (`-c` to edit it), `rgit commit` to squash several into one, or `rgit undo` to put them back.
+
+```text
+$ rgit reset --soft HEAD~1
+rgit: Uncommitted 41ab7f0 "third commit" from main; HEAD is now 9c2e0d4 "second commit".
+      Its changes are staged, ready to commit again: b.txt (new), src/lib.txt (modified).
+      Your files are untouched; unstaged changes stay unstaged: a.txt.
+  next: `rgit commit -C ORIG_HEAD` to commit again with the same message (`-c` to edit it), or `rgit commit` for a new one; `rgit undo` puts the commit back.
+```
+
 **Patch mode (`reset -p [<tree-ish>]`).** Same prompts as `add -p`, but unstages the hunks you accept.
 
 <details>

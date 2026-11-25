@@ -47,3 +47,15 @@ fn config_verbosity_and_conflict_narration() {
     r.run("config rgit.verbosity explain").run("merge topic").run("status").run("conflicts").run("merge --abort");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn soft_reset_explains_where_the_changes_went() {
+    let mut r = super::three_commits();
+    r.set_env("RGIT_VERBOSITY", "explain");
+    // One commit back, with an unstaged edit on top: what is staged, what stays unstaged.
+    r.write("a.txt", "one\ntwo\nunstaged\n").run("reset --soft HEAD~1").run("status --short");
+    r.run("commit -C ORIG_HEAD").run("log --oneline -1");
+    // Two commits back, after they were pushed.
+    r.run_in("..", "clone repo clone").run_in("../clone", "reset --soft HEAD~2").run_in("../clone", "status --short");
+    assert_snapshot!(r.finish());
+}

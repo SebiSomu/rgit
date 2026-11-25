@@ -211,7 +211,7 @@ pub(super) fn report_reset(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, 
             note(&format!("{}; no uncommitted work was lost. Undo: `rgit reset --hard ORIG_HEAD`.", moved_text));
         }
     } else if soft {
-        note(&format!("{}. Index and files untouched: the undone commits' changes are now staged, ready to re-commit.", moved_text));
+        report_soft_reset(b, a, &moved_text);
     } else {
         let unstaged = a.worktree_changes.as_ref().map(|c| c.len()).unwrap_or(0);
         if unstaged > 0 {
@@ -219,6 +219,55 @@ pub(super) fn report_reset(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, 
         } else {
             note(&format!("{}. Your files are untouched and match the new HEAD.", moved_text));
         }
+    }
+}
+
+/// `reset --soft`: which commits were taken off the branch, that their changes are staged
+/// now (file by file), what stays unstaged, whether they were pushed, and how to commit again
+/// or put them back.
+// Used by `report_reset`.
+fn report_soft_reset(b: &RepoSnapshot, a: &RepoSnapshot, moved_text: &str) {
+    let (Some(old), Some(new)) = (b.head.as_deref(), a.head.as_deref()) else { return };
+    if !is_ancestor(new, old) {
+        note(&format!("{}. Index and files untouched: the difference between the two commits is now staged.", moved_text));
+        return;
+    }
+    let subject = |h: &str| commit_info(h).map(|(s, _, _)| s).unwrap_or_default();
+    let n = commits_between(Some(new), old);
+    let what = if n == 1 { format!("{} \"{}\"", short(old), subject(old)) } else { format!("{} commits (newest: {} \"{}\")", n, short(old), subject(old)) };
+    let from = a.head_branch.as_ref().map(|br| format!(" from {}", br)).unwrap_or_default();
+    note(&format!("Uncommitted {}{}; HEAD is now {} \"{}\".", what, from, short(new), subject(new)));
+
+    let head_tree = commit_tree_map(Some(new));
+    let staged: Vec<String> = a
+        .staged
+        .iter()
+        .map(|p| {
+            let kind = match (head_tree.contains_key(p), a.index.contains_key(p)) {
+                (false, _) => "new",
+                (true, false) => "deleted",
+                _ => "modified",
+            };
+            format!("{} ({})", p, kind)
+        })
+        .collect();
+    let before = if b.staged.is_empty() { String::new() } else { format!(", together with what you had staged before ({})", list(&b.staged, 3)) };
+    super::super::line(&format!("{} changes are staged, ready to commit again: {}{}.", if n == 1 { "Its" } else { "Their" }, list(&staged, 6), before));
+    let unstaged: Vec<String> = a.worktree_changes.clone().unwrap_or_default().into_iter().map(|c| c.1).collect();
+    if unstaged.is_empty() {
+        super::super::line("Your files are untouched.");
+    } else {
+        super::super::line(&format!("Your files are untouched; unstaged changes stay unstaged: {}.", list(&unstaged, 4)));
+    }
+    detail("A soft reset only moves the branch: the index and the files keep the old commit's content, so `rgit diff --cached` shows exactly what it contained.");
+    let pushed = b.refs.iter().find(|(name, tip)| name.starts_with("refs/remotes/") && !name.ends_with("/HEAD") && is_ancestor(old, tip));
+    if let Some((name, _)) = pushed {
+        warn(&format!("{} already on {}: once you commit again, the branch diverges from it and needs `rgit push --force`.", if n == 1 { "That commit is" } else { "Those commits are" }, name.trim_start_matches("refs/remotes/")));
+    }
+    if n == 1 {
+        next("`rgit commit -C ORIG_HEAD` to commit again with the same message (`-c` to edit it), or `rgit commit` for a new one; `rgit undo` puts the commit back.");
+    } else {
+        next("`rgit commit` to make them one commit (a squash); `rgit undo` puts the commits back.");
     }
 }
 

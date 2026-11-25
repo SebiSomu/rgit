@@ -3,6 +3,7 @@ pub mod blame;
 pub mod changelog;
 pub mod cherry;
 pub mod compare;
+pub mod contributors;
 pub mod follow;
 pub mod graph;
 pub mod hotspots;

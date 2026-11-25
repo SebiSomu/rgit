@@ -240,6 +240,8 @@ pub enum Commands {
     Open(crate::remote::open::cli::OpenArgs),
     /// A Markdown changelog from conventional commits: breaking changes, features, fixes... per version.
     Changelog(crate::history::changelog::cli::ChangelogArgs),
+    /// Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day.
+    Contributors(crate::history::contributors::cli::ContributorsArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -418,6 +420,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::PrSummary(args) => crate::remote::pr_summary::cli::dispatch_pr_summary(args)?,
         Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
         Commands::Changelog(args) => crate::history::changelog::cli::dispatch_changelog(args)?,
+        Commands::Contributors(args) => crate::history::contributors::cli::dispatch_contributors(args)?,
     }
 
     Ok(())

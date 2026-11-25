@@ -299,6 +299,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`pr-summary`](#rgit-pr-summary) | A Markdown pull request description: title, commits, files, and whether it merges cleanly (rgit only). |
 | [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
 | [`changelog`](#rgit-changelog) | A Markdown changelog from conventional commits, per version (rgit only). |
+| [`contributors`](#rgit-contributors) | Everyone who wrote the commits: commits, share, co-authored, lines, first and last day (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -3066,6 +3067,47 @@ $ rgit changelog --version v0.2.0
 - Tweak the README wording (`2f0a6d1`)
 
 Contributors: Ana, Bob, Cy
+```
+
+
+### `rgit contributors`
+
+Everyone who wrote the commits, one line each (rgit only).
+
+**Syntax:** `rgit contributors [<rev>...] [--since <date>] [--sort commits|lines|first|last|name] [-e]`
+
+git's way is `git shortlog -sne` plus `git log --author=... --format=%ad` per person. Over the non-merge commits reachable from HEAD (or the given revisions or range, `v1.0..`; `--since` by author date), each contributor gets: commits authored, commits co-authored (from `Co-authored-by:` trailers, shown as `(+N co-authored)`), their share of the commits, lines added and removed in their commits, and their first and last commit day.
+
+`.mailmap` is applied (the working tree's file, as `check-mailmap` reads it), so one person's several names and emails count as one; `-e` shows the email they used most. `--sort` orders by commits (default, co-authored included), lines changed, first commit, last commit, or name. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit contributors -h</code></summary>
+
+```text
+Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day
+
+Usage: rgit contributors [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Revisions or a range (`v1.0..`); default: HEAD
+
+Options:
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --sort <SORT>   Order of the table [default: commits] [possible values: commits, lines, first, last, name]
+  -e, --email         Show each contributor's email
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit contributors -e
+3 contributors, 4 commits:
+  Ana <ana@work.example>  2 commits                    50%  +4 -1            2023-09-01 to 2023-11-01
+  Cy <cy@example.com>     1 commit (+1 co-authored)    25%  +2 -0            2023-11-01 to 2023-11-02
+  Bob <bob@example.com>   1 commit                     25%  +1 -0            2023-10-01
 ```
 
 

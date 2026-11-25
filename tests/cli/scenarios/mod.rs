@@ -19,6 +19,7 @@ mod absorb;
 mod backup;
 mod changelog;
 mod compare;
+mod contributors;
 mod doctor;
 mod hotspots;
 mod ignore;

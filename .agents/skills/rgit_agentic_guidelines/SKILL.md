@@ -49,6 +49,8 @@ src/
 │   ├── config.rs             # Local & global .gitconfig reader/writer/author identity
 │   ├── date.rs               # Civil-date math, timezone offsets, approxidate parsing (shared by log, commit, rev-list, mail)
 │   ├── editor.rs             # Editor command resolution (GIT_EDITOR/core.editor/...) and launching
+│   ├── eol.rs                # Line-ending conversion (core.autocrlf, core.eol, text/eol attributes) between the working tree and the object store
+│   │   └── types.rs          # Types: TextAttr, EolAttr, Action, AutoCrlf, Settings
 │   ├── index.rs              # Binary staging index (.git/index) reader and writer
 │   ├── object_store.rs       # Object compression, hashing, tree writing, and refs/replace substitution on read
 │   ├── pack.rs               # Packfile engine: idx parse/write, packed object lookup (read_object fallback), deltas, pack writer
@@ -106,10 +108,21 @@ src/
 │   │   ├── cli.rs            # CLI: blame, annotate (clap args + dispatch)
 │   │   ├── engine.rs         # Line attribution algorithm, diff-mapping, tree lookups, date formatting
 │   │   └── types.rs          # Types: BlameLine
+│   ├── changelog.rs          # changelog (Markdown from conventional commits, per version; --prepend)
+│   │   ├── cli.rs            # CLI: changelog (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of changelog
+│   │   └── types.rs          # Types: Entry
 │   ├── cherry.rs             # cherry (-v, --abbrev[=<n>], <upstream> [<head> [<limit>]])
 │   │   ├── cli.rs            # CLI: cherry (clap args + dispatch)
 │   │   ├── engine.rs         # Upstream lookup, non-merge commit walks, git-compatible patch IDs, hash abbreviation
 │   │   └── types.rs          # Types: CherryOptions
+│   ├── compare.rs            # compare (ahead/behind, commits and files on each side, in-memory merge conflict check)
+│   │   ├── cli.rs            # CLI: compare (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of compare
+│   │   └── types.rs          # Types: Change, FileDiff
+│   ├── contributors.rs       # contributors (commits, share, co-authors, lines, first/last day; honors .mailmap)
+│   │   ├── cli.rs            # CLI: contributors (clap args + dispatch)
+│   │   └── types.rs          # Types: Contributor, SortBy
 │   ├── follow.rs             # log --follow: rename/copy source search, similarity scoring, rename-aware diff output
 │   │   └── types.rs          # Types: FollowPair
 │   ├── graph.rs              # git graph.c port: log --graph rows, column mapping, merge layouts
@@ -118,6 +131,10 @@ src/
 │   │   ├── cli.rs            # CLI: grep (clap args + dispatch)
 │   │   ├── engine.rs         # Matcher construction, pathspec filtering, content search
 │   │   └── types.rs          # Types: GrepFileResult, GrepOptions
+│   ├── hotspots.rs           # hotspots (files that change most, have most authors, change together)
+│   │   ├── cli.rs            # CLI: hotspots (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of hotspots
+│   │   └── types.rs          # Types: FileStats, Hotspots
 │   ├── last_modified.rs      # last-modified (-r, -t, -z, <revision-range>, paths)
 │   │   ├── cli.rs            # CLI: last-modified (clap args + dispatch)
 │   │   ├── engine.rs         # Per-path last-change lookup over a range (recursion, trees, boundary commits)
@@ -146,6 +163,18 @@ src/
 │   │   ├── cli.rs            # CLI: show-branch (clap args + dispatch)
 │   │   ├── engine.rs         # git show-branch.c port: tip collection, join_revs walk, topo sort, commit naming, column display
 │   │   └── types.rs          # Types: ShowBranchOptions
+│   ├── stats.rs              # stats (activity, weekdays, authors, languages, biggest commits)
+│   │   ├── cli.rs            # CLI: stats (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of stats
+│   │   └── types.rs          # Types: CommitStat, AuthorStat
+│   ├── story.rs              # story (history of a file or directory in plain words, follows renames)
+│   │   ├── cli.rs            # CLI: story (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of story
+│   │   └── types.rs          # Types: Event
+│   ├── timeline.rs           # timeline (day-by-day digest: commits, authors, branches, merges, lines)
+│   │   ├── cli.rs            # CLI: timeline (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of timeline
+│   │   └── types.rs          # Types: Event
 │   └── types.rs              # History types shared by several history commands
 ├── mail.rs                   # Declares the mail modules
 ├── mail/                     # Patch and mail workflows: format-patch, am, apply, mailinfo/mailsplit, trailers, mailmap, request-pull
@@ -209,6 +238,10 @@ src/
 │   │   ├── cli.rs            # CLI: merge-tree (clap args + dispatch)
 │   │   ├── engine.rs         # Line-level 3-way file merge, in-memory tree merge, conflict stages/messages, virtual bases
 │   │   └── types.rs          # Types: ConflictRegion, FileMergeResult, MergeMessage, MergePathOutcome, MergePathReport, ...
+│   ├── move_commit.rs        # move-commit (cherry-pick onto another branch and drop here; -c/--copy; checked in memory first)
+│   │   ├── cli.rs            # CLI: move-commit (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of move-commit
+│   │   └── types.rs          # Types: Replayed
 │   ├── rebase.rs             # rebase (--onto, --keep-base, <branch>, --reapply-cherry-picks, -i, --continue, --abort, --skip, --edit-todo)
 │   │   ├── cli.rs            # CLI: rebase (clap args + dispatch)
 │   │   ├── engine.rs         # Rebase engine: git's commit selection, up-to-date check, todo editor, replay runner
@@ -223,6 +256,10 @@ src/
 │   ├── revert.rs             # revert (--continue, --abort)
 │   │   └── cli.rs            # CLI: revert (clap args + dispatch)
 │   ├── sequencer.rs          # .git/sequencer state (todo, head, abort-safety, opts) and -x / -s trailers for cherry-pick
+│   ├── split.rs              # split (cut one commit into several by hunk, re-parenting the commits above)
+│   │   ├── cli.rs            # CLI: split (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of split
+│   │   └── types.rs          # Types: PathMap, Piece, SplitSource
 │   └── types.rs              # Merge types shared by several merge commands (conflict style, ...)
 ├── plumbing.rs               # Declares the plumbing modules
 ├── plumbing/                 # Low-level and utility commands: init/hash-object/cat-file/..., mktree, mktag, rev-parse, config, var, help
@@ -256,6 +293,10 @@ src/
 │   ├── stripspace.rs         # stripspace (-s, -c)
 │   │   ├── cli.rs            # CLI: stripspace (clap args + dispatch)
 │   │   └── engine.rs         # Whitespace cleanup on raw bytes, comment-line prefixing
+│   ├── tip.rs                # tip/bingo and zen (a git tip of the day, the Zen of rgit)
+│   │   ├── cli.rs            # CLI: tip (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of tip
+│   │   └── types.rs          # Types: Tip
 │   ├── unpack_file.rs        # unpack-file <blob>
 │   │   └── cli.rs            # CLI: unpack-file (clap args + dispatch)
 │   ├── var.rs                # var (-l, <variable>)
@@ -320,6 +361,10 @@ src/
 │       └── types.rs          # Types: PreparedRefUpdate, RefUpdate, UpdateRefOptions, UpdateRefsState
 ├── remote.rs                 # Declares the remote modules
 ├── remote/                   # Remotes and transports (local paths, GitHub Git Data API, bundles): clone, fetch, pull, push
+│   ├── backup.rs             # backup (every ref into a dated bundle in ~/.rgit-backups, newest 10 kept)
+│   │   ├── cli.rs            # CLI: backup (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of backup
+│   │   └── types.rs          # Types: Backup
 │   ├── bundle.rs             # bundle (create [-q] [--version], verify [-q], list-heads, unbundle)
 │   │   ├── cli.rs            # CLI: bundle (clap args + dispatch)
 │   │   ├── engine.rs         # Bundle header read/write, rev/ref resolution, object enumeration, packfile write/read with deltas
@@ -334,6 +379,14 @@ src/
 │   │   └── types.rs          # Types: FetchRefResult
 │   ├── github.rs             # GitHub Git Data API client, blob/tree/commit uploader, remote ref updates
 │   │   └── types.rs          # Types: CommitIdentity, GitHubTreeEntry
+│   ├── open.rs               # open (web page of a file, branch, commit or pull request; -p prints it)
+│   │   ├── cli.rs            # CLI: open (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of open
+│   │   └── types.rs          # Types: Host, WebRepo, Target
+│   ├── pr_summary.rs         # pr-summary (Markdown pull request description: commits, files, merges cleanly?)
+│   │   ├── cli.rs            # CLI: pr-summary (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of pr-summary
+│   │   └── types.rs          # Types: ChangedFile
 │   ├── pull.rs               # pull (fetch from remote + merge upstream branch into current branch)
 │   │   └── cli.rs            # CLI: pull (clap args + dispatch)
 │   ├── push.rs               # push (local transport & GitHub Git Data API: object transfers, ff checks, ref updates)
@@ -344,6 +397,10 @@ src/
 │   │   ├── cli.rs            # CLI: remote (clap args + dispatch)
 │   │   ├── engine.rs         # Remote config queries, name validation, ref directory manipulation, tracking branch collection
 │   │   └── types.rs          # Types: RemoteAction, RemoteInfo
+│   ├── sync.rs               # sync (fetch, then fast-forward/rebase/merge onto the upstream and push, with a plan first)
+│   │   ├── cli.rs            # CLI: sync (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of sync
+│   │   └── types.rs          # Types: Integration, SyncState
 │   └── types.rs              # Remote types shared by several transports (GitHub target, ...)
 ├── storage.rs                # Declares the storage modules
 ├── storage/                  # Object storage maintenance: packs, pack indexes, commit-graph, multi-pack-index, gc, prune, fsck
@@ -355,6 +412,10 @@ src/
 │   │   ├── cli.rs            # CLI: count-objects (clap args + dispatch)
 │   │   ├── engine.rs         # Loose/packed object statistics, human-readable sizes
 │   │   └── types.rs          # Types: ObjectCountReport
+│   ├── doctor.rs             # doctor (objects, refs, identity, config, hooks, stale locks, worktrees, huge files; --fix)
+│   │   ├── cli.rs            # CLI: doctor (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of doctor
+│   │   └── types.rs          # Types: Severity, AutoFix, Finding
 │   ├── fsck.rs               # fsck (object integrity, connectivity, dangling/unreachable reports)
 │   │   ├── cli.rs            # CLI: fsck (clap args + dispatch)
 │   │   ├── engine.rs         # Object integrity checks, connectivity walks, dangling object reports
@@ -389,6 +450,10 @@ src/
 │       └── cli.rs            # CLI: verify-pack (clap args + dispatch)
 ├── workspace.rs              # Declares the workspace modules
 ├── workspace/                # Working tree and index: add/status/rm/mv, checkout/switch, restore, reset, clean, stash, commit, worktrees, sparse, submodules
+│   ├── absorb.rs             # absorb (fold each staged hunk into the commit that last changed those lines)
+│   │   ├── cli.rs            # CLI: absorb (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of absorb
+│   │   └── types.rs          # Types: StagedHunk, Placement
 │   ├── branch.rs             # branch (list -a/-r/-v/-vv/patterns/--merged/--contains/--points-at, create -f/-t/--no-track, -d/-D/-r, -m/-M, -c/-C, -u, --unset-upstream, --show-current), switch, checkout
 │   │   ├── cli.rs            # CLI: branch, switch, checkout (clap args + dispatch)
 │   │   ├── engine.rs         # branch arg parsing, list rendering (-v/-vv tracking), upstream config, branch config section moves
@@ -408,12 +473,24 @@ src/
 │   │   ├── cli.rs            # CLI: commit-tree, commit (clap args + dispatch)
 │   │   └── types.rs          # Types: CommitOptions
 │   ├── commit_summary.rs     # `[branch abbrev] subject` summary + diffstat printed after commit / cherry-pick
+│   ├── fixup.rs              # fixup (fold the staged changes into an earlier commit and rewrite the commits above)
+│   │   ├── cli.rs            # CLI: fixup (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of fixup
+│   │   └── types.rs          # Types: Candidate
 │   ├── gitignore.rs          # Gitignore parsing and pattern matching
+│   ├── ignore.rs             # ignore (add patterns to .gitignore or the global file, untrack what they now ignore)
+│   │   ├── cli.rs            # CLI: ignore (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of ignore
+│   │   └── types.rs          # Types: PatternPlan
 │   ├── index_plumbing.rs     # Entry vs worktree state, path normalization, add_index_entry rules, refresh, temp files
 │   ├── ls_files.rs           # ls-files (-c, -m, -d, -o, -i, --exclude-standard, -s, -t, -z, pathspecs)
 │   │   ├── cli.rs            # CLI: ls-files (clap args + dispatch)
 │   │   ├── engine.rs         # Worktree-vs-index state, untracked/ignored walker, ls-files pathspec matching
 │   │   └── types.rs          # Types: LsFilesOptions, UntrackedPath, WorktreeState
+│   ├── oops.rs               # oops (the most likely fixes right after a mistake)
+│   │   ├── cli.rs            # CLI: oops (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of oops
+│   │   └── types.rs          # Types: Fix, OopsContext
 │   ├── patch.rs              # patch mode entry points: add -p, reset -p, checkout -p, restore -p, stash -p
 │   │   ├── engine.rs         # Interactive hunk engine for -p modes: patch parsing, hunk split/render, applying selected hunks
 │   │   └── types.rs          # Types: HunkUse, InteractiveFile, InteractiveHunk, PatchModeSpec, PatchTarget
@@ -427,6 +504,10 @@ src/
 │   ├── restore.rs            # restore (worktree and staged paths)
 │   │   ├── cli.rs            # CLI: restore (clap args + dispatch)
 │   │   └── types.rs          # Types: WriteoutStage
+│   ├── secrets.rs            # secrets (keys, tokens, passwords, .env files in staged changes, files or history)
+│   │   ├── cli.rs            # CLI: secrets (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of secrets
+│   │   └── types.rs          # Types: Scope, Finding
 │   ├── sparse_checkout.rs    # sparse-checkout (init, set, add, list, reapply, disable, check-rules)
 │   │   ├── cli.rs            # CLI: sparse-checkout (clap args + dispatch)
 │   │   └── engine.rs         # Sparse checkout patterns, cone files, apply to worktree + skip-worktree bits, re-apply hook
@@ -444,9 +525,21 @@ src/
 │   │   ├── engine.rs         # .gitmodules, nested repo HEAD, URL resolution, running rgit in a submodule
 │   │   └── types.rs          # Types: SubmoduleInfo
 │   ├── types.rs              # Working-tree types shared by several commands (index file state, ...)
+│   ├── undo.rs               # undo/redo and the operation log (what the last command changed, how to take it back)
+│   │   ├── cli.rs            # CLI: undo (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of undo
+│   │   └── types.rs          # Types: RepoState, OpKind, Operation, Captured, Change, RestorePlan
 │   ├── update_index.rs       # update-index (--add, --remove, --cacheinfo, --chmod, --refresh, --index-info, --stdin)
 │   │   ├── cli.rs            # CLI: update-index (clap args + dispatch)
 │   │   └── types.rs          # Types: UpdateIndexFlags
+│   ├── whereami.rs           # whereami (branch, upstream, changes, operation in progress, what to run next)
+│   │   ├── cli.rs            # CLI: whereami (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of whereami
+│   │   └── types.rs          # Types: Upstream, Situation
+│   ├── wip.rs                # wip (save uncommitted work on a hidden per-branch ref; --restore)
+│   │   ├── cli.rs            # CLI: wip (clap args + dispatch)
+│   │   ├── engine.rs         # Logic of wip
+│   │   └── types.rs          # Types: WipEntry
 │   └── worktree.rs           # worktree (add, list, remove, move, lock, unlock, prune)
 │       ├── cli.rs            # CLI: worktree (clap args + dispatch)
 │       ├── engine.rs         # Worktree listing/lookup, admin dirs, checkout into a new worktree, prune/move, list formatting

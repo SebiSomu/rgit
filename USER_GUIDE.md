@@ -274,7 +274,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`merge-tree`](#rgit-merge-tree) | Merge two commits in memory and print the result. |
 | [`merge-file`](#rgit-merge-file) | Three-way merge of three files. |
 
-### 6. Undo, recovery and health
+### 6. Undo and recovery
 
 | Command | What it does |
 |---|---|
@@ -285,33 +285,48 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
-| [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
-| [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
-| [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
-| [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
-| [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
-| [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
-| [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
-| [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
-| [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
-| [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
-| [`pr-summary`](#rgit-pr-summary) | A Markdown pull request description: title, commits, files, and whether it merges cleanly (rgit only). |
-| [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
-| [`changelog`](#rgit-changelog) | A Markdown changelog from conventional commits, per version (rgit only). |
-| [`contributors`](#rgit-contributors) | Everyone who wrote the commits: commits, share, co-authored, lines, first and last day (rgit only). |
-| [`tip`](#rgit-tip) | A tip about git or rgit: of the day, by number, random, or the list; also `rgit bingo` (rgit only). |
-| [`zen`](#rgit-zen) | The Zen of rgit: the ideas it is built on (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
 | [`reflog`](#rgit-reflog) | Show where HEAD and branches used to point. |
 | [`bisect`](#rgit-bisect) | Binary-search the history for the commit that broke something. |
+
+### 7. Understanding and learning
+
+| Command | What it does |
+|---|---|
+| [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
+| [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
+| [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
+| [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
+| [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
+| [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
+| [`contributors`](#rgit-contributors) | Everyone who wrote the commits: commits, share, co-authored, lines, first and last day (rgit only). |
+| [`tip`](#rgit-tip) | A tip about git or rgit: of the day, by number, random, or the list; also `rgit bingo` (rgit only). |
+| [`zen`](#rgit-zen) | The Zen of rgit: the ideas it is built on (rgit only). |
+
+### 8. Safety and health
+
+| Command | What it does |
+|---|---|
+| [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
+| [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
+| [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
+| [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
 | [`fsck`](#rgit-fsck) | Check the object database for corruption. |
 | [`gc`](#rgit-gc) | Clean up: expire old reflog entries and delete unreachable objects. |
 | [`prune`](#rgit-prune) | Delete unreachable loose objects. |
 
-### 7. Remotes and collaboration
+### 9. Review and release
+
+| Command | What it does |
+|---|---|
+| [`pr-summary`](#rgit-pr-summary) | A Markdown pull request description: title, commits, files, and whether it merges cleanly (rgit only). |
+| [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
+| [`changelog`](#rgit-changelog) | A Markdown changelog from conventional commits, per version (rgit only). |
+
+### 10. Remotes and collaboration
 
 | Command | What it does |
 |---|---|
@@ -323,7 +338,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`request-pull`](#rgit-request-pull) | Write a pull-request summary. |
 | [`fmt-merge-msg`](#rgit-fmt-merge-msg) | Build a merge commit message from FETCH_HEAD-style lines. |
 
-### 8. Patches and email
+### 11. Patches and email
 
 | Command | What it does |
 |---|---|
@@ -336,7 +351,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`check-mailmap`](#rgit-check-mailmap) | Show the canonical name and email from .mailmap. |
 | [`patch-id`](#rgit-patch-id) | Compute stable IDs for patches. |
 
-### 9. Export and import
+### 12. Export and import
 
 | Command | What it does |
 |---|---|
@@ -345,7 +360,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`fast-export`](#rgit-fast-export) | Write history as a fast-import stream. |
 | [`fast-import`](#rgit-fast-import) | Read a fast-import stream into the repository. |
 
-### 10. Objects, refs and the index (plumbing)
+### 13. Objects, refs and the index (plumbing)
 
 | Command | What it does |
 |---|---|
@@ -379,7 +394,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`stripspace`](#rgit-stripspace) | Clean up whitespace in text from standard input. |
 | [`column`](#rgit-column) | Arrange lines from standard input in columns. |
 
-### 11. Storage and maintenance
+### 14. Storage and maintenance
 
 | Command | What it does |
 |---|---|
@@ -1949,9 +1964,9 @@ rgit merge-file -p ours.txt base.txt theirs.txt
 ```
 
 
-## 6. Undo, recovery and health
+## 6. Undo and recovery
 
-Go back, set work aside, find a bug, and check the repository is sound.
+Go back, set work aside, rewrite commits, and find a bug.
 
 
 ### `rgit undo`
@@ -2304,58 +2319,6 @@ Rewrote the commit on top; the files are unchanged.
 ```
 
 
-### `rgit whereami`
-
-One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next (rgit only).
-
-**Syntax:** `rgit whereami`
-
-It shows what `git status`, `git branch -vv`, `git log -1` and `git stash list` would show between them, in one place, plus one suggestion. The lines:
-
-- **Header:** the branch (`(no commits yet)` when unborn), or `HEAD detached at <commit>`, with `(rebasing <branch>)` / `(bisecting, started on <branch>)` when a rebase or bisect detached it.
-- **Upstream:** `origin/main: 2 ahead, 1 behind` (counted against the remote-tracking ref, so as of the last fetch; nothing is fetched), `up to date`, `none (not pushed to origin yet)`, `none (no remotes)`, or `gone` when the remote branch was deleted.
-- **Last commit:** hash, subject, author and age.
-- **Changes:** conflicted, staged, modified and untracked counts, or `none (clean)`.
-- **In progress:** a merge, rebase (with how many commits are done), cherry-pick, revert, bisect (the commit under test), `am`, or a `stash apply` stopped on conflicts. Only shown when there is one.
-- **Saved:** stash entries and this branch's `rgit wip` saves. Only shown when there are any.
-- **Next:** the most likely next command, in this order: finish (or abort) the operation in progress (resolving conflicts first); get off a detached HEAD; make the first commit; commit what is staged, or stage what is modified; `rgit sync` when behind, `rgit push` when ahead, `rgit push -u` for a branch never pushed; add untracked files; otherwise nothing to do.
-
-It only reads, so it is not recorded in the operation log.
-
-<details>
-<summary>Options as printed by <code>rgit whereami -h</code></summary>
-
-```text
-One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next
-
-Usage: rgit whereami
-
-Options:
-  -h, --help  Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit whereami
-On branch main
-Upstream    origin/main: 1 ahead, 1 behind
-Last commit 4332f6c clone commit (Test Author, 2 hours ago)
-Changes     none (clean)
-Saved       1 stash entry
-Next        `rgit sync` to bring in origin/main's new commit and replay yours on top
-
-$ rgit whereami
-HEAD detached at 8f0c2e1 (rebasing main)
-Last commit 8f0c2e1 side edit (Test Author, 5 minutes ago)
-Changes     1 conflicted
-In progress rebase of main onto 8f0c2e1: 0 of 1 commits done
-Next        resolve the conflicts (`rgit conflicts` shows them), `rgit add` each file, then `rgit rebase --continue`
-```
-
-
 ### `rgit move-commit`
 
 Move commits of the current branch to another branch: cherry-pick them there and drop them here, without switching (rgit only).
@@ -2404,777 +2367,6 @@ Moved 2 commits to 'fresh' (now 7b3e0c2, a new branch off 9c2e0d4):
   2f0a6d1 second commit
   7b3e0c2 fifth commit
 Dropped them from 'two' (now 9c2e0d4).
-```
-
-
-### `rgit ignore`
-
-Add patterns to `.gitignore` (or the global ignore file) and stop tracking the files they now ignore (rgit only).
-
-**Syntax:** `rgit ignore <pattern>... [--global] [--keep-tracked] [-n]`
-
-git's way is `echo 'build/' >> .gitignore`, then `git rm -r --cached build/` for files already committed (an ignore rule alone never untracks anything), then `git add .gitignore`. `rgit ignore` does all three:
-
-- **The file:** each pattern is added at the end of the top-level `.gitignore` (created if missing), or with `--global` the global ignore file (`core.excludesFile`, default `~/.config/git/ignore`, the same file git reads). Patterns the file already has are skipped, and so are repeats. The existing lines are never reordered, since order matters for `!` rules. Patterns are .gitignore syntax: quote them so the shell doesn't expand `*`; one starting with `#` is refused (it would be a comment).
-- **Tracked files:** tracked files the patterns match, and that the rules as a whole now ignore, are removed from the index (`rm --cached`: they stay on disk), unless `--keep-tracked`.
-- **Staging:** `.gitignore` is staged with the removals, so one `rgit commit` records it all, unless the file had unstaged edits of its own (then only the removals are staged, and it says so).
-- **Typos:** a pattern that matches no file, tracked or untracked, gets a note.
-
-`-n`/`--dry-run` prints the plan. It is one `rgit undo` step (the global file is outside the repository, so undo doesn't restore it).
-
-rgit's ignore rules include the global ignore file and `.git/info/exclude`, like git (lowest priority first: global file, `.git/info/exclude`, then the `.gitignore` files), in `add`, `status`, `clean`, `stash -u`, `ls-files --exclude-standard` and `check-ignore`.
-
-<details>
-<summary>Options as printed by <code>rgit ignore -h</code></summary>
-
-```text
-Add patterns to .gitignore (or the global ignore file) and stop tracking the files they now ignore
-
-Usage: rgit ignore [OPTIONS] <PATTERN>...
-
-Arguments:
-  <PATTERN>...  Patterns, in .gitignore syntax (quote them so the shell doesn't expand `*`)
-
-Options:
-      --global        Add them to the global ignore file (core.excludesFile, default ~/.config/git/ignore) instead of .gitignore
-      --keep-tracked  Keep tracking files that the patterns match (by default they are untracked, kept on disk)
-  -n, --dry-run       Print what would change, change nothing
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit ignore '*.log' build/ '*.lgo'
-Added to .gitignore: *.log, build/, *.lgo
-  note: '*.lgo' matches no file yet (a typo?)
-Stopped tracking 2 files that are now ignored (kept on disk): build/out.o, debug.log
-Staged .gitignore and the removals; `rgit commit` records them.
-```
-
-
-### `rgit story`
-
-The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, and a timeline (rgit only).
-
-**Syntax:** `rgit story <path> [-n <N> | --all]`
-
-It sums up what `git log --follow`, `git blame` and `git shortlog` would show between them:
-
-- **Created:** date (with age), author and commit, and the original name if the file was renamed since. A directory shows its first commit instead.
-- **Renamed:** each rename or copy that made the file, followed back like `log --follow`.
-- **Changed:** number of commits and authors, and the lines added and removed.
-- **Most commits:** the top three authors by number of commits (shown when there is more than one author).
-- **Rewrite:** up to three commits that replaced at least half the lines of a file of 5 or more lines.
-- **Lines today:** who wrote the current lines (blame; summed over the files for a directory), as percentages.
-- **Last change**, or **Deleted** for a file that is gone (its history is still told).
-- **Timeline:** the newest 10 commits (`-n` changes the count, `--all` lists every one) with date, author, `+added -removed`, and whether the commit created, renamed or deleted the file.
-
-Merge commits are skipped, as in `log --follow`. It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit story -h</code></summary>
-
-```text
-The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, timeline
-
-Usage: rgit story [OPTIONS] <PATH>
-
-Arguments:
-  <PATH>  The file or directory
-
-Options:
-  -n, --max-count <N>  How many commits the timeline lists (newest first) [default: 10]
-      --all            List every commit in the timeline
-  -h, --help           Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit story parser.rs
-parser.rs
-Created      2023-11-14 (2 years ago) by Ana in 41ab7f0 "Add parser" as parse.rs
-Renamed      parse.rs -> parser.rs in 9c2e0d4 "Rename parser" (Bob, 2023-11-14)
-Changed      5 commits, by 2 authors; +13 -6 lines
-Most commits Ana (3 commits), Bob (2 commits)
-Rewrite      Bob replaced 71% of its lines in 5d1c0aa "Rewrite tokenizer" (2023-11-14)
-Lines today  Bob (71%), Ana (29%)
-Last change  2023-11-14 (2 years ago) by Ana in 8e2f913 "Fix g"
-
-Timeline (newest first):
-  2023-11-14  8e2f913  Ana  +1 -1      Fix g
-  2023-11-14  5d1c0aa  Bob  +5 -5      Rewrite tokenizer
-  2023-11-14  9c2e0d4  Bob  +0 -0      Rename parser  (renamed)
-  2023-11-14  2f0a6d1  Ana  +1 -0      Add g
-  2023-11-14  41ab7f0  Ana  +6 -0      Add parser  (created)
-```
-
-
-### `rgit hotspots`
-
-Files that change most, have the most authors, and change together (rgit only).
-
-**Syntax:** `rgit hotspots [<path>...] [--since <date>] [-n <N>]`
-
-One walk over the current branch's non-merge commits (each against its first parent), counting only files that still exist, gives three lists of the top `-n` (default 10):
-
-- **Most changed:** files changed in the most commits (ties broken by lines changed), with `+added -removed`. A file changed only once is not listed.
-- **Most authors:** files changed by more than one author, with each author's commit count (top three).
-- **Changed together:** pairs of files changed in the same commits (at least 2), with what share of the less-changed file's commits that is. Commits that change more than 30 files (a reformat, a mass rename, generated code) are left out of this list and counted in its heading.
-
-Paths limit it to files under them; `--since` takes the same dates as `log --since` (`2024-01-01`, `3 months ago`, ...) and looks at the commit date. Renames are not followed: a renamed file starts over under its new name. It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit hotspots -h</code></summary>
-
-```text
-Files that change most, have the most authors, and change together (coupling)
-
-Usage: rgit hotspots [OPTIONS] [PATH]...
-
-Arguments:
-  [PATH]...  Only files under these paths
-
-Options:
-      --since <DATE>   Only commits since this date (`2024-01-01`, `3 months ago`, ...)
-  -n, --max-count <N>  How many entries each list shows [default: 10]
-  -h, --help           Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit hotspots
-Hotspots over 6 commits (34 files):
-
-Most changed
-     5 commits  +5 -1  cli.rs
-     3 commits  +3 -1  parser.rs
-     2 commits  +2 -0  README.md
-
-Most authors
-     3 authors  cli.rs  (Ana 2, Bob 2, Cy 1)
-     2 authors  parser.rs  (Ana 2, Bob 1)
-     2 authors  README.md  (Ana 1, Cy 1)
-
-Changed together (leaving out 1 commit of more than 30 files)
-     3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
-```
-
-
-### `rgit doctor`
-
-Check the repository for problems, each with the command that fixes it; `--fix` applies the safe fixes (rgit only).
-
-**Syntax:** `rgit doctor [--fix] [--quick] [--large <size>]`
-
-It prints only what is wrong, as `error` (something is broken) or `warning` (something will likely go wrong), each followed by a `fix:` line, then a summary. Exit code 1 when an error is left, so it can gate a script or CI. The checks:
-
-- **Objects:** `fsck`'s integrity and connectivity check (corrupt or missing objects are errors; dangling objects are normal and not reported). The slow part on a big repository: `--quick` skips it.
-- **Refs:** `refs verify`.
-- **Identity:** `user.name` / `user.email` not set (nor `GIT_AUTHOR_*` / `GIT_COMMITTER_*`), so commits get rgit's placeholder.
-- **Config:** lines `config` can't read (a header without `]`, a setting outside any section), a branch tracking a remote that doesn't exist or a remote branch that is gone, a local-path remote URL that doesn't exist, `core.hooksPath` / `core.excludesFile` naming a missing path.
-- **Hooks:** hook files (not `.sample`) that aren't executable, so they never run (Unix only; Windows has no such bit).
-- **Lock files:** `*.lock` under `.git`. Older than 10 minutes, a command that crashed left it and writes will fail (an error); a recent one may belong to a running command (a warning, left alone).
-- **Worktrees:** linked worktrees whose directory is gone.
-- **Huge untracked files:** not ignored and at least `--large` (default `50M`; `500K`, `1G`, or bytes), so `rgit add .` would commit them; the fix is `rgit ignore`.
-- **Forgotten operations:** a merge, rebase, cherry-pick, revert, bisect or `am` in progress for over a day.
-
-`--fix` applies the mechanical fixes itself (stale lock files removed, broken worktree records pruned, hooks made executable) and lists them as `fixed`; everything else stays a suggestion to run yourself.
-
-<details>
-<summary>Options as printed by <code>rgit doctor -h</code></summary>
-
-```text
-Check the repository for problems (objects, refs, identity, config, hooks, stale locks, worktrees, huge files) and how to fix them
-
-Usage: rgit doctor [OPTIONS]
-
-Options:
-      --fix           Apply the safe fixes: remove stale lock files, prune broken worktrees, make hooks executable
-      --quick         Skip the object check (the slow part on a big repository)
-      --large <SIZE>  Size from which an untracked file counts as huge (`500K`, `50M`, `1G`; default 50M) [default: 50M]
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit doctor --quick
-warning  user.email is not set: commits will say 'rgit@example.com'
-         fix: rgit config --global user.email you@example.com
-error    .git/index.lock is 1 hour old: a command that crashed left it, and writes to it will fail
-         fix: rgit doctor --fix (removes stale locks)
-warning  worktree 'ghost' is broken: gitdir file points to non-existent location
-         fix: rgit worktree prune (or `rgit doctor --fix`)
-Checked 8 areas (objects skipped: --quick): 1 error, 2 warnings.
-`rgit doctor --fix` applies the fixes marked `rgit doctor --fix`.
-
-$ rgit doctor --quick --fix
-warning  user.email is not set: commits will say 'rgit@example.com'
-         fix: rgit config --global user.email you@example.com
-fixed    removed .git/index.lock
-fixed    pruned worktree 'ghost'
-Checked 8 areas (objects skipped: --quick): 2 fixed, 1 warning.
-```
-
-
-### `rgit stats`
-
-Numbers on the current branch's history: activity, weekdays, authors, languages and the biggest commits (rgit only).
-
-**Syntax:** `rgit stats [<path>...] [--since <date>] [--weeks <N>]`
-
-Over the non-merge commits (each against its first parent; paths and `--since` narrow them, `--since` taking `log --since` dates and looking at the author date):
-
-- **Totals:** commits, authors, the first and last commit day, lines and files at HEAD, lines added and removed over all commits.
-- **Activity:** commits per week as a sparkline over the last `--weeks` weeks (default 12). The last week is the newest commit's, not today's, so an old repository still shows its active period.
-- **By weekday:** commits per day of the week, in each author's local time.
-- **Authors:** commits, share, lines added and removed, first and last commit (top 10).
-- **Languages:** lines and files per language at HEAD, from the file extension (top 10; binary files skipped; unknown extensions show as `Other (.ext)`).
-- **Biggest commits:** the 5 with the most lines changed.
-
-Days are UTC except in the biggest-commits list, which uses the author's local date. It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit stats -h</code></summary>
-
-```text
-Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits
-
-Usage: rgit stats [OPTIONS] [PATH]...
-
-Arguments:
-  [PATH]...  Only commits and files under these paths
-
-Options:
-      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
-      --weeks <N>     How many weeks the activity line covers (ending at the newest commit) [default: 12]
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit stats
-6 commits by 3 authors, 2023-09-04 to 2023-11-13
-8 lines in 4 files today; +12 -4 lines over all commits (2 changed per commit on average)
-
-Activity, last 12 weeks to 2023-11-13 (busiest week: 2 commits)
-  | ▄▄   █    █|
-
-By weekday
-  Mon      3  ██████████████████████████████
-  Tue      2  ████████████████████
-  Wed      0
-  ...
-
-Authors
-  Ana         3 commits   50%  +7 -1            2023-09-04 to 2023-10-03
-  Bob         2 commits   33%  +4 -3            2023-10-02 to 2023-11-13
-  Cy          1 commit    16%  +1 -0            2023-11-11 to 2023-11-11
-
-Languages (lines today)
-  Rust              4 lines   50%     2 files  ████████████████████
-  Markdown          3 lines   37%     1 file   ███████████████
-  TypeScript        1 lines   12%     1 file   █████
-
-Biggest commits
-  41ab7f0  2023-10-02  +4 -0            1 file   Library (Bob)
-  ...
-```
-
-
-### `rgit timeline`
-
-A day-by-day digest of the repository: commits, authors, branches, merges and lines, newest day first (rgit only).
-
-**Syntax:** `rgit timeline [-n <days>] [--since <date>] [--current]`
-
-Two lines per day that has commits: the counts (commits and merges), the authors (most active first, with their count), the branches, and the lines added and removed; then the merges (`merged feature/x into main`), the first three subjects and `+N more`. Between two shown days, `(quiet for N days)` marks the gap.
-
-- **Days** are the authors' local days: a commit at 23:30 `-0500` counts on that day, though it is the next day in UTC.
-- **Branches:** every local branch by default (`--current`: only HEAD's history, without branch names). A commit on the default branch's own line (`init.defaultBranch`, else `main`, else `master`; first parents) counts on it; any other on the most specific branch that has it, so a merged branch's commits still count on that branch while it exists.
-- `-n` sets how many days with commits are shown (default 14; the last line says how many there are), `--since` takes `log --since` dates (author date).
-
-It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit timeline -h</code></summary>
-
-```text
-A day-by-day digest of the repository: commits, authors, branches, merges, lines
-
-Usage: rgit timeline [OPTIONS]
-
-Options:
-  -n, --days <N>      How many days with commits to show (newest first) [default: 14]
-      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
-      --current       Only the current branch (default: every local branch)
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit timeline
-Mon 2023-11-13  1 merge by Ana on main
-                merged feature/x into main
-                (quiet for 2 days)
-Fri 2023-11-10  1 commit by Ana on main  +1 -0
-                Add c
-Thu 2023-11-09  5 commits by Bob (3), Ana (2) on feature/x (4), main  +5 -0
-                Polish x · Review x · More x · +2 more
-                (quiet for 2 days)
-Mon 2023-11-06  1 commit by Ana on main  +1 -0
-                Start
-```
-
-
-### `rgit compare`
-
-Where two branches or commits stand against each other, in one answer (rgit only).
-
-**Syntax:** `rgit compare [<a> [<b>]] [-n <N>]`
-
-With two arguments it compares `a` with `b`; with one, HEAD with it; with none, HEAD with its upstream (as of the last fetch). git's way is `git rev-list --left-right --count a...b`, `git log b..a` and `a..b`, `git merge-base`, `git diff --stat`, `git cherry` and a trial merge. `rgit compare` prints:
-
-- **Where they stand:** the same commit, `a` ahead (`b` can fast-forward to it), `a` behind, diverged (since which merge base), or no shared history. When diverged, how many commits each side has that the other doesn't, and how many of those the other side already has as a copy (same patch: cherry-picked or rebased).
-- **The commits** only each side has (`-n` per side, default 10).
-- **The files that differ** between the tips, each with how each side changed it since the merge base (`changed on both sides`, `added on feature`, `changed on main, deleted on feature`, ...).
-- **Merging:** for diverged branches, whether a merge would be clean or which files would conflict (worked out in memory, nothing is touched), and the next command (`rgit merge` / `rgit rebase`, or `rgit sync` against the upstream; `rgit push` or a fast-forward when one side is simply ahead).
-
-It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit compare -h</code></summary>
-
-```text
-Where two branches stand: ahead, behind or diverged, the commits and files on each side, and whether merging would conflict
-
-Usage: rgit compare [OPTIONS] [REV]...
-
-Arguments:
-  [REV]...  Two branches or commits; with one, HEAD against it; with none, HEAD against its upstream
-
-Options:
-  -n, --max-count <N>  How many commits each side's list shows [default: 10]
-  -h, --help           Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit compare main
-feature and main have diverged since 9c2e0d4 "third commit" (2023-11-14):
-  feature:  2 commits main doesn't have (1 of them is on main too, as a copy)
-  main:     3 commits feature doesn't have (1 of them is on feature too, as a copy)
-
-Only on feature
-  5d1c0aa 2023-11-14 Add x (Ana)
-  41ab7f0 2023-11-14 Feature edit (Ana)
-
-Only on main
-  8e2f913 2023-11-14 Add x (Ana)
-  2f0a6d1 2023-11-14 Main b (Bob)
-  7b3e0c2 2023-11-14 Main edit (Bob)
-
-2 files differ
-  a.txt  changed on both sides
-  b.txt  changed on main
-
-Merging would conflict in 1 file: a.txt.
-Next: `rgit merge main` or `rgit rebase main`.
-```
-
-
-### `rgit secrets`
-
-Look for obvious secrets in the staged changes, every tracked file, or the history; exit code 1 when anything is found (rgit only).
-
-**Syntax:** `rgit secrets [--all-files | --history [<rev>...]] [-q]`
-
-- **Default: the staged changes**, only the lines they add (what is about to be committed), plus new files whose name says they hold secrets. Made for a pre-commit hook.
-- `--all-files`: every tracked file, as staged.
-- `--history`: the lines every commit added, reachable from HEAD or from the given revisions or ranges (`HEAD~10..`); each secret is reported once, at the commit that introduced it, even if it was deleted since.
-
-What it finds: AWS access and secret keys, GitHub, Slack, Google, Stripe, Anthropic and OpenAI-style keys and tokens, private keys (`-----BEGIN ... PRIVATE KEY-----`), JSON web tokens, passwords in URLs (`postgres://user:pass@host`), hard-coded `password = "..."` / `api_key = "..."` assignments, and files such as `.env` (not `.env.example`), `id_rsa`, `*.pem`, `*.key`, `credentials.json`, `.npmrc`. Binary files and files over 1 MiB are skipped. Matches are printed masked (`AKIA…QQ`). A line containing `rgit:allow-secret` (in a comment) is never reported. The warnings `rgit add` and `rgit commit` print use the same rules.
-
-`-q` prints nothing: only the exit code says. As a pre-commit hook (`.git/hooks/pre-commit`, made executable):
-
-```sh
-#!/bin/sh
-exec rgit secrets
-```
-
-<details>
-<summary>Options as printed by <code>rgit secrets -h</code></summary>
-
-```text
-Look for secrets (keys, tokens, passwords, .env files) in the staged changes, all files or the history; exit 1 when found
-
-Usage: rgit secrets [OPTIONS] [REV]...
-
-Arguments:
-  [REV]...  Revisions or ranges for --history (default: HEAD)
-
-Options:
-      --all-files  Scan every tracked file (as staged), not only the staged changes
-      --history    Scan the lines every commit added (reachable from HEAD, or from the given revisions/ranges)
-  -q, --quiet      Print nothing; only the exit code says (1 = something found)
-  -h, --help       Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit secrets
-Possible secrets in the staged changes:
-  .env         a secrets/key file
-  a.txt:3      a GitHub token       ghp_…a1
-  config.py:2  an AWS access key    AKIA…QQ
-  config.py:3  a password in a URL  post…32
-
-4 found. Take them out of the code (an environment variable, or a file listed in .gitignore); `rgit restore --staged <file>` unstages a file.
-False alarm? Add `rgit:allow-secret` in a comment on that line.
-```
-
-
-### `rgit backup`
-
-Save every ref of the repository to a dated bundle file, keeping the newest few (rgit only).
-
-**Syntax:** `rgit backup [--dir <dir>] [--keep <n>] [-f]` · `rgit backup --list [--dir <dir>]`
-
-git's way is `git bundle create <file> --all` by hand. `rgit backup` writes the same bundle (branches, tags, remote-tracking refs, the stash and `rgit wip` saves) to `<dir>/<repo>-<YYYY-MM-DD-HHMMSS>.bundle` (UTC; `-2`, `-3`... for more in the same second):
-
-- **Where:** `--dir`, else `rgit.backupDir`, else `~/.rgit-backups`. `<repo>` is the working tree's directory name.
-- **Skipped when nothing changed:** if the newest backup has exactly the same refs, no new file is written (`-f` writes one anyway).
-- **Retention:** afterwards only the newest `--keep` backups of this repository stay (else `rgit.backupKeep`, else 10; `0` keeps all); the older ones are deleted and listed.
-- **Not in a backup:** uncommitted changes (they aren't refs); it says so when there are some. `rgit wip` first saves them as a ref.
-- `--list` shows this repository's backups, newest first, with size and number of refs.
-
-**Restoring:** `rgit clone <file> <dir>` makes a repository from a backup, with its branches and tags (clone and fetch from a bundle now bring the bundle's tags along). `rgit bundle list-heads <file>` shows every ref a backup holds.
-
-<details>
-<summary>Options as printed by <code>rgit backup -h</code></summary>
-
-```text
-Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one
-
-Usage: rgit backup [OPTIONS]
-
-Options:
-      --dir <DIR>  Where the backups go (default: rgit.backupDir, else ~/.rgit-backups)
-      --keep <N>   How many backups of this repository to keep, newest first; 0 keeps all (default: rgit.backupKeep, else 10)
-  -f, --force      Back up even when nothing changed since the last backup
-      --list       List this repository's backups instead
-  -h, --help       Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit backup
-Backed up 3 refs (16 objects) to ~/.rgit-backups/demo-2026-11-25-174537.bundle (2 KB).
-Removed 1 older backup (keeping the newest 10): demo-2026-11-01-091200.bundle
-Restore with `rgit clone ~/.rgit-backups/demo-2026-11-25-174537.bundle <dir>`.
-$ rgit backup
-Nothing new since the last backup (~/.rgit-backups/demo-2026-11-25-174537.bundle): same 3 refs. `-f` makes one anyway.
-```
-
-
-### `rgit pr-summary`
-
-A Markdown draft of a pull request description, printed to stdout (rgit only).
-
-**Syntax:** `rgit pr-summary [<base> [<head>]] [--title <text>]`
-
-For the commits `<head>` (default HEAD) has that `<base>` doesn't. The base defaults to the remote's default branch (`origin/HEAD`, else `origin/main` or `origin/master`), else a local `main` or `master`. It prints:
-
-- **A title:** the commit's subject for a single commit (its body follows as the description), otherwise made from the branch name (`feature/add-parser` → `Add parser`); `--title` sets it.
-- **The totals:** commits, files and lines changed against the base (from the merge base).
-- **Commits**, oldest first, with short hashes (for more than one commit).
-- **Files**, each with `+added -removed` (`new`, `deleted`, `binary` noted).
-- **Whether it merges cleanly** into the base, from an in-memory merge, or which files would conflict.
-
-Paste it into the pull request, or pipe it (`rgit pr-summary > pr.md`). It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit pr-summary -h</code></summary>
-
-```text
-A Markdown pull request description: title, commits, files with their lines, and whether it merges cleanly
-
-Usage: rgit pr-summary [OPTIONS] [BASE] [HEAD]
-
-Arguments:
-  [BASE]  The branch the pull request goes into (default: the remote's default branch, else main or master)
-  [HEAD]  The branch or commit with the changes (default: HEAD)
-
-Options:
-      --title <TEXT>  The title to use instead of the one rgit makes up
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit pr-summary
-# Add parser
-
-2 commits, 3 files changed (+2 -2) against `main`.
-
-## Commits
-
-- Add parser (`41ab7f0`)
-- Tidy a and b (`9c2e0d4`)
-
-## Files
-
-- `a.txt` (+1 -1)
-- `b.txt` (deleted, -1)
-- `parser.rs` (new, +1)
-
-Merges cleanly into `main`.
-```
-
-
-### `rgit open`
-
-Open (or with `-p` print) the web page of a file, branch, commit or pull request (rgit only).
-
-**Syntax:** `rgit open [<target>] [-p] [--remote <name>]`
-
-The page is on the remote's site (`origin`, or the only remote, or `--remote`), worked out from its URL (`https://`, `ssh://`, `git@host:` or rgit's `owner/repo` shorthand) for GitHub, GitLab (with subgroups) and Bitbucket. The target:
-
-- **nothing:** the current branch (it must be on the remote; otherwise it says to push first);
-- **a file or directory**, optionally with lines (`src/lib.rs:12`, `src/lib.rs:12-20`): shown at the current branch when the remote has it, else at HEAD's commit (so the link works before you push);
-- **a branch** (on the remote), or **a commit** (any revision: `HEAD~2`, a hash, a tag);
-- **`pr`:** the page that opens a new pull request (merge request) from the current branch into the remote's default branch;
-- **`#123`:** pull request 123.
-
-The URL is always printed; the browser is started with `start` (Windows), `open` (macOS) or `xdg-open`.
-
-<details>
-<summary>Options as printed by <code>rgit open -h</code></summary>
-
-```text
-Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket
-
-Usage: rgit open [OPTIONS] [TARGET]
-
-Arguments:
-  [TARGET]  A file or directory (`path:12` or `path:12-20` for lines), a branch, a commit, `pr` (a new pull request from the current branch) or `#123` (pull request 123). Default: the current branch
-
-Options:
-  -p, --print          Only print the URL, don't open the browser
-      --remote <NAME>  The remote whose web page to use (default: origin, or the only remote)
-  -h, --help           Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit open -p src/lib.txt:1
-https://github.com/sebi/rgit/blob/main/src/lib.txt#L1
-$ rgit open pr
-https://github.com/sebi/rgit/compare/main...feature/add-parser?expand=1
-$ rgit open -p --remote lab '#7'
-https://gitlab.com/group/sub/proj/-/merge_requests/7
-```
-
-
-### `rgit changelog`
-
-A Markdown changelog from conventional-commit messages, one section per version (rgit only).
-
-**Syntax:** `rgit changelog [<a>..<b>] [--version <name>] [--all] [--prepend <file>]`
-
-Commit subjects of the form `type(scope)!: description` ([Conventional Commits](https://www.conventionalcommits.org)) are grouped by type, in this order: **Breaking changes** first (a `!` after the type, or a `BREAKING CHANGE:` footer, whose text is added), then Features (`feat`), Bug fixes (`fix`), Performance (`perf`), Refactoring, Documentation (`docs`), Tests, Build and CI (`build`, `ci`), Style, Chores, Reverts, and **Other changes** for every subject that doesn't follow the convention. Each entry shows its scope in bold and its short hash; each section ends with the contributors. Merge commits are left out.
-
-- **Which commits:** by default, those since the latest tag HEAD has, headed `Unreleased`; when HEAD is tagged, that tag's own section (since the tag before it). `<a>..<b>` picks the range; `--version` names the heading (default `Unreleased`, or the tag the range ends at).
-- **The date** in the heading is the newest commit's author date.
-- `--all`: one section per tag over the whole history, newest first (and `Unreleased` on top for commits after the last tag).
-- `--prepend <file>`: writes the result at the top of the file instead (below its `# ` title; a new file gets `# Changelog`), and refuses when the file already has that version's heading.
-
-<details>
-<summary>Options as printed by <code>rgit changelog -h</code></summary>
-
-```text
-A Markdown changelog from conventional commits: breaking changes, features, fixes... per version
-
-Usage: rgit changelog [OPTIONS] [RANGE]
-
-Arguments:
-  [RANGE]  The commits to cover, as `<a>..<b>` (default: since the latest tag, or everything)
-
-Options:
-      --version <NAME>  The heading's version name (default: `Unreleased`, or the tag the range ends at)
-      --all             One section per tag, for the whole history (newest first)
-      --prepend <FILE>  Add the result at the top of this file (after its first `# ` title, if it has one) instead of printing it
-  -h, --help            Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit changelog --version v0.2.0
-## v0.2.0 (2023-11-14)
-
-### Breaking changes
-
-- **api:** rename run() to start() (`5d1c0aa`)
-
-### Features
-
-- **api:** rename run() to start() (`5d1c0aa`)
-- **cli:** add --json output (`41ab7f0`)
-
-### Documentation
-
-- explain --json (`9c2e0d4`)
-
-### Build and CI
-
-- cache cargo builds (`8e2f913`)
-
-### Other changes
-
-- Tweak the README wording (`2f0a6d1`)
-
-Contributors: Ana, Bob, Cy
-```
-
-
-### `rgit contributors`
-
-Everyone who wrote the commits, one line each (rgit only).
-
-**Syntax:** `rgit contributors [<rev>...] [--since <date>] [--sort commits|lines|first|last|name] [-e]`
-
-git's way is `git shortlog -sne` plus `git log --author=... --format=%ad` per person. Over the non-merge commits reachable from HEAD (or the given revisions or range, `v1.0..`; `--since` by author date), each contributor gets: commits authored, commits co-authored (from `Co-authored-by:` trailers, shown as `(+N co-authored)`), their share of the commits, lines added and removed in their commits, and their first and last commit day.
-
-`.mailmap` is applied (the working tree's file, as `check-mailmap` reads it), so one person's several names and emails count as one; `-e` shows the email they used most. `--sort` orders by commits (default, co-authored included), lines changed, first commit, last commit, or name. It only reads.
-
-<details>
-<summary>Options as printed by <code>rgit contributors -h</code></summary>
-
-```text
-Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day
-
-Usage: rgit contributors [OPTIONS] [REV]...
-
-Arguments:
-  [REV]...  Revisions or a range (`v1.0..`); default: HEAD
-
-Options:
-      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
-      --sort <SORT>   Order of the table [default: commits] [possible values: commits, lines, first, last, name]
-  -e, --email         Show each contributor's email
-  -h, --help          Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit contributors -e
-3 contributors, 4 commits:
-  Ana <ana@work.example>  2 commits                    50%  +4 -1            2023-09-01 to 2023-11-01
-  Cy <cy@example.com>     1 commit (+1 co-authored)    25%  +2 -0            2023-11-01 to 2023-11-02
-  Bob <bob@example.com>   1 commit                     25%  +1 -0            2023-10-01
-```
-
-
-### `rgit tip`
-
-A short tip about git or rgit, with a command to try; also `rgit bingo` (rgit only).
-
-**Syntax:** `rgit tip [<n> | -r | --all]`
-
-There are 36 tips, from git's basics (the three trees, two and three dots, relative revisions, the reflog, rebase versus merge) to rgit's own commands (`undo`, `oops`, `whereami`, `fixup`, `absorb`, `split`, `move-commit`, `story`, `compare`, `secrets`, `doctor`, `backup`...). Without arguments it shows the tip of the day (the same one all day, UTC); `<n>` shows tip number `n`, `-r` a random one, `--all` lists every title. It works outside a repository too.
-
-<details>
-<summary>Options as printed by <code>rgit tip -h</code></summary>
-
-```text
-A tip about git or rgit: the tip of the day, a given one, a random one, or the list
-
-Usage: rgit tip [OPTIONS] [N]
-
-Arguments:
-  [N]  Show this tip (by number) instead of the tip of the day
-
-Options:
-  -r, --random  A random tip instead of the tip of the day
-      --all     List every tip's title
-  -h, --help    Print help
-```
-
-</details>
-
-**Example:**
-
-```text
-$ rgit tip 7
-Tip 7 of 36: Uncommit
-
-  `rgit reset --soft HEAD~1` takes the last commit off the branch and leaves
-  its changes staged, ready to commit again (`rgit commit -C ORIG_HEAD` keeps
-  the message).
-
-  Try: rgit reset --soft HEAD~1
-```
-
-
-### `rgit zen`
-
-The ideas rgit is built on (rgit only).
-
-**Syntax:** `rgit zen`
-
-```text
-$ rgit zen
-The Zen of rgit
-
-Explain first, act second.
-Say what happened, not what ran.
-Every change can be undone; every undo, redone.
-A refusal is better than a surprise.
-Check everything, then touch anything: nothing half-done.
-Uncommitted work is sacred.
-Speak git's formats; speak plainly about them.
-The next step belongs in the output.
-Shared history is shared: rewrite only what is yours.
-One command, one whole job.
-If it needs a tutorial, it needs a better message.
 ```
 
 
@@ -3401,6 +2593,670 @@ rgit bisect reset
 ```
 
 
+## 7. Understanding and learning
+
+Read the story of a file, see where you stand, measure the history, and learn git as you go.
+
+
+### `rgit whereami`
+
+One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next (rgit only).
+
+**Syntax:** `rgit whereami`
+
+It shows what `git status`, `git branch -vv`, `git log -1` and `git stash list` would show between them, in one place, plus one suggestion. The lines:
+
+- **Header:** the branch (`(no commits yet)` when unborn), or `HEAD detached at <commit>`, with `(rebasing <branch>)` / `(bisecting, started on <branch>)` when a rebase or bisect detached it.
+- **Upstream:** `origin/main: 2 ahead, 1 behind` (counted against the remote-tracking ref, so as of the last fetch; nothing is fetched), `up to date`, `none (not pushed to origin yet)`, `none (no remotes)`, or `gone` when the remote branch was deleted.
+- **Last commit:** hash, subject, author and age.
+- **Changes:** conflicted, staged, modified and untracked counts, or `none (clean)`.
+- **In progress:** a merge, rebase (with how many commits are done), cherry-pick, revert, bisect (the commit under test), `am`, or a `stash apply` stopped on conflicts. Only shown when there is one.
+- **Saved:** stash entries and this branch's `rgit wip` saves. Only shown when there are any.
+- **Next:** the most likely next command, in this order: finish (or abort) the operation in progress (resolving conflicts first); get off a detached HEAD; make the first commit; commit what is staged, or stage what is modified; `rgit sync` when behind, `rgit push` when ahead, `rgit push -u` for a branch never pushed; add untracked files; otherwise nothing to do.
+
+It only reads, so it is not recorded in the operation log.
+
+<details>
+<summary>Options as printed by <code>rgit whereami -h</code></summary>
+
+```text
+One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next
+
+Usage: rgit whereami
+
+Options:
+  -h, --help  Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit whereami
+On branch main
+Upstream    origin/main: 1 ahead, 1 behind
+Last commit 4332f6c clone commit (Test Author, 2 hours ago)
+Changes     none (clean)
+Saved       1 stash entry
+Next        `rgit sync` to bring in origin/main's new commit and replay yours on top
+
+$ rgit whereami
+HEAD detached at 8f0c2e1 (rebasing main)
+Last commit 8f0c2e1 side edit (Test Author, 5 minutes ago)
+Changes     1 conflicted
+In progress rebase of main onto 8f0c2e1: 0 of 1 commits done
+Next        resolve the conflicts (`rgit conflicts` shows them), `rgit add` each file, then `rgit rebase --continue`
+```
+
+
+### `rgit story`
+
+The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, and a timeline (rgit only).
+
+**Syntax:** `rgit story <path> [-n <N> | --all]`
+
+It sums up what `git log --follow`, `git blame` and `git shortlog` would show between them:
+
+- **Created:** date (with age), author and commit, and the original name if the file was renamed since. A directory shows its first commit instead.
+- **Renamed:** each rename or copy that made the file, followed back like `log --follow`.
+- **Changed:** number of commits and authors, and the lines added and removed.
+- **Most commits:** the top three authors by number of commits (shown when there is more than one author).
+- **Rewrite:** up to three commits that replaced at least half the lines of a file of 5 or more lines.
+- **Lines today:** who wrote the current lines (blame; summed over the files for a directory), as percentages.
+- **Last change**, or **Deleted** for a file that is gone (its history is still told).
+- **Timeline:** the newest 10 commits (`-n` changes the count, `--all` lists every one) with date, author, `+added -removed`, and whether the commit created, renamed or deleted the file.
+
+Merge commits are skipped, as in `log --follow`. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit story -h</code></summary>
+
+```text
+The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, timeline
+
+Usage: rgit story [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>  The file or directory
+
+Options:
+  -n, --max-count <N>  How many commits the timeline lists (newest first) [default: 10]
+      --all            List every commit in the timeline
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit story parser.rs
+parser.rs
+Created      2023-11-14 (2 years ago) by Ana in 41ab7f0 "Add parser" as parse.rs
+Renamed      parse.rs -> parser.rs in 9c2e0d4 "Rename parser" (Bob, 2023-11-14)
+Changed      5 commits, by 2 authors; +13 -6 lines
+Most commits Ana (3 commits), Bob (2 commits)
+Rewrite      Bob replaced 71% of its lines in 5d1c0aa "Rewrite tokenizer" (2023-11-14)
+Lines today  Bob (71%), Ana (29%)
+Last change  2023-11-14 (2 years ago) by Ana in 8e2f913 "Fix g"
+
+Timeline (newest first):
+  2023-11-14  8e2f913  Ana  +1 -1      Fix g
+  2023-11-14  5d1c0aa  Bob  +5 -5      Rewrite tokenizer
+  2023-11-14  9c2e0d4  Bob  +0 -0      Rename parser  (renamed)
+  2023-11-14  2f0a6d1  Ana  +1 -0      Add g
+  2023-11-14  41ab7f0  Ana  +6 -0      Add parser  (created)
+```
+
+
+### `rgit hotspots`
+
+Files that change most, have the most authors, and change together (rgit only).
+
+**Syntax:** `rgit hotspots [<path>...] [--since <date>] [-n <N>]`
+
+One walk over the current branch's non-merge commits (each against its first parent), counting only files that still exist, gives three lists of the top `-n` (default 10):
+
+- **Most changed:** files changed in the most commits (ties broken by lines changed), with `+added -removed`. A file changed only once is not listed.
+- **Most authors:** files changed by more than one author, with each author's commit count (top three).
+- **Changed together:** pairs of files changed in the same commits (at least 2), with what share of the less-changed file's commits that is. Commits that change more than 30 files (a reformat, a mass rename, generated code) are left out of this list and counted in its heading.
+
+Paths limit it to files under them; `--since` takes the same dates as `log --since` (`2024-01-01`, `3 months ago`, ...) and looks at the commit date. Renames are not followed: a renamed file starts over under its new name. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit hotspots -h</code></summary>
+
+```text
+Files that change most, have the most authors, and change together (coupling)
+
+Usage: rgit hotspots [OPTIONS] [PATH]...
+
+Arguments:
+  [PATH]...  Only files under these paths
+
+Options:
+      --since <DATE>   Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+  -n, --max-count <N>  How many entries each list shows [default: 10]
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit hotspots
+Hotspots over 6 commits (34 files):
+
+Most changed
+     5 commits  +5 -1  cli.rs
+     3 commits  +3 -1  parser.rs
+     2 commits  +2 -0  README.md
+
+Most authors
+     3 authors  cli.rs  (Ana 2, Bob 2, Cy 1)
+     2 authors  parser.rs  (Ana 2, Bob 1)
+     2 authors  README.md  (Ana 1, Cy 1)
+
+Changed together (leaving out 1 commit of more than 30 files)
+     3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
+```
+
+
+### `rgit stats`
+
+Numbers on the current branch's history: activity, weekdays, authors, languages and the biggest commits (rgit only).
+
+**Syntax:** `rgit stats [<path>...] [--since <date>] [--weeks <N>]`
+
+Over the non-merge commits (each against its first parent; paths and `--since` narrow them, `--since` taking `log --since` dates and looking at the author date):
+
+- **Totals:** commits, authors, the first and last commit day, lines and files at HEAD, lines added and removed over all commits.
+- **Activity:** commits per week as a sparkline over the last `--weeks` weeks (default 12). The last week is the newest commit's, not today's, so an old repository still shows its active period.
+- **By weekday:** commits per day of the week, in each author's local time.
+- **Authors:** commits, share, lines added and removed, first and last commit (top 10).
+- **Languages:** lines and files per language at HEAD, from the file extension (top 10; binary files skipped; unknown extensions show as `Other (.ext)`).
+- **Biggest commits:** the 5 with the most lines changed.
+
+Days are UTC except in the biggest-commits list, which uses the author's local date. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit stats -h</code></summary>
+
+```text
+Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits
+
+Usage: rgit stats [OPTIONS] [PATH]...
+
+Arguments:
+  [PATH]...  Only commits and files under these paths
+
+Options:
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --weeks <N>     How many weeks the activity line covers (ending at the newest commit) [default: 12]
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit stats
+6 commits by 3 authors, 2023-09-04 to 2023-11-13
+8 lines in 4 files today; +12 -4 lines over all commits (2 changed per commit on average)
+
+Activity, last 12 weeks to 2023-11-13 (busiest week: 2 commits)
+  | ▄▄   █    █|
+
+By weekday
+  Mon      3  ██████████████████████████████
+  Tue      2  ████████████████████
+  Wed      0
+  ...
+
+Authors
+  Ana         3 commits   50%  +7 -1            2023-09-04 to 2023-10-03
+  Bob         2 commits   33%  +4 -3            2023-10-02 to 2023-11-13
+  Cy          1 commit    16%  +1 -0            2023-11-11 to 2023-11-11
+
+Languages (lines today)
+  Rust              4 lines   50%     2 files  ████████████████████
+  Markdown          3 lines   37%     1 file   ███████████████
+  TypeScript        1 lines   12%     1 file   █████
+
+Biggest commits
+  41ab7f0  2023-10-02  +4 -0            1 file   Library (Bob)
+  ...
+```
+
+
+### `rgit timeline`
+
+A day-by-day digest of the repository: commits, authors, branches, merges and lines, newest day first (rgit only).
+
+**Syntax:** `rgit timeline [-n <days>] [--since <date>] [--current]`
+
+Two lines per day that has commits: the counts (commits and merges), the authors (most active first, with their count), the branches, and the lines added and removed; then the merges (`merged feature/x into main`), the first three subjects and `+N more`. Between two shown days, `(quiet for N days)` marks the gap.
+
+- **Days** are the authors' local days: a commit at 23:30 `-0500` counts on that day, though it is the next day in UTC.
+- **Branches:** every local branch by default (`--current`: only HEAD's history, without branch names). A commit on the default branch's own line (`init.defaultBranch`, else `main`, else `master`; first parents) counts on it; any other on the most specific branch that has it, so a merged branch's commits still count on that branch while it exists.
+- `-n` sets how many days with commits are shown (default 14; the last line says how many there are), `--since` takes `log --since` dates (author date).
+
+It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit timeline -h</code></summary>
+
+```text
+A day-by-day digest of the repository: commits, authors, branches, merges, lines
+
+Usage: rgit timeline [OPTIONS]
+
+Options:
+  -n, --days <N>      How many days with commits to show (newest first) [default: 14]
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --current       Only the current branch (default: every local branch)
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit timeline
+Mon 2023-11-13  1 merge by Ana on main
+                merged feature/x into main
+                (quiet for 2 days)
+Fri 2023-11-10  1 commit by Ana on main  +1 -0
+                Add c
+Thu 2023-11-09  5 commits by Bob (3), Ana (2) on feature/x (4), main  +5 -0
+                Polish x · Review x · More x · +2 more
+                (quiet for 2 days)
+Mon 2023-11-06  1 commit by Ana on main  +1 -0
+                Start
+```
+
+
+### `rgit compare`
+
+Where two branches or commits stand against each other, in one answer (rgit only).
+
+**Syntax:** `rgit compare [<a> [<b>]] [-n <N>]`
+
+With two arguments it compares `a` with `b`; with one, HEAD with it; with none, HEAD with its upstream (as of the last fetch). git's way is `git rev-list --left-right --count a...b`, `git log b..a` and `a..b`, `git merge-base`, `git diff --stat`, `git cherry` and a trial merge. `rgit compare` prints:
+
+- **Where they stand:** the same commit, `a` ahead (`b` can fast-forward to it), `a` behind, diverged (since which merge base), or no shared history. When diverged, how many commits each side has that the other doesn't, and how many of those the other side already has as a copy (same patch: cherry-picked or rebased).
+- **The commits** only each side has (`-n` per side, default 10).
+- **The files that differ** between the tips, each with how each side changed it since the merge base (`changed on both sides`, `added on feature`, `changed on main, deleted on feature`, ...).
+- **Merging:** for diverged branches, whether a merge would be clean or which files would conflict (worked out in memory, nothing is touched), and the next command (`rgit merge` / `rgit rebase`, or `rgit sync` against the upstream; `rgit push` or a fast-forward when one side is simply ahead).
+
+It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit compare -h</code></summary>
+
+```text
+Where two branches stand: ahead, behind or diverged, the commits and files on each side, and whether merging would conflict
+
+Usage: rgit compare [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Two branches or commits; with one, HEAD against it; with none, HEAD against its upstream
+
+Options:
+  -n, --max-count <N>  How many commits each side's list shows [default: 10]
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit compare main
+feature and main have diverged since 9c2e0d4 "third commit" (2023-11-14):
+  feature:  2 commits main doesn't have (1 of them is on main too, as a copy)
+  main:     3 commits feature doesn't have (1 of them is on feature too, as a copy)
+
+Only on feature
+  5d1c0aa 2023-11-14 Add x (Ana)
+  41ab7f0 2023-11-14 Feature edit (Ana)
+
+Only on main
+  8e2f913 2023-11-14 Add x (Ana)
+  2f0a6d1 2023-11-14 Main b (Bob)
+  7b3e0c2 2023-11-14 Main edit (Bob)
+
+2 files differ
+  a.txt  changed on both sides
+  b.txt  changed on main
+
+Merging would conflict in 1 file: a.txt.
+Next: `rgit merge main` or `rgit rebase main`.
+```
+
+
+### `rgit contributors`
+
+Everyone who wrote the commits, one line each (rgit only).
+
+**Syntax:** `rgit contributors [<rev>...] [--since <date>] [--sort commits|lines|first|last|name] [-e]`
+
+git's way is `git shortlog -sne` plus `git log --author=... --format=%ad` per person. Over the non-merge commits reachable from HEAD (or the given revisions or range, `v1.0..`; `--since` by author date), each contributor gets: commits authored, commits co-authored (from `Co-authored-by:` trailers, shown as `(+N co-authored)`), their share of the commits, lines added and removed in their commits, and their first and last commit day.
+
+`.mailmap` is applied (the working tree's file, as `check-mailmap` reads it), so one person's several names and emails count as one; `-e` shows the email they used most. `--sort` orders by commits (default, co-authored included), lines changed, first commit, last commit, or name. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit contributors -h</code></summary>
+
+```text
+Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day
+
+Usage: rgit contributors [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Revisions or a range (`v1.0..`); default: HEAD
+
+Options:
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --sort <SORT>   Order of the table [default: commits] [possible values: commits, lines, first, last, name]
+  -e, --email         Show each contributor's email
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit contributors -e
+3 contributors, 4 commits:
+  Ana <ana@work.example>  2 commits                    50%  +4 -1            2023-09-01 to 2023-11-01
+  Cy <cy@example.com>     1 commit (+1 co-authored)    25%  +2 -0            2023-11-01 to 2023-11-02
+  Bob <bob@example.com>   1 commit                     25%  +1 -0            2023-10-01
+```
+
+
+### `rgit tip`
+
+A short tip about git or rgit, with a command to try; also `rgit bingo` (rgit only).
+
+**Syntax:** `rgit tip [<n> | -r | --all]`
+
+There are 36 tips, from git's basics (the three trees, two and three dots, relative revisions, the reflog, rebase versus merge) to rgit's own commands (`undo`, `oops`, `whereami`, `fixup`, `absorb`, `split`, `move-commit`, `story`, `compare`, `secrets`, `doctor`, `backup`...). Without arguments it shows the tip of the day (the same one all day, UTC); `<n>` shows tip number `n`, `-r` a random one, `--all` lists every title. It works outside a repository too.
+
+<details>
+<summary>Options as printed by <code>rgit tip -h</code></summary>
+
+```text
+A tip about git or rgit: the tip of the day, a given one, a random one, or the list
+
+Usage: rgit tip [OPTIONS] [N]
+
+Arguments:
+  [N]  Show this tip (by number) instead of the tip of the day
+
+Options:
+  -r, --random  A random tip instead of the tip of the day
+      --all     List every tip's title
+  -h, --help    Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit tip 7
+Tip 7 of 36: Uncommit
+
+  `rgit reset --soft HEAD~1` takes the last commit off the branch and leaves
+  its changes staged, ready to commit again (`rgit commit -C ORIG_HEAD` keeps
+  the message).
+
+  Try: rgit reset --soft HEAD~1
+```
+
+
+### `rgit zen`
+
+The ideas rgit is built on (rgit only).
+
+**Syntax:** `rgit zen`
+
+```text
+$ rgit zen
+The Zen of rgit
+
+Explain first, act second.
+Say what happened, not what ran.
+Every change can be undone; every undo, redone.
+A refusal is better than a surprise.
+Check everything, then touch anything: nothing half-done.
+Uncommitted work is sacred.
+Speak git's formats; speak plainly about them.
+The next step belongs in the output.
+Shared history is shared: rewrite only what is yours.
+One command, one whole job.
+If it needs a tutorial, it needs a better message.
+```
+
+
+## 8. Safety and health
+
+Keep secrets and junk out, check that the repository is sound, and keep a copy of it.
+
+
+### `rgit ignore`
+
+Add patterns to `.gitignore` (or the global ignore file) and stop tracking the files they now ignore (rgit only).
+
+**Syntax:** `rgit ignore <pattern>... [--global] [--keep-tracked] [-n]`
+
+git's way is `echo 'build/' >> .gitignore`, then `git rm -r --cached build/` for files already committed (an ignore rule alone never untracks anything), then `git add .gitignore`. `rgit ignore` does all three:
+
+- **The file:** each pattern is added at the end of the top-level `.gitignore` (created if missing), or with `--global` the global ignore file (`core.excludesFile`, default `~/.config/git/ignore`, the same file git reads). Patterns the file already has are skipped, and so are repeats. The existing lines are never reordered, since order matters for `!` rules. Patterns are .gitignore syntax: quote them so the shell doesn't expand `*`; one starting with `#` is refused (it would be a comment).
+- **Tracked files:** tracked files the patterns match, and that the rules as a whole now ignore, are removed from the index (`rm --cached`: they stay on disk), unless `--keep-tracked`.
+- **Staging:** `.gitignore` is staged with the removals, so one `rgit commit` records it all, unless the file had unstaged edits of its own (then only the removals are staged, and it says so).
+- **Typos:** a pattern that matches no file, tracked or untracked, gets a note.
+
+`-n`/`--dry-run` prints the plan. It is one `rgit undo` step (the global file is outside the repository, so undo doesn't restore it).
+
+rgit's ignore rules include the global ignore file and `.git/info/exclude`, like git (lowest priority first: global file, `.git/info/exclude`, then the `.gitignore` files), in `add`, `status`, `clean`, `stash -u`, `ls-files --exclude-standard` and `check-ignore`.
+
+<details>
+<summary>Options as printed by <code>rgit ignore -h</code></summary>
+
+```text
+Add patterns to .gitignore (or the global ignore file) and stop tracking the files they now ignore
+
+Usage: rgit ignore [OPTIONS] <PATTERN>...
+
+Arguments:
+  <PATTERN>...  Patterns, in .gitignore syntax (quote them so the shell doesn't expand `*`)
+
+Options:
+      --global        Add them to the global ignore file (core.excludesFile, default ~/.config/git/ignore) instead of .gitignore
+      --keep-tracked  Keep tracking files that the patterns match (by default they are untracked, kept on disk)
+  -n, --dry-run       Print what would change, change nothing
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit ignore '*.log' build/ '*.lgo'
+Added to .gitignore: *.log, build/, *.lgo
+  note: '*.lgo' matches no file yet (a typo?)
+Stopped tracking 2 files that are now ignored (kept on disk): build/out.o, debug.log
+Staged .gitignore and the removals; `rgit commit` records them.
+```
+
+
+### `rgit secrets`
+
+Look for obvious secrets in the staged changes, every tracked file, or the history; exit code 1 when anything is found (rgit only).
+
+**Syntax:** `rgit secrets [--all-files | --history [<rev>...]] [-q]`
+
+- **Default: the staged changes**, only the lines they add (what is about to be committed), plus new files whose name says they hold secrets. Made for a pre-commit hook.
+- `--all-files`: every tracked file, as staged.
+- `--history`: the lines every commit added, reachable from HEAD or from the given revisions or ranges (`HEAD~10..`); each secret is reported once, at the commit that introduced it, even if it was deleted since.
+
+What it finds: AWS access and secret keys, GitHub, Slack, Google, Stripe, Anthropic and OpenAI-style keys and tokens, private keys (`-----BEGIN ... PRIVATE KEY-----`), JSON web tokens, passwords in URLs (`postgres://user:pass@host`), hard-coded `password = "..."` / `api_key = "..."` assignments, and files such as `.env` (not `.env.example`), `id_rsa`, `*.pem`, `*.key`, `credentials.json`, `.npmrc`. Binary files and files over 1 MiB are skipped. Matches are printed masked (`AKIA…QQ`). A line containing `rgit:allow-secret` (in a comment) is never reported. The warnings `rgit add` and `rgit commit` print use the same rules.
+
+`-q` prints nothing: only the exit code says. As a pre-commit hook (`.git/hooks/pre-commit`, made executable):
+
+```sh
+#!/bin/sh
+exec rgit secrets
+```
+
+<details>
+<summary>Options as printed by <code>rgit secrets -h</code></summary>
+
+```text
+Look for secrets (keys, tokens, passwords, .env files) in the staged changes, all files or the history; exit 1 when found
+
+Usage: rgit secrets [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Revisions or ranges for --history (default: HEAD)
+
+Options:
+      --all-files  Scan every tracked file (as staged), not only the staged changes
+      --history    Scan the lines every commit added (reachable from HEAD, or from the given revisions/ranges)
+  -q, --quiet      Print nothing; only the exit code says (1 = something found)
+  -h, --help       Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit secrets
+Possible secrets in the staged changes:
+  .env         a secrets/key file
+  a.txt:3      a GitHub token       ghp_…a1
+  config.py:2  an AWS access key    AKIA…QQ
+  config.py:3  a password in a URL  post…32
+
+4 found. Take them out of the code (an environment variable, or a file listed in .gitignore); `rgit restore --staged <file>` unstages a file.
+False alarm? Add `rgit:allow-secret` in a comment on that line.
+```
+
+
+### `rgit doctor`
+
+Check the repository for problems, each with the command that fixes it; `--fix` applies the safe fixes (rgit only).
+
+**Syntax:** `rgit doctor [--fix] [--quick] [--large <size>]`
+
+It prints only what is wrong, as `error` (something is broken) or `warning` (something will likely go wrong), each followed by a `fix:` line, then a summary. Exit code 1 when an error is left, so it can gate a script or CI. The checks:
+
+- **Objects:** `fsck`'s integrity and connectivity check (corrupt or missing objects are errors; dangling objects are normal and not reported). The slow part on a big repository: `--quick` skips it.
+- **Refs:** `refs verify`.
+- **Identity:** `user.name` / `user.email` not set (nor `GIT_AUTHOR_*` / `GIT_COMMITTER_*`), so commits get rgit's placeholder.
+- **Config:** lines `config` can't read (a header without `]`, a setting outside any section), a branch tracking a remote that doesn't exist or a remote branch that is gone, a local-path remote URL that doesn't exist, `core.hooksPath` / `core.excludesFile` naming a missing path.
+- **Hooks:** hook files (not `.sample`) that aren't executable, so they never run (Unix only; Windows has no such bit).
+- **Lock files:** `*.lock` under `.git`. Older than 10 minutes, a command that crashed left it and writes will fail (an error); a recent one may belong to a running command (a warning, left alone).
+- **Worktrees:** linked worktrees whose directory is gone.
+- **Huge untracked files:** not ignored and at least `--large` (default `50M`; `500K`, `1G`, or bytes), so `rgit add .` would commit them; the fix is `rgit ignore`.
+- **Forgotten operations:** a merge, rebase, cherry-pick, revert, bisect or `am` in progress for over a day.
+
+`--fix` applies the mechanical fixes itself (stale lock files removed, broken worktree records pruned, hooks made executable) and lists them as `fixed`; everything else stays a suggestion to run yourself.
+
+<details>
+<summary>Options as printed by <code>rgit doctor -h</code></summary>
+
+```text
+Check the repository for problems (objects, refs, identity, config, hooks, stale locks, worktrees, huge files) and how to fix them
+
+Usage: rgit doctor [OPTIONS]
+
+Options:
+      --fix           Apply the safe fixes: remove stale lock files, prune broken worktrees, make hooks executable
+      --quick         Skip the object check (the slow part on a big repository)
+      --large <SIZE>  Size from which an untracked file counts as huge (`500K`, `50M`, `1G`; default 50M) [default: 50M]
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit doctor --quick
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+error    .git/index.lock is 1 hour old: a command that crashed left it, and writes to it will fail
+         fix: rgit doctor --fix (removes stale locks)
+warning  worktree 'ghost' is broken: gitdir file points to non-existent location
+         fix: rgit worktree prune (or `rgit doctor --fix`)
+Checked 8 areas (objects skipped: --quick): 1 error, 2 warnings.
+`rgit doctor --fix` applies the fixes marked `rgit doctor --fix`.
+
+$ rgit doctor --quick --fix
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+fixed    removed .git/index.lock
+fixed    pruned worktree 'ghost'
+Checked 8 areas (objects skipped: --quick): 2 fixed, 1 warning.
+```
+
+
+### `rgit backup`
+
+Save every ref of the repository to a dated bundle file, keeping the newest few (rgit only).
+
+**Syntax:** `rgit backup [--dir <dir>] [--keep <n>] [-f]` · `rgit backup --list [--dir <dir>]`
+
+git's way is `git bundle create <file> --all` by hand. `rgit backup` writes the same bundle (branches, tags, remote-tracking refs, the stash and `rgit wip` saves) to `<dir>/<repo>-<YYYY-MM-DD-HHMMSS>.bundle` (UTC; `-2`, `-3`... for more in the same second):
+
+- **Where:** `--dir`, else `rgit.backupDir`, else `~/.rgit-backups`. `<repo>` is the working tree's directory name.
+- **Skipped when nothing changed:** if the newest backup has exactly the same refs, no new file is written (`-f` writes one anyway).
+- **Retention:** afterwards only the newest `--keep` backups of this repository stay (else `rgit.backupKeep`, else 10; `0` keeps all); the older ones are deleted and listed.
+- **Not in a backup:** uncommitted changes (they aren't refs); it says so when there are some. `rgit wip` first saves them as a ref.
+- `--list` shows this repository's backups, newest first, with size and number of refs.
+
+**Restoring:** `rgit clone <file> <dir>` makes a repository from a backup, with its branches and tags (clone and fetch from a bundle now bring the bundle's tags along). `rgit bundle list-heads <file>` shows every ref a backup holds.
+
+<details>
+<summary>Options as printed by <code>rgit backup -h</code></summary>
+
+```text
+Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one
+
+Usage: rgit backup [OPTIONS]
+
+Options:
+      --dir <DIR>  Where the backups go (default: rgit.backupDir, else ~/.rgit-backups)
+      --keep <N>   How many backups of this repository to keep, newest first; 0 keeps all (default: rgit.backupKeep, else 10)
+  -f, --force      Back up even when nothing changed since the last backup
+      --list       List this repository's backups instead
+  -h, --help       Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit backup
+Backed up 3 refs (16 objects) to ~/.rgit-backups/demo-2026-11-25-174537.bundle (2 KB).
+Removed 1 older backup (keeping the newest 10): demo-2026-11-01-091200.bundle
+Restore with `rgit clone ~/.rgit-backups/demo-2026-11-25-174537.bundle <dir>`.
+$ rgit backup
+Nothing new since the last backup (~/.rgit-backups/demo-2026-11-25-174537.bundle): same 3 refs. `-f` makes one anyway.
+```
+
+
 ### `rgit fsck`
 
 Check the object database for corruption.
@@ -3497,7 +3353,181 @@ rgit prune -n
 ```
 
 
-## 7. Remotes and collaboration
+## 9. Review and release
+
+Describe a branch for a pull request, open it on the web, and write the changelog.
+
+
+### `rgit pr-summary`
+
+A Markdown draft of a pull request description, printed to stdout (rgit only).
+
+**Syntax:** `rgit pr-summary [<base> [<head>]] [--title <text>]`
+
+For the commits `<head>` (default HEAD) has that `<base>` doesn't. The base defaults to the remote's default branch (`origin/HEAD`, else `origin/main` or `origin/master`), else a local `main` or `master`. It prints:
+
+- **A title:** the commit's subject for a single commit (its body follows as the description), otherwise made from the branch name (`feature/add-parser` → `Add parser`); `--title` sets it.
+- **The totals:** commits, files and lines changed against the base (from the merge base).
+- **Commits**, oldest first, with short hashes (for more than one commit).
+- **Files**, each with `+added -removed` (`new`, `deleted`, `binary` noted).
+- **Whether it merges cleanly** into the base, from an in-memory merge, or which files would conflict.
+
+Paste it into the pull request, or pipe it (`rgit pr-summary > pr.md`). It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit pr-summary -h</code></summary>
+
+```text
+A Markdown pull request description: title, commits, files with their lines, and whether it merges cleanly
+
+Usage: rgit pr-summary [OPTIONS] [BASE] [HEAD]
+
+Arguments:
+  [BASE]  The branch the pull request goes into (default: the remote's default branch, else main or master)
+  [HEAD]  The branch or commit with the changes (default: HEAD)
+
+Options:
+      --title <TEXT>  The title to use instead of the one rgit makes up
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit pr-summary
+# Add parser
+
+2 commits, 3 files changed (+2 -2) against `main`.
+
+## Commits
+
+- Add parser (`41ab7f0`)
+- Tidy a and b (`9c2e0d4`)
+
+## Files
+
+- `a.txt` (+1 -1)
+- `b.txt` (deleted, -1)
+- `parser.rs` (new, +1)
+
+Merges cleanly into `main`.
+```
+
+
+### `rgit open`
+
+Open (or with `-p` print) the web page of a file, branch, commit or pull request (rgit only).
+
+**Syntax:** `rgit open [<target>] [-p] [--remote <name>]`
+
+The page is on the remote's site (`origin`, or the only remote, or `--remote`), worked out from its URL (`https://`, `ssh://`, `git@host:` or rgit's `owner/repo` shorthand) for GitHub, GitLab (with subgroups) and Bitbucket. The target:
+
+- **nothing:** the current branch (it must be on the remote; otherwise it says to push first);
+- **a file or directory**, optionally with lines (`src/lib.rs:12`, `src/lib.rs:12-20`): shown at the current branch when the remote has it, else at HEAD's commit (so the link works before you push);
+- **a branch** (on the remote), or **a commit** (any revision: `HEAD~2`, a hash, a tag);
+- **`pr`:** the page that opens a new pull request (merge request) from the current branch into the remote's default branch;
+- **`#123`:** pull request 123.
+
+The URL is always printed; the browser is started with `start` (Windows), `open` (macOS) or `xdg-open`.
+
+<details>
+<summary>Options as printed by <code>rgit open -h</code></summary>
+
+```text
+Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket
+
+Usage: rgit open [OPTIONS] [TARGET]
+
+Arguments:
+  [TARGET]  A file or directory (`path:12` or `path:12-20` for lines), a branch, a commit, `pr` (a new pull request from the current branch) or `#123` (pull request 123). Default: the current branch
+
+Options:
+  -p, --print          Only print the URL, don't open the browser
+      --remote <NAME>  The remote whose web page to use (default: origin, or the only remote)
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit open -p src/lib.txt:1
+https://github.com/sebi/rgit/blob/main/src/lib.txt#L1
+$ rgit open pr
+https://github.com/sebi/rgit/compare/main...feature/add-parser?expand=1
+$ rgit open -p --remote lab '#7'
+https://gitlab.com/group/sub/proj/-/merge_requests/7
+```
+
+
+### `rgit changelog`
+
+A Markdown changelog from conventional-commit messages, one section per version (rgit only).
+
+**Syntax:** `rgit changelog [<a>..<b>] [--version <name>] [--all] [--prepend <file>]`
+
+Commit subjects of the form `type(scope)!: description` ([Conventional Commits](https://www.conventionalcommits.org)) are grouped by type, in this order: **Breaking changes** first (a `!` after the type, or a `BREAKING CHANGE:` footer, whose text is added), then Features (`feat`), Bug fixes (`fix`), Performance (`perf`), Refactoring, Documentation (`docs`), Tests, Build and CI (`build`, `ci`), Style, Chores, Reverts, and **Other changes** for every subject that doesn't follow the convention. Each entry shows its scope in bold and its short hash; each section ends with the contributors. Merge commits are left out.
+
+- **Which commits:** by default, those since the latest tag HEAD has, headed `Unreleased`; when HEAD is tagged, that tag's own section (since the tag before it). `<a>..<b>` picks the range; `--version` names the heading (default `Unreleased`, or the tag the range ends at).
+- **The date** in the heading is the newest commit's author date.
+- `--all`: one section per tag over the whole history, newest first (and `Unreleased` on top for commits after the last tag).
+- `--prepend <file>`: writes the result at the top of the file instead (below its `# ` title; a new file gets `# Changelog`), and refuses when the file already has that version's heading.
+
+<details>
+<summary>Options as printed by <code>rgit changelog -h</code></summary>
+
+```text
+A Markdown changelog from conventional commits: breaking changes, features, fixes... per version
+
+Usage: rgit changelog [OPTIONS] [RANGE]
+
+Arguments:
+  [RANGE]  The commits to cover, as `<a>..<b>` (default: since the latest tag, or everything)
+
+Options:
+      --version <NAME>  The heading's version name (default: `Unreleased`, or the tag the range ends at)
+      --all             One section per tag, for the whole history (newest first)
+      --prepend <FILE>  Add the result at the top of this file (after its first `# ` title, if it has one) instead of printing it
+  -h, --help            Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit changelog --version v0.2.0
+## v0.2.0 (2023-11-14)
+
+### Breaking changes
+
+- **api:** rename run() to start() (`5d1c0aa`)
+
+### Features
+
+- **api:** rename run() to start() (`5d1c0aa`)
+- **cli:** add --json output (`41ab7f0`)
+
+### Documentation
+
+- explain --json (`9c2e0d4`)
+
+### Build and CI
+
+- cache cargo builds (`8e2f913`)
+
+### Other changes
+
+- Tweak the README wording (`2f0a6d1`)
+
+Contributors: Ana, Bob, Cy
+```
+
+
+## 10. Remotes and collaboration
 
 Share work through a local path or through GitHub.
 
@@ -3733,7 +3763,7 @@ printf '%s\t\tbranch '"'"'feature'"'"' of .\n' $(rgit rev-parse feature) | rgit 
 ```
 
 
-## 8. Patches and email
+## 11. Patches and email
 
 Move changes as text: patch files, mailboxes and trailers.
 
@@ -4024,7 +4054,7 @@ rgit show HEAD | rgit patch-id
 ```
 
 
-## 9. Export and import
+## 12. Export and import
 
 Archives and streams for moving history between tools.
 
@@ -4155,7 +4185,7 @@ mkdir ../copy
 ```
 
 
-## 10. Objects, refs and the index (plumbing)
+## 13. Objects, refs and the index (plumbing)
 
 Low-level building blocks, mostly for scripts and for understanding how git works.
 
@@ -5182,7 +5212,7 @@ printf 'a\nb\nc\nd\n' | rgit column --mode=column --width=20
 ```
 
 
-## 11. Storage and maintenance
+## 14. Storage and maintenance
 
 Packfiles, indexes and housekeeping.
 
@@ -5580,6 +5610,42 @@ rgit bisect good v1.0                  # this older one worked
 rgit bisect reset                      # go back when done
 ```
 
+## Know where you stand
+
+```bash
+rgit whereami                          # branch, upstream, changes, what to run next
+rgit compare main                      # ahead/behind, commits and files each side, would a merge conflict?
+rgit story src/main.rs                 # one file's history in plain words
+rgit hotspots                          # files that change most, and change together
+```
+
+## Tidy commits before sharing
+
+```bash
+rgit fixup <commit>                    # fold the staged fix into an earlier commit
+rgit absorb                            # let rgit pick the commit for each staged hunk
+rgit split <commit>                    # cut one commit into several, hunk by hunk
+rgit move-commit <commit> other        # committed on the wrong branch? move it (-c copies)
+rgit oops                              # after a mistake: the most likely fixes
+```
+
+## Open a pull request
+
+```bash
+rgit secrets                           # nothing sensitive in the staged changes? (exit 1 if found)
+rgit sync                              # fetch, rebase onto the upstream, push, with a plan first
+rgit pr-summary main                   # Markdown description: commits, files, merges cleanly?
+rgit open -p                           # print the branch's web page (without -p it opens it)
+```
+
+## Cut a release
+
+```bash
+rgit changelog v1.0..HEAD              # Markdown from conventional commits
+rgit contributors v1.0..HEAD           # who to thank
+rgit tag -a v1.1 -m "Version 1.1"
+```
+
 ## Keep the repository healthy
 
 ```bash
@@ -5587,6 +5653,8 @@ rgit fsck                              # verify objects and refs
 rgit count-objects -vH                 # how much space loose objects use
 rgit gc                                # expire old reflog entries, drop unreachable objects
 rgit repack -a -d                      # pack loose objects into a packfile
+rgit doctor                            # fsck, refs, identity, hooks, stale locks, worktrees; --fix repairs the safe ones
+rgit backup                            # every ref in a dated bundle (newest 10 kept); rgit clone <file> restores
 ```
 
 ---
@@ -5596,11 +5664,15 @@ rgit repack -a -d                      # pack loose objects into a packfile
 rgit aims for git's behaviour and output, but some things are different or missing:
 
 - **Transports.** Only local paths and GitHub (REST API). No SSH, no smart HTTP git protocol.
-- **Bundles.** `bundle create`, `verify`, `list-heads` and `unbundle` work; `clone` *from* a bundle file does not yet.
+- **Tags over local transport.** `clone` and `fetch` from a local path do not copy tags (a bundle does, so `rgit clone <backup file>` restores them).
 - **`stash show`** with no flag prints the full patch; git prints only a summary there and the patch with `-p`. `-p` is accepted.
 - **`reflog <ref>`** needs the word `show` (`rgit reflog show main`); `reflog -n <count>` works on its own.
 - **`switch`** accepts a branch name (or a full commit hash with `--detach`); revision expressions such as `HEAD~1` are not accepted there. Use `checkout` or `rev-parse`.
-- **`init`** takes no directory argument: create the folder and enter it first.
+- **`init`** takes no directory argument and no `--bare`: create the folder and enter it first.
+- **`config --get`** is not accepted; use `rgit config <key>`.
+- **`show :<path>`** (a file from the index) and **`status --ignored`** are not supported; use `diff --cached` and `ls-files -o -i --exclude-standard`.
+- **`branch -vv`** does not print the `[origin/main: ahead 1]` upstream brackets; `rgit whereami` and `rgit compare` show them.
+- **`undo`** restores refs, the index and the working tree, but not branch configuration (`branch.<name>.*`) or the global ignore file. `doctor --fix` and `changelog --prepend` change files without being recorded for `undo`.
 - **`cat-file`** without `-p`, `-t`, `-s` or `-e` prints nothing (git prints a usage error).
 - **`revert --no-edit`** and **`merge --no-edit`** are accepted for compatibility. Reverts and clean merges never open an editor; concluding a conflicted merge (`merge --continue` or `commit`) does, so set `RGIT_EDITOR` (for example `RGIT_EDITOR=true` to accept the default message).
 - **`GIT_EDITOR`** is not read; use `RGIT_EDITOR`, `core.editor`, `VISUAL` or `EDITOR`.
@@ -5625,6 +5697,8 @@ rgit aims for git's behaviour and output, but some things are different or missi
 | `Authentication failed for GitHub` | The token is wrong, expired or lacks the `repo` scope. |
 | An editor opens and you did not expect it | Give the message on the command line (`-m`), or set `RGIT_EDITOR` / `core.editor`. |
 | A merge stopped halfway | `rgit status`, then `rgit conflicts`; finish with `--continue` or give up with `--abort`. |
-| Lost a commit after `reset --hard` | `rgit reflog`, then `rgit reset --hard <hash or HEAD@{n}>`. |
+| Lost a commit after `reset --hard` | `rgit undo`, or `rgit reflog`, then `rgit reset --hard <hash or HEAD@{n}>`. |
+| A command fails because a `.git/*.lock` file exists | Another rgit is running, or one was killed. If none is, `rgit doctor --fix` removes stale locks. |
+| `rgit secrets` exits 1 | It found something that looks like a key or token (masked in the output). Remove it and rotate the secret, or mark a false positive with `rgit:allow-secret` on that line. |
 | Output has extra explanatory text | That is narration on a terminal; use `--plain` or `RGIT_VERBOSITY=quiet`. |
 | Windows shows `rgit.exe` in usage text | Normal; the program name follows the file name. |

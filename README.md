@@ -2,7 +2,7 @@
 
 **A Git implementation written in Rust, built from scratch.**
 
-`rgit` reimplements Git's object model and more than a hundred of its commands. It reads and writes Git's own on-disk formats (loose objects, packfiles, the index, refs, reflogs, config, bundles, commit-graph, multi-pack-index), so a repository created by `rgit` can be opened by real `git` and the other way round.
+`rgit` reimplements Git's object model and more than a hundred of its commands, and adds more than twenty-five of its own that git does not have. It reads and writes Git's own on-disk formats (loose objects, packfiles, the index, refs, reflogs, config, bundles, commit-graph, multi-pack-index), so a repository created by `rgit` can be opened by real `git` and the other way round.
 
 It started as a way to learn how version control works inside, and it has grown into a tool you can use every day on your own projects.
 
@@ -16,8 +16,10 @@ It started as a way to learn how version control works inside, and it has grown 
 - **Git-compatible storage.** Zlib objects, SHA-1 ids, index v2/v3, packfiles with offset and ref deltas, `packed-refs`, reflogs, `.git` worktree files.
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
 - **Two remote transports.** Local paths, and GitHub through its REST API with a personal access token.
-- **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected). `rgit conflicts` lists unresolved conflicts in plain words, `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change, `rgit oops` suggests the most likely fix right after a mistake, `rgit wip` saves unfinished work per branch in one word, `rgit fixup` folds a fix into an earlier commit, `rgit absorb` works out which commit each fix belongs to, and `rgit sync` fetches, rebases and pushes with a plan.
-- **A safety net.** 25 unit tests and 118 end-to-end scenario snapshots that pin down the output of the commands.
+- **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected), and `reset --soft` says where the changes went. `rgit conflicts` lists unresolved conflicts in plain words, `rgit whereami` shows where you stand and what to run next, and `rgit tip` teaches one git trick at a time.
+- **Safer history editing.** `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change, `rgit oops` suggests the most likely fix right after a mistake, `rgit wip` saves unfinished work per branch, and `rgit fixup`, `absorb`, `split` and `move-commit` rewrite commits with every step checked in memory before any ref moves. See [Beyond git](#beyond-git).
+- **Insight into a repository.** `story`, `hotspots`, `stats`, `timeline`, `compare` and `contributors` answer the questions people usually write scripts for; `secrets` and `doctor` check a repository before you share it.
+- **A safety net.** 31 unit tests and 118 end-to-end scenario snapshots that pin down the output of the commands.
 
 ## Install
 
@@ -73,18 +75,39 @@ rgit --explain merge feature
 | Area | Commands |
 |---|---|
 | **Getting started and configuration** | `init`, `clone`, `config`, `var`, `version`, `help` |
-| **Everyday work: stage, commit, clean up** | `status`, `add`, `rm`, `mv`, `commit`, `restore`, `clean` |
+| **Everyday work: stage, commit, clean up** | `status`, `add`, `rm`, `mv`, `commit`, `restore`, `clean`, `ignore` |
 | **History and inspection** | `log`, `show`, `diff`, `blame`, `annotate`, `whatchanged`, `shortlog`, `grep`, `describe`, `name-rev`, `show-branch`, `last-modified`, `range-diff`, `cherry`, `repo` |
 | **Branches, tags and working trees** | `branch`, `switch`, `checkout`, `tag`, `worktree`, `sparse-checkout`, `submodule` |
 | **Merging, rebasing and replaying** | `merge`, `conflicts`, `merge-base`, `rebase`, `cherry-pick`, `revert`, `replay`, `rerere`, `banana-split`, `merge-tree`, `merge-file` |
-| **Undo, recovery and health** | `undo`, `redo`, `oops`, `wip`, `fixup`, `absorb`, `sync`, `reset`, `stash`, `reflog`, `bisect`, `fsck`, `gc`, `prune` |
+| **Undo and recovery** | `undo`, `redo`, `oops`, `wip`, `fixup`, `absorb`, `split`, `move-commit`, `sync`, `reset`, `stash`, `reflog`, `bisect` |
+| **Understanding and learning** | `whereami`, `story`, `hotspots`, `stats`, `timeline`, `compare`, `contributors`, `tip`, `zen` |
+| **Safety and health** | `secrets`, `doctor`, `backup`, `fsck`, `gc`, `prune` |
+| **Review and release** | `pr-summary`, `open`, `changelog` |
 | **Remotes and collaboration** | `remote`, `fetch`, `push`, `pull`, `bundle`, `request-pull`, `fmt-merge-msg` |
 | **Patches and email** | `apply`, `format-patch`, `am`, `mailsplit`, `mailinfo`, `interpret-trailers`, `check-mailmap`, `patch-id` |
 | **Export and import** | `archive`, `get-tar-commit-id`, `fast-export`, `fast-import` |
 | **Objects, refs and the index (plumbing)** | `hash-object`, `cat-file`, `write-tree`, `ls-tree`, `commit-tree`, `mktree`, `mktag`, `unpack-file`, `rev-parse`, `rev-list`, `ls-files`, `check-ignore`, `check-ref-format`, `show-ref`, `symbolic-ref`, `update-ref`, `pack-refs`, `for-each-ref`, `refs`, `replace`, `notes`, `update-index`, `checkout-index`, `read-tree`, `diff-tree`, `diff-index`, `diff-files`, `stripspace`, `column` |
 | **Storage and maintenance** | `repack`, `pack-objects`, `unpack-objects`, `index-pack`, `verify-pack`, `show-index`, `prune-packed`, `commit-graph`, `multi-pack-index`, `count-objects`, `maintenance`, `for-each-repo`, `hook` |
 
-Synonyms: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`.
+Synonyms: `stage` = `add`, `init-db` = `init`, `fsck-objects` = `fsck`, `bingo` = `tip`.
+
+## Beyond git
+
+These commands exist only in rgit. All of them are documented, with examples, in the [user guide](USER_GUIDE.md#command-index).
+
+| Command | What it does |
+|---|---|
+| `undo`, `redo` | Take back the last operation (commit, merge, rebase, `reset --hard`...) after showing what changes; bring it back. |
+| `oops` | After a mistake, the most likely fixes, ready to run. |
+| `wip` | Save everything uncommitted on a hidden per-branch ref and clean the tree. |
+| `fixup`, `absorb` | Fold staged changes into an earlier commit, or each hunk into the commit that last touched those lines. |
+| `split`, `move-commit` | Split a commit by hunk; move commits to another branch without switching. |
+| `sync` | Fetch, then fast-forward, rebase or merge onto the upstream and push, with a plan first. |
+| `conflicts`, `whereami` | What is unresolved and who changed what; where you stand and what to run next. |
+| `story`, `hotspots`, `stats`, `timeline`, `compare`, `contributors` | Read a repository: one file's history, risky files, numbers, a day-by-day digest, how two branches differ, who wrote what. |
+| `secrets`, `doctor`, `backup`, `ignore` | Look for keys and tokens, check repository health (`--fix` repairs the safe problems), save every ref to a bundle, ignore files and stop tracking them. |
+| `pr-summary`, `open`, `changelog` | A pull request description, the web page of a file or branch, a changelog from conventional commits. |
+| `tip`, `zen` | A git tip of the day; the ideas rgit is built on. |
 
 ## Remotes
 
@@ -120,18 +143,18 @@ src/
 
 | Module | Files | What it holds |
 |---|---|---|
-| [`src/core/`](src/core) | 15 | Repository fundamentals every domain builds on: object store, packfiles, index, refs, reflog, commits, config, revision parsing, dates, editor, ref-name rules, wildmatch. Never imports from a domain. |
-| [`src/workspace/`](src/workspace) | 63 | Everything that touches the working tree and index: `add`, `rm`, `mv`, `status`, `commit`, `restore`, `reset`, `clean`, `branch`, `switch`, `checkout`, `stash`, `worktree`, `sparse-checkout`, `submodule`, patch mode, the plumbing for index and working tree. |
-| [`src/references/`](src/references) | 54 | Refs and everything built on them: `tag`, `notes`, `replace`, `reflog`, `show-ref`, `symbolic-ref`, `update-ref`, `pack-refs`, `for-each-ref`, `refs`, `check-ref-format`. |
-| [`src/history/`](src/history) | 50 | Reading history: `log`, `blame`, `grep`, `rev-list`, `shortlog`, `bisect`, `name-rev`, `show-branch`, `range-diff`, `last-modified`, `cherry`, `graph`, `--follow`. |
-| [`src/mail/`](src/mail) | 34 | Patches and mail: `apply`, `format-patch`, `am`, `mailsplit`, `mailinfo`, `interpret-trailers`, `mailmap`, `request-pull`, `fmt-merge-msg`. |
-| [`src/merge/`](src/merge) | 41 | Combining and rewriting: `merge`, `rebase`, `cherry-pick`, `revert`, `replay`, `rerere`, `merge-tree`, `merge-file`, `banana-split`, the sequencer and conflict handling. |
-| [`src/storage/`](src/storage) | 41 | Object storage and maintenance: `gc`, `fsck`, `prune`, `repack`, `pack-objects`, `index-pack`, `verify-pack`, `commit-graph`, `multi-pack-index`, `maintenance`, `count-objects`. |
-| [`src/remote/`](src/remote) | 26 | Talking to other repositories: `clone`, `fetch`, `push`, `pull`, `remote`, `bundle`, and the GitHub REST API client. |
-| [`src/diff/`](src/diff) | 21 | Diff machinery and commands: Myers diff, hunks, rename/copy detection, combined diffs, `diff`, `diff-tree`, `diff-index`, `diff-files`, `patch-id`. |
-| [`src/plumbing/`](src/plumbing) | 38 | Low-level and utility commands: `init`, `hash-object`, `cat-file`, `ls-tree`, `config`, `rev-parse`, `var`, `help`, `hook`, `column`, `stripspace`, `mktree`, `mktag`. |
-| [`src/export/`](src/export) | 15 | Moving history in and out: `archive`, `fast-export`, `fast-import`, `get-tar-commit-id`. |
-| [`src/ui/`](src/ui) | 9 | The narration layer behind `--explain`, `--teach` and `--plain`: snapshots, reports, warnings. |
+| [`src/core/`](src/core) | 16 | Repository fundamentals every domain builds on: object store, packfiles, index, refs, reflog, commits, config, revision parsing, dates, editor, ref-name rules, wildmatch. Never imports from a domain. |
+| [`src/workspace/`](src/workspace) | 94 | Everything that touches the working tree and index: `add`, `rm`, `mv`, `status`, `commit`, `restore`, `reset`, `clean`, `branch`, `switch`, `checkout`, `stash`, `worktree`, `sparse-checkout`, `submodule`, patch mode, `undo`, `oops`, `wip`, `fixup`, `absorb`, `whereami`, `ignore`, `secrets`, the plumbing for index and working tree. |
+| [`src/references/`](src/references) | 53 | Refs and everything built on them: `tag`, `notes`, `replace`, `reflog`, `show-ref`, `symbolic-ref`, `update-ref`, `pack-refs`, `for-each-ref`, `refs`, `check-ref-format`. |
+| [`src/history/`](src/history) | 76 | Reading history: `log`, `blame`, `grep`, `rev-list`, `shortlog`, `bisect`, `name-rev`, `show-branch`, `range-diff`, `last-modified`, `cherry`, `graph`, `--follow`, and the analysis commands `story`, `hotspots`, `stats`, `timeline`, `compare`, `contributors`, `changelog`. |
+| [`src/mail/`](src/mail) | 33 | Patches and mail: `apply`, `format-patch`, `am`, `mailsplit`, `mailinfo`, `interpret-trailers`, `mailmap`, `request-pull`, `fmt-merge-msg`. |
+| [`src/merge/`](src/merge) | 48 | Combining and rewriting: `merge`, `rebase`, `cherry-pick`, `revert`, `replay`, `rerere`, `merge-tree`, `merge-file`, `banana-split`, `split`, `move-commit`, the sequencer and conflict handling. |
+| [`src/storage/`](src/storage) | 44 | Object storage and maintenance: `gc`, `fsck`, `prune`, `repack`, `pack-objects`, `index-pack`, `verify-pack`, `commit-graph`, `multi-pack-index`, `maintenance`, `count-objects`, `doctor`. |
+| [`src/remote/`](src/remote) | 41 | Talking to other repositories: `clone`, `fetch`, `push`, `pull`, `sync`, `remote`, `bundle`, `backup`, `open`, `pr-summary`, and the GitHub REST API client. |
+| [`src/diff/`](src/diff) | 20 | Diff machinery and commands: Myers diff, hunks, rename/copy detection, combined diffs, `diff`, `diff-tree`, `diff-index`, `diff-files`, `patch-id`. |
+| [`src/plumbing/`](src/plumbing) | 41 | Low-level and utility commands: `init`, `hash-object`, `cat-file`, `ls-tree`, `config`, `rev-parse`, `var`, `help`, `hook`, `column`, `stripspace`, `mktree`, `mktag`, `tip`, `zen`. |
+| [`src/export/`](src/export) | 14 | Moving history in and out: `archive`, `fast-export`, `fast-import`, `get-tar-commit-id`. |
+| [`src/ui/`](src/ui) | 8 | The narration layer behind `--explain`, `--teach` and `--plain`: snapshots, reports, warnings. |
 
 Inside a domain, every command is a thin module on top of its engine, with its own CLI definition and types next to it:
 

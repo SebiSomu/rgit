@@ -29,6 +29,7 @@ mod split;
 mod stats;
 mod story;
 mod timeline;
+mod tip;
 mod whereami;
 
 use crate::harness::Repo;

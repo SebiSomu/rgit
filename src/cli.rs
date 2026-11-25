@@ -242,6 +242,11 @@ pub enum Commands {
     Changelog(crate::history::changelog::cli::ChangelogArgs),
     /// Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day.
     Contributors(crate::history::contributors::cli::ContributorsArgs),
+    /// A tip about git or rgit: the tip of the day, a given one, a random one, or the list.
+    #[command(visible_alias = "bingo")]
+    Tip(crate::plumbing::tip::cli::TipArgs),
+    /// The Zen of rgit: the ideas it is built on.
+    Zen(crate::plumbing::tip::cli::ZenArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -421,6 +426,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
         Commands::Changelog(args) => crate::history::changelog::cli::dispatch_changelog(args)?,
         Commands::Contributors(args) => crate::history::contributors::cli::dispatch_contributors(args)?,
+        Commands::Tip(args) => crate::plumbing::tip::cli::dispatch_tip(args)?,
+        Commands::Zen(args) => crate::plumbing::tip::cli::dispatch_zen(args)?,
     }
 
     Ok(())

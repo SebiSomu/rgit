@@ -300,6 +300,8 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
 | [`changelog`](#rgit-changelog) | A Markdown changelog from conventional commits, per version (rgit only). |
 | [`contributors`](#rgit-contributors) | Everyone who wrote the commits: commits, share, co-authored, lines, first and last day (rgit only). |
+| [`tip`](#rgit-tip) | A tip about git or rgit: of the day, by number, random, or the list; also `rgit bingo` (rgit only). |
+| [`zen`](#rgit-zen) | The Zen of rgit: the ideas it is built on (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -3108,6 +3110,71 @@ $ rgit contributors -e
   Ana <ana@work.example>  2 commits                    50%  +4 -1            2023-09-01 to 2023-11-01
   Cy <cy@example.com>     1 commit (+1 co-authored)    25%  +2 -0            2023-11-01 to 2023-11-02
   Bob <bob@example.com>   1 commit                     25%  +1 -0            2023-10-01
+```
+
+
+### `rgit tip`
+
+A short tip about git or rgit, with a command to try; also `rgit bingo` (rgit only).
+
+**Syntax:** `rgit tip [<n> | -r | --all]`
+
+There are 36 tips, from git's basics (the three trees, two and three dots, relative revisions, the reflog, rebase versus merge) to rgit's own commands (`undo`, `oops`, `whereami`, `fixup`, `absorb`, `split`, `move-commit`, `story`, `compare`, `secrets`, `doctor`, `backup`...). Without arguments it shows the tip of the day (the same one all day, UTC); `<n>` shows tip number `n`, `-r` a random one, `--all` lists every title. It works outside a repository too.
+
+<details>
+<summary>Options as printed by <code>rgit tip -h</code></summary>
+
+```text
+A tip about git or rgit: the tip of the day, a given one, a random one, or the list
+
+Usage: rgit tip [OPTIONS] [N]
+
+Arguments:
+  [N]  Show this tip (by number) instead of the tip of the day
+
+Options:
+  -r, --random  A random tip instead of the tip of the day
+      --all     List every tip's title
+  -h, --help    Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit tip 7
+Tip 7 of 36: Uncommit
+
+  `rgit reset --soft HEAD~1` takes the last commit off the branch and leaves
+  its changes staged, ready to commit again (`rgit commit -C ORIG_HEAD` keeps
+  the message).
+
+  Try: rgit reset --soft HEAD~1
+```
+
+
+### `rgit zen`
+
+The ideas rgit is built on (rgit only).
+
+**Syntax:** `rgit zen`
+
+```text
+$ rgit zen
+The Zen of rgit
+
+Explain first, act second.
+Say what happened, not what ran.
+Every change can be undone; every undo, redone.
+A refusal is better than a surprise.
+Check everything, then touch anything: nothing half-done.
+Uncommitted work is sacred.
+Speak git's formats; speak plainly about them.
+The next step belongs in the output.
+Shared history is shared: rewrite only what is yours.
+One command, one whole job.
+If it needs a tutorial, it needs a better message.
 ```
 
 

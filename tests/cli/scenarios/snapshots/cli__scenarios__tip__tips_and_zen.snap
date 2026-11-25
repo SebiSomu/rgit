@@ -1,0 +1,83 @@
+---
+source: tests/cli/scenarios/tip.rs
+expression: r.finish()
+---
+$ rgit tip 1
+Tip 1 of 36: Undo almost anything
+
+  `rgit undo` takes back the last command that changed the repository: a
+  commit, reset, rebase, merge or deleted branch. `rgit redo` brings it back.
+
+  Try: rgit undo --list
+$ rgit bingo 7
+Tip 7 of 36: Uncommit
+
+  `rgit reset --soft HEAD~1` takes the last commit off the branch and leaves
+  its changes staged, ready to commit again (`rgit commit -C ORIG_HEAD` keeps
+  the message).
+
+  Try: rgit reset --soft HEAD~1
+$ rgit tip --all
+  1  Undo almost anything
+  2  Ask what went wrong
+  3  One screen on where you are
+  4  Three trees
+  5  Stage part of a file
+  6  Unstage without losing anything
+  7  Uncommit
+  8  Fix an older commit
+  9  Let rgit find the commit
+ 10  Split a commit
+ 11  Committed on the wrong branch?
+ 12  Save work in progress
+ 13  Stash includes untracked files only if asked
+ 14  Go back to the previous branch
+ 15  Relative revisions
+ 16  Two dots and three dots
+ 17  Compare two branches
+ 18  Stay in sync
+ 19  Rebase versus merge
+ 20  Conflicts explained
+ 21  The reflog remembers
+ 22  Find the commit that broke it
+ 23  Who changed this line?
+ 24  A file's whole story
+ 25  Where the churn is
+ 26  Ignore a file that is already tracked
+ 27  Keep secrets out
+ 28  Check the repository's health
+ 29  Back it all up
+ 30  Several checkouts of one repository
+ 31  Copy one commit
+ 32  Annotated tags carry a message
+ 33  Write the release notes from history
+ 34  Draft the pull request
+ 35  Make rgit explain more
+ 36  Clean, but look first
+`rgit tip <n>` shows one.
+$ rgit tip 0
+[stderr]
+fatal: there is no tip 0: they go from 1 to 36
+[exit 128]
+$ rgit tip 999
+[stderr]
+fatal: there is no tip 999: they go from 1 to 36
+[exit 128]
+$ rgit zen
+The Zen of rgit
+
+Explain first, act second.
+Say what happened, not what ran.
+Every change can be undone; every undo, redone.
+A refusal is better than a surprise.
+Check everything, then touch anything: nothing half-done.
+Uncommitted work is sacred.
+Speak git's formats; speak plainly about them.
+The next step belongs in the output.
+Shared history is shared: rewrite only what is yours.
+One command, one whole job.
+If it needs a tutorial, it needs a better message.
+
+==== final state ====
+(no .git)
+worktree:

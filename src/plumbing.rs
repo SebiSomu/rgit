@@ -8,6 +8,7 @@ pub mod mktree;
 pub mod repo_info;
 pub mod rev_parse;
 pub mod stripspace;
+pub mod tip;
 pub mod unpack_file;
 pub mod var;
 pub mod version;

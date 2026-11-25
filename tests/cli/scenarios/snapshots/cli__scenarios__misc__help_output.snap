@@ -36,20 +36,20 @@ Available commands:
    count-objects       name-rev            symbolic-ref
    describe            notes               sync
    diff                oops                tag
-   diff-files          pack-objects        undo
-   diff-index          pack-refs           unpack-file
-   diff-tree           patch-id            unpack-objects
-   doctor              prune               update-index
-   fast-export         prune-packed        update-ref
-   fast-import         pull                var
-   fetch               push                verify-pack
-   fixup               range-diff          version
-   fmt-merge-msg       read-tree           whatchanged
-   for-each-ref        rebase              whereami
-   for-each-repo       redo                wip
-   format-patch        reflog              worktree
-   fsck                refs                write-tree
-   fsck-objects        remote
+   diff-files          pack-objects        timeline
+   diff-index          pack-refs           undo
+   diff-tree           patch-id            unpack-file
+   doctor              prune               unpack-objects
+   fast-export         prune-packed        update-index
+   fast-import         pull                update-ref
+   fetch               push                var
+   fixup               range-diff          verify-pack
+   fmt-merge-msg       read-tree           version
+   for-each-ref        rebase              whatchanged
+   for-each-repo       redo                whereami
+   format-patch        reflog              wip
+   fsck                refs                worktree
+   fsck-objects        remote              write-tree
    gc                  repack
 
 See 'rgit help <command>' for the options of a command.
@@ -143,20 +143,20 @@ Available commands:
    count-objects       name-rev            symbolic-ref
    describe            notes               sync
    diff                oops                tag
-   diff-files          pack-objects        undo
-   diff-index          pack-refs           unpack-file
-   diff-tree           patch-id            unpack-objects
-   doctor              prune               update-index
-   fast-export         prune-packed        update-ref
-   fast-import         pull                var
-   fetch               push                verify-pack
-   fixup               range-diff          version
-   fmt-merge-msg       read-tree           whatchanged
-   for-each-ref        rebase              whereami
-   for-each-repo       redo                wip
-   format-patch        reflog              worktree
-   fsck                refs                write-tree
-   fsck-objects        remote
+   diff-files          pack-objects        timeline
+   diff-index          pack-refs           undo
+   diff-tree           patch-id            unpack-file
+   doctor              prune               unpack-objects
+   fast-export         prune-packed        update-index
+   fast-import         pull                update-ref
+   fetch               push                var
+   fixup               range-diff          verify-pack
+   fmt-merge-msg       read-tree           version
+   for-each-ref        rebase              whatchanged
+   for-each-repo       redo                whereami
+   format-patch        reflog              wip
+   fsck                refs                worktree
+   fsck-objects        remote              write-tree
    gc                  repack
 
 See 'rgit help <command>' for the options of a command.
@@ -293,6 +293,7 @@ Commands:
   hotspots            Files that change most, have the most authors, and change together (coupling)
   doctor              Check the repository for problems (objects, refs, identity, config, hooks, stale locks, worktrees, huge files) and how to fix them
   stats               Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits
+  timeline            A day-by-day digest of the repository: commits, authors, branches, merges, lines
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

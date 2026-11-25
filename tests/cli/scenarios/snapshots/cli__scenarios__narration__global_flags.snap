@@ -75,7 +75,7 @@ HEAD commit:
   tree <H9>
   parent <H2>
   parent <H4>
-  author Test Committer <committer@example.com> 1700000660 +0000
+  author Test Author <author@example.com> 1700000660 +0000
   committer Test Committer <committer@example.com> 1700000660 +0000
   
   m

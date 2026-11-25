@@ -139,7 +139,7 @@ Merge made by the 'ort' strategy.
 Dropped stash@{0} (On main: rgit sync: local changes)
 'main' now contains origin/main; not pushed yet: 2 commits (`rgit sync --push`).
 (../clone) $ rgit log --oneline -1
-86e453e Merge remote-tracking branch 'origin/main'
+44e53d0 Merge remote-tracking branch 'origin/main'
 
 ==== final state ====
 HEAD: ref: refs/heads/main

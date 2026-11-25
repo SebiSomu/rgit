@@ -14,4 +14,5 @@ pub mod shortlog;
 pub mod show_branch;
 pub mod stats;
 pub mod story;
+pub mod timeline;
 pub mod types;

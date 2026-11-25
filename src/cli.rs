@@ -226,6 +226,8 @@ pub enum Commands {
     Doctor(crate::storage::doctor::cli::DoctorArgs),
     /// Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits.
     Stats(crate::history::stats::cli::StatsArgs),
+    /// A day-by-day digest of the repository: commits, authors, branches, merges, lines.
+    Timeline(crate::history::timeline::cli::TimelineArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -397,6 +399,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Hotspots(args) => crate::history::hotspots::cli::dispatch_hotspots(args)?,
         Commands::Doctor(args) => crate::storage::doctor::cli::dispatch_doctor(args)?,
         Commands::Stats(args) => crate::history::stats::cli::dispatch_stats(args)?,
+        Commands::Timeline(args) => crate::history::timeline::cli::dispatch_timeline(args)?,
     }
 
     Ok(())

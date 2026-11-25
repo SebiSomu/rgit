@@ -292,6 +292,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
 | [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
 | [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
+| [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2683,6 +2684,54 @@ Languages (lines today)
 Biggest commits
   41ab7f0  2023-10-02  +4 -0            1 file   Library (Bob)
   ...
+```
+
+
+### `rgit timeline`
+
+A day-by-day digest of the repository: commits, authors, branches, merges and lines, newest day first (rgit only).
+
+**Syntax:** `rgit timeline [-n <days>] [--since <date>] [--current]`
+
+Two lines per day that has commits: the counts (commits and merges), the authors (most active first, with their count), the branches, and the lines added and removed; then the merges (`merged feature/x into main`), the first three subjects and `+N more`. Between two shown days, `(quiet for N days)` marks the gap.
+
+- **Days** are the authors' local days: a commit at 23:30 `-0500` counts on that day, though it is the next day in UTC.
+- **Branches:** every local branch by default (`--current`: only HEAD's history, without branch names). A commit on the default branch's own line (`init.defaultBranch`, else `main`, else `master`; first parents) counts on it; any other on the most specific branch that has it, so a merged branch's commits still count on that branch while it exists.
+- `-n` sets how many days with commits are shown (default 14; the last line says how many there are), `--since` takes `log --since` dates (author date).
+
+It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit timeline -h</code></summary>
+
+```text
+A day-by-day digest of the repository: commits, authors, branches, merges, lines
+
+Usage: rgit timeline [OPTIONS]
+
+Options:
+  -n, --days <N>      How many days with commits to show (newest first) [default: 14]
+      --since <DATE>  Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+      --current       Only the current branch (default: every local branch)
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit timeline
+Mon 2023-11-13  1 merge by Ana on main
+                merged feature/x into main
+                (quiet for 2 days)
+Fri 2023-11-10  1 commit by Ana on main  +1 -0
+                Add c
+Thu 2023-11-09  5 commits by Bob (3), Ana (2) on feature/x (4), main  +5 -0
+                Polish x · Review x · More x · +2 more
+                (quiet for 2 days)
+Mon 2023-11-06  1 commit by Ana on main  +1 -0
+                Start
 ```
 
 

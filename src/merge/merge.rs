@@ -183,8 +183,10 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let signature = crate::core::commit::current_signature()?;
-    let commit_hash = crate::core::commit::write_commit_object(&auto_merge, &[our_commit.clone(), their_commit.clone()], &signature, &signature, &message)?;
+    // Like git: the author is GIT_AUTHOR_* (or user.*), the committer GIT_COMMITTER_*.
+    let author = crate::core::commit::current_author_signature()?;
+    let committer = crate::core::commit::current_signature()?;
+    let commit_hash = crate::core::commit::write_commit_object(&auto_merge, &[our_commit.clone(), their_commit.clone()], &author, &committer, &message)?;
     let made_by = format!("Merge made by the '{}' strategy.", strategy);
     crate::core::reflog::set_reflog_action(&format!("merge {}: {}", name, made_by));
     move_head(&head_state, &commit_hash)?;

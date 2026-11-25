@@ -1,0 +1,135 @@
+---
+source: tests/cli/scenarios/timeline.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-11-06T10:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-06T10:00:00 +0200
+$ write a.txt (2 bytes)
+$ rgit add a.txt
+Staged files to index (1 new).
+$ rgit commit -m 'Start'
+[main (root-commit) <H1:7>] Start
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 a.txt
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-11-09T09:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-09T09:00:00 +0200
+$ write a.txt (4 bytes)
+$ rgit commit -a -m 'Add b'
+[main <H2:7>] Add b
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch -c feature/x
+Switched to a new branch 'feature/x'
+$ export GIT_AUTHOR_NAME=Bob
+$ export GIT_AUTHOR_DATE=2023-11-09T15:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-09T15:00:00 +0200
+$ write x.txt (2 bytes)
+$ rgit add x.txt
+Staged files to index (1 new).
+$ rgit commit -m 'Start x'
+[feature/x <H3:7>] Start x
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 x.txt
+$ export GIT_AUTHOR_NAME=Bob
+$ export GIT_AUTHOR_DATE=2023-11-09T16:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-09T16:00:00 +0200
+$ write x.txt (4 bytes)
+$ rgit commit -a -m 'More x'
+[feature/x <H4:7>] More x
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-11-09T17:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-09T17:00:00 +0200
+$ write x.txt (6 bytes)
+$ rgit commit -a -m 'Review x'
+[feature/x <H5:7>] Review x
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ export GIT_AUTHOR_NAME=Bob
+$ export GIT_AUTHOR_DATE=2023-11-09T18:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-09T18:00:00 +0200
+$ write x.txt (8 bytes)
+$ rgit commit -a -m 'Polish x'
+[feature/x <H6:7>] Polish x
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-11-10T23:30:00 -0500
+$ export GIT_COMMITTER_DATE=2023-11-10T23:30:00 -0500
+$ write a.txt (6 bytes)
+$ rgit commit -a -m 'Add c'
+[main <H7:7>] Add c
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ export GIT_AUTHOR_NAME=Ana
+$ export GIT_AUTHOR_DATE=2023-11-13T11:00:00 +0200
+$ export GIT_COMMITTER_DATE=2023-11-13T11:00:00 +0200
+$ rgit merge feature/x --no-ff -m "Merge branch 'feature/x'"
+Merge made by the 'ort' strategy.
+ x.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+ create mode 100644 x.txt
+$ rgit timeline
+Mon 2023-11-13  1 merge by Ana on main
+                merged feature/x into main
+                (quiet for 2 days)
+Fri 2023-11-10  1 commit by Ana on main  +1 -0
+                Add c
+Thu 2023-11-09  5 commits by Bob (3), Ana (2) on feature/x (4), main  +5 -0
+                Polish x · Review x · More x · +2 more
+                (quiet for 2 days)
+Mon 2023-11-06  1 commit by Ana on main  +1 -0
+                Start
+$ rgit timeline -n 2
+Mon 2023-11-13  1 merge by Ana on main
+                merged feature/x into main
+                (quiet for 2 days)
+Fri 2023-11-10  1 commit by Ana on main  +1 -0
+                Add c
+(2 of 4 days with commits; -n 4 shows more)
+$ rgit timeline --current --since 2023-11-10
+Mon 2023-11-13  1 merge by Ana
+                merged feature/x
+                (quiet for 2 days)
+Fri 2023-11-10  1 commit by Ana  +1 -0
+                Add c
+$ rgit timeline --since 2030-01-01
+No commits in that time.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature/x <H6>
+  refs/heads/main <H8>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H9> 0	a.txt
+  100644 <H10> 0	x.txt
+HEAD commit:
+  tree <H11>
+  parent <H7>
+  parent <H6>
+  author Ana <author@example.com> 1699866000 +0200
+  committer Test Committer <committer@example.com> 1699866000 +0200
+  
+  Merge branch 'feature/x'
+worktree:
+  a.txt
+    | a
+    | b
+    | c
+  x.txt
+    | x
+    | y
+    | z
+    | w

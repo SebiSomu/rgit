@@ -41,3 +41,17 @@ fn branch_rename_push() {
     r.run_in("../clone", "undo").run_in("../clone", "branch");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn clone_and_fetch_from_bundle() {
+    let mut r = three_commits();
+    r.run("branch feature").run("bundle create ../full.bundle --all");
+    r.run_in("..", "clone full.bundle").run_in("../full", "branch -a").run_in("../full", "remote -v").run_in("../full", "status");
+    r.run_in("..", "clone -b feature full.bundle feat").run_in("../feat", "branch");
+    // An incremental bundle needs its prerequisite commits: a fresh clone can't use it...
+    r.write("d.txt", "dee\n").run("add d.txt").run("commit -m 'fourth commit'").run("bundle create ../incr.bundle main~1..main");
+    r.run_in("..", "clone incr.bundle incr");
+    // ...but a clone that already has them can fetch from it.
+    r.run_in("../full", "remote set-url origin ../incr.bundle").run_in("../full", "fetch").run_in("../full", "log --oneline -2 origin/main");
+    assert_snapshot!(r.finish());
+}

@@ -12,6 +12,7 @@ use crate::remote::fetch::engine::{
     write_fetch_head,
     write_local_remote_tracking_ref,
 };
+use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, is_bundle_file, read_bundle, read_packfile, store_loose_objects};
 use crate::remote::github::{fetch_from_github, parse_github_remote, resolve_github_token};
 use crate::remote::push::engine::resolve_remote_repo_path;
 use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
@@ -50,6 +51,12 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
 
         fetch_from_github(&target, &remote_name, &remote_display, branch.as_deref())?;
         return Ok(());
+    }
+
+    let bundle_path = std::path::PathBuf::from(configured_url.as_deref().unwrap_or(&remote_name));
+    if is_bundle_file(&bundle_path) {
+        let remote_display = configured_url.unwrap_or_else(|| remote_name.clone());
+        return fetch_from_bundle(&bundle_path, &remote_name, &remote_display, branch.as_deref());
     }
 
     let remote_git_dir = resolve_remote_repo_path(&remote_name)?;
@@ -155,5 +162,58 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
 
     write_fetch_head(&fetch_head_entries)?;
 
+    Ok(())
+}
+
+
+/// `rgit fetch <bundle>` (or a remote whose url is a bundle file): checks the bundle's
+/// prerequisites, stores its objects here, then updates `refs/remotes/<remote>/<branch>` for
+/// each branch it carries (only `branch` when given), its remote HEAD and FETCH_HEAD, with
+/// the same output as a fetch from a local repository.
+fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: &str, branch: Option<&str>) -> Result<()> {
+    let (header, bytes) = read_bundle(&path.to_string_lossy())?;
+    check_bundle_prerequisites(&header)?;
+    let branches: Vec<(String, String)> = bundle_branches(&header).into_iter().filter(|(name, _)| branch.is_none_or(|b| b == name)).collect();
+
+    println!("From {}", remote_display);
+    if branches.is_empty() {
+        println!(" * (no branches found or empty repository)");
+        return Ok(());
+    }
+
+    let mut received = 0usize;
+    let mut fetch_head_entries = Vec::new();
+    for (branch_name, remote_sha) in &branches {
+        fetch_head_entries.push((remote_sha.clone(), branch_name.clone(), remote_display.to_string()));
+        let local_sha = read_local_remote_tracking_ref(remote_name, branch_name);
+        if local_sha.as_deref() == Some(remote_sha.as_str()) {
+            println!(" = [up to date]      {:20} -> {}/{}", branch_name, remote_name, branch_name);
+            continue;
+        }
+        // The objects are stored once, before the first ref that needs them.
+        if received == 0 {
+            received = store_loose_objects(&read_packfile(&bytes[header.pack_offset..])?)?;
+        }
+        write_local_remote_tracking_ref(remote_name, branch_name, remote_sha)?;
+        match &local_sha {
+            None => println!(" * [new branch]      {:20} -> {}/{}", branch_name, remote_name, branch_name),
+            Some(old) => println!(
+                "   {}..{}  {:16} -> {}/{}",
+                crate::core::commit::short_hash(old),
+                crate::core::commit::short_hash(remote_sha),
+                branch_name, remote_name, branch_name
+            ),
+        }
+    }
+
+    if received > 0 {
+        println!("Receiving objects: 100% ({}/{}), done.", received, received);
+    }
+    if let Some(default_branch) = bundle_head_branch(&header)
+        && let Some((_, sha)) = branches.iter().find(|(b, _)| *b == default_branch)
+    {
+        let _ = crate::core::refs::write_remote_head(remote_name, &default_branch, sha);
+    }
+    write_fetch_head(&fetch_head_entries)?;
     Ok(())
 }

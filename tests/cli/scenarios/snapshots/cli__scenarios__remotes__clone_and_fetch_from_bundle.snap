@@ -1,0 +1,110 @@
+---
+source: tests/cli/scenarios/remotes.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit branch feature
+$ rgit bundle create ../full.bundle --all
+(..) $ rgit clone full.bundle
+Cloning into 'full'...
+From <TMP>/full.bundle
+ * [new branch]      feature              -> origin/feature
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+(../full) $ rgit branch -a
+* main
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/feature
+  remotes/origin/main
+(../full) $ rgit remote -v
+origin	<TMP>/full.bundle (fetch)
+origin	<TMP>/full.bundle (push)
+(../full) $ rgit status
+On branch main
+nothing to commit, working tree clean
+(..) $ rgit clone -b feature full.bundle feat
+Cloning into 'feat'...
+From <TMP>/full.bundle
+ * [new branch]      feature              -> origin/feature
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+(../feat) $ rgit branch
+* feature
+$ write d.txt (4 bytes)
+$ rgit add d.txt
+Staged files to index (1 new).
+$ rgit commit -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 d.txt
+$ rgit bundle create ../incr.bundle main~1..main
+(..) $ rgit clone incr.bundle incr
+Cloning into 'incr'...
+[stderr]
+Error: error: Repository lacks these prerequisite commits:
+error: <H3> 
+[exit 1]
+(../full) $ rgit remote set-url origin ../incr.bundle
+(../full) $ rgit fetch
+From ../incr.bundle
+   <H3:7>..<H4:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+(../full) $ rgit log --oneline -2 origin/main
+<H4:7> fourth commit
+<H3:7> third commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H3>
+  refs/heads/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	d.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H9>
+  parent <H3>
+  author Test Author <author@example.com> 1700000900 +0000
+  committer Test Committer <committer@example.com> 1700000900 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  d.txt
+    | dee
+  src/lib.txt
+    | lib v2

@@ -8,7 +8,7 @@ use std::io::{self, IsTerminal, Write};
 use anyhow::Result;
 
 use crate::remote::bundle::engine::{
-    enumerate_bundle_objects, format_bundle_header, missing_bundle_prerequisites, parse_bundle_header, read_packfile, resolve_bundle_revs,
+    check_bundle_prerequisites, enumerate_bundle_objects, format_bundle_header, read_bundle, read_packfile, resolve_bundle_revs,
     select_bundle_commits, store_loose_objects, write_packfile,
 };
 use crate::remote::bundle::types::{BundleAction, BundleHeader};
@@ -89,12 +89,6 @@ fn bundle_create(quiet: bool, version: u8, file: &str, revs: &[String]) -> Resul
     Ok(())
 }
 
-fn read_bundle(file: &str) -> Result<(BundleHeader, Vec<u8>)> {
-    let bytes = fs::read(file).map_err(|_| anyhow::anyhow!("error: could not open '{}'", file))?;
-    let header = parse_bundle_header(&bytes, file)?;
-    Ok((header, bytes))
-}
-
 fn print_refs(header: &BundleHeader, filter: &[String]) {
     for (oid, name) in &header.refs {
         if filter.is_empty() || filter.contains(name) {
@@ -103,21 +97,9 @@ fn print_refs(header: &BundleHeader, filter: &[String]) {
     }
 }
 
-fn check_prerequisites(header: &BundleHeader) -> Result<()> {
-    let missing = missing_bundle_prerequisites(header);
-    if missing.is_empty() {
-        return Ok(());
-    }
-    let mut message = String::from("error: Repository lacks these prerequisite commits:");
-    for oid in missing {
-        message.push_str(&format!("\nerror: {} ", oid));
-    }
-    anyhow::bail!(message)
-}
-
 fn bundle_verify(quiet: bool, file: &str) -> Result<()> {
     let (header, _) = read_bundle(file)?;
-    check_prerequisites(&header)?;
+    check_bundle_prerequisites(&header)?;
     if !quiet {
         let refs = header.refs.len();
         if refs == 1 {
@@ -147,7 +129,7 @@ fn bundle_verify(quiet: bool, file: &str) -> Result<()> {
 
 fn bundle_unbundle(file: &str, refnames: &[String]) -> Result<()> {
     let (header, bytes) = read_bundle(file)?;
-    check_prerequisites(&header)?;
+    check_bundle_prerequisites(&header)?;
     let objects = read_packfile(&bytes[header.pack_offset..])?;
     let stored = store_loose_objects(&objects)?;
     if io::stderr().is_terminal() {

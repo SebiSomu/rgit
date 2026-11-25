@@ -47,11 +47,14 @@ $ rgit get-tar-commit-id
 fatal: git get-tar-commit-id: EOF before reading tar header
 [exit 128]
 $ rgit clone repo.bundle ../from-bundle
-[stderr]
-Error: fatal: '<REPO>/repo.bundle' does not appear to be a git repository
-[exit 1]
+Cloning into '../from-bundle'...
+From <REPO>/repo.bundle
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
 (../from-bundle) $ rgit log --format=%s
-[skipped: directory ../from-bundle does not exist]
+third commit
+second commit
+first commit
 
 ==== final state ====
 HEAD: ref: refs/heads/main

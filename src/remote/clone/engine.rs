@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use crate::workspace::checkout::{sync_working_tree, update_index_from_tree};
+use crate::remote::bundle::engine::{bundle_head_branch, is_bundle_file, read_bundle};
 use crate::remote::fetch::engine::read_remote_head;
 use crate::remote::github::{build_github_client, get_github_default_branch, parse_github_remote, resolve_github_token};
 use crate::remote::push::engine::resolve_remote_repo_path;
@@ -10,8 +11,8 @@ use crate::core::commit::resolve_tree_from_source;
 use crate::remote::types::GitHubTarget;
 use crate::remote::clone::types::CloneSource;
 
-/// Classifies the repository argument of `clone` as a local repository or a GitHub
-/// repository. A path that exists on disk is always treated as local (even if it contains
+/// Classifies the repository argument of `clone` as a bundle file, a local repository or a
+/// GitHub repository. A path that exists on disk is always treated as local (even if it contains
 /// `github.com/`, e.g. `~/src/github.com/owner/repo`) and is made absolute here, so that it
 /// stays valid after `clone` changes into the new directory.
 // Used by `clone`.
@@ -25,6 +26,9 @@ pub fn classify_clone_source(spec: &str) -> Result<CloneSource> {
     if as_path.exists() {
         let absolute = std::path::absolute(as_path)
             .with_context(|| format!("Cannot resolve path '{}'", spec))?;
+        if is_bundle_file(&absolute) {
+            return Ok(CloneSource::Bundle { path: absolute });
+        }
         let git_dir = resolve_remote_repo_path(&absolute.to_string_lossy())?;
         return Ok(CloneSource::Local { path: absolute, git_dir });
     }
@@ -44,6 +48,7 @@ pub fn classify_clone_source(spec: &str) -> Result<CloneSource> {
 pub fn remote_default_branch(source: &CloneSource, remote_name: &str) -> Result<Option<String>> {
     match source {
         CloneSource::Local { git_dir, .. } => read_remote_head(git_dir),
+        CloneSource::Bundle { path } => Ok(bundle_head_branch(&read_bundle(&path.to_string_lossy())?.0)),
         CloneSource::GitHub { owner, repo } => {
             let token = resolve_github_token(remote_name)?;
             let client = build_github_client(&token)?;

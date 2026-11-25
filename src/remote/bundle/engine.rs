@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs;
 use std::io::{Read, Write};
+use std::path::Path;
 use anyhow::Context;
 use flate2::bufread::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -475,3 +477,60 @@ pub fn store_loose_objects(objects: &[(String, Vec<u8>)]) -> anyhow::Result<usiz
     Ok(objects.len())
 }
 
+
+/// Reads a bundle file and parses its header, returning the header and the whole file (the
+/// packfile starts at `header.pack_offset`).
+// Used by `bundle verify`, `bundle list-heads`, `bundle unbundle`, `fetch` and `clone` from a bundle.
+pub fn read_bundle(file: &str) -> anyhow::Result<(BundleHeader, Vec<u8>)> {
+    let bytes = fs::read(file).map_err(|_| anyhow::anyhow!("error: could not open '{}'", file))?;
+    let header = parse_bundle_header(&bytes, file)?;
+    Ok((header, bytes))
+}
+
+/// Fails with git's "Repository lacks these prerequisite commits" error, listing every
+/// prerequisite commit of the bundle that this repository does not have.
+// Used by `bundle verify`, `bundle unbundle`, `fetch` and `clone` from a bundle.
+pub fn check_bundle_prerequisites(header: &BundleHeader) -> anyhow::Result<()> {
+    let missing = missing_bundle_prerequisites(header);
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let mut message = String::from("error: Repository lacks these prerequisite commits:");
+    for oid in missing {
+        message.push_str(&format!("\nerror: {} ", oid));
+    }
+    anyhow::bail!(message)
+}
+
+/// Whether `path` is a file that starts with a v2 or v3 bundle signature, so `fetch` and
+/// `clone` can treat it as a bundle instead of a repository directory.
+// Used by `fetch` and `clone`.
+pub fn is_bundle_file(path: &Path) -> bool {
+    let Ok(mut file) = fs::File::open(path) else { return false };
+    let mut start = [0u8; 16];
+    file.read_exact(&mut start).is_ok() && (&start == b"# v2 git bundle\n" || &start == b"# v3 git bundle\n")
+}
+
+/// The branches a bundle carries (`refs/heads/<name>` refs), as `(name, oid)`.
+// Used by `fetch` from a bundle.
+pub fn bundle_branches(header: &BundleHeader) -> Vec<(String, String)> {
+    header
+        .refs
+        .iter()
+        .filter_map(|(oid, name)| name.strip_prefix("refs/heads/").map(|branch| (branch.to_string(), oid.clone())))
+        .collect()
+}
+
+/// The branch a bundle's `HEAD` ref points at, guessed like git does from the commit ids (a
+/// bundle stores HEAD as an id, not a symref): `main` or `master` when one of them matches,
+/// else the first matching branch. `None` when the bundle has no HEAD or no branch matches it.
+// Used by `fetch` and `clone` from a bundle.
+pub fn bundle_head_branch(header: &BundleHeader) -> Option<String> {
+    let head = header.refs.iter().find(|(_, name)| name == "HEAD").map(|(oid, _)| oid)?;
+    let matching: Vec<String> = bundle_branches(header).into_iter().filter(|(_, oid)| oid == head).map(|(name, _)| name).collect();
+    ["main", "master"]
+        .iter()
+        .find(|preferred| matching.iter().any(|name| name == *preferred))
+        .map(|name| name.to_string())
+        .or_else(|| matching.into_iter().next())
+}

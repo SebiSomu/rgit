@@ -1,0 +1,151 @@
+---
+source: tests/cli/scenarios/open.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit switch -c feature/add-parser
+Switched to a new branch 'feature/add-parser'
+$ write parser.rs (14 bytes)
+$ rgit add parser.rs
+Staged files to index (1 new).
+$ rgit commit -m 'Add parser' -m 'Parses the input.'
+[feature/add-parser <H4:7>] Add parser
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 parser.rs
+$ rgit pr-summary
+# Add parser
+
+Parses the input.
+
+1 commit, 1 file changed (+1 -0) against `main`.
+
+## Files
+
+- `parser.rs` (new, +1)
+
+Merges cleanly into `main`.
+$ write a.txt (8 bytes)
+$ rgit rm b.txt
+rm 'b.txt'
+$ rgit commit -a -m 'Tidy a and b'
+[feature/add-parser <H5:7>] Tidy a and b
+ Author: Test Author <author@example.com>
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+ delete mode 100644 b.txt
+$ rgit pr-summary
+# Add parser
+
+2 commits, 3 files changed (+2 -2) against `main`.
+
+## Commits
+
+- Add parser (`<H4:7>`)
+- Tidy a and b (`<H5:7>`)
+
+## Files
+
+- `a.txt` (+1 -1)
+- `b.txt` (deleted, -1)
+- `parser.rs` (new, +1)
+
+Merges cleanly into `main`.
+$ rgit pr-summary main --title 'Parser, first cut'
+# Parser, first cut
+
+2 commits, 3 files changed (+2 -2) against `main`.
+
+## Commits
+
+- Add parser (`<H4:7>`)
+- Tidy a and b (`<H5:7>`)
+
+## Files
+
+- `a.txt` (+1 -1)
+- `b.txt` (deleted, -1)
+- `parser.rs` (new, +1)
+
+Merges cleanly into `main`.
+$ rgit switch main
+Switched to branch 'main'
+$ write a.txt (9 bytes)
+$ rgit commit -a -m 'German'
+[main <H6:7>] German
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch feature/add-parser
+Switched to branch 'feature/add-parser'
+$ rgit pr-summary main
+# Add parser
+
+2 commits, 3 files changed (+2 -2) against `main`.
+
+## Commits
+
+- Add parser (`<H4:7>`)
+- Tidy a and b (`<H5:7>`)
+
+## Files
+
+- `a.txt` (+1 -1)
+- `b.txt` (deleted, -1)
+- `parser.rs` (new, +1)
+
+**Conflicts with `main`** in `a.txt`: rebase or merge `main` first.
+$ rgit pr-summary feature/add-parser
+[stderr]
+fatal: nothing to summarize: feature/add-parser and feature/add-parser are the same
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/feature/add-parser
+refs:
+  refs/heads/feature/add-parser <H5>
+  refs/heads/main <H6>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H7> 0	a.txt
+  100644 <H8> 0	parser.rs
+  100644 <H9> 0	src/lib.txt
+HEAD commit:
+  tree <H10>
+  parent <H4>
+  author Test Author <author@example.com> 1700000660 +0000
+  committer Test Committer <committer@example.com> 1700000660 +0000
+  
+  Tidy a and b
+worktree:
+  a.txt
+    | one
+    | TWO
+  parser.rs
+    | fn parse() {}
+  src/lib.txt
+    | lib v2

@@ -296,6 +296,8 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
 | [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
 | [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
+| [`pr-summary`](#rgit-pr-summary) | A Markdown pull request description: title, commits, files, and whether it merges cleanly (rgit only). |
+| [`open`](#rgit-open) | Open or print the web page of a file, branch, commit or pull request (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2894,6 +2896,111 @@ Removed 1 older backup (keeping the newest 10): demo-2026-11-01-091200.bundle
 Restore with `rgit clone ~/.rgit-backups/demo-2026-11-25-174537.bundle <dir>`.
 $ rgit backup
 Nothing new since the last backup (~/.rgit-backups/demo-2026-11-25-174537.bundle): same 3 refs. `-f` makes one anyway.
+```
+
+
+### `rgit pr-summary`
+
+A Markdown draft of a pull request description, printed to stdout (rgit only).
+
+**Syntax:** `rgit pr-summary [<base> [<head>]] [--title <text>]`
+
+For the commits `<head>` (default HEAD) has that `<base>` doesn't. The base defaults to the remote's default branch (`origin/HEAD`, else `origin/main` or `origin/master`), else a local `main` or `master`. It prints:
+
+- **A title:** the commit's subject for a single commit (its body follows as the description), otherwise made from the branch name (`feature/add-parser` → `Add parser`); `--title` sets it.
+- **The totals:** commits, files and lines changed against the base (from the merge base).
+- **Commits**, oldest first, with short hashes (for more than one commit).
+- **Files**, each with `+added -removed` (`new`, `deleted`, `binary` noted).
+- **Whether it merges cleanly** into the base, from an in-memory merge, or which files would conflict.
+
+Paste it into the pull request, or pipe it (`rgit pr-summary > pr.md`). It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit pr-summary -h</code></summary>
+
+```text
+A Markdown pull request description: title, commits, files with their lines, and whether it merges cleanly
+
+Usage: rgit pr-summary [OPTIONS] [BASE] [HEAD]
+
+Arguments:
+  [BASE]  The branch the pull request goes into (default: the remote's default branch, else main or master)
+  [HEAD]  The branch or commit with the changes (default: HEAD)
+
+Options:
+      --title <TEXT>  The title to use instead of the one rgit makes up
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit pr-summary
+# Add parser
+
+2 commits, 3 files changed (+2 -2) against `main`.
+
+## Commits
+
+- Add parser (`41ab7f0`)
+- Tidy a and b (`9c2e0d4`)
+
+## Files
+
+- `a.txt` (+1 -1)
+- `b.txt` (deleted, -1)
+- `parser.rs` (new, +1)
+
+Merges cleanly into `main`.
+```
+
+
+### `rgit open`
+
+Open (or with `-p` print) the web page of a file, branch, commit or pull request (rgit only).
+
+**Syntax:** `rgit open [<target>] [-p] [--remote <name>]`
+
+The page is on the remote's site (`origin`, or the only remote, or `--remote`), worked out from its URL (`https://`, `ssh://`, `git@host:` or rgit's `owner/repo` shorthand) for GitHub, GitLab (with subgroups) and Bitbucket. The target:
+
+- **nothing:** the current branch (it must be on the remote; otherwise it says to push first);
+- **a file or directory**, optionally with lines (`src/lib.rs:12`, `src/lib.rs:12-20`): shown at the current branch when the remote has it, else at HEAD's commit (so the link works before you push);
+- **a branch** (on the remote), or **a commit** (any revision: `HEAD~2`, a hash, a tag);
+- **`pr`:** the page that opens a new pull request (merge request) from the current branch into the remote's default branch;
+- **`#123`:** pull request 123.
+
+The URL is always printed; the browser is started with `start` (Windows), `open` (macOS) or `xdg-open`.
+
+<details>
+<summary>Options as printed by <code>rgit open -h</code></summary>
+
+```text
+Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket
+
+Usage: rgit open [OPTIONS] [TARGET]
+
+Arguments:
+  [TARGET]  A file or directory (`path:12` or `path:12-20` for lines), a branch, a commit, `pr` (a new pull request from the current branch) or `#123` (pull request 123). Default: the current branch
+
+Options:
+  -p, --print          Only print the URL, don't open the browser
+      --remote <NAME>  The remote whose web page to use (default: origin, or the only remote)
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit open -p src/lib.txt:1
+https://github.com/sebi/rgit/blob/main/src/lib.txt#L1
+$ rgit open pr
+https://github.com/sebi/rgit/compare/main...feature/add-parser?expand=1
+$ rgit open -p --remote lab '#7'
+https://gitlab.com/group/sub/proj/-/merge_requests/7
 ```
 
 

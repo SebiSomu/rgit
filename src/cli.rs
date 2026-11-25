@@ -234,6 +234,10 @@ pub enum Commands {
     Secrets(crate::workspace::secrets::cli::SecretsArgs),
     /// Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one.
     Backup(crate::remote::backup::cli::BackupArgs),
+    /// A Markdown pull request description: title, commits, files with their lines, and whether it merges cleanly.
+    PrSummary(crate::remote::pr_summary::cli::PrSummaryArgs),
+    /// Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket.
+    Open(crate::remote::open::cli::OpenArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -409,6 +413,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Compare(args) => crate::history::compare::cli::dispatch_compare(args)?,
         Commands::Secrets(args) => crate::workspace::secrets::cli::dispatch_secrets(args)?,
         Commands::Backup(args) => crate::remote::backup::cli::dispatch_backup(args)?,
+        Commands::PrSummary(args) => crate::remote::pr_summary::cli::dispatch_pr_summary(args)?,
+        Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
     }
 
     Ok(())

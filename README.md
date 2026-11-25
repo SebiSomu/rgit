@@ -12,12 +12,12 @@ It started as a way to learn how version control works inside, and it has grown 
 
 ## Highlights
 
-- **133 commands**, from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
+- **135 commands**, from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
 - **Git-compatible storage.** Zlib objects, SHA-1 ids, index v2/v3, packfiles with offset and ref deltas, `packed-refs`, reflogs, `.git` worktree files.
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
 - **Two remote transports.** Local paths, and GitHub through its REST API with a personal access token.
 - **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected). `rgit conflicts` lists unresolved conflicts in plain words, `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change, `rgit oops` suggests the most likely fix right after a mistake, `rgit wip` saves unfinished work per branch in one word, `rgit fixup` folds a fix into an earlier commit, `rgit absorb` works out which commit each fix belongs to, and `rgit sync` fetches, rebases and pushes with a plan.
-- **A safety net.** 25 unit tests and 113 end-to-end scenario snapshots that pin down the output of the commands.
+- **A safety net.** 25 unit tests and 115 end-to-end scenario snapshots that pin down the output of the commands.
 
 ## Install
 

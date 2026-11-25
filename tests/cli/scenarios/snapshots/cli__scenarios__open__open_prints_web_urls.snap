@@ -1,0 +1,112 @@
+---
+source: tests/cli/scenarios/open.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit open -p
+[stderr]
+fatal: this repository has no remote, so it has no web page
+hint: `rgit remote add origin <url>`
+[exit 128]
+$ rgit remote add origin git@github.com:sebi/rgit.git
+$ rgit update-ref refs/remotes/origin/main HEAD
+$ rgit open -p
+https://github.com/sebi/rgit/tree/main
+$ rgit open -p src/lib.txt:1
+https://github.com/sebi/rgit/blob/main/src/lib.txt#L1
+$ rgit open -p a.txt:1-2
+https://github.com/sebi/rgit/blob/main/a.txt#L1-L2
+$ rgit open -p src
+https://github.com/sebi/rgit/tree/main/src
+$ rgit open -p HEAD~1
+https://github.com/sebi/rgit/commit/<H2>
+$ rgit open -p '#42'
+https://github.com/sebi/rgit/pull/42
+$ rgit switch -c feature/add-parser
+Switched to a new branch 'feature/add-parser'
+$ rgit open -p a.txt
+https://github.com/sebi/rgit/blob/<H3>/a.txt
+$ rgit open -p pr
+[stderr]
+fatal: push 'feature/add-parser' first (`rgit push -u origin feature/add-parser`): a pull request is made from the remote's branch
+[exit 128]
+$ rgit update-ref refs/remotes/origin/feature/add-parser HEAD
+$ rgit open -p pr
+https://github.com/sebi/rgit/compare/main...feature/add-parser?expand=1
+$ rgit open -p a.txt
+https://github.com/sebi/rgit/blob/feature/add-parser/a.txt
+$ rgit open -p nope
+[stderr]
+fatal: 'nope' is not a file, branch or commit here
+[exit 128]
+$ rgit remote add lab https://gitlab.com/group/sub/proj.git
+$ rgit update-ref refs/remotes/lab/feature/add-parser HEAD
+$ rgit open -p --remote lab b.txt:3
+https://gitlab.com/group/sub/proj/-/blob/feature/add-parser/b.txt#L3
+$ rgit open -p --remote lab '#7'
+https://gitlab.com/group/sub/proj/-/merge_requests/7
+$ rgit remote add bb ssh://git@bitbucket.org/team/repo.git
+$ rgit open -p --remote bb HEAD
+https://bitbucket.org/team/repo/commits/<H3>
+$ rgit remote add local ../elsewhere
+$ rgit open -p --remote local
+[stderr]
+fatal: can't tell the web page of local (../elsewhere): rgit knows GitHub, GitLab and Bitbucket URLs
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/feature/add-parser
+refs:
+  refs/heads/feature/add-parser <H3>
+  refs/heads/main <H3>
+  refs/remotes/lab/feature/add-parser <H3>
+  refs/remotes/origin/feature/add-parser <H3>
+  refs/remotes/origin/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG config
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

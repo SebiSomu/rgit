@@ -63,6 +63,14 @@ impl Repo {
         self
     }
 
+    /// Makes a file look `secs` seconds old (its modification time).
+    pub fn age(&mut self, rel: &str, secs: u64) -> &mut Self {
+        let file = fs::File::options().write(true).open(self.root.join(rel)).unwrap();
+        file.set_modified(SystemTime::now() - std::time::Duration::from_secs(secs)).unwrap();
+        self.log.push_str(&format!("$ age {} ({}s)\n", rel, secs));
+        self
+    }
+
     /// Writes a worktree file (parent directories are created).
     pub fn write(&mut self, rel: &str, content: &str) -> &mut Self {
         let path = self.root.join(rel);

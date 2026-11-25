@@ -290,6 +290,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
 | [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
 | [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
+| [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2554,6 +2555,65 @@ Most authors
 
 Changed together (leaving out 1 commit of more than 30 files)
      3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
+```
+
+
+### `rgit doctor`
+
+Check the repository for problems, each with the command that fixes it; `--fix` applies the safe fixes (rgit only).
+
+**Syntax:** `rgit doctor [--fix] [--quick] [--large <size>]`
+
+It prints only what is wrong, as `error` (something is broken) or `warning` (something will likely go wrong), each followed by a `fix:` line, then a summary. Exit code 1 when an error is left, so it can gate a script or CI. The checks:
+
+- **Objects:** `fsck`'s integrity and connectivity check (corrupt or missing objects are errors; dangling objects are normal and not reported). The slow part on a big repository: `--quick` skips it.
+- **Refs:** `refs verify`.
+- **Identity:** `user.name` / `user.email` not set (nor `GIT_AUTHOR_*` / `GIT_COMMITTER_*`), so commits get rgit's placeholder.
+- **Config:** lines `config` can't read (a header without `]`, a setting outside any section), a branch tracking a remote that doesn't exist or a remote branch that is gone, a local-path remote URL that doesn't exist, `core.hooksPath` / `core.excludesFile` naming a missing path.
+- **Hooks:** hook files (not `.sample`) that aren't executable, so they never run (Unix only; Windows has no such bit).
+- **Lock files:** `*.lock` under `.git`. Older than 10 minutes, a command that crashed left it and writes will fail (an error); a recent one may belong to a running command (a warning, left alone).
+- **Worktrees:** linked worktrees whose directory is gone.
+- **Huge untracked files:** not ignored and at least `--large` (default `50M`; `500K`, `1G`, or bytes), so `rgit add .` would commit them; the fix is `rgit ignore`.
+- **Forgotten operations:** a merge, rebase, cherry-pick, revert, bisect or `am` in progress for over a day.
+
+`--fix` applies the mechanical fixes itself (stale lock files removed, broken worktree records pruned, hooks made executable) and lists them as `fixed`; everything else stays a suggestion to run yourself.
+
+<details>
+<summary>Options as printed by <code>rgit doctor -h</code></summary>
+
+```text
+Check the repository for problems (objects, refs, identity, config, hooks, stale locks, worktrees, huge files) and how to fix them
+
+Usage: rgit doctor [OPTIONS]
+
+Options:
+      --fix           Apply the safe fixes: remove stale lock files, prune broken worktrees, make hooks executable
+      --quick         Skip the object check (the slow part on a big repository)
+      --large <SIZE>  Size from which an untracked file counts as huge (`500K`, `50M`, `1G`; default 50M) [default: 50M]
+  -h, --help          Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit doctor --quick
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+error    .git/index.lock is 1 hour old: a command that crashed left it, and writes to it will fail
+         fix: rgit doctor --fix (removes stale locks)
+warning  worktree 'ghost' is broken: gitdir file points to non-existent location
+         fix: rgit worktree prune (or `rgit doctor --fix`)
+Checked 8 areas (objects skipped: --quick): 1 error, 2 warnings.
+`rgit doctor --fix` applies the fixes marked `rgit doctor --fix`.
+
+$ rgit doctor --quick --fix
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+fixed    removed .git/index.lock
+fixed    pruned worktree 'ghost'
+Checked 8 areas (objects skipped: --quick): 2 fixed, 1 warning.
 ```
 
 

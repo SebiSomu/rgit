@@ -6,39 +6,40 @@ $ rgit help
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   repack
-   add                 grep                replace
-   am                  hash-object         replay
-   annotate            help                repo
-   apply               hook                request-pull
-   archive             hotspots            rerere
-   banana-split        ignore              reset
-   bisect              index-pack          restore
-   blame               init                rev-list
-   branch              init-db             rev-parse
-   bundle              interpret-trailers  revert
-   cat-file            last-modified       rm
-   check-ignore        log                 save
-   check-mailmap       ls-files            shortlog
-   check-ref-format    ls-tree             show
-   checkout            mailinfo            show-branch
-   checkout-index      mailsplit           show-index
-   cherry              maintenance         show-ref
-   cherry-pick         merge               sparse-checkout
-   clean               merge-base          split
-   clone               merge-file          stage
-   column              merge-tree          stash
-   commit              mktag               status
-   commit-graph        mktree              story
-   commit-tree         move-commit         stripspace
-   config              multi-pack-index    submodule
-   conflicts           mv                  switch
-   count-objects       name-rev            symbolic-ref
-   describe            notes               sync
-   diff                oops                tag
-   diff-files          pack-objects        undo
-   diff-index          pack-refs           unpack-file
-   diff-tree           patch-id            unpack-objects
+   absorb              gc                  remote
+   add                 get-tar-commit-id   repack
+   am                  grep                replace
+   annotate            hash-object         replay
+   apply               help                repo
+   archive             hook                request-pull
+   banana-split        hotspots            rerere
+   bisect              ignore              reset
+   blame               index-pack          restore
+   branch              init                rev-list
+   bundle              init-db             rev-parse
+   cat-file            interpret-trailers  revert
+   check-ignore        last-modified       rm
+   check-mailmap       log                 save
+   check-ref-format    ls-files            shortlog
+   checkout            ls-tree             show
+   checkout-index      mailinfo            show-branch
+   cherry              mailsplit           show-index
+   cherry-pick         maintenance         show-ref
+   clean               merge               sparse-checkout
+   clone               merge-base          split
+   column              merge-file          stage
+   commit              merge-tree          stash
+   commit-graph        mktag               status
+   commit-tree         mktree              story
+   config              move-commit         stripspace
+   conflicts           multi-pack-index    submodule
+   count-objects       mv                  switch
+   describe            name-rev            symbolic-ref
+   diff                notes               sync
+   diff-files          oops                tag
+   diff-index          pack-objects        undo
+   diff-tree           pack-refs           unpack-file
+   doctor              patch-id            unpack-objects
    fast-export         prune               update-index
    fast-import         prune-packed        update-ref
    fetch               pull                var
@@ -49,7 +50,6 @@ Available commands:
    format-patch        redo                wip
    fsck                reflog              worktree
    fsck-objects        refs                write-tree
-   gc                  remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -112,39 +112,40 @@ $ rgit help -a
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   repack
-   add                 grep                replace
-   am                  hash-object         replay
-   annotate            help                repo
-   apply               hook                request-pull
-   archive             hotspots            rerere
-   banana-split        ignore              reset
-   bisect              index-pack          restore
-   blame               init                rev-list
-   branch              init-db             rev-parse
-   bundle              interpret-trailers  revert
-   cat-file            last-modified       rm
-   check-ignore        log                 save
-   check-mailmap       ls-files            shortlog
-   check-ref-format    ls-tree             show
-   checkout            mailinfo            show-branch
-   checkout-index      mailsplit           show-index
-   cherry              maintenance         show-ref
-   cherry-pick         merge               sparse-checkout
-   clean               merge-base          split
-   clone               merge-file          stage
-   column              merge-tree          stash
-   commit              mktag               status
-   commit-graph        mktree              story
-   commit-tree         move-commit         stripspace
-   config              multi-pack-index    submodule
-   conflicts           mv                  switch
-   count-objects       name-rev            symbolic-ref
-   describe            notes               sync
-   diff                oops                tag
-   diff-files          pack-objects        undo
-   diff-index          pack-refs           unpack-file
-   diff-tree           patch-id            unpack-objects
+   absorb              gc                  remote
+   add                 get-tar-commit-id   repack
+   am                  grep                replace
+   annotate            hash-object         replay
+   apply               help                repo
+   archive             hook                request-pull
+   banana-split        hotspots            rerere
+   bisect              ignore              reset
+   blame               index-pack          restore
+   branch              init                rev-list
+   bundle              init-db             rev-parse
+   cat-file            interpret-trailers  revert
+   check-ignore        last-modified       rm
+   check-mailmap       log                 save
+   check-ref-format    ls-files            shortlog
+   checkout            ls-tree             show
+   checkout-index      mailinfo            show-branch
+   cherry              mailsplit           show-index
+   cherry-pick         maintenance         show-ref
+   clean               merge               sparse-checkout
+   clone               merge-base          split
+   column              merge-file          stage
+   commit              merge-tree          stash
+   commit-graph        mktag               status
+   commit-tree         mktree              story
+   config              move-commit         stripspace
+   conflicts           multi-pack-index    submodule
+   count-objects       mv                  switch
+   describe            name-rev            symbolic-ref
+   diff                notes               sync
+   diff-files          oops                tag
+   diff-index          pack-objects        undo
+   diff-tree           pack-refs           unpack-file
+   doctor              patch-id            unpack-objects
    fast-export         prune               update-index
    fast-import         prune-packed        update-ref
    fetch               pull                var
@@ -155,7 +156,6 @@ Available commands:
    format-patch        redo                wip
    fsck                reflog              worktree
    fsck-objects        refs                write-tree
-   gc                  remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -289,6 +289,7 @@ Commands:
   ignore              Add patterns to .gitignore (or the global ignore file) and stop tracking the files they now ignore
   story               The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, timeline
   hotspots            Files that change most, have the most authors, and change together (coupling)
+  doctor              Check the repository for problems (objects, refs, identity, config, hooks, stale locks, worktrees, huge files) and how to fix them
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

@@ -1,0 +1,126 @@
+---
+source: tests/cli/scenarios/doctor.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ export GIT_AUTHOR_EMAIL=
+$ export GIT_COMMITTER_EMAIL=
+$ write .git/config (214 bytes)
+$ write .git/index.lock (0 bytes)
+$ age .git/index.lock (3600s)
+$ write .git/refs/heads/main.lock (0 bytes)
+$ write .git/worktrees/ghost/gitdir (22 bytes)
+$ write .git/worktrees/ghost/HEAD (21 bytes)
+$ write .git/MERGE_HEAD (41 bytes)
+$ age .git/MERGE_HEAD (172800s)
+$ write dump.bin (2048 bytes)
+$ rgit doctor --quick --large 1K
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+warning  config: .git/config line 10 is a [section] header without its closing ], so it is ignored: [broken
+         fix: edit .git/config (or `rgit config --unset` the setting and set it again)
+warning  config: .git/config line 11 is a setting outside any [section], so it is ignored: orphan = 1
+         fix: edit .git/config (or `rgit config --unset` the setting and set it again)
+warning  branch 'main' tracks remote 'ghost', which doesn't exist
+         fix: rgit branch --unset-upstream main
+warning  remote 'old' points to ../missing, which doesn't exist
+         fix: rgit remote set-url old <new-url>
+warning  core.hooksPath is missing-hooks, which doesn't exist (no hooks directory is used)
+         fix: rgit config --unset core.hooksPath (or create it)
+error    .git/index.lock is 1 hour old: a command that crashed left it, and writes to it will fail
+         fix: rgit doctor --fix (removes stale locks)
+warning  .git/refs/heads/main.lock is recent (under 10 minutes old): a git or rgit command may still be running
+         fix: wait for it; if nothing is running, delete .git/refs/heads/main.lock
+warning  worktree 'ghost' is broken: gitdir file points to non-existent location
+         fix: rgit worktree prune (or `rgit doctor --fix`)
+warning  untracked dump.bin is 2 KB: `rgit add .` would commit it
+         fix: rgit ignore dump.bin
+warning  a merge has been in progress for 2 days
+         fix: rgit merge --continue, or rgit merge --abort
+Checked 8 areas (objects skipped: --quick): 1 error, 10 warnings.
+`rgit doctor --fix` applies the fixes marked `rgit doctor --fix`.
+[exit 1]
+$ rgit doctor --quick --large 1K --fix
+warning  user.email is not set: commits will say 'rgit@example.com'
+         fix: rgit config --global user.email you@example.com
+warning  config: .git/config line 10 is a [section] header without its closing ], so it is ignored: [broken
+         fix: edit .git/config (or `rgit config --unset` the setting and set it again)
+warning  config: .git/config line 11 is a setting outside any [section], so it is ignored: orphan = 1
+         fix: edit .git/config (or `rgit config --unset` the setting and set it again)
+warning  branch 'main' tracks remote 'ghost', which doesn't exist
+         fix: rgit branch --unset-upstream main
+warning  remote 'old' points to ../missing, which doesn't exist
+         fix: rgit remote set-url old <new-url>
+warning  core.hooksPath is missing-hooks, which doesn't exist (no hooks directory is used)
+         fix: rgit config --unset core.hooksPath (or create it)
+warning  .git/refs/heads/main.lock is recent (under 10 minutes old): a git or rgit command may still be running
+         fix: wait for it; if nothing is running, delete .git/refs/heads/main.lock
+warning  untracked dump.bin is 2 KB: `rgit add .` would commit it
+         fix: rgit ignore dump.bin
+warning  a merge has been in progress for 2 days
+         fix: rgit merge --continue, or rgit merge --abort
+fixed    removed .git/index.lock
+fixed    pruned worktree 'ghost'
+Checked 8 areas (objects skipped: --quick): 2 fixed, 9 warnings.
+$ rgit worktree list
+<REPO>  <H3:7> [main]
+$ rgit doctor --large 1Q
+[stderr]
+fatal: '1Q' is not a size (try 500K, 50M or 1G)
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+  refs/heads/main.lock 
+git-dir entries:
+  COMMIT_EDITMSG MERGE_HEAD config
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  dump.bin (no newline at end)
+    | xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  src/lib.txt
+    | lib v2

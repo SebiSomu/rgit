@@ -295,6 +295,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
 | [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
 | [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
+| [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2847,6 +2848,52 @@ Possible secrets in the staged changes:
 
 4 found. Take them out of the code (an environment variable, or a file listed in .gitignore); `rgit restore --staged <file>` unstages a file.
 False alarm? Add `rgit:allow-secret` in a comment on that line.
+```
+
+
+### `rgit backup`
+
+Save every ref of the repository to a dated bundle file, keeping the newest few (rgit only).
+
+**Syntax:** `rgit backup [--dir <dir>] [--keep <n>] [-f]` · `rgit backup --list [--dir <dir>]`
+
+git's way is `git bundle create <file> --all` by hand. `rgit backup` writes the same bundle (branches, tags, remote-tracking refs, the stash and `rgit wip` saves) to `<dir>/<repo>-<YYYY-MM-DD-HHMMSS>.bundle` (UTC; `-2`, `-3`... for more in the same second):
+
+- **Where:** `--dir`, else `rgit.backupDir`, else `~/.rgit-backups`. `<repo>` is the working tree's directory name.
+- **Skipped when nothing changed:** if the newest backup has exactly the same refs, no new file is written (`-f` writes one anyway).
+- **Retention:** afterwards only the newest `--keep` backups of this repository stay (else `rgit.backupKeep`, else 10; `0` keeps all); the older ones are deleted and listed.
+- **Not in a backup:** uncommitted changes (they aren't refs); it says so when there are some. `rgit wip` first saves them as a ref.
+- `--list` shows this repository's backups, newest first, with size and number of refs.
+
+**Restoring:** `rgit clone <file> <dir>` makes a repository from a backup, with its branches and tags (clone and fetch from a bundle now bring the bundle's tags along). `rgit bundle list-heads <file>` shows every ref a backup holds.
+
+<details>
+<summary>Options as printed by <code>rgit backup -h</code></summary>
+
+```text
+Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one
+
+Usage: rgit backup [OPTIONS]
+
+Options:
+      --dir <DIR>  Where the backups go (default: rgit.backupDir, else ~/.rgit-backups)
+      --keep <N>   How many backups of this repository to keep, newest first; 0 keeps all (default: rgit.backupKeep, else 10)
+  -f, --force      Back up even when nothing changed since the last backup
+      --list       List this repository's backups instead
+  -h, --help       Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit backup
+Backed up 3 refs (16 objects) to ~/.rgit-backups/demo-2026-11-25-174537.bundle (2 KB).
+Removed 1 older backup (keeping the newest 10): demo-2026-11-01-091200.bundle
+Restore with `rgit clone ~/.rgit-backups/demo-2026-11-25-174537.bundle <dir>`.
+$ rgit backup
+Nothing new since the last backup (~/.rgit-backups/demo-2026-11-25-174537.bundle): same 3 refs. `-f` makes one anyway.
 ```
 
 

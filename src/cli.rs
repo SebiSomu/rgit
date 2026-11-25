@@ -232,6 +232,8 @@ pub enum Commands {
     Compare(crate::history::compare::cli::CompareArgs),
     /// Look for secrets (keys, tokens, passwords, .env files) in the staged changes, all files or the history; exit 1 when found.
     Secrets(crate::workspace::secrets::cli::SecretsArgs),
+    /// Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one.
+    Backup(crate::remote::backup::cli::BackupArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -406,6 +408,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Timeline(args) => crate::history::timeline::cli::dispatch_timeline(args)?,
         Commands::Compare(args) => crate::history::compare::cli::dispatch_compare(args)?,
         Commands::Secrets(args) => crate::workspace::secrets::cli::dispatch_secrets(args)?,
+        Commands::Backup(args) => crate::remote::backup::cli::dispatch_backup(args)?,
     }
 
     Ok(())

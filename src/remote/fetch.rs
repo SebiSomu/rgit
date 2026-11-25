@@ -168,8 +168,9 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
 
 /// `rgit fetch <bundle>` (or a remote whose url is a bundle file): checks the bundle's
 /// prerequisites, stores its objects here, then updates `refs/remotes/<remote>/<branch>` for
-/// each branch it carries (only `branch` when given), its remote HEAD and FETCH_HEAD, with
-/// the same output as a fetch from a local repository.
+/// each branch it carries (only `branch` when given), creates the tags it carries that don't
+/// exist here, and writes its remote HEAD and FETCH_HEAD, with the same output as a fetch from
+/// a local repository.
 fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: &str, branch: Option<&str>) -> Result<()> {
     let (header, bytes) = read_bundle(&path.to_string_lossy())?;
     check_bundle_prerequisites(&header)?;
@@ -203,6 +204,23 @@ fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: 
                 crate::core::commit::short_hash(remote_sha),
                 branch_name, remote_name, branch_name
             ),
+        }
+    }
+
+    // Tags come along too (like git's clone and its tag following): new ones are created,
+    // existing ones are left alone.
+    for (oid, refname) in &header.refs {
+        let Some(tag) = refname.strip_prefix("refs/tags/") else { continue };
+        match crate::core::refs::read_ref(refname)? {
+            Some(local) if local == *oid => {}
+            Some(_) => println!(" ! [rejected]        {:20} -> {}  (would clobber existing tag)", tag, tag),
+            None => {
+                if received == 0 {
+                    received = store_loose_objects(&read_packfile(&bytes[header.pack_offset..])?)?;
+                }
+                crate::core::refs::write_ref(refname, oid)?;
+                println!(" * [new tag]         {:20} -> {}", tag, tag);
+            }
         }
     }
 

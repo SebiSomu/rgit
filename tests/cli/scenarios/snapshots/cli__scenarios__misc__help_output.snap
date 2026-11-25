@@ -6,12 +6,13 @@ $ rgit help
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   replay
-   add                 grep                repo
-   am                  hash-object         request-pull
-   annotate            help                rerere
-   apply               hook                reset
-   archive             hotspots            restore
+   absorb              gc                  replace
+   add                 get-tar-commit-id   replay
+   am                  grep                repo
+   annotate            hash-object         request-pull
+   apply               help                rerere
+   archive             hook                reset
+   backup              hotspots            restore
    banana-split        ignore              rev-list
    bisect              index-pack          rev-parse
    blame               init                revert
@@ -51,7 +52,6 @@ Available commands:
    format-patch        refs                worktree
    fsck                remote              write-tree
    fsck-objects        repack
-   gc                  replace
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -114,12 +114,13 @@ $ rgit help -a
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              get-tar-commit-id   replay
-   add                 grep                repo
-   am                  hash-object         request-pull
-   annotate            help                rerere
-   apply               hook                reset
-   archive             hotspots            restore
+   absorb              gc                  replace
+   add                 get-tar-commit-id   replay
+   am                  grep                repo
+   annotate            hash-object         request-pull
+   apply               help                rerere
+   archive             hook                reset
+   backup              hotspots            restore
    banana-split        ignore              rev-list
    bisect              index-pack          rev-parse
    blame               init                revert
@@ -159,7 +160,6 @@ Available commands:
    format-patch        refs                worktree
    fsck                remote              write-tree
    fsck-objects        repack
-   gc                  replace
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -298,6 +298,7 @@ Commands:
   timeline            A day-by-day digest of the repository: commits, authors, branches, merges, lines
   compare             Where two branches stand: ahead, behind or diverged, the commits and files on each side, and whether merging would conflict
   secrets             Look for secrets (keys, tokens, passwords, .env files) in the staged changes, all files or the history; exit 1 when found
+  backup              Save every ref to a dated bundle in ~/.rgit-backups (keeping the newest 10); `rgit clone <file>` restores one
 
 Options:
       --explain  Narrate what the command actually did, and what it means (`rgit --explain merge x`)

@@ -1,0 +1,101 @@
+---
+source: tests/cli/scenarios/backup.rs
+expression: stable(r.finish())
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit backup --list
+No backups of repo in ~/.rgit-backups.
+$ rgit backup --dir ../backups
+Backed up 2 refs (13 objects) to ../backups/repo-<STAMP>.bundle (1020 bytes).
+Restore with `rgit clone ../backups/repo-<STAMP>.bundle <dir>`.
+$ rgit backup --dir ../backups
+Nothing new since the last backup (../backups/repo-<STAMP>.bundle): same 2 refs. `-f` makes one anyway.
+$ write a.txt (14 bytes)
+$ rgit commit -a -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit backup --dir ../backups --keep 2
+Backed up 2 refs (16 objects) to ../backups/repo-<STAMP>.bundle (2 KB).
+Restore with `rgit clone ../backups/repo-<STAMP>.bundle <dir>`.
+$ rgit tag v1
+$ rgit backup --dir ../backups --keep 2
+Backed up 3 refs (16 objects) to ../backups/repo-<STAMP>.bundle (2 KB).
+Removed 1 older backup (keeping the newest 2): repo-<STAMP>.bundle
+Restore with `rgit clone ../backups/repo-<STAMP>.bundle <dir>`.
+$ rgit backup --dir ../backups --list
+Backups of repo in ../backups (newest first):
+  repo-<STAMP>.bundle      2 KB  3 refs
+  repo-<STAMP>.bundle      2 KB  2 refs
+Restore one with `rgit clone <file> <dir>`.
+$ write b.txt (6 bytes)
+$ rgit backup --dir ../backups -f --keep 0
+Backed up 3 refs (16 objects) to ../backups/repo-<STAMP>.bundle (2 KB).
+Not in it: your uncommitted changes (`rgit wip` saves them as a ref; back up again after).
+Restore with `rgit clone ../backups/repo-<STAMP>.bundle <dir>`.
+(..) $ rgit clone backups/repo-<STAMP>.bundle restored
+Cloning into 'restored'...
+From <TMP>/backups/repo-<STAMP>.bundle
+ * [new branch]      main                 -> origin/main
+ * [new tag]         v1                   -> v1
+Receiving objects: 100% (16/16), done.
+(../restored) $ rgit log --oneline --all
+<H4:7> fourth commit
+<H3:7> third commit
+<H2:7> second commit
+<H1:7> first commit
+(../restored) $ rgit tag
+v1
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+  refs/tags/v1 <H4>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H3>
+  author Test Author <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | two
+    | three
+  b.txt
+    | dirty
+  src/lib.txt
+    | lib v2

@@ -47,6 +47,28 @@ pub fn bundle(action: BundleAction) -> Result<()> {
 }
 
 fn bundle_create(quiet: bool, version: u8, file: &str, revs: &[String]) -> Result<()> {
+    let (_, contents, objects) = build_bundle(version, revs)?;
+    if file == "-" {
+        io::stdout().lock().write_all(&contents)?;
+    } else {
+        let lock = format!("{}.lock", file);
+        fs::write(&lock, &contents).map_err(|e| anyhow::anyhow!("fatal: could not create '{}': {}", file, e))?;
+        fs::rename(&lock, file)?;
+    }
+    if !quiet && io::stderr().is_terminal() {
+        eprintln!("Total {} (delta 0), reused 0 (delta 0), pack-reused 0", objects);
+    }
+    Ok(())
+}
+
+/// A bundle made in memory: its refs as `(object, refname)`, the file contents, and the number of
+/// objects in its pack.
+type BuiltBundle = (Vec<(String, String)>, Vec<u8>, usize);
+
+/// The bytes of a bundle of `revs` (rev-list arguments, such as `--all`): its refs as
+/// `(object, refname)`, the file contents, and how many objects its pack holds.
+// Used by `bundle create` and `rgit backup`.
+pub(crate) fn build_bundle(version: u8, revs: &[String]) -> Result<BuiltBundle> {
     if version != 2 && version != 3 {
         anyhow::bail!("fatal: unsupported bundle version {}", version);
     }
@@ -75,18 +97,7 @@ fn bundle_create(quiet: bool, version: u8, file: &str, revs: &[String]) -> Resul
     let objects = enumerate_bundle_objects(&commits, &prerequisites, &tips)?;
     let mut contents = format_bundle_header(version, &refs, &prerequisites)?.into_bytes();
     contents.extend(write_packfile(&objects)?);
-
-    if file == "-" {
-        io::stdout().lock().write_all(&contents)?;
-    } else {
-        let lock = format!("{}.lock", file);
-        fs::write(&lock, &contents).map_err(|e| anyhow::anyhow!("fatal: could not create '{}': {}", file, e))?;
-        fs::rename(&lock, file)?;
-    }
-    if !quiet && io::stderr().is_terminal() {
-        eprintln!("Total {} (delta 0), reused 0 (delta 0), pack-reused 0", objects.len());
-    }
-    Ok(())
+    Ok((refs, contents, objects.len()))
 }
 
 fn print_refs(header: &BundleHeader, filter: &[String]) {

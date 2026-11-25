@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod bundle;
 pub mod clone;
 pub mod fetch;

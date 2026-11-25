@@ -15,6 +15,7 @@ mod wip;
 mod fixup;
 mod sync;
 mod absorb;
+mod backup;
 mod compare;
 mod doctor;
 mod hotspots;

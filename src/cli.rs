@@ -214,6 +214,8 @@ pub enum Commands {
     Split(crate::merge::split::cli::SplitArgs),
     /// One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next.
     Whereami(crate::workspace::whereami::cli::WhereamiArgs),
+    /// Move commits of the current branch to another branch (cherry-pick there, drop here) without switching.
+    MoveCommit(crate::merge::move_commit::cli::MoveCommitArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -370,6 +372,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Absorb(args) => crate::workspace::absorb::cli::dispatch_absorb(args)?,
         Commands::Split(args) => crate::merge::split::cli::dispatch_split(args)?,
         Commands::Whereami(args) => crate::workspace::whereami::cli::dispatch_whereami(args)?,
+        Commands::MoveCommit(args) => crate::merge::move_commit::cli::dispatch_move_commit(args)?,
     }
 
     Ok(())

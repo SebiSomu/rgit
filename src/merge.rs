@@ -7,6 +7,7 @@ pub mod fmt_merge_msg;
 pub mod merge;
 pub mod merge_file;
 pub mod merge_tree;
+pub mod move_commit;
 pub mod rebase;
 pub mod replay;
 pub mod rerere;

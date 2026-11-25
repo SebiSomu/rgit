@@ -15,6 +15,7 @@ mod wip;
 mod fixup;
 mod sync;
 mod absorb;
+mod move_commit;
 mod split;
 mod whereami;
 

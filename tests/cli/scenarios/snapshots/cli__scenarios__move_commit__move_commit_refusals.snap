@@ -1,0 +1,126 @@
+---
+source: tests/cli/scenarios/move_commit.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit branch side HEAD~2
+$ rgit move-commit HEAD nope
+[stderr]
+fatal: no branch named 'nope'
+hint: pass -c to create it (at <H2:7>, where the oldest commit moved was made)
+[exit 128]
+$ rgit move-commit HEAD main
+[stderr]
+fatal: 'main' is the current branch; name the branch to move the commits to
+[exit 128]
+$ rgit move-commit HEAD~2 side
+[stderr]
+fatal: <H1:7> is the root commit; it can't be moved
+[exit 128]
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit move-commit HEAD~2 side
+[stderr]
+fatal: <H4:7> fourth commit needs the commits being moved (without them it conflicts in a.txt); nothing was changed
+hint: move it too, or pass --copy to only copy the commits to 'side'
+[exit 128]
+$ rgit branch other HEAD~3
+$ rgit switch other
+Switched to branch 'other'
+$ write a.txt (4 bytes)
+$ rgit commit -a -m 'other edit'
+[other <H5:7>] other edit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit move-commit HEAD other
+[stderr]
+fatal: <H4:7> fourth commit doesn't apply cleanly on 'other' (conflicts in a.txt); nothing was changed
+hint: cherry-pick it by hand to resolve them: `rgit switch other` then `rgit cherry-pick <H4:7>`
+[exit 128]
+$ write src/lib.txt (6 bytes)
+$ rgit move-commit HEAD~1 side
+[stderr]
+fatal: dropping the commits changes src/lib.txt, which you have uncommitted changes in (or an untracked file at); nothing was changed
+hint: commit or `rgit wip` them first
+[exit 128]
+$ rgit restore src/lib.txt
+$ rgit move-commit HEAD~1.. side
+[stderr]
+fatal: <H4:7> fourth commit doesn't apply cleanly on 'side' (conflicts in a.txt); nothing was changed
+hint: cherry-pick it by hand to resolve them: `rgit switch side` then `rgit cherry-pick <H4:7>`
+[exit 128]
+$ rgit log --oneline side
+<H1:7> first commit
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      other                -> origin/other
+ * [new branch]      main                 -> origin/main
+ * [new branch]      side                 -> origin/side
+Receiving objects: 100% (19/19), done.
+(../clone) $ rgit move-commit HEAD~1.. other -c
+[stderr]
+fatal: <H4:7> is already pushed (origin/main has it); dropping it would make the branches diverge
+hint: pass --force to drop it anyway (you'll need `rgit push --force` afterwards), or --copy to only copy it
+[exit 128]
+(../clone) $ rgit move-commit --copy HEAD other -c
+Copied 1 commit to 'other' (now <H4:7>, a new branch off <H3:7>):
+  <H4:7> fourth commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+  refs/heads/other <H5>
+  refs/heads/side <H1>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	b.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H9>
+  parent <H3>
+  author Test Author <author@example.com> 1700000600 +0000
+  committer Test Committer <committer@example.com> 1700000600 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | TWO
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

@@ -286,6 +286,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
 | [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
+| [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2337,6 +2338,57 @@ Last commit 8f0c2e1 side edit (Test Author, 5 minutes ago)
 Changes     1 conflicted
 In progress rebase of main onto 8f0c2e1: 0 of 1 commits done
 Next        resolve the conflicts (`rgit conflicts` shows them), `rgit add` each file, then `rgit rebase --continue`
+```
+
+
+### `rgit move-commit`
+
+Move commits of the current branch to another branch: cherry-pick them there and drop them here, without switching (rgit only).
+
+**Syntax:** `rgit move-commit <commit>... <branch> [-c] [--copy] [-f]`
+
+git's way is `git switch <branch>`, `git cherry-pick <commit>`, `git switch -`, then `git rebase --onto <commit>^ <commit>` (or `git reset --keep HEAD~1` for the last commit), with `git stash` around it when the tree is dirty. rgit does both halves in memory first (three-way merges in the object store, like `rgit replay`), so it never stops halfway:
+
+- **The other branch:** the commits are re-created on top of it, oldest first, keeping author and message; only its ref moves. If one doesn't apply cleanly, nothing changes and the hint says how to cherry-pick it by hand.
+- **The current branch:** rewritten from the oldest moved commit, with the commits on top replayed without the moved ones (commits whose parent didn't change are kept as they are). If a commit on top needs the moved ones, nothing changes.
+- **Your files:** the working tree and index follow the new HEAD, changing only the files that differ. Uncommitted changes in other files stay; changes in those files are refused before anything moves.
+
+Commits can be hashes, revisions or ranges (`HEAD~3..`), and must be on the current branch's first-parent line after its last merge (not the root commit). `-c`/`--create` creates the branch when it doesn't exist, at the oldest moved commit's parent: the "committed on main instead of a topic branch" fix, which keeps the commits' hashes. `--copy` only copies (a cherry-pick without switching). Dropping commits a remote-tracking branch has needs `-f`/`--force`. It is one `rgit undo` step for both branches, and refuses while a merge, rebase, cherry-pick, revert or `am` is in progress.
+
+<details>
+<summary>Options as printed by <code>rgit move-commit -h</code></summary>
+
+```text
+Move commits of the current branch to another branch (cherry-pick there, drop here) without switching
+
+Usage: rgit move-commit [OPTIONS] <COMMIT>... <BRANCH>
+
+Arguments:
+  <COMMIT>...  The commits to move: hashes, revisions or ranges like HEAD~3..
+  <BRANCH>     The branch to move them to
+
+Options:
+  -c, --create  Create the branch if it doesn't exist, at the parent of the oldest commit moved
+      --copy    Copy the commits to the branch, keep them on the current one
+  -f, --force   Also drop commits a remote-tracking branch already has
+  -h, --help    Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit move-commit HEAD~1 side
+Moved 1 commit to 'side' (now 5d1c0aa):
+  41ab7f0 third commit
+Dropped it from 'main' (now 8e2f913), replaying the commit on top.
+
+$ rgit move-commit HEAD~2.. fresh -c
+Moved 2 commits to 'fresh' (now 7b3e0c2, a new branch off 9c2e0d4):
+  2f0a6d1 second commit
+  7b3e0c2 fifth commit
+Dropped them from 'two' (now 9c2e0d4).
 ```
 
 

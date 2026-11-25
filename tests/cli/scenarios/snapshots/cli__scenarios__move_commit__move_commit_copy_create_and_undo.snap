@@ -1,0 +1,151 @@
+---
+source: tests/cli/scenarios/move_commit.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit branch side HEAD~2
+$ write c.txt (4 bytes)
+$ rgit add c.txt
+Staged files to index (1 new).
+$ rgit commit -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+$ write a.txt (17 bytes)
+$ rgit move-commit HEAD~1 side
+Moved 1 commit to 'side' (now <H5:7>):
+  <H3:7> third commit
+Dropped it from 'main' (now <H6:7>), replaying the commit on top.
+$ rgit log --oneline
+<H6:7> fourth commit
+<H2:7> second commit
+<H1:7> first commit
+$ rgit log --oneline side
+<H5:7> third commit
+<H1:7> first commit
+$ rgit show side --stat
+commit <H5>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:18:20 2023 +0000
+
+    third commit
+    
+    With a body paragraph.
+
+ b.txt       | 1 +
+ src/lib.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+$ rgit status --short
+ M a.txt
+$ rgit move-commit HEAD topic -c
+Moved 1 commit to 'topic' (now <H6:7>, a new branch off <H2:7>):
+  <H6:7> fourth commit
+Dropped it from 'main' (now <H2:7>).
+$ rgit log --oneline --all --graph
+* <H5:7> third commit
+| * <H6:7> fourth commit
+| * <H2:7> second commit
+|/  
+* <H1:7> first commit
+$ rgit move-commit --copy HEAD side
+Copied 1 commit to 'side' (now <H7:7>):
+  <H2:7> second commit
+$ rgit log --oneline side
+<H7:7> second commit
+<H5:7> third commit
+<H1:7> first commit
+$ rgit log --oneline -1
+<H2:7> second commit
+$ rgit switch -c two
+Switched to a new branch 'two'
+$ write d.txt (2 bytes)
+$ rgit add d.txt
+Staged files to index (1 new).
+$ rgit commit -m 'fifth commit'
+[two <H8:7>] fifth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 d.txt
+$ rgit move-commit HEAD~2.. fresh -c
+[stderr]
+fatal: dropping the commits changes a.txt, which you have uncommitted changes in (or an untracked file at); nothing was changed
+hint: commit or `rgit wip` them first
+[exit 128]
+$ rgit restore a.txt
+$ rgit move-commit HEAD~2.. fresh -c
+Moved 2 commits to 'fresh' (now <H8:7>, a new branch off <H1:7>):
+  <H2:7> second commit
+  <H8:7> fifth commit
+Dropped them from 'two' (now <H1:7>).
+$ rgit log --oneline fresh
+<H8:7> fifth commit
+<H2:7> second commit
+<H1:7> first commit
+$ rgit log --oneline
+<H1:7> first commit
+$ rgit undo
+Undoing #16: rgit move-commit HEAD~2.. fresh -c  (just now)
+  - files restored: a.txt, d.txt
+  - index (staging area): put back as it was
+  - branch 'fresh': removed (was at <H8:7> "fifth commit")
+  - branch 'two': <H1:7> -> <H8:7> "fifth commit"
+Done. `rgit redo` brings it back.
+$ rgit log --oneline topic
+<H6:7> fourth commit
+<H2:7> second commit
+<H1:7> first commit
+
+==== final state ====
+HEAD: ref: refs/heads/two
+refs:
+  refs/heads/main <H2>
+  refs/heads/side <H7>
+  refs/heads/topic <H6>
+  refs/heads/two <H8>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H9> 0	a.txt
+  100644 <H10> 0	d.txt
+  100644 <H11> 0	src/lib.txt
+HEAD commit:
+  tree <H12>
+  parent <H2>
+  author Test Author <author@example.com> 1700001260 +0000
+  committer Test Committer <committer@example.com> 1700001260 +0000
+  
+  fifth commit
+worktree:
+  a.txt
+    | one
+    | two
+  d.txt
+    | d
+  src/lib.txt
+    | lib v1

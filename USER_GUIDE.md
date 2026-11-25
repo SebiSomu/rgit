@@ -289,6 +289,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
 | [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
+| [`hotspots`](#rgit-hotspots) | Files that change most, have the most authors, and change together (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2499,6 +2500,60 @@ Timeline (newest first):
   2023-11-14  9c2e0d4  Bob  +0 -0      Rename parser  (renamed)
   2023-11-14  2f0a6d1  Ana  +1 -0      Add g
   2023-11-14  41ab7f0  Ana  +6 -0      Add parser  (created)
+```
+
+
+### `rgit hotspots`
+
+Files that change most, have the most authors, and change together (rgit only).
+
+**Syntax:** `rgit hotspots [<path>...] [--since <date>] [-n <N>]`
+
+One walk over the current branch's non-merge commits (each against its first parent), counting only files that still exist, gives three lists of the top `-n` (default 10):
+
+- **Most changed:** files changed in the most commits (ties broken by lines changed), with `+added -removed`. A file changed only once is not listed.
+- **Most authors:** files changed by more than one author, with each author's commit count (top three).
+- **Changed together:** pairs of files changed in the same commits (at least 2), with what share of the less-changed file's commits that is. Commits that change more than 30 files (a reformat, a mass rename, generated code) are left out of this list and counted in its heading.
+
+Paths limit it to files under them; `--since` takes the same dates as `log --since` (`2024-01-01`, `3 months ago`, ...) and looks at the commit date. Renames are not followed: a renamed file starts over under its new name. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit hotspots -h</code></summary>
+
+```text
+Files that change most, have the most authors, and change together (coupling)
+
+Usage: rgit hotspots [OPTIONS] [PATH]...
+
+Arguments:
+  [PATH]...  Only files under these paths
+
+Options:
+      --since <DATE>   Only commits since this date (`2024-01-01`, `3 months ago`, ...)
+  -n, --max-count <N>  How many entries each list shows [default: 10]
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit hotspots
+Hotspots over 6 commits (34 files):
+
+Most changed
+     5 commits  +5 -1  cli.rs
+     3 commits  +3 -1  parser.rs
+     2 commits  +2 -0  README.md
+
+Most authors
+     3 authors  cli.rs  (Ana 2, Bob 2, Cy 1)
+     2 authors  parser.rs  (Ana 2, Bob 1)
+     2 authors  README.md  (Ana 1, Cy 1)
+
+Changed together (leaving out 1 commit of more than 30 files)
+     3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
 ```
 
 

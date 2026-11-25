@@ -3,6 +3,7 @@ pub mod blame;
 pub mod cherry;
 pub mod follow;
 pub mod graph;
+pub mod hotspots;
 pub mod grep;
 pub mod last_modified;
 pub mod log;

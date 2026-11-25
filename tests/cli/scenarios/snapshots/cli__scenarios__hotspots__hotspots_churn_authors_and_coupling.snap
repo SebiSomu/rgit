@@ -1,0 +1,286 @@
+---
+source: tests/cli/scenarios/hotspots.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export GIT_AUTHOR_NAME=Ana
+$ write cli.rs (2 bytes)
+$ write parser.rs (2 bytes)
+$ write README.md (2 bytes)
+$ rgit add .
+Staged files to index (3 new).
+$ rgit commit -m start
+[main (root-commit) <H1:7>] start
+ Author: Ana <author@example.com>
+ 3 files changed, 3 insertions(+)
+ create mode 100644 README.md
+ create mode 100644 cli.rs
+ create mode 100644 parser.rs
+$ write cli.rs (4 bytes)
+$ write parser.rs (4 bytes)
+$ rgit commit -a -m 'cli + parser'
+[main <H2:7>] cli + parser
+ Author: Ana <author@example.com>
+ 2 files changed, 2 insertions(+)
+$ export GIT_AUTHOR_NAME=Bob
+$ write cli.rs (6 bytes)
+$ write parser.rs (4 bytes)
+$ rgit commit -a -m 'cli + parser again'
+[main <H3:7>] cli + parser again
+ Author: Bob <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+$ write cli.rs (6 bytes)
+$ rgit commit -a -m 'cli only'
+[main <H4:7>] cli only
+ Author: Bob <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ export GIT_AUTHOR_NAME=Cy
+$ write README.md (7 bytes)
+$ write gone.txt (2 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 2 unchanged).
+$ rgit commit -m docs
+[main <H5:7>] docs
+ Author: Cy <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 gone.txt
+$ rgit rm gone.txt
+rm 'gone.txt'
+$ rgit commit -m 'drop gone'
+[main <H6:7>] drop gone
+ Author: Cy <author@example.com>
+ 1 file changed, 1 deletion(-)
+ delete mode 100644 gone.txt
+$ write gen/f00.txt (2 bytes)
+$ write gen/f01.txt (2 bytes)
+$ write gen/f02.txt (2 bytes)
+$ write gen/f03.txt (2 bytes)
+$ write gen/f04.txt (2 bytes)
+$ write gen/f05.txt (2 bytes)
+$ write gen/f06.txt (2 bytes)
+$ write gen/f07.txt (2 bytes)
+$ write gen/f08.txt (2 bytes)
+$ write gen/f09.txt (2 bytes)
+$ write gen/f10.txt (2 bytes)
+$ write gen/f11.txt (2 bytes)
+$ write gen/f12.txt (2 bytes)
+$ write gen/f13.txt (2 bytes)
+$ write gen/f14.txt (2 bytes)
+$ write gen/f15.txt (2 bytes)
+$ write gen/f16.txt (2 bytes)
+$ write gen/f17.txt (2 bytes)
+$ write gen/f18.txt (2 bytes)
+$ write gen/f19.txt (2 bytes)
+$ write gen/f20.txt (2 bytes)
+$ write gen/f21.txt (2 bytes)
+$ write gen/f22.txt (2 bytes)
+$ write gen/f23.txt (2 bytes)
+$ write gen/f24.txt (2 bytes)
+$ write gen/f25.txt (2 bytes)
+$ write gen/f26.txt (2 bytes)
+$ write gen/f27.txt (2 bytes)
+$ write gen/f28.txt (2 bytes)
+$ write gen/f29.txt (2 bytes)
+$ write gen/f30.txt (2 bytes)
+$ write cli.rs (8 bytes)
+$ rgit add .
+Staged files to index (31 new, 1 modified, 2 unchanged).
+$ rgit commit -m 'generate files'
+[main <H7:7>] generate files
+ Author: Cy <author@example.com>
+ 32 files changed, 32 insertions(+)
+ create mode 100644 gen/f00.txt
+ create mode 100644 gen/f01.txt
+ create mode 100644 gen/f02.txt
+ create mode 100644 gen/f03.txt
+ create mode 100644 gen/f04.txt
+ create mode 100644 gen/f05.txt
+ create mode 100644 gen/f06.txt
+ create mode 100644 gen/f07.txt
+ create mode 100644 gen/f08.txt
+ create mode 100644 gen/f09.txt
+ create mode 100644 gen/f10.txt
+ create mode 100644 gen/f11.txt
+ create mode 100644 gen/f12.txt
+ create mode 100644 gen/f13.txt
+ create mode 100644 gen/f14.txt
+ create mode 100644 gen/f15.txt
+ create mode 100644 gen/f16.txt
+ create mode 100644 gen/f17.txt
+ create mode 100644 gen/f18.txt
+ create mode 100644 gen/f19.txt
+ create mode 100644 gen/f20.txt
+ create mode 100644 gen/f21.txt
+ create mode 100644 gen/f22.txt
+ create mode 100644 gen/f23.txt
+ create mode 100644 gen/f24.txt
+ create mode 100644 gen/f25.txt
+ create mode 100644 gen/f26.txt
+ create mode 100644 gen/f27.txt
+ create mode 100644 gen/f28.txt
+ create mode 100644 gen/f29.txt
+ create mode 100644 gen/f30.txt
+$ rgit hotspots
+Hotspots over 6 commits (34 files):
+
+Most changed
+     5 commits  +5 -1  cli.rs
+     3 commits  +3 -1  parser.rs
+     2 commits  +2 -0  README.md
+
+Most authors
+     3 authors  cli.rs  (Ana 2, Bob 2, Cy 1)
+     2 authors  parser.rs  (Ana 2, Bob 1)
+     2 authors  README.md  (Ana 1, Cy 1)
+
+Changed together (leaving out 1 commit of more than 30 files)
+     3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
+$ rgit hotspots -n 1
+Hotspots over 6 commits (34 files):
+
+Most changed
+     5 commits  +5 -1  cli.rs
+
+Most authors
+     3 authors  cli.rs  (Ana 2, Bob 2, Cy 1)
+
+Changed together (leaving out 1 commit of more than 30 files)
+     3 commits  cli.rs <-> parser.rs  (100% of parser.rs's changes)
+$ rgit hotspots README.md
+Hotspots over 2 commits (1 file):
+
+Most changed
+     2 commits  +2 -0  README.md
+
+Most authors
+     2 authors  README.md  (Ana 1, Cy 1)
+$ rgit hotspots --since '<AGE> ago'
+No commits changed any file that still exists since <AGE> ago.
+$ rgit hotspots --since nonsense
+[stderr]
+fatal: 'nonsense' is not a date rgit understands (try 2024-01-01 or '<AGE> ago')
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H8> 0	README.md
+  100644 <H9> 0	cli.rs
+  100644 <H10> 0	gen/f00.txt
+  100644 <H10> 0	gen/f01.txt
+  100644 <H10> 0	gen/f02.txt
+  100644 <H10> 0	gen/f03.txt
+  100644 <H10> 0	gen/f04.txt
+  100644 <H10> 0	gen/f05.txt
+  100644 <H10> 0	gen/f06.txt
+  100644 <H10> 0	gen/f07.txt
+  100644 <H10> 0	gen/f08.txt
+  100644 <H10> 0	gen/f09.txt
+  100644 <H10> 0	gen/f10.txt
+  100644 <H10> 0	gen/f11.txt
+  100644 <H10> 0	gen/f12.txt
+  100644 <H10> 0	gen/f13.txt
+  100644 <H10> 0	gen/f14.txt
+  100644 <H10> 0	gen/f15.txt
+  100644 <H10> 0	gen/f16.txt
+  100644 <H10> 0	gen/f17.txt
+  100644 <H10> 0	gen/f18.txt
+  100644 <H10> 0	gen/f19.txt
+  100644 <H10> 0	gen/f20.txt
+  100644 <H10> 0	gen/f21.txt
+  100644 <H10> 0	gen/f22.txt
+  100644 <H10> 0	gen/f23.txt
+  100644 <H10> 0	gen/f24.txt
+  100644 <H10> 0	gen/f25.txt
+  100644 <H10> 0	gen/f26.txt
+  100644 <H10> 0	gen/f27.txt
+  100644 <H10> 0	gen/f28.txt
+  100644 <H10> 0	gen/f29.txt
+  100644 <H10> 0	gen/f30.txt
+  100644 <H11> 0	parser.rs
+HEAD commit:
+  tree <H12>
+  parent <H6>
+  author Cy <author@example.com> 1700000660 +0000
+  committer Test Committer <committer@example.com> 1700000660 +0000
+  
+  generate files
+worktree:
+  README.md
+    | r
+    | more
+  cli.rs
+    | A
+    | b
+    | c
+    | d
+  gen/f00.txt
+    | x
+  gen/f01.txt
+    | x
+  gen/f02.txt
+    | x
+  gen/f03.txt
+    | x
+  gen/f04.txt
+    | x
+  gen/f05.txt
+    | x
+  gen/f06.txt
+    | x
+  gen/f07.txt
+    | x
+  gen/f08.txt
+    | x
+  gen/f09.txt
+    | x
+  gen/f10.txt
+    | x
+  gen/f11.txt
+    | x
+  gen/f12.txt
+    | x
+  gen/f13.txt
+    | x
+  gen/f14.txt
+    | x
+  gen/f15.txt
+    | x
+  gen/f16.txt
+    | x
+  gen/f17.txt
+    | x
+  gen/f18.txt
+    | x
+  gen/f19.txt
+    | x
+  gen/f20.txt
+    | x
+  gen/f21.txt
+    | x
+  gen/f22.txt
+    | x
+  gen/f23.txt
+    | x
+  gen/f24.txt
+    | x
+  gen/f25.txt
+    | x
+  gen/f26.txt
+    | x
+  gen/f27.txt
+    | x
+  gen/f28.txt
+    | x
+  gen/f29.txt
+    | x
+  gen/f30.txt
+    | x
+  parser.rs
+    | P
+    | q

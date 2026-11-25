@@ -15,6 +15,7 @@ mod wip;
 mod fixup;
 mod sync;
 mod absorb;
+mod hotspots;
 mod ignore;
 mod move_commit;
 mod split;

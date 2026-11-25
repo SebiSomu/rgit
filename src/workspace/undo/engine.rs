@@ -48,7 +48,7 @@ const READ_ONLY: &[&str] = &[
     "diff-files", "show-index", "verify-pack", "conflicts", "archive", "format-patch", "get-tar-commit-id",
     "unpack-file", "merge-tree", "hash-object", "write-tree", "config", "clone", "init", "init-db", "push", "fetch",
     "gc", "prune", "repack", "pack-objects", "prune-packed", "index-pack", "unpack-objects", "commit-graph",
-    "multi-pack-index", "maintenance", "for-each-repo", "fast-export", "bundle", "undo", "redo", "oops", "whereami", "story",
+    "multi-pack-index", "maintenance", "for-each-repo", "fast-export", "bundle", "undo", "redo", "oops", "whereami", "story", "hotspots",
 ];
 
 /// Commands that can rewrite files in the working tree: their operations carry a snapshot.

@@ -362,16 +362,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
 // Used by the `add` and `commit` warnings.
 pub fn scan_risks(paths: &[String]) -> (Vec<(String, String)>, Vec<String>, Vec<(String, u64)>) {
     let limit: u64 = crate::core::config::get_config_value("rgit.largeFileWarning").ok().flatten().and_then(|v| v.parse().ok()).unwrap_or(50 << 20);
-    let content_rules: Vec<(regex::Regex, &str)> = [
-        (r"AKIA[0-9A-Z]{16}", "an AWS access key"),
-        (r"-----BEGIN [A-Z ]*PRIVATE KEY-----", "a private key"),
-        (r"gh[pousr]_[A-Za-z0-9]{36,}", "a GitHub token"),
-        (r"xox[baprs]-[A-Za-z0-9-]{10,}", "a Slack token"),
-        (r#"(?i)(api[_-]?key|secret|passwd|password|token)\s*[:=]\s*['"][^'"\s]{8,}['"]"#, "a hard-coded password or key"),
-    ]
-    .iter()
-    .filter_map(|(re, what)| regex::Regex::new(re).ok().map(|r| (r, *what)))
-    .collect();
+    let content_rules = crate::workspace::secrets::engine::rules();
     let (mut secrets, mut build, mut large) = (Vec::new(), Vec::new(), Vec::new());
     for path in paths {
         let name = path.rsplit('/').next().unwrap_or(path);
@@ -383,12 +374,12 @@ pub fn scan_risks(paths: &[String]) -> (Vec<(String, String)>, Vec<String>, Vec<
         if meta.len() > limit {
             large.push((path.clone(), meta.len()));
         }
-        if lower == ".env" || lower.starts_with(".env.") && lower != ".env.example" || ["id_rsa", "id_ed25519", "id_ecdsa", "credentials.json"].contains(&lower.as_str()) || [".pem", ".p12", ".pfx", ".key"].iter().any(|e| lower.ends_with(e)) {
+        if crate::workspace::secrets::engine::is_secret_file(path) {
             secrets.push((path.clone(), "a secrets/key file".to_string()));
         } else if meta.len() <= 1 << 20 {
             if let Ok(content) = fs::read(path) {
                 let text = String::from_utf8_lossy(&content);
-                if let Some((_, what)) = content_rules.iter().find(|(re, _)| re.is_match(&text)) {
+                if let Some((_, what)) = content_rules.iter().find(|(re, _)| text.lines().any(|l| !l.contains(crate::workspace::secrets::engine::ALLOW_MARKER) && re.is_match(l))) {
                     secrets.push((path.clone(), what.to_string()));
                 }
             }

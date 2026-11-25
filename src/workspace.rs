@@ -16,6 +16,7 @@ pub mod patch;
 pub mod read_tree;
 pub mod reset;
 pub mod restore;
+pub mod secrets;
 pub mod sparse_checkout;
 pub mod staging;
 pub mod stash;

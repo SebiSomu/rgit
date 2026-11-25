@@ -20,6 +20,7 @@ mod doctor;
 mod hotspots;
 mod ignore;
 mod move_commit;
+mod secrets;
 mod split;
 mod stats;
 mod story;

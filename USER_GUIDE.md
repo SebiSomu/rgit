@@ -294,6 +294,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`stats`](#rgit-stats) | Numbers on the branch's history: activity, weekdays, authors, languages, biggest commits (rgit only). |
 | [`timeline`](#rgit-timeline) | A day-by-day digest of the repository: commits, authors, branches, merges, lines (rgit only). |
 | [`compare`](#rgit-compare) | Where two branches stand: ahead, behind or diverged, commits and files on each side, whether merging would conflict (rgit only). |
+| [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2792,6 +2793,60 @@ Only on main
 
 Merging would conflict in 1 file: a.txt.
 Next: `rgit merge main` or `rgit rebase main`.
+```
+
+
+### `rgit secrets`
+
+Look for obvious secrets in the staged changes, every tracked file, or the history; exit code 1 when anything is found (rgit only).
+
+**Syntax:** `rgit secrets [--all-files | --history [<rev>...]] [-q]`
+
+- **Default: the staged changes**, only the lines they add (what is about to be committed), plus new files whose name says they hold secrets. Made for a pre-commit hook.
+- `--all-files`: every tracked file, as staged.
+- `--history`: the lines every commit added, reachable from HEAD or from the given revisions or ranges (`HEAD~10..`); each secret is reported once, at the commit that introduced it, even if it was deleted since.
+
+What it finds: AWS access and secret keys, GitHub, Slack, Google, Stripe, Anthropic and OpenAI-style keys and tokens, private keys (`-----BEGIN ... PRIVATE KEY-----`), JSON web tokens, passwords in URLs (`postgres://user:pass@host`), hard-coded `password = "..."` / `api_key = "..."` assignments, and files such as `.env` (not `.env.example`), `id_rsa`, `*.pem`, `*.key`, `credentials.json`, `.npmrc`. Binary files and files over 1 MiB are skipped. Matches are printed masked (`AKIA…QQ`). A line containing `rgit:allow-secret` (in a comment) is never reported. The warnings `rgit add` and `rgit commit` print use the same rules.
+
+`-q` prints nothing: only the exit code says. As a pre-commit hook (`.git/hooks/pre-commit`, made executable):
+
+```sh
+#!/bin/sh
+exec rgit secrets
+```
+
+<details>
+<summary>Options as printed by <code>rgit secrets -h</code></summary>
+
+```text
+Look for secrets (keys, tokens, passwords, .env files) in the staged changes, all files or the history; exit 1 when found
+
+Usage: rgit secrets [OPTIONS] [REV]...
+
+Arguments:
+  [REV]...  Revisions or ranges for --history (default: HEAD)
+
+Options:
+      --all-files  Scan every tracked file (as staged), not only the staged changes
+      --history    Scan the lines every commit added (reachable from HEAD, or from the given revisions/ranges)
+  -q, --quiet      Print nothing; only the exit code says (1 = something found)
+  -h, --help       Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit secrets
+Possible secrets in the staged changes:
+  .env         a secrets/key file
+  a.txt:3      a GitHub token       ghp_…a1
+  config.py:2  an AWS access key    AKIA…QQ
+  config.py:3  a password in a URL  post…32
+
+4 found. Take them out of the code (an environment variable, or a file listed in .gitignore); `rgit restore --staged <file>` unstages a file.
+False alarm? Add `rgit:allow-secret` in a comment on that line.
 ```
 
 

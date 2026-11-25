@@ -428,7 +428,11 @@ fn redact_now(text: &str) -> String {
         let n: i64 = caps[0].parse().unwrap();
         if (n - now).abs() < 2 * 86_400 { "<NOW>".to_string() } else { caps[0].to_string() }
     }).to_string();
-    redact_today(&text, now)
+    let text = redact_today(&text, now);
+    // Ages ("3 years ago") are measured from the real clock, the dates from the fixed one.
+    static AGO: OnceLock<Regex> = OnceLock::new();
+    let ago = AGO.get_or_init(|| Regex::new(r"\b\d+ (?:second|minute|hour|day|month|year)s? ago\b").unwrap());
+    ago.replace_all(&text, "<AGE> ago").to_string()
 }
 
 /// Human-readable renderings of today's date (UTC) come from the same clock-reading code.

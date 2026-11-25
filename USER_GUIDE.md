@@ -285,6 +285,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
+| [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -2284,6 +2285,58 @@ Split 8c41d2e into 3 commits:
   a91f4c2 mixed bag (part 2)
   0d6e8b1 mixed bag
 Rewrote the commit on top; the files are unchanged.
+```
+
+
+### `rgit whereami`
+
+One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next (rgit only).
+
+**Syntax:** `rgit whereami`
+
+It shows what `git status`, `git branch -vv`, `git log -1` and `git stash list` would show between them, in one place, plus one suggestion. The lines:
+
+- **Header:** the branch (`(no commits yet)` when unborn), or `HEAD detached at <commit>`, with `(rebasing <branch>)` / `(bisecting, started on <branch>)` when a rebase or bisect detached it.
+- **Upstream:** `origin/main: 2 ahead, 1 behind` (counted against the remote-tracking ref, so as of the last fetch; nothing is fetched), `up to date`, `none (not pushed to origin yet)`, `none (no remotes)`, or `gone` when the remote branch was deleted.
+- **Last commit:** hash, subject, author and age.
+- **Changes:** conflicted, staged, modified and untracked counts, or `none (clean)`.
+- **In progress:** a merge, rebase (with how many commits are done), cherry-pick, revert, bisect (the commit under test), `am`, or a `stash apply` stopped on conflicts. Only shown when there is one.
+- **Saved:** stash entries and this branch's `rgit wip` saves. Only shown when there are any.
+- **Next:** the most likely next command, in this order: finish (or abort) the operation in progress (resolving conflicts first); get off a detached HEAD; make the first commit; commit what is staged, or stage what is modified; `rgit sync` when behind, `rgit push` when ahead, `rgit push -u` for a branch never pushed; add untracked files; otherwise nothing to do.
+
+It only reads, so it is not recorded in the operation log.
+
+<details>
+<summary>Options as printed by <code>rgit whereami -h</code></summary>
+
+```text
+One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next
+
+Usage: rgit whereami
+
+Options:
+  -h, --help  Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit whereami
+On branch main
+Upstream    origin/main: 1 ahead, 1 behind
+Last commit 4332f6c clone commit (Test Author, 2 hours ago)
+Changes     none (clean)
+Saved       1 stash entry
+Next        `rgit sync` to bring in origin/main's new commit and replay yours on top
+
+$ rgit whereami
+HEAD detached at 8f0c2e1 (rebasing main)
+Last commit 8f0c2e1 side edit (Test Author, 5 minutes ago)
+Changes     1 conflicted
+In progress rebase of main onto 8f0c2e1: 0 of 1 commits done
+Next        resolve the conflicts (`rgit conflicts` shows them), `rgit add` each file, then `rgit rebase --continue`
 ```
 
 

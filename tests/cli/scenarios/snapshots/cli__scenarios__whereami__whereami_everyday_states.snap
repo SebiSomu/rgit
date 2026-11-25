@@ -1,0 +1,149 @@
+---
+source: tests/cli/scenarios/whereami.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ rgit whereami
+On branch main (no commits yet)
+Upstream    none (no remotes)
+Changes     none (clean)
+Next        `rgit add` your files, then `rgit commit` (the first commit)
+$ write a.txt (8 bytes)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (3 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 3 files changed, 4 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 b.txt
+ create mode 100644 src/lib.txt
+$ rgit whereami
+On branch main
+Upstream    none (no remotes)
+Last commit <H1:7> first commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Next        nothing to do: everything is committed
+$ write a.txt (8 bytes)
+$ write src/lib.txt (7 bytes)
+$ write new.txt (2 bytes)
+$ rgit add a.txt
+Staged files to index (1 modified).
+$ rgit whereami
+On branch main
+Upstream    none (no remotes)
+Last commit <H1:7> first commit (Test Author, <AGE> ago)
+Changes     1 staged, 1 modified, 1 untracked
+Next        `rgit commit` the staged changes (`rgit add` the rest first, or `rgit commit -a` for everything)
+$ rgit commit -a -m 'fourth commit'
+[main <H2:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+$ rgit whereami
+On branch main
+Upstream    none (no remotes)
+Last commit <H2:7> fourth commit (Test Author, <AGE> ago)
+Changes     1 untracked
+Next        `rgit add <file>` to track the new files (or list them in .gitignore)
+$ write b.txt (5 bytes)
+$ rgit stash push -m parked
+Saved working directory and index state On main: parked
+$ rgit wip 'half done'
+Saved wip@{0} (WIP on main: half done)
+The working tree is clean; `rgit wip --restore` brings the changes back.
+$ rgit whereami
+On branch main
+Upstream    none (no remotes)
+Last commit <H2:7> fourth commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Saved       1 stash entry, 1 wip save (`rgit wip --list`)
+Next        nothing to do: everything is committed
+(..) $ rgit clone repo clone
+Cloning into 'clone'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (11/11), done.
+(../clone) $ rgit whereami
+On branch main
+Upstream    origin/main: up to date
+Last commit <H2:7> fourth commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Next        nothing to do: everything is committed and level with the last fetch (`rgit fetch` to check for new commits)
+$ write ../clone/c.txt (2 bytes)
+(../clone) $ rgit add c.txt
+Staged files to index (1 new).
+(../clone) $ rgit commit -m 'clone commit'
+[main ce4a000] clone commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 c.txt
+(../clone) $ rgit whereami
+On branch main
+Upstream    origin/main: 1 ahead
+Last commit ce4a000 clone commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Next        `rgit push`
+$ write b.txt (6 bytes)
+$ rgit commit -a -m 'fifth commit'
+[main <H3:7>] fifth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+(../clone) $ rgit fetch
+From <REPO>
+   <H2:7>..<H3:7>  main             -> origin/main
+Receiving objects: 100% (3/3), done.
+(../clone) $ rgit whereami
+On branch main
+Upstream    origin/main: 1 ahead, 1 behind
+Last commit ce4a000 clone commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Next        `rgit sync` to bring in origin/main's new commit and replay yours on top
+(../clone) $ rgit switch -c topic
+Switched to a new branch 'topic'
+(../clone) $ rgit whereami
+On branch topic
+Upstream    none (not pushed to origin yet)
+Last commit ce4a000 clone commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Next        `rgit push -u origin topic` to publish the branch (or `rgit sync --push`)
+$ rgit switch --detach HEAD~1
+HEAD is now at <H2:7> (detached)
+[stderr]
+warning: You are in a detached HEAD state.
+  You can look around, make experimental commits, or switch -c <branch> to keep them.
+$ rgit whereami
+HEAD detached at <H2:7>
+Last commit <H2:7> fourth commit (Test Author, <AGE> ago)
+Changes     none (clean)
+Saved       1 stash entry
+Next        `rgit switch -c <name>` to keep commits made here on a branch, or `rgit switch <branch>` to go back
+
+==== final state ====
+HEAD: <H2>
+refs:
+  refs/heads/main <H3>
+  refs/rgit/wip/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG STASH_LIST
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H1>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700000420 +0000
+  
+  fourth commit
+worktree:
+  a.txt
+    | one
+    | TWO
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v3

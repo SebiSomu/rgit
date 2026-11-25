@@ -16,6 +16,7 @@ mod fixup;
 mod sync;
 mod absorb;
 mod split;
+mod whereami;
 
 use crate::harness::Repo;
 

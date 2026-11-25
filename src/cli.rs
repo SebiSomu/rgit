@@ -212,6 +212,8 @@ pub enum Commands {
     Absorb(crate::workspace::absorb::cli::AbsorbArgs),
     /// Split one commit into several by hunk, picking each new commit's hunks and message.
     Split(crate::merge::split::cli::SplitArgs),
+    /// One screen on where you are: branch, upstream, last commit, changes, operation in progress, saves, and what to run next.
+    Whereami(crate::workspace::whereami::cli::WhereamiArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -367,6 +369,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,
         Commands::Absorb(args) => crate::workspace::absorb::cli::dispatch_absorb(args)?,
         Commands::Split(args) => crate::merge::split::cli::dispatch_split(args)?,
+        Commands::Whereami(args) => crate::workspace::whereami::cli::dispatch_whereami(args)?,
     }
 
     Ok(())

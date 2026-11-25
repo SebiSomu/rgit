@@ -35,8 +35,8 @@ Automatic merge failed; fix conflicts and then commit the result.
 [stderr]
 rgit: Merge stopped: 1 file conflict.
       conflict.txt             conflict in 1 place (lines 2-6)  both sides edited the same lines
-          ours:   HEAD               'main edit' (Test Author, 3 years ago)
-          theirs: topic              'topic edit' (Test Author, 3 years ago)
+          ours:   HEAD               'main edit' (Test Author, <AGE> ago)
+          theirs: topic              'topic edit' (Test Author, <AGE> ago)
   next: open each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,
   next: then `rgit add <file>` for each one and `rgit merge --continue`.
   next: Changed your mind? `rgit merge --abort` puts everything back as it was.
@@ -56,8 +56,8 @@ $ rgit conflicts
 merge in progress: 1 left of 1.
 
   conflict.txt             conflict in 1 place (lines 2-6)  both sides edited the same lines
-      ours:   HEAD               'main edit' (Test Author, 3 years ago)
-      theirs: topic              'topic edit' (Test Author, 3 years ago)
+      ours:   HEAD               'main edit' (Test Author, <AGE> ago)
+      theirs: topic              'topic edit' (Test Author, <AGE> ago)
 
 Next: edit each file, keep the code you want, delete the <<<<<<< ======= >>>>>>> lines,
       then `rgit add <file>` for each one and `rgit merge --continue`.

@@ -1,0 +1,112 @@
+---
+source: tests/cli/scenarios/story.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ export GIT_AUTHOR_NAME=Ana
+$ write parse.rs (60 bytes)
+$ rgit add parse.rs
+Staged files to index (1 new).
+$ rgit commit -m 'Add parser'
+[main (root-commit) <H1:7>] Add parser
+ Author: Ana <author@example.com>
+ 1 file changed, 6 insertions(+)
+ create mode 100644 parse.rs
+$ write parse.rs (70 bytes)
+$ rgit commit -a -m 'Add g'
+[main <H2:7>] Add g
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ export GIT_AUTHOR_NAME=Bob
+$ rgit mv parse.rs parser.rs
+renamed 'parse.rs' -> 'parser.rs'
+$ rgit commit -m 'Rename parser'
+[main <H3:7>] Rename parser
+ Author: Bob <author@example.com>
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename parse.rs => parser.rs (100%)
+$ write parser.rs (79 bytes)
+$ rgit commit -a -m 'Rewrite tokenizer'
+[main <H4:7>] Rewrite tokenizer
+ Author: Bob <author@example.com>
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+$ export GIT_AUTHOR_NAME=Ana
+$ write parser.rs (80 bytes)
+$ rgit commit -a -m 'Fix g'
+[main <H5:7>] Fix g
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ write other.txt (2 bytes)
+$ rgit add other.txt
+Staged files to index (1 new).
+$ rgit commit -m 'Unrelated'
+[main <H6:7>] Unrelated
+ Author: Ana <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 other.txt
+$ rgit story parser.rs
+parser.rs
+Created      2023-11-14 (<AGE> ago) by Ana in <H1:7> "Add parser" as parse.rs
+Renamed      parse.rs -> parser.rs in <H3:7> "Rename parser" (Bob, 2023-11-14)
+Changed      5 commits, by 2 authors; +13 -6 lines
+Most commits Ana (3 commits), Bob (2 commits)
+Rewrite      Bob replaced 71% of its lines in <H4:7> "Rewrite tokenizer" (2023-11-14)
+Lines today  Bob (71%), Ana (29%)
+Last change  2023-11-14 (<AGE> ago) by Ana in <H5:7> "Fix g"
+
+Timeline (newest first):
+  2023-11-14  <H5:7>  Ana  +1 -1      Fix g
+  2023-11-14  <H4:7>  Bob  +5 -5      Rewrite tokenizer
+  2023-11-14  <H3:7>  Bob  +0 -0      Rename parser  (renamed)
+  2023-11-14  <H2:7>  Ana  +1 -0      Add g
+  2023-11-14  <H1:7>  Ana  +6 -0      Add parser  (created)
+$ rgit story parser.rs -n 2
+parser.rs
+Created      2023-11-14 (<AGE> ago) by Ana in <H1:7> "Add parser" as parse.rs
+Renamed      parse.rs -> parser.rs in <H3:7> "Rename parser" (Bob, 2023-11-14)
+Changed      5 commits, by 2 authors; +13 -6 lines
+Most commits Ana (3 commits), Bob (2 commits)
+Rewrite      Bob replaced 71% of its lines in <H4:7> "Rewrite tokenizer" (2023-11-14)
+Lines today  Bob (71%), Ana (29%)
+Last change  2023-11-14 (<AGE> ago) by Ana in <H5:7> "Fix g"
+
+Timeline (newest first, 2 of 5; --all for every one):
+  2023-11-14  <H5:7>  Ana  +1 -1      Fix g
+  2023-11-14  <H4:7>  Bob  +5 -5      Rewrite tokenizer
+$ rgit blame -s parser.rs
+<H4:8> 1) fn tokens() {}
+<H4:8> 2) fn parse() {}
+^<H1:7> 3) fn c() {}
+<H4:8> 4) fn x() {}
+<H4:8> 5) fn y() {}
+<H4:8> 6) fn z() {}
+<H5:8> 7) fn g2() {}
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H6>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H7> 0	other.txt
+  100644 <H8> 0	parser.rs
+HEAD commit:
+  tree <H9>
+  parent <H5>
+  author Ana <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  Unrelated
+worktree:
+  other.txt
+    | o
+  parser.rs
+    | fn tokens() {}
+    | fn parse() {}
+    | fn c() {}
+    | fn x() {}
+    | fn y() {}
+    | fn z() {}
+    | fn g2() {}

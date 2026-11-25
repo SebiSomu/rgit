@@ -218,6 +218,8 @@ pub enum Commands {
     MoveCommit(crate::merge::move_commit::cli::MoveCommitArgs),
     /// Add patterns to .gitignore (or the global ignore file) and stop tracking the files they now ignore.
     Ignore(crate::workspace::ignore::cli::IgnoreArgs),
+    /// The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, timeline.
+    Story(crate::history::story::cli::StoryArgs),
 }
 
 /// The arguments after `subcommand` exactly as typed. clap drops a leading `--`, but `log`,
@@ -376,6 +378,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Whereami(args) => crate::workspace::whereami::cli::dispatch_whereami(args)?,
         Commands::MoveCommit(args) => crate::merge::move_commit::cli::dispatch_move_commit(args)?,
         Commands::Ignore(args) => crate::workspace::ignore::cli::dispatch_ignore(args)?,
+        Commands::Story(args) => crate::history::story::cli::dispatch_story(args)?,
     }
 
     Ok(())

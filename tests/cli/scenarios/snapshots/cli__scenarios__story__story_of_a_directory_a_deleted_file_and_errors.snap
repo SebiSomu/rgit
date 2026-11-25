@@ -1,0 +1,95 @@
+---
+source: tests/cli/scenarios/story.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ write src/main.txt (5 bytes)
+$ rgit add src/main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'Add main'
+[main <H4:7>] Add main
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 src/main.txt
+$ rgit rm b.txt
+rm 'b.txt'
+$ rgit commit -m 'Drop b'
+[main <H5:7>] Drop b
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 deletion(-)
+ delete mode 100644 b.txt
+$ rgit story src/
+src/ (directory)
+First commit 2023-11-14 (<AGE> ago) by Test Author in <H1:7> "first commit"
+Changed      3 commits, by 1 author; +3 -1 lines
+Lines today  Test Author (100%)
+Last change  2023-11-14 (<AGE> ago) by Test Author in <H4:7> "Add main"
+
+Timeline (newest first):
+  2023-11-14  <H4:7>  Test Author  +1 -0      Add main
+  2023-11-14  <H3:7>  Test Author  +1 -1      third commit
+  2023-11-14  <H1:7>  Test Author  +1 -0      first commit
+$ rgit story b.txt
+b.txt (deleted)
+Created      2023-11-14 (<AGE> ago) by Test Author in <H3:7> "third commit"
+Changed      2 commits, by 1 author; +1 -1 lines
+Deleted      2023-11-14 (<AGE> ago) by Test Author in <H5:7> "Drop b"
+
+Timeline (newest first):
+  2023-11-14  <H5:7>  Test Author  +0 -1      Drop b  (deleted)
+  2023-11-14  <H3:7>  Test Author  +1 -0      third commit  (created)
+$ rgit story nothing.txt
+[stderr]
+fatal: 'nothing.txt' has no history in this branch
+[exit 128]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H5>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	src/lib.txt
+  100644 <H8> 0	src/main.txt
+HEAD commit:
+  tree <H9>
+  parent <H4>
+  author Test Author <author@example.com> 1700000540 +0000
+  committer Test Committer <committer@example.com> 1700000540 +0000
+  
+  Drop b
+worktree:
+  a.txt
+    | one
+    | two
+  src/lib.txt
+    | lib v2
+  src/main.txt
+    | main

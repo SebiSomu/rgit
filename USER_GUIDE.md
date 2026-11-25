@@ -288,6 +288,7 @@ General git servers over SSH or plain HTTPS git protocol are not supported. Trea
 | [`whereami`](#rgit-whereami) | One screen on where you are and what to run next (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
+| [`story`](#rgit-story) | The history of a file or directory in plain words (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
 | [`stash`](#rgit-stash) | Set work aside and bring it back later. |
@@ -904,7 +905,7 @@ Show which commit last changed each line of a file.
 
 **Syntax:** `rgit blame [-L <start>,<end>] [-s] [<rev>] [--] <file>`
 
-Shows, for each line, the commit that last changed it, plus author and date; uncommitted lines show as "Not Committed Yet". `-L` limits the range (`10,20`, `10,+5`, `10,`), `-s` hides author and date, a leading `^` marks lines from the root commit.
+Shows, for each line, the commit that last changed it, plus author and date; uncommitted lines show as "Not Committed Yet". `-L` limits the range (`10,20`, `10,+5`, `10,`), `-s` hides author and date, a leading `^` marks lines from the root commit. Renames are followed (a file created by renaming or copying another keeps the old lines' commits); unlike git, the original file name is not printed for those lines.
 
 <details>
 <summary>Options as printed by <code>rgit blame -h</code></summary>
@@ -2438,6 +2439,66 @@ Added to .gitignore: *.log, build/, *.lgo
   note: '*.lgo' matches no file yet (a typo?)
 Stopped tracking 2 files that are now ignored (kept on disk): build/out.o, debug.log
 Staged .gitignore and the removals; `rgit commit` records them.
+```
+
+
+### `rgit story`
+
+The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, and a timeline (rgit only).
+
+**Syntax:** `rgit story <path> [-n <N> | --all]`
+
+It sums up what `git log --follow`, `git blame` and `git shortlog` would show between them:
+
+- **Created:** date (with age), author and commit, and the original name if the file was renamed since. A directory shows its first commit instead.
+- **Renamed:** each rename or copy that made the file, followed back like `log --follow`.
+- **Changed:** number of commits and authors, and the lines added and removed.
+- **Most commits:** the top three authors by number of commits (shown when there is more than one author).
+- **Rewrite:** up to three commits that replaced at least half the lines of a file of 5 or more lines.
+- **Lines today:** who wrote the current lines (blame; summed over the files for a directory), as percentages.
+- **Last change**, or **Deleted** for a file that is gone (its history is still told).
+- **Timeline:** the newest 10 commits (`-n` changes the count, `--all` lists every one) with date, author, `+added -removed`, and whether the commit created, renamed or deleted the file.
+
+Merge commits are skipped, as in `log --follow`. It only reads.
+
+<details>
+<summary>Options as printed by <code>rgit story -h</code></summary>
+
+```text
+The history of a file or directory in plain words: created, renames, rewrites, authors, who wrote it today, timeline
+
+Usage: rgit story [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>  The file or directory
+
+Options:
+  -n, --max-count <N>  How many commits the timeline lists (newest first) [default: 10]
+      --all            List every commit in the timeline
+  -h, --help           Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit story parser.rs
+parser.rs
+Created      2023-11-14 (2 years ago) by Ana in 41ab7f0 "Add parser" as parse.rs
+Renamed      parse.rs -> parser.rs in 9c2e0d4 "Rename parser" (Bob, 2023-11-14)
+Changed      5 commits, by 2 authors; +13 -6 lines
+Most commits Ana (3 commits), Bob (2 commits)
+Rewrite      Bob replaced 71% of its lines in 5d1c0aa "Rewrite tokenizer" (2023-11-14)
+Lines today  Bob (71%), Ana (29%)
+Last change  2023-11-14 (2 years ago) by Ana in 8e2f913 "Fix g"
+
+Timeline (newest first):
+  2023-11-14  8e2f913  Ana  +1 -1      Fix g
+  2023-11-14  5d1c0aa  Bob  +5 -5      Rewrite tokenizer
+  2023-11-14  9c2e0d4  Bob  +0 -0      Rename parser  (renamed)
+  2023-11-14  2f0a6d1  Ana  +1 -0      Add g
+  2023-11-14  41ab7f0  Ana  +6 -0      Add parser  (created)
 ```
 
 

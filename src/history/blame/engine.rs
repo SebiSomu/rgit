@@ -118,11 +118,12 @@ pub fn blob_hash_at_path(commit_hash: &str, path: &str) -> Result<Option<String>
 /// every commit twice (once as a child, once as a parent).
 // Used by `blame`.
 fn cached_blob_hash(cache: &mut HashMap<String, Option<String>>, commit_hash: &str, path: &str) -> Result<Option<String>> {
-    if let Some(known) = cache.get(commit_hash) {
+    let key = format!("{}:{}", commit_hash, path);
+    if let Some(known) = cache.get(&key) {
         return Ok(known.clone());
     }
     let found = blob_hash_at_path(commit_hash, path)?;
-    cache.insert(commit_hash.to_string(), found.clone());
+    cache.insert(key, found.clone());
     Ok(found)
 }
 
@@ -221,7 +222,8 @@ fn commit_author_info(commit_hash: &str) -> Result<(String, u64, String, bool)> 
 /// turn: a line that survives unchanged is handed to that parent, and a line that no parent
 /// has is blamed on the commit itself. With `use_working_copy`, the file on disk is first
 /// diffed against `commit_hash`'s version and lines it changed are marked as not committed
-/// yet. `line_spec` is an optional `-L` range. File renames are not followed.
+/// yet. `line_spec` is an optional `-L` range. Renames are followed: when a commit created the
+/// path by renaming (or copying) a file, its lines are carried on under the old name.
 // Used by `blame`.
 pub fn blame_file(path: &str, commit_hash: &str, use_working_copy: bool, line_spec: Option<&str>) -> Result<Vec<BlameLine>> {
     let mut blob_cache: HashMap<String, Option<String>> = HashMap::new();
@@ -270,10 +272,13 @@ pub fn blame_file(path: &str, commit_hash: &str, use_working_copy: bool, line_sp
         }
     }
 
-    let mut queue: VecDeque<(String, Vec<(usize, usize)>)> = VecDeque::new();
-    queue.push_back((commit_hash.to_string(), mapping));
+    // (commit, the file's path there, (final line, line in that commit) pairs).
+    type Pending = (String, String, Vec<(usize, usize)>);
+    let mut queue: VecDeque<Pending> = VecDeque::new();
+    queue.push_back((commit_hash.to_string(), path.to_string(), mapping));
 
-    while let Some((commit, mapping)) = queue.pop_front() {
+    while let Some((commit, path, mapping)) = queue.pop_front() {
+        let path = path.as_str();
         if mapping.is_empty() {
             continue;
         }
@@ -294,8 +299,24 @@ pub fn blame_file(path: &str, commit_hash: &str, use_working_copy: bool, line_sp
             if remaining.is_empty() {
                 break;
             }
-            let Some(parent_blob) = cached_blob_hash(&mut blob_cache, parent, path)? else {
-                continue;
+            let mut parent_path = path.to_string();
+            let parent_blob = match cached_blob_hash(&mut blob_cache, parent, path)? {
+                Some(blob) => blob,
+                // Created here: maybe renamed or copied from another file of the parent.
+                None if parents.len() == 1 => {
+                    let parsed = crate::core::commit::parse_commit_object(&commit)?;
+                    match crate::history::follow::follow_commit_pairs(&parsed, path)?.1 {
+                        Some(old) => match cached_blob_hash(&mut blob_cache, parent, &old)? {
+                            Some(blob) => {
+                                parent_path = old;
+                                blob
+                            }
+                            None => continue,
+                        },
+                        None => continue,
+                    }
+                }
+                None => continue,
             };
 
             let mut passed: Vec<(usize, usize)> = Vec::new();
@@ -315,7 +336,7 @@ pub fn blame_file(path: &str, commit_hash: &str, use_working_copy: bool, line_sp
             }
 
             if !passed.is_empty() {
-                queue.push_back((parent.clone(), passed));
+                queue.push_back((parent.clone(), parent_path, passed));
             }
         }
 

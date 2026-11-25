@@ -18,6 +18,7 @@ mod absorb;
 mod ignore;
 mod move_commit;
 mod split;
+mod story;
 mod whereami;
 
 use crate::harness::Repo;

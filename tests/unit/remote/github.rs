@@ -145,3 +145,12 @@ fn test_ensure_pushed_commit_matches() {
     assert!(err.contains("357620c as ebda604"));
     assert!(err.contains("Nothing was updated: 'dev'"));
 }
+
+#[test]
+fn test_raw_commit_message_keeps_every_byte() {
+    let commit = "tree t\nparent p\nauthor A <a@b> 1 +0000\ncommitter A <a@b> 1 +0000\n\nSubject\n\nBody line\n";
+    assert_eq!(raw_commit_message(commit), "Subject\n\nBody line\n");
+    assert_eq!(raw_commit_message("tree t\n\nno newline"), "no newline");
+    assert_eq!(raw_commit_message("tree t\n\n"), "");
+    assert_eq!(raw_commit_message("tree t\n"), "");
+}

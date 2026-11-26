@@ -83,6 +83,14 @@ pub fn format_iso8601_with_offset(secs: u64, offset_minutes: i64) -> String {
     format!("{}{}{:02}:{:02}", utc_text.trim_end_matches('Z'), sign, abs / 60, abs % 60)
 }
 
+/// A commit's message exactly as stored: everything after the blank line that ends the
+/// headers, trailing newline included. GitHub keeps the message byte for byte, so trimming
+/// it (as `extract_commit_message` does for display) would change the commit's hash.
+// Used by `push_to_github`.
+pub fn raw_commit_message(commit_text: &str) -> &str {
+    commit_text.split_once("\n\n").map(|(_, message)| message).unwrap_or("")
+}
+
 /// Fails a push when GitHub stored a commit under a different hash than the local one: the
 /// API rebuilds commits from their parts, and anything it can't reproduce (a signature, an
 /// unusual header or tree) changes the hash. Run before any ref is updated.
@@ -964,7 +972,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
             }
         }
 
-        let message = crate::core::commit::extract_commit_message(&text);
+        let message = raw_commit_message(&text);
         let remote_tree_sha = upload_tree_to_github(
             &client,
             target,
@@ -981,7 +989,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
         let remote_commit_sha = create_github_commit(
             &client,
             target,
-            &message,
+            message,
             &remote_tree_sha,
             &mapped_parents,
             author.as_ref(),

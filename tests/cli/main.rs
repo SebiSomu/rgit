@@ -3,4 +3,5 @@
 //! (or `cargo insta review`) only when a behaviour change is wanted.
 
 mod harness;
+mod http_server;
 mod scenarios;

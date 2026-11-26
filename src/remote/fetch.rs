@@ -223,9 +223,11 @@ fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: 
 }
 
 /// `rgit fetch` from a remote reached over git's smart-HTTP protocol (any https host, and
-/// GitHub with `rgit.httpTransport=smart`). Lists the server's branches, downloads one pack
-/// with the branch tips this repository lacks, verifies and indexes it, checks that every
-/// wanted commit arrived, and only then installs the pack and moves
+/// GitHub with `rgit.httpTransport=smart`). Lists the server's branches, negotiates with the
+/// local ref tips so the server sends only what this repository lacks, then verifies and
+/// indexes the pack (completing a thin pack with the local bases it deltas against), checks
+/// that every wanted commit arrived and that everything the new objects reference exists,
+/// and only then installs the pack and moves
 /// `refs/remotes/<remote>/<branch>` (only `branch` when given), the remote HEAD and FETCH_HEAD.
 /// A transfer that fails at any point leaves the repository unchanged. The output matches a
 /// fetch from a local repository.
@@ -254,14 +256,24 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
     wants.dedup();
     let mut received = 0usize;
     if !wants.is_empty() {
-        let pack = fetch_pack(&client, &discovery, url, &wants, std::io::stderr().is_terminal())?;
-        let (pack, index, objects) = crate::core::pack::index_pack_bytes(pack, false)?;
+        // The local ref tips, annotated tags peeled to what they name, are where the `have`s start.
+        let mut local_tips: Vec<String> = crate::core::refs::list_all_refs()
+            .into_values()
+            .filter_map(|oid| crate::history::name_rev::engine::peel_ref_tip(&oid).map(|(peeled, _, _, _)| peeled))
+            .collect();
+        local_tips.sort();
+        local_tips.dedup();
+        let pack = fetch_pack(&client, &discovery, url, &wants, &local_tips, std::io::stderr().is_terminal())?;
+        received = pack_object_count(&pack);
+        let (pack, index, objects) = crate::core::pack::index_pack_bytes(pack, true)?;
         let arrived: std::collections::HashSet<&str> = objects.iter().map(|o| o.hash.as_str()).collect();
         if let Some(missing) = wants.iter().find(|w| !arrived.contains(w.as_str())) {
             anyhow::bail!("fatal: the pack from '{}' does not contain {}; nothing was updated", shown, missing);
         }
+        if let Some((object, missing)) = crate::remote::fetch::engine::first_missing_reference(&objects, &arrived) {
+            anyhow::bail!("fatal: the pack from '{}' is incomplete: {} references {}, which is missing; nothing was updated", shown, object, missing);
+        }
         crate::core::pack::store_pack(&crate::core::repo::path(".git/objects/pack"), "pack-", &pack, &index)?;
-        received = objects.len();
     }
 
     let mut fetch_head_entries = Vec::new();
@@ -294,4 +306,11 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
     }
     write_fetch_head(&fetch_head_entries)?;
     Ok(())
+}
+
+/// The number of objects a pack's header announces (what the server sent, before a thin
+/// pack is completed with local bases); 0 for a pack too short to have a header.
+// Used by `fetch_from_smart_http`.
+fn pack_object_count(pack: &[u8]) -> usize {
+    pack.get(8..12).map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as usize).unwrap_or(0)
 }

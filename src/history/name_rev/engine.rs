@@ -75,7 +75,7 @@ pub fn parse_name_rev_args(args: &[String]) -> Result<NameRevOptions, String> {
 }
 
 /// Parents and committer date of a commit; `None` when the object is missing or not a commit.
-// Used by `build_rev_names` and `name-rev`.
+// Used by `build_rev_names`, `name-rev` and the fetch negotiation over HTTPS (`fetch_pack`).
 pub fn commit_parents_and_date(hash: &str) -> Option<(Vec<String>, i64)> {
     let (object_type, content) = read_object(hash).ok()?;
     if object_type != "commit" {
@@ -102,7 +102,7 @@ fn signature_date(value: &str) -> i64 {
 
 /// Follows annotated tags from `hash` to the object they finally name. Returns that object's
 /// hash and type, whether a tag was peeled on the way, and the date of the last tag peeled.
-// Used by `build_rev_names` and `name-rev`.
+// Used by `build_rev_names`, `name-rev` and fetch over HTTPS (peeling local tags into `have` tips).
 pub fn peel_ref_tip(hash: &str) -> Option<(String, String, bool, Option<i64>)> {
     let mut current = hash.to_string();
     let mut deref = false;

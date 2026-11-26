@@ -1,7 +1,9 @@
 //! git's smart-HTTP protocol (gitprotocol-http, gitprotocol-v2) on top of `HttpClient` and
 //! pkt-line: ref discovery through `info/refs`, then protocol v2 `ls-refs` when the server
-//! speaks v2, or the v0 ref advertisement when it doesn't. Fetch and push build on this.
+//! speaks v2, or the v0 ref advertisement when it doesn't; then fetch with have/ACK
+//! negotiation (`fetch_pack`). Push builds on this.
 
+pub mod negotiation;
 pub mod types;
 
 use anyhow::Result;
@@ -9,7 +11,7 @@ use anyhow::Result;
 use crate::remote::http::{redact_url, HttpClient};
 use crate::remote::pktline::types::Packet;
 use crate::remote::pktline::{decode_all, demux_sideband, encode_text, PacketReader, DELIM, FLUSH};
-use crate::remote::smart_http::types::{Discovery, ProtocolVersion, RemoteRef};
+use crate::remote::smart_http::types::{Discovery, Negotiator, ProtocolVersion, RemoteProgress, RemoteRef, RoundAnswer};
 
 const ADVERTISEMENT_TYPE: &str = "application/x-git-upload-pack-advertisement";
 const REQUEST_TYPE: &str = "application/x-git-upload-pack-request";
@@ -174,34 +176,90 @@ pub fn parse_ls_refs_line(line: &str) -> Result<RemoteRef> {
     Ok(entry)
 }
 
-/// Downloads one pack holding `wants` (object ids, normally branch tips) and everything they
-/// reach, from a server found by `discover_refs`. Uses protocol v2's `fetch` command, or the
-/// v0 request for older servers. Sends no `have` lines yet, so the pack is complete on its
-/// own. With `progress`, the server's progress text is shown as `remote: ...` lines (git shows
-/// it only when stderr is a terminal); otherwise the server is asked not to send it.
-/// Returns the raw pack bytes, still to be verified and indexed by the caller.
-// Used by `fetch` and `clone` over HTTPS.
-pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: &[String], progress: bool) -> Result<Vec<u8>> {
-    let (body, v2) = match discovery.version {
-        ProtocolVersion::V2 => (v2_fetch_request(&discovery.capabilities, wants, progress)?, true),
-        ProtocolVersion::V0 => (v0_fetch_request(&discovery.capabilities, wants, progress)?, false),
-    };
+/// `have` lines in the first round of a negotiation; later rounds send more (git's
+/// stateless-RPC schedule: doubling up to 16384, then 10% more each round).
+const INITIAL_HAVES: usize = 16;
+
+/// After the server has acknowledged something, this many `have`s in a row without a new
+/// acknowledgement end the negotiation (git's MAX_IN_VAIN).
+const MAX_IN_VAIN: usize = 256;
+
+/// Downloads one pack holding `wants` (object ids, normally branch tips) and what they reach
+/// that this repository lacks, from a server found by `discover_refs`. Negotiates first, as
+/// git does over HTTP: each round sends the wants, the `have`s the server already
+/// acknowledged and a batch of new ones from `local_tips` (newest commits first), until the
+/// server is ready, nothing is left to offer, or too many `have`s went unacknowledged; then
+/// `done`. With no local commits the first round is `done`, and the pack is complete. Uses
+/// protocol v2's `fetch` command, or the v0 request (with `multi_ack_detailed`) for older
+/// servers. The pack may be thin (deltas against objects this repository has): the caller
+/// completes it while indexing. With `progress`, the server's progress text is shown as
+/// `remote: ...` lines (git shows it only when stderr is a terminal); otherwise the server is
+/// asked not to send it. Returns the raw pack bytes, still to be verified and indexed.
+// Used by `fetch` (and so `clone` and `pull`) over HTTPS.
+pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: &[String], local_tips: &[String], progress: bool) -> Result<Vec<u8>> {
+    let v2 = discovery.version == ProtocolVersion::V2;
+    let offered = |name: &str| discovery.capabilities.iter().any(|c| c == name);
+    // v0 over HTTP can only negotiate with multi_ack_detailed; without it, send no haves.
+    let tips: &[String] = if v2 || offered("multi_ack_detailed") { local_tips } else { &[] };
+    let sideband = offered("side-band-64k") || offered("side-band");
+    let mut negotiator = Negotiator::new(commit_parents_and_date, tips);
+    let mut acked: Vec<String> = Vec::new();
+    let (mut batch, mut in_vain, mut got_ack, mut ready) = (INITIAL_HAVES, 0usize, false, false);
+    let mut remote_progress = RemoteProgress::default();
+    let mut pack = Vec::new();
+
     let mut headers = vec![("Content-Type", REQUEST_TYPE), ("Accept", RESULT_TYPE)];
     if v2 {
         headers.push(("Git-Protocol", "version=2"));
     }
-    let response = client.post(&format!("{}/git-upload-pack", discovery.base_url), &headers, &body)?.check_status(url)?;
-    let mut reader = PacketReader::new(response.into_reader());
-    let mut pack = Vec::new();
-    let mut show = |bytes: &[u8]| {
-        if progress {
-            show_remote_progress(bytes);
+    loop {
+        let mut haves: Vec<String> = Vec::new();
+        while !ready && haves.len() < batch {
+            match negotiator.next_have() {
+                Some(have) => haves.push(have),
+                None => break,
+            }
         }
-    };
-    if v2 {
-        read_v2_fetch_response(&mut reader, &mut pack, &mut show)?;
-    } else {
-        read_v0_fetch_response(&mut reader, &mut pack, &mut show, discovery.capabilities.iter().any(|c| c == "side-band-64k" || c == "side-band"))?;
+        in_vain += haves.len();
+        let done = ready || haves.is_empty() || (got_ack && in_vain > MAX_IN_VAIN);
+        let mut all_haves = acked.clone();
+        all_haves.extend(haves);
+        let body = if v2 {
+            v2_fetch_request(&discovery.capabilities, wants, &all_haves, done, progress)?
+        } else {
+            v0_fetch_request(&discovery.capabilities, wants, &all_haves, done, progress)?
+        };
+        let response = client.post(&format!("{}/git-upload-pack", discovery.base_url), &headers, &body)?.check_status(url)?;
+        let mut reader = PacketReader::new(response.into_reader());
+        let mut show = |bytes: &[u8]| {
+            if progress {
+                remote_progress.show(bytes);
+            }
+        };
+        let answer = if v2 {
+            read_v2_fetch_response(&mut reader, &mut pack, &mut show)?
+        } else {
+            read_v0_fetch_response(&mut reader, &mut pack, &mut show, sideband, done)?
+        };
+        match answer {
+            RoundAnswer::Pack => break,
+            RoundAnswer::Acks { .. } if done => anyhow::bail!("protocol error: the server sent no pack after 'done'"),
+            RoundAnswer::Acks { acks, ready: server_ready } => {
+                for ack in acks {
+                    if !acked.contains(&ack) {
+                        negotiator.ack(&ack);
+                        acked.push(ack);
+                        got_ack = true;
+                        in_vain = 0;
+                    }
+                }
+                ready = server_ready;
+                batch = if batch < 16384 { batch * 2 } else { batch * 11 / 10 };
+            }
+        }
+    }
+    if progress {
+        remote_progress.finish();
     }
     if pack.is_empty() {
         anyhow::bail!("fatal: the server at '{}' sent no pack", redact_url(url));
@@ -209,9 +267,16 @@ pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: 
     Ok(pack)
 }
 
-/// The v2 `fetch` request: the command, then `ofs-delta`, one `want` per object, `done`.
+/// Parents and committer date of a local commit, for the negotiator.
 // Used by `fetch_pack`.
-fn v2_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -> Result<Vec<u8>> {
+fn commit_parents_and_date(oid: &str) -> Option<(Vec<String>, i64)> {
+    crate::history::name_rev::engine::commit_parents_and_date(oid)
+}
+
+/// A v2 `fetch` request: the command, then `thin-pack` and `ofs-delta`, one `want` per
+/// object, the `have`s, and `done` when this is the last round.
+// Used by `fetch_pack`.
+fn v2_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, progress: bool) -> Result<Vec<u8>> {
     if !capabilities.iter().any(|c| c == "fetch" || c.starts_with("fetch=")) {
         anyhow::bail!("fatal: the server speaks protocol v2 but does not offer fetch");
     }
@@ -223,6 +288,7 @@ fn v2_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -
         body.extend(encode_text("object-format=sha1")?);
     }
     body.extend_from_slice(DELIM);
+    body.extend(encode_text("thin-pack")?);
     body.extend(encode_text("ofs-delta")?);
     if !progress {
         body.extend(encode_text("no-progress")?);
@@ -230,21 +296,33 @@ fn v2_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -
     for want in wants {
         body.extend(encode_text(&format!("want {}", want))?);
     }
-    body.extend(encode_text("done")?);
+    for have in haves {
+        body.extend(encode_text(&format!("have {}", have))?);
+    }
+    if done {
+        body.extend(encode_text("done")?);
+    }
     body.extend_from_slice(FLUSH);
     Ok(body)
 }
 
-/// The v0 request: the first `want` carries the capabilities rgit uses (of those the server
-/// offered), then the other `want`s, a flush and `done`.
+/// A v0 request: the first `want` carries the capabilities rgit uses (of those the server
+/// offered), then the other `want`s and a flush, the `have`s, and `done` for the last round
+/// or a flush for a round that waits for acknowledgements.
 // Used by `fetch_pack`.
-fn v0_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -> Result<Vec<u8>> {
+fn v0_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, progress: bool) -> Result<Vec<u8>> {
     let offered = |name: &str| capabilities.iter().any(|c| c == name);
     let mut requested: Vec<String> = Vec::new();
+    if offered("multi_ack_detailed") {
+        requested.push("multi_ack_detailed".into());
+    }
     if offered("side-band-64k") {
         requested.push("side-band-64k".into());
     } else if offered("side-band") {
         requested.push("side-band".into());
+    }
+    if offered("thin-pack") {
+        requested.push("thin-pack".into());
     }
     if offered("ofs-delta") {
         requested.push("ofs-delta".into());
@@ -261,74 +339,110 @@ fn v0_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -
         body.extend(encode_text(line.trim_end())?);
     }
     body.extend_from_slice(FLUSH);
-    body.extend(encode_text("done")?);
+    for have in haves {
+        body.extend(encode_text(&format!("have {}", have))?);
+    }
+    if done {
+        body.extend(encode_text("done")?);
+    } else {
+        body.extend_from_slice(FLUSH);
+    }
     Ok(body)
 }
 
-/// Reads a v2 `fetch` response: sections (`shallow-info`, `wanted-refs`, `packfile-uris`) are
-/// skipped up to the `packfile` section, whose sideband stream is the pack.
+/// Reads a v2 `fetch` response. A round without `done` gets an `acknowledgments` section
+/// (`NAK` or `ACK <oid>` lines, maybe `ready`); after `ready` the pack follows in the same
+/// response. Other sections (`shallow-info`, `wanted-refs`, `packfile-uris`) are skipped up
+/// to `packfile`, whose sideband stream is the pack.
 // Used by `fetch_pack`.
-fn read_v2_fetch_response<R: std::io::Read>(reader: &mut PacketReader<R>, pack: &mut Vec<u8>, progress: &mut dyn FnMut(&[u8])) -> Result<()> {
+fn read_v2_fetch_response<R: std::io::Read>(reader: &mut PacketReader<R>, pack: &mut Vec<u8>, progress: &mut dyn FnMut(&[u8])) -> Result<RoundAnswer> {
+    let mut acks = Vec::new();
+    let mut ready = false;
+    let mut in_acknowledgments = false;
     while let Some(packet) = reader.read_packet()? {
         if let Some(message) = packet.error_message() {
             anyhow::bail!("remote error: {}", message);
         }
-        match packet.text().as_deref() {
-            Some("packfile") => {
+        match (packet.text(), &packet) {
+            (Some(line), _) if line == "packfile" => {
                 demux_sideband(reader, pack, progress)?;
-                return Ok(());
+                return Ok(RoundAnswer::Pack);
             }
-            // A section header or one of its lines; sections end with a delimiter.
-            Some(_) | None => continue,
+            (Some(line), _) if line == "acknowledgments" => in_acknowledgments = true,
+            (Some(line), _) if in_acknowledgments => {
+                if let Some(oid) = line.strip_prefix("ACK ") {
+                    acks.push(oid.to_string());
+                } else if line == "ready" {
+                    ready = true;
+                }
+            }
+            // The acknowledgments end with a flush when no pack follows.
+            (None, Packet::Flush) if in_acknowledgments && !ready => return Ok(RoundAnswer::Acks { acks, ready: false }),
+            (None, Packet::Delim) => in_acknowledgments = false,
+            // A line of another section, or the end of one.
+            _ => continue,
         }
+    }
+    if in_acknowledgments && !ready {
+        return Ok(RoundAnswer::Acks { acks, ready: false });
     }
     anyhow::bail!("protocol error: the server's answer ended before the pack")
 }
 
-/// Reads a v0 response to a request ending in `done`: `NAK` (no common commits), then the
+/// Reads a v0 response. A round without `done` gets `ACK <oid> common|ready|continue` lines
+/// and a final `NAK`. After `done`, the server answers with `NAK` (nothing in common) or a
+/// bare `ACK <oid>` (after any `common` acknowledgements of that round's `have`s), then the
 /// pack, in sideband packets when side-band was negotiated, raw otherwise.
 // Used by `fetch_pack`.
-fn read_v0_fetch_response<R: std::io::Read>(reader: &mut PacketReader<R>, pack: &mut Vec<u8>, progress: &mut dyn FnMut(&[u8]), sideband: bool) -> Result<()> {
+fn read_v0_fetch_response<R: std::io::Read>(
+    reader: &mut PacketReader<R>,
+    pack: &mut Vec<u8>,
+    progress: &mut dyn FnMut(&[u8]),
+    sideband: bool,
+    done: bool,
+) -> Result<RoundAnswer> {
+    let mut acks = Vec::new();
+    let mut ready = false;
     loop {
         let Some(packet) = reader.read_packet()? else {
-            anyhow::bail!("protocol error: the server's answer ended before the pack");
+            if done {
+                anyhow::bail!("protocol error: the server's answer ended before the pack");
+            }
+            return Ok(RoundAnswer::Acks { acks, ready });
         };
         if let Some(message) = packet.error_message() {
             anyhow::bail!("remote error: {}", message);
         }
-        match packet.text().as_deref() {
-            Some("NAK") => break,
-            Some(line) if line.starts_with("ACK ") => continue,
-            Some(line) if line.starts_with("shallow ") || line.starts_with("unshallow ") => continue,
-            _ => anyhow::bail!("protocol error: expected NAK from the server"),
+        let Some(line) = packet.text() else { continue };
+        if line == "NAK" {
+            if !done {
+                return Ok(RoundAnswer::Acks { acks, ready });
+            }
+            break;
         }
+        if let Some(rest) = line.strip_prefix("ACK ") {
+            match rest.split_once(' ') {
+                Some((oid, status)) => {
+                    acks.push(oid.to_string());
+                    ready |= status == "ready";
+                }
+                // A bare ACK is the server's answer to `done`: the pack comes next.
+                None if done => break,
+                None => acks.push(rest.to_string()),
+            }
+            continue;
+        }
+        if line.starts_with("shallow ") || line.starts_with("unshallow ") {
+            continue;
+        }
+        anyhow::bail!("protocol error: unexpected line '{}' from the server", line);
     }
     if sideband {
         demux_sideband(reader, pack, progress)?;
     } else {
         reader.read_raw_to_end(pack)?;
     }
-    Ok(())
-}
-
-/// Shows sideband progress text as git does: each line (ended by `\n` or `\r`) prefixed
-/// with `remote: `.
-// Used by `fetch_pack`.
-fn show_remote_progress(bytes: &[u8]) {
-    use std::io::Write;
-    let text = String::from_utf8_lossy(bytes);
-    let mut stderr = std::io::stderr().lock();
-    let mut start = 0;
-    for (i, c) in text.char_indices() {
-        if c == '\n' || c == '\r' {
-            let _ = write!(stderr, "remote: {}{}", &text[start..i], c);
-            start = i + 1;
-        }
-    }
-    if start < text.len() {
-        let _ = write!(stderr, "remote: {}", &text[start..]);
-    }
-    let _ = stderr.flush();
+    Ok(RoundAnswer::Pack)
 }
 
 #[cfg(test)]

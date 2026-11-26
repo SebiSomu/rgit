@@ -33,3 +33,47 @@ pub struct Discovery {
     pub capabilities: Vec<String>,
     pub base_url: String,
 }
+
+/// Picks the `have` lines of a fetch negotiation, as git's default negotiator does: local
+/// commits newest first (by committer date), starting from the local ref tips. A commit the
+/// server acknowledges is common, and so is everything it reaches: those are never sent.
+/// The walk ends when every commit left in the queue is known to be common. `lookup` gives a
+/// commit's parents and committer date (`None` for a missing or non-commit object).
+// Used by: src/remote/smart_http.rs, src/remote/smart_http/negotiation.rs
+// Used by command/helper: `fetch_pack` (fetch, clone and pull over HTTPS)
+pub struct Negotiator<F: FnMut(&str) -> Option<(Vec<String>, i64)>> {
+    pub(crate) lookup: F,
+    /// Commits still to visit, newest first (ties by name, so the order is stable).
+    pub(crate) queue: std::collections::BinaryHeap<(i64, String)>,
+    /// Commits that were ever queued.
+    pub(crate) seen: std::collections::HashSet<String>,
+    /// Commits in the queue right now.
+    pub(crate) queued: std::collections::HashSet<String>,
+    /// Commits known to be common with the server.
+    pub(crate) common: std::collections::HashSet<String>,
+    /// Parents of every seen commit.
+    pub(crate) parents: std::collections::HashMap<String, Vec<String>>,
+    /// Queued commits not known to be common; the walk ends when it reaches 0.
+    pub(crate) non_common: usize,
+}
+
+/// What the server answered to one round of a fetch: the pack (after `done`, or after the
+/// server said it is `ready` in protocol v2), or the acknowledged `have`s of a round that
+/// did not end the negotiation, with `ready` when the server (v0) has enough to send a pack.
+// Used by: src/remote/smart_http.rs
+// Used by command/helper: `fetch_pack`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RoundAnswer {
+    Pack,
+    Acks { acks: Vec<String>, ready: bool },
+}
+
+/// Shows the server's sideband progress text as `remote: ...` lines. The text arrives in
+/// chunks that can end in the middle of a line, so the unfinished part waits for the rest.
+// Used by: src/remote/smart_http.rs
+// Used by command/helper: `fetch_pack`
+#[derive(Debug, Default)]
+pub struct RemoteProgress {
+    /// The start of a line whose end (`\n` or `\r`) has not arrived yet.
+    pub(crate) pending: Vec<u8>,
+}

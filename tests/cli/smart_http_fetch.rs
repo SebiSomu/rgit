@@ -1,6 +1,8 @@
 //! Clone and fetch over git's smart-HTTP protocol, checked by real git: the result must pass
 //! `git fsck`, have the source's refs, history and files, and pick up new commits on fetch.
-//! Runs against protocol v2, v0, and a server that requires a login.
+//! Runs against protocol v2, v0, and a server that requires a login. Fetches negotiate, so
+//! they bring only new objects, also after many local-only commits (several rounds) and
+//! into a repository whose history the server doesn't share.
 
 use crate::harness::clean_rgit;
 use crate::http_server::{clean_git, GitHttpServer, ServerOptions};
@@ -80,6 +82,8 @@ fn clone_then_fetch(server: &GitHttpServer, url: &str, home: &Path, label: &str)
     let (out, err, ok) = rgit(&clone, home, &["fetch"]);
     assert!(ok, "[{}] rgit fetch failed:\n{}{}", label, out, err);
     assert!(out.contains("main"), "[{}] fetch output: {}", label, out);
+    // Negotiation: only the new commit, its root tree and README's blob come over.
+    assert!(out.contains("Receiving objects: 100% (3/3), done."), "[{}] fetch should receive only the new objects: {}", label, out);
     assert_eq!(git(&clone, &["rev-parse", "refs/remotes/origin/main"]), git(&source, &["rev-parse", "main"]));
     let fsck = clean_git().current_dir(&clone).args(["fsck", "--strict", "--no-dangling"]).output().unwrap();
     assert!(fsck.status.success() && fsck.stderr.is_empty(), "[{}] git fsck after fetch: {}", label, String::from_utf8_lossy(&fsck.stderr));
@@ -146,4 +150,107 @@ fn cloning_an_empty_repository() {
     let clone = tmp.path().join("empty");
     // HEAD names the server's default branch, though it has no commits yet.
     assert_eq!(git(&clone, &["symbolic-ref", "HEAD"]).trim(), "refs/heads/main");
+}
+
+/// `count` local-only commits on a branch `local-work` of `repo` (on top of `from`, or a new
+/// root), newer than anything on the server, made with git fast-import so it stays quick.
+fn local_only_commits(repo: &Path, count: usize, from: Option<&str>) {
+    let mut stream = String::new();
+    for i in 0..count {
+        let content = format!("local {}\n", i);
+        stream.push_str("commit refs/heads/local-work\n");
+        stream.push_str(&format!("committer T <t@e> {} +0000\n", 2_000_000_000 + i));
+        stream.push_str("data 6\nlocal\n");
+        if let (0, Some(from)) = (i, from) {
+            stream.push_str(&format!("from {}\n", from));
+        }
+        stream.push_str(&format!("M 100644 inline local.txt\ndata {}\n{}\n", content.len(), content));
+    }
+    let mut child = clean_git()
+        .current_dir(repo)
+        .args(["fast-import", "--quiet"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .expect("run git fast-import");
+    use std::io::Write;
+    child.stdin.take().unwrap().write_all(stream.as_bytes()).unwrap();
+    assert!(child.wait().unwrap().success(), "git fast-import");
+}
+
+/// A clone with many commits the server doesn't have still fetches only the new objects:
+/// the negotiation takes several rounds to get past the local-only commits.
+fn fetch_after_local_work(options: ServerOptions, label: &str) {
+    let v0 = options.force_v0;
+    let server = or_skip!(GitHttpServer::start_with(options));
+    let home = tempfile::tempdir().unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path().canonicalize().unwrap();
+    let source = base.join("source");
+    source_repo(&source);
+    publish(&server, &source);
+    let (out, err, ok) = rgit(&base, home.path(), &["clone", &server.url("repo.git"), "copy"]);
+    assert!(ok, "[{}] rgit clone failed:\n{}{}", label, out, err);
+    let clone = base.join("copy");
+    local_only_commits(&clone, 300, Some("refs/heads/main"));
+
+    std::fs::write(source.join("README.md"), "after local work\n").unwrap();
+    git(&source, &["-c", "user.name=T", "-c", "user.email=t@e", "commit", "-q", "-am", "server work"]);
+    git(&source, &["push", "-q", &server.root().join("repo.git").to_string_lossy(), "main"]);
+
+    let before = server.requests().len();
+    let (out, err, ok) = rgit(&clone, home.path(), &["fetch"]);
+    assert!(ok, "[{}] rgit fetch failed:\n{}{}", label, out, err);
+    assert!(out.contains("Receiving objects: 100% (3/3), done."), "[{}] {}", label, out);
+    assert_eq!(git(&clone, &["rev-parse", "refs/remotes/origin/main"]), git(&source, &["rev-parse", "main"]));
+    let fsck = clean_git().current_dir(&clone).args(["fsck", "--strict", "--no-dangling"]).output().unwrap();
+    assert!(fsck.status.success() && fsck.stderr.is_empty(), "[{}] git fsck: {}", label, String::from_utf8_lossy(&fsck.stderr));
+    // Rounds of 16, 32, 64, 128, 256 haves get past the 300 local commits.
+    let packs = server.requests()[before..].iter().filter(|r| r.method == "POST" && r.status == 200).count() - if v0 { 0 } else { 1 };
+    assert!(packs >= 3, "[{}] expected several negotiation rounds, got {}", label, packs);
+}
+
+#[test]
+fn fetch_negotiates_past_local_only_commits_over_v2() {
+    fetch_after_local_work(ServerOptions::default(), "v2");
+}
+
+#[test]
+fn fetch_negotiates_past_local_only_commits_over_v0() {
+    fetch_after_local_work(ServerOptions { force_v0: true, ..Default::default() }, "v0");
+}
+
+/// A repository with its own unrelated history fetches the server's whole history: every
+/// `have` is answered with NAK and the negotiation ends when there is nothing left to offer.
+fn fetch_into_unrelated_history(options: ServerOptions, label: &str) {
+    let server = or_skip!(GitHttpServer::start_with(options));
+    let home = tempfile::tempdir().unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path().canonicalize().unwrap();
+    let source = base.join("source");
+    source_repo(&source);
+    publish(&server, &source);
+    let mine = base.join("mine");
+    std::fs::create_dir_all(&mine).unwrap();
+    git(&mine, &["init", "-q", "-b", "main"]);
+    local_only_commits(&mine, 40, None);
+    git(&mine, &["symbolic-ref", "HEAD", "refs/heads/local-work"]);
+    git(&mine, &["remote", "add", "origin", &server.url("repo.git")]);
+
+    let (out, err, ok) = rgit(&mine, home.path(), &["fetch"]);
+    assert!(ok, "[{}] rgit fetch failed:\n{}{}", label, out, err);
+    assert!(out.contains(" * [new branch]      main"), "[{}] {}", label, out);
+    assert_eq!(git(&mine, &["rev-parse", "refs/remotes/origin/main"]), git(&source, &["rev-parse", "main"]));
+    assert_eq!(git(&mine, &["rev-list", "--count", "refs/remotes/origin/main"]).trim(), "5");
+    let fsck = clean_git().current_dir(&mine).args(["fsck", "--strict", "--no-dangling"]).output().unwrap();
+    assert!(fsck.status.success() && fsck.stderr.is_empty(), "[{}] git fsck: {}", label, String::from_utf8_lossy(&fsck.stderr));
+}
+
+#[test]
+fn fetch_into_unrelated_history_over_v2() {
+    fetch_into_unrelated_history(ServerOptions::default(), "v2");
+}
+
+#[test]
+fn fetch_into_unrelated_history_over_v0() {
+    fetch_into_unrelated_history(ServerOptions { force_v0: true, ..Default::default() }, "v0");
 }

@@ -83,6 +83,63 @@ pub fn local_has_object(hash: &str) -> bool {
     crate::core::repo::path(format!(".git/objects/{}/{}", &hash[..2], &hash[2..])).exists() || crate::core::pack::packed_object_exists(hash)
 }
 
+/// Checks that a fetched pack is complete on top of this repository: every object a commit,
+/// tree or tag in `objects` references is either in the pack (`in_pack`) or already here.
+/// Submodule commits (gitlinks) are not objects of this repository and are skipped. Returns
+/// the first referencing object and the missing name, or `None` when nothing is missing.
+// Used by `fetch` over HTTPS.
+pub fn first_missing_reference(objects: &[crate::core::types::PackedObject], in_pack: &HashSet<&str>) -> Option<(String, String)> {
+    let mut checked: HashSet<String> = HashSet::new();
+    for object in objects {
+        for reference in object_references(&object.kind, &object.content) {
+            if in_pack.contains(reference.as_str()) || checked.contains(&reference) {
+                continue;
+            }
+            if !local_has_object(&reference) {
+                return Some((object.hash.clone(), reference));
+            }
+            checked.insert(reference);
+        }
+    }
+    None
+}
+
+/// The objects a commit (tree, parents), tree (entries other than gitlinks) or tag (target)
+/// refers to; nothing for a blob or a malformed object.
+// Used by `first_missing_reference`.
+pub fn object_references(kind: &str, content: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
+    match kind {
+        "commit" | "tag" => {
+            let text = String::from_utf8_lossy(content);
+            for line in text.split('\n').take_while(|l| !l.is_empty()) {
+                let name = match kind {
+                    "commit" => line.strip_prefix("tree ").or_else(|| line.strip_prefix("parent ")),
+                    _ => line.strip_prefix("object "),
+                };
+                if let Some(name) = name.map(str::trim).filter(|n| n.len() == 40) {
+                    out.push(name.to_string());
+                }
+            }
+        }
+        "tree" => {
+            let mut rest = content;
+            while let Some(nul) = rest.iter().position(|&b| b == 0) {
+                if rest.len() < nul + 21 {
+                    break;
+                }
+                let gitlink = rest.starts_with(b"160000 ");
+                if !gitlink {
+                    out.push(hex::encode(&rest[nul + 1..nul + 21]));
+                }
+                rest = &rest[nul + 21..];
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
 /// BFS-walks a commit graph from `remote_commit` using the remote's object store and
 /// collects all commit, tree, and blob hashes that are missing from the local repository.
 // Used by `fetch`.

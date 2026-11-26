@@ -1,5 +1,6 @@
 //! Local-path remotes (no network): clone, fetch, push, pull, remote.
 use super::three_commits;
+use crate::harness::Repo;
 use insta::assert_snapshot;
 
 #[test]
@@ -53,5 +54,32 @@ fn clone_and_fetch_from_bundle() {
     r.run_in("..", "clone incr.bundle incr");
     // ...but a clone that already has them can fetch from it.
     r.run_in("../full", "remote set-url origin ../incr.bundle").run_in("../full", "fetch").run_in("../full", "log --oneline -2 origin/main");
+    assert_snapshot!(r.finish());
+}
+
+#[test]
+fn credential_helpers() {
+    let mut r = Repo::new();
+    // No helper and no terminal: `fill` fails like git.
+    r.set_env("GIT_TERMINAL_PROMPT", "0");
+    r.run_stdin("credential fill", "protocol=https\nhost=github.com\n\n");
+    r.run("config --global credential.helper store");
+    r.run_stdin("credential approve", "protocol=https\nhost=github.com\nusername=sebi\npassword=tok/en%1\n\n");
+    r.run_stdin("credential approve", "url=https://me@gitlab.com\npassword=p@ss\n\n");
+    // Saving the same user's login again replaces it; the newest login comes first.
+    r.run_stdin("credential approve", "protocol=https\nhost=github.com\nusername=sebi\npassword=newer\n\n");
+    r.show_file("../home/.git-credentials");
+    r.run_stdin("credential fill", "protocol=https\nhost=github.com\n\n");
+    r.run_stdin("credential fill", "protocol=https\nhost=gitlab.com\nusername=someone-else\n\n");
+    r.run_stdin("credential reject", "protocol=https\nhost=github.com\n\n");
+    r.show_file("../home/.git-credentials");
+    // The helper itself, with its own file.
+    r.run_stdin("credential-store --file creds store", "protocol=https\nhost=example.com\nusername=a\npassword=b\n\n");
+    r.run_stdin("credential-store --file creds get", "protocol=https\nhost=example.com\n\n");
+    r.run_stdin("credential-store --file creds erase", "protocol=https\nhost=example.com\nusername=a\n\n");
+    r.show_file("creds");
+    // Errors.
+    r.run_stdin("credential fill", "host=example.com\n\n").run_stdin("credential fill", "not a line\n");
+    r.run("credential").run("credential-store --bogus get");
     assert_snapshot!(r.finish());
 }

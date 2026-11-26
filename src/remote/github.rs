@@ -1,6 +1,7 @@
 pub mod types;
 
 use anyhow::{Context, Result};
+use std::io::IsTerminal;
 use base64::Engine;
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::remote::{push::types::PushStatus, types::GitHubTarget};
@@ -84,8 +85,10 @@ pub fn parse_github_remote(remote_url: &str) -> Option<(String, String)> {
     None
 }
 
-/// Retrieves the GitHub personal access token from environment variables or git configuration.
-// Used by `push`.
+/// Retrieves the GitHub personal access token: `GITHUB_TOKEN` / `RGIT_GITHUB_TOKEN`, then
+/// `remote.<name>.token` / `github.token`, then the credential helpers and a prompt (the
+/// password of the `https://github.com` login).
+// Used by `push`, `fetch`, `clone` and `request-pull`.
 pub fn resolve_github_token(remote_name: &str) -> Result<String> {
     if let Ok(tok) = std::env::var("GITHUB_TOKEN") {
         if !tok.trim().is_empty() {
@@ -111,11 +114,23 @@ pub fn resolve_github_token(remote_name: &str) -> Result<String> {
         }
     }
 
+    // Then the credential helpers (`credential.helper`), and a prompt when someone can answer
+    // it: the login's password is the token. It is approved or rejected by the first request.
+    let mut credential = crate::remote::credential::types::Credential::for_https_host("github.com");
+    use crate::remote::credential::engine::{askpass_program, terminal_prompts_disabled};
+    let can_prompt = askpass_program().is_some() || (std::io::stdin().is_terminal() && std::io::stderr().is_terminal() && !terminal_prompts_disabled());
+    let typed = crate::remote::credential::engine::fill(&mut credential, can_prompt).map_err(|message| anyhow::anyhow!("fatal: {}", message))?;
+    if let Some(token) = credential.password.clone().filter(|t| !t.trim().is_empty()) {
+        crate::remote::credential::engine::set_pending(credential, typed);
+        return Ok(token.trim().to_string());
+    }
+
     anyhow::bail!(
         "fatal: GitHub token not found.\n\
          Please provide a Personal Access Token with repo scope via:\n\
          - Setting environment variable GITHUB_TOKEN\n\
-         - Or configuring via: rgit config github.token <your-token>"
+         - Or configuring via: rgit config github.token <your-token>\n\
+         - Or a credential helper (rgit config --global credential.helper store), then run the command in a terminal once"
     )
 }
 
@@ -156,7 +171,8 @@ pub fn get_github_branch_commit(client: &reqwest::blocking::Client, target: &Git
         return Ok(None);
     }
     if res.status() == reqwest::StatusCode::UNAUTHORIZED {
-        anyhow::bail!("fatal: Authentication failed for GitHub (bad credentials). Check your GITHUB_TOKEN.");
+        crate::remote::credential::engine::reject_pending();
+        anyhow::bail!("fatal: Authentication failed for GitHub (bad credentials). Check your token (GITHUB_TOKEN, github.token or your credential helper).");
     }
     if res.status() == reqwest::StatusCode::FORBIDDEN {
         anyhow::bail!("fatal: GitHub API access forbidden or rate limit exceeded for repo '{}/{}'.", target.owner, target.repo);
@@ -166,6 +182,7 @@ pub fn get_github_branch_commit(client: &reqwest::blocking::Client, target: &Git
         anyhow::bail!("fatal: GitHub API error ({}): {}", url, err_body);
     }
 
+    crate::remote::credential::engine::approve_pending();
     let json: serde_json::Value = res.json().context("Failed to parse GitHub API ref response")?;
     let sha = json["object"]["sha"]
         .as_str()
@@ -385,13 +402,15 @@ pub fn list_github_refs(client: &reqwest::blocking::Client, target: &GitHubTarge
         anyhow::bail!("fatal: Repository '{}/{}' not found or not accessible.", target.owner, target.repo);
     }
     if res.status() == reqwest::StatusCode::UNAUTHORIZED {
-        anyhow::bail!("fatal: Authentication failed for GitHub (bad credentials). Check your GITHUB_TOKEN.");
+        crate::remote::credential::engine::reject_pending();
+        anyhow::bail!("fatal: Authentication failed for GitHub (bad credentials). Check your token (GITHUB_TOKEN, github.token or your credential helper).");
     }
     if !res.status().is_success() {
         let err = res.text().unwrap_or_default();
         anyhow::bail!("fatal: GitHub API error listing refs: {}", err);
     }
 
+    crate::remote::credential::engine::approve_pending();
     let json: serde_json::Value = res.json().context("Failed to parse GitHub refs response")?;
     let mut refs = Vec::new();
     if let Some(arr) = json.as_array() {
@@ -416,9 +435,13 @@ pub fn list_github_refs(client: &reqwest::blocking::Client, target: &GitHubTarge
 pub fn get_github_default_branch(client: &reqwest::blocking::Client, target: &GitHubTarget) -> Result<String> {
     let url = format!("https://api.github.com/repos/{}/{}", target.owner, target.repo);
     let res = client.get(&url).send().context("Failed to get repo info from GitHub")?;
+    if res.status() == reqwest::StatusCode::UNAUTHORIZED {
+        crate::remote::credential::engine::reject_pending();
+    }
     if !res.status().is_success() {
         return Ok("main".to_string());
     }
+    crate::remote::credential::engine::approve_pending();
     let json: serde_json::Value = res.json().context("Failed to parse repo info")?;
     Ok(json["default_branch"]
         .as_str()

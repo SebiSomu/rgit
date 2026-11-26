@@ -89,6 +89,16 @@ impl Repo {
         self
     }
 
+    /// Logs the contents of a file (relative to the repository root) into the transcript.
+    pub fn show_file(&mut self, rel: &str) -> &mut Self {
+        let content = self.read(rel);
+        self.log.push_str(&format!("$ cat {}\n{}", rel, content));
+        if !content.ends_with('\n') {
+            self.log.push('\n');
+        }
+        self
+    }
+
     pub fn read(&self, rel: &str) -> String {
         fs::read_to_string(self.root.join(rel)).unwrap_or_else(|e| format!("<unreadable: {}>", e))
     }

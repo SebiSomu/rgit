@@ -1,6 +1,7 @@
 pub mod backup;
 pub mod bundle;
 pub mod clone;
+pub mod credential;
 pub mod fetch;
 pub mod github;
 pub mod open;

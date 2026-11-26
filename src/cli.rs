@@ -238,6 +238,12 @@ pub enum Commands {
     PrSummary(crate::remote::pr_summary::cli::PrSummaryArgs),
     /// Open (or print with -p) the web page of a file, branch, commit or pull request on GitHub, GitLab or Bitbucket.
     Open(crate::remote::open::cli::OpenArgs),
+    /// Fill, approve or reject a login through the credential helpers (git's credential protocol).
+    #[command(disable_help_flag = true)]
+    Credential(crate::remote::credential::cli::CredentialArgs),
+    /// The `store` credential helper: logins in ~/.git-credentials, shared with git.
+    #[command(disable_help_flag = true)]
+    CredentialStore(crate::remote::credential::cli::CredentialStoreArgs),
     /// A Markdown changelog from conventional commits: breaking changes, features, fixes... per version.
     Changelog(crate::history::changelog::cli::ChangelogArgs),
     /// Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day.
@@ -424,6 +430,8 @@ pub fn handle_commands() -> Result<()> {
         Commands::Backup(args) => crate::remote::backup::cli::dispatch_backup(args)?,
         Commands::PrSummary(args) => crate::remote::pr_summary::cli::dispatch_pr_summary(args)?,
         Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
+        Commands::Credential(args) => crate::remote::credential::cli::dispatch_credential(args)?,
+        Commands::CredentialStore(args) => crate::remote::credential::cli::dispatch_credential_store(args)?,
         Commands::Changelog(args) => crate::history::changelog::cli::dispatch_changelog(args)?,
         Commands::Contributors(args) => crate::history::contributors::cli::dispatch_contributors(args)?,
         Commands::Tip(args) => crate::plumbing::tip::cli::dispatch_tip(args)?,

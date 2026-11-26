@@ -27,8 +27,6 @@ pub enum ProtocolVersion {
 // Used by: src/remote/smart_http.rs, src/remote/ls_remote.rs
 // Used by command/helper: `discover_refs` and the `ls-remote` command
 #[derive(Debug, Clone)]
-// `version`, `capabilities` and `base_url` are read by fetch over HTTPS from step 5 on.
-#[allow(dead_code)]
 pub struct Discovery {
     pub refs: Vec<RemoteRef>,
     pub version: ProtocolVersion,

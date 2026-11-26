@@ -14,7 +14,7 @@ use crate::remote::fetch::engine::{
 };
 use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, read_bundle, read_packfile, store_loose_objects};
 use crate::remote::github::{fetch_from_github, resolve_github_token};
-use crate::remote::transport::{resolve_remote, smart_http_not_supported_yet, types::Transport};
+use crate::remote::transport::{resolve_remote, types::Transport};
 use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
 
 pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
@@ -45,7 +45,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
             return Ok(());
         }
         Transport::Bundle { path } => return fetch_from_bundle(&path, &remote_name, &remote_display, branch.as_deref()),
-        Transport::SmartHttp { url } => return Err(smart_http_not_supported_yet("fetch from", &url)),
+        Transport::SmartHttp { url } => return fetch_from_smart_http(&url, &remote_name, &remote_display, branch.as_deref()),
         Transport::Local { git_dir } => git_dir,
     };
 
@@ -217,6 +217,80 @@ fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: 
         && let Some((_, sha)) = branches.iter().find(|(b, _)| *b == default_branch)
     {
         let _ = crate::core::refs::write_remote_head(remote_name, &default_branch, sha);
+    }
+    write_fetch_head(&fetch_head_entries)?;
+    Ok(())
+}
+
+/// `rgit fetch` from a remote reached over git's smart-HTTP protocol (any https host, and
+/// GitHub with `rgit.httpTransport=smart`). Lists the server's branches, downloads one pack
+/// with the branch tips this repository lacks, verifies and indexes it, checks that every
+/// wanted commit arrived, and only then installs the pack and moves
+/// `refs/remotes/<remote>/<branch>` (only `branch` when given), the remote HEAD and FETCH_HEAD.
+/// A transfer that fails at any point leaves the repository unchanged. The output matches a
+/// fetch from a local repository.
+fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, branch: Option<&str>) -> Result<()> {
+    use std::io::IsTerminal;
+    use crate::remote::smart_http::{discover_refs, fetch_pack};
+
+    let client = crate::remote::http::HttpClient::new()?;
+    let discovery = discover_refs(&client, url, &["HEAD".to_string(), "refs/heads/".to_string()], false)?;
+    let branches: Vec<(String, String)> = discovery
+        .refs
+        .iter()
+        .filter_map(|r| Some((r.name.strip_prefix("refs/heads/")?.to_string(), r.oid.clone()?)))
+        .filter(|(name, _)| branch.is_none_or(|b| b == name))
+        .collect();
+
+    let shown = crate::remote::http::redact_url(remote_display);
+    println!("From {}", shown);
+    if branches.is_empty() {
+        println!(" * (no branches found or empty repository)");
+        return Ok(());
+    }
+
+    let mut wants: Vec<String> = branches.iter().map(|(_, oid)| oid.clone()).filter(|oid| !crate::remote::fetch::engine::local_has_object(oid)).collect();
+    wants.sort();
+    wants.dedup();
+    let mut received = 0usize;
+    if !wants.is_empty() {
+        let pack = fetch_pack(&client, &discovery, url, &wants, std::io::stderr().is_terminal())?;
+        let (pack, index, objects) = crate::core::pack::index_pack_bytes(pack, false)?;
+        let arrived: std::collections::HashSet<&str> = objects.iter().map(|o| o.hash.as_str()).collect();
+        if let Some(missing) = wants.iter().find(|w| !arrived.contains(w.as_str())) {
+            anyhow::bail!("fatal: the pack from '{}' does not contain {}; nothing was updated", shown, missing);
+        }
+        crate::core::pack::store_pack(&crate::core::repo::path(".git/objects/pack"), "pack-", &pack, &index)?;
+        received = objects.len();
+    }
+
+    let mut fetch_head_entries = Vec::new();
+    for (branch_name, remote_sha) in &branches {
+        fetch_head_entries.push((remote_sha.clone(), branch_name.clone(), shown.clone()));
+        let local_sha = read_local_remote_tracking_ref(remote_name, branch_name);
+        if local_sha.as_deref() == Some(remote_sha.as_str()) {
+            println!(" = [up to date]      {:20} -> {}/{}", branch_name, remote_name, branch_name);
+            continue;
+        }
+        write_local_remote_tracking_ref(remote_name, branch_name, remote_sha)?;
+        match &local_sha {
+            None => println!(" * [new branch]      {:20} -> {}/{}", branch_name, remote_name, branch_name),
+            Some(old) => println!(
+                "   {}..{}  {:16} -> {}/{}",
+                crate::core::commit::short_hash(old),
+                crate::core::commit::short_hash(remote_sha),
+                branch_name, remote_name, branch_name
+            ),
+        }
+    }
+    if received > 0 {
+        println!("Receiving objects: 100% ({}/{}), done.", received, received);
+    }
+    let head_target = discovery.refs.iter().find(|r| r.name == "HEAD").and_then(|r| r.symref_target.as_deref()?.strip_prefix("refs/heads/"));
+    if let Some(default_branch) = head_target
+        && let Some((_, sha)) = branches.iter().find(|(b, _)| b == default_branch)
+    {
+        let _ = crate::core::refs::write_remote_head(remote_name, default_branch, sha);
     }
     write_fetch_head(&fetch_head_entries)?;
     Ok(())

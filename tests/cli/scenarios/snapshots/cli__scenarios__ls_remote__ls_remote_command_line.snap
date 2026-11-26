@@ -72,10 +72,8 @@ $ rgit ls-remote <HTTP>/missing.git
 fatal: repository '<HTTP>/missing.git/' not found
 [exit 128]
 $ rgit fetch origin
-[stderr]
-Error: fatal: rgit can't fetch from '<HTTP>/repo.git' yet: over HTTPS only GitHub is supported so far
-hint: `rgit ls-remote <HTTP>/repo.git` already works with any host
-[exit 1]
+From <HTTP>/repo.git
+ * [new branch]      main                 -> origin/main
 $ rgit push origin main
 [stderr]
 Error: fatal: rgit can't push to '<HTTP>/repo.git' yet: over HTTPS only GitHub is supported so far
@@ -86,8 +84,10 @@ hint: `rgit ls-remote <HTTP>/repo.git` already works with any host
 HEAD: ref: refs/heads/main
 refs:
   refs/heads/main <H3>
+  refs/remotes/origin/HEAD ref: refs/remotes/origin/main
+  refs/remotes/origin/main <H3>
 git-dir entries:
-  COMMIT_EDITMSG config
+  COMMIT_EDITMSG FETCH_HEAD config
 index (ls-files -s):
   100644 <H4> 0	a.txt
   100644 <H5> 0	b.txt

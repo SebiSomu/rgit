@@ -11,6 +11,8 @@ pub enum CloneSource {
     Local { path: PathBuf, git_dir: PathBuf },
     GitHub { owner: String, repo: String },
     Bundle { path: PathBuf },
+    /// An `http(s)://` repository reached with git's smart-HTTP protocol.
+    SmartHttp { url: String },
 }
 
 impl CloneSource {
@@ -21,6 +23,7 @@ impl CloneSource {
             CloneSource::Local { path, .. } => path.display().to_string(),
             CloneSource::GitHub { owner, repo } => format!("https://github.com/{}/{}", owner, repo),
             CloneSource::Bundle { path } => path.display().to_string(),
+            CloneSource::SmartHttp { url } => url.clone(),
         }
     }
  
@@ -45,6 +48,13 @@ impl CloneSource {
                 let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                 let name = name.strip_suffix(".bundle").unwrap_or(&name);
                 name.strip_suffix(".git").unwrap_or(name).to_string()
+            }
+            CloneSource::SmartHttp { url } => {
+                // The last path component: https://host/team/proj.git -> proj
+                let path = url.split(['?', '#']).next().unwrap_or(url).trim_end_matches('/');
+                let name = path.rsplit('/').next().unwrap_or_default();
+                let name = name.strip_suffix(".git").unwrap_or(name);
+                if name.is_empty() || name.contains(':') { "repository".to_string() } else { name.to_string() }
             }
         }
     }

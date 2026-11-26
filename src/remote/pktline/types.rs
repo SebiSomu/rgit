@@ -36,8 +36,6 @@ impl Packet {
 // Used by: src/remote/pktline.rs
 // Used by command/helper: `parse_sideband` and `demux_sideband`
 #[derive(Debug, Clone, PartialEq, Eq)]
-// Used by fetch over HTTPS from step 5 on.
-#[allow(dead_code)]
 pub enum Band {
     Data(Vec<u8>),
     Progress(Vec<u8>),

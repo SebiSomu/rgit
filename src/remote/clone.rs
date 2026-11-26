@@ -54,6 +54,12 @@ fn clone_into(target_dir: &Path, source: &CloneSource, remote_name: &str, reques
 
     create_repository_skeleton()?;
     set_in(&crate::core::repo::path(LOCAL_CONFIG_PATH), &format!("remote.{}.url", remote_name), &source.url())?;
+    // The refspec `remote add` writes too: git needs it to map `main` to `origin/main`.
+    set_in(
+        &crate::core::repo::path(LOCAL_CONFIG_PATH),
+        &format!("remote.{}.fetch", remote_name),
+        &format!("+refs/heads/*:refs/remotes/{}/*", remote_name),
+    )?;
 
     crate::remote::fetch::fetch(Some(remote_name.to_string()), None)?;
 
@@ -81,4 +87,4 @@ fn clone_into(target_dir: &Path, source: &CloneSource, remote_name: &str, reques
     }
 
     Ok(())
-}
+}

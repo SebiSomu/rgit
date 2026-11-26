@@ -78,8 +78,6 @@ impl HttpResponse {
     }
 
     /// The body as a stream (pack data).
-    // Used by fetch over HTTPS from step 5 on.
-    #[allow(dead_code)]
     pub fn into_reader(self) -> impl std::io::Read {
         self.response
     }

@@ -31,12 +31,19 @@ pub fn classify_clone_source(spec: &str) -> Result<CloneSource> {
             Transport::Local { git_dir } => CloneSource::Local { path: absolute, git_dir },
             // An existing path is never classified as GitHub.
             Transport::GitHubApi { owner, repo } => CloneSource::GitHub { owner, repo },
-            Transport::SmartHttp { url } => return Err(crate::remote::transport::smart_http_not_supported_yet("clone", &url)),
+            Transport::SmartHttp { url } => CloneSource::SmartHttp { url },
         });
     }
 
     if let Some((owner, repo)) = parse_github_remote(spec) {
+        if crate::remote::transport::github_uses_smart_http() {
+            return Ok(CloneSource::SmartHttp { url: crate::remote::transport::github_https_url(spec, &owner, &repo) });
+        }
         return Ok(CloneSource::GitHub { owner, repo });
+    }
+
+    if spec.starts_with("https://") || spec.starts_with("http://") {
+        return Ok(CloneSource::SmartHttp { url: spec.to_string() });
     }
 
     anyhow::bail!("fatal: repository '{}' does not exist", spec)
@@ -51,6 +58,16 @@ pub fn remote_default_branch(source: &CloneSource, remote_name: &str) -> Result<
     match source {
         CloneSource::Local { git_dir, .. } => read_remote_head(git_dir),
         CloneSource::Bundle { path } => Ok(bundle_head_branch(&read_bundle(&path.to_string_lossy())?.0)),
+        // Asks for an unborn HEAD too, so an empty repository still names its default branch.
+        CloneSource::SmartHttp { url } => {
+            let client = crate::remote::http::HttpClient::new()?;
+            let discovery = crate::remote::smart_http::discover_refs(&client, url, &["HEAD".to_string()], true)?;
+            Ok(discovery
+                .refs
+                .iter()
+                .find(|r| r.name == "HEAD")
+                .and_then(|r| r.symref_target.as_deref()?.strip_prefix("refs/heads/").map(str::to_string)))
+        }
         CloneSource::GitHub { owner, repo } => {
             let token = resolve_github_token(remote_name)?;
             let client = build_github_client(&token)?;

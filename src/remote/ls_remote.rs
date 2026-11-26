@@ -61,11 +61,7 @@ fn run(args: Vec<String>) -> Result<()> {
         // ls-remote is read-only, so it uses git's own protocol on GitHub too: one request, and
         // exactly git's answer (peeled tags, symbolic refs).
         Transport::GitHubApi { owner, repo } => {
-            let url = remote
-                .configured_url
-                .clone()
-                .filter(|u| u.starts_with("https://") || u.starts_with("http://"))
-                .unwrap_or_else(|| format!("https://github.com/{}/{}.git", owner, repo));
+            let url = crate::remote::transport::github_https_url(remote.configured_url.as_deref().unwrap_or(""), owner, repo);
             discover_refs(&HttpClient::new()?, &url, &prefixes, false)?.refs
         }
     };

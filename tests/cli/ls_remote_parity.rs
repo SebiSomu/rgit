@@ -2,6 +2,7 @@
 //! transport (bare and non-bare paths, a bundle, smart HTTP v2 and v0, an empty repository),
 //! with the same flags, must give byte-identical output and the same exit code.
 
+use crate::harness::clean_rgit as rgit;
 use crate::http_server::{clean_git, GitHttpServer, ServerOptions};
 use std::path::Path;
 use std::process::Command;
@@ -50,26 +51,6 @@ fn rich_repo(dir: &Path) {
 fn run(mut command: Command) -> (String, i32) {
     let output = command.output().expect("run command");
     (String::from_utf8_lossy(&output.stdout).into_owned(), output.status.code().unwrap_or(-1))
-}
-
-/// `rgit` with the same clean environment the clean `git` gets.
-fn rgit(dir: &Path, home: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_rgit"));
-    for (key, _) in std::env::vars_os() {
-        let key = key.to_string_lossy();
-        if key.starts_with("GIT_") || key.starts_with("RGIT_") || key.starts_with("RUST_") || key.to_ascii_lowercase().ends_with("_proxy") {
-            command.env_remove(key.as_ref());
-        }
-    }
-    command
-        .current_dir(dir)
-        .env("HOME", home)
-        .env("USERPROFILE", home)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .env("RGIT_VERBOSITY", "quiet")
-        .env("NO_PROXY", "*");
-    command
 }
 
 const FLAG_SETS: &[&[&str]] = &[

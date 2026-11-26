@@ -27,7 +27,11 @@ pub fn resolve_remote(spec: &str) -> Result<Remote> {
     } else if path.exists() {
         Transport::Local { git_dir: resolve_remote_repo_path(spec)? }
     } else if let Some((owner, repo)) = parse_github_remote(&url) {
-        Transport::GitHubApi { owner, repo }
+        if github_uses_smart_http() {
+            Transport::SmartHttp { url: github_https_url(&url, &owner, &repo) }
+        } else {
+            Transport::GitHubApi { owner, repo }
+        }
     } else if url.starts_with("https://") || url.starts_with("http://") {
         Transport::SmartHttp { url }
     } else {
@@ -55,4 +59,25 @@ pub fn smart_http_not_supported_yet(action: &str, url: &str) -> anyhow::Error {
         crate::remote::http::redact_url(url),
         crate::remote::http::redact_url(url)
     )
+}
+
+/// Whether GitHub remotes use git's smart-HTTP protocol instead of the REST API: opt in with
+/// `rgit config --global rgit.httpTransport smart` (until smart HTTP becomes the default).
+// Used by `resolve_remote` and `clone`.
+pub fn github_uses_smart_http() -> bool {
+    crate::core::config::get_config_value("rgit.httptransport")
+        .ok()
+        .flatten()
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("smart"))
+}
+
+/// The https URL of a GitHub repository: the URL itself when it already is one, else
+/// `https://github.com/<owner>/<repo>.git` (for `git@github.com:` and shorthand remotes).
+// Used by `resolve_remote`, `clone` and `ls-remote`.
+pub fn github_https_url(url: &str, owner: &str, repo: &str) -> String {
+    if url.starts_with("https://") || url.starts_with("http://") {
+        url.to_string()
+    } else {
+        format!("https://github.com/{}/{}.git", owner, repo)
+    }
 }

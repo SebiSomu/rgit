@@ -32,7 +32,7 @@ fn ls_remote_command_line() {
     r.run(&format!("ls-remote --exit-code {} no-such-ref", url));
     r.run("ls-remote --bogus").run("ls-remote -h");
     r.run(&format!("ls-remote {}", server.url("missing.git")));
-    // Fetch and push over HTTPS to hosts other than GitHub are the next steps.
+    // Fetch over HTTPS works with any host; push is the next step.
     r.run("fetch origin").run("push origin main");
     assert_snapshot!(r.finish());
 }

@@ -8,7 +8,7 @@ use anyhow::Result;
 
 use crate::remote::http::{redact_url, HttpClient};
 use crate::remote::pktline::types::Packet;
-use crate::remote::pktline::{decode_all, encode_text, DELIM, FLUSH};
+use crate::remote::pktline::{decode_all, demux_sideband, encode_text, PacketReader, DELIM, FLUSH};
 use crate::remote::smart_http::types::{Discovery, ProtocolVersion, RemoteRef};
 
 const ADVERTISEMENT_TYPE: &str = "application/x-git-upload-pack-advertisement";
@@ -172,6 +172,163 @@ pub fn parse_ls_refs_line(line: &str) -> Result<RemoteRef> {
         }
     }
     Ok(entry)
+}
+
+/// Downloads one pack holding `wants` (object ids, normally branch tips) and everything they
+/// reach, from a server found by `discover_refs`. Uses protocol v2's `fetch` command, or the
+/// v0 request for older servers. Sends no `have` lines yet, so the pack is complete on its
+/// own. With `progress`, the server's progress text is shown as `remote: ...` lines (git shows
+/// it only when stderr is a terminal); otherwise the server is asked not to send it.
+/// Returns the raw pack bytes, still to be verified and indexed by the caller.
+// Used by `fetch` and `clone` over HTTPS.
+pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: &[String], progress: bool) -> Result<Vec<u8>> {
+    let (body, v2) = match discovery.version {
+        ProtocolVersion::V2 => (v2_fetch_request(&discovery.capabilities, wants, progress)?, true),
+        ProtocolVersion::V0 => (v0_fetch_request(&discovery.capabilities, wants, progress)?, false),
+    };
+    let mut headers = vec![("Content-Type", REQUEST_TYPE), ("Accept", RESULT_TYPE)];
+    if v2 {
+        headers.push(("Git-Protocol", "version=2"));
+    }
+    let response = client.post(&format!("{}/git-upload-pack", discovery.base_url), &headers, &body)?.check_status(url)?;
+    let mut reader = PacketReader::new(response.into_reader());
+    let mut pack = Vec::new();
+    let mut show = |bytes: &[u8]| {
+        if progress {
+            show_remote_progress(bytes);
+        }
+    };
+    if v2 {
+        read_v2_fetch_response(&mut reader, &mut pack, &mut show)?;
+    } else {
+        read_v0_fetch_response(&mut reader, &mut pack, &mut show, discovery.capabilities.iter().any(|c| c == "side-band-64k" || c == "side-band"))?;
+    }
+    if pack.is_empty() {
+        anyhow::bail!("fatal: the server at '{}' sent no pack", redact_url(url));
+    }
+    Ok(pack)
+}
+
+/// The v2 `fetch` request: the command, then `ofs-delta`, one `want` per object, `done`.
+// Used by `fetch_pack`.
+fn v2_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -> Result<Vec<u8>> {
+    if !capabilities.iter().any(|c| c == "fetch" || c.starts_with("fetch=")) {
+        anyhow::bail!("fatal: the server speaks protocol v2 but does not offer fetch");
+    }
+    let mut body = encode_text("command=fetch")?;
+    if capabilities.iter().any(|c| c.starts_with("agent=")) {
+        body.extend(encode_text(&format!("agent={}", crate::remote::http::USER_AGENT))?);
+    }
+    if capabilities.iter().any(|c| c == "object-format=sha1") {
+        body.extend(encode_text("object-format=sha1")?);
+    }
+    body.extend_from_slice(DELIM);
+    body.extend(encode_text("ofs-delta")?);
+    if !progress {
+        body.extend(encode_text("no-progress")?);
+    }
+    for want in wants {
+        body.extend(encode_text(&format!("want {}", want))?);
+    }
+    body.extend(encode_text("done")?);
+    body.extend_from_slice(FLUSH);
+    Ok(body)
+}
+
+/// The v0 request: the first `want` carries the capabilities rgit uses (of those the server
+/// offered), then the other `want`s, a flush and `done`.
+// Used by `fetch_pack`.
+fn v0_fetch_request(capabilities: &[String], wants: &[String], progress: bool) -> Result<Vec<u8>> {
+    let offered = |name: &str| capabilities.iter().any(|c| c == name);
+    let mut requested: Vec<String> = Vec::new();
+    if offered("side-band-64k") {
+        requested.push("side-band-64k".into());
+    } else if offered("side-band") {
+        requested.push("side-band".into());
+    }
+    if offered("ofs-delta") {
+        requested.push("ofs-delta".into());
+    }
+    if !progress && offered("no-progress") {
+        requested.push("no-progress".into());
+    }
+    if capabilities.iter().any(|c| c.starts_with("agent=")) {
+        requested.push(format!("agent={}", crate::remote::http::USER_AGENT));
+    }
+    let mut body = Vec::new();
+    for (i, want) in wants.iter().enumerate() {
+        let line = if i == 0 { format!("want {} {}", want, requested.join(" ")) } else { format!("want {}", want) };
+        body.extend(encode_text(line.trim_end())?);
+    }
+    body.extend_from_slice(FLUSH);
+    body.extend(encode_text("done")?);
+    Ok(body)
+}
+
+/// Reads a v2 `fetch` response: sections (`shallow-info`, `wanted-refs`, `packfile-uris`) are
+/// skipped up to the `packfile` section, whose sideband stream is the pack.
+// Used by `fetch_pack`.
+fn read_v2_fetch_response<R: std::io::Read>(reader: &mut PacketReader<R>, pack: &mut Vec<u8>, progress: &mut dyn FnMut(&[u8])) -> Result<()> {
+    while let Some(packet) = reader.read_packet()? {
+        if let Some(message) = packet.error_message() {
+            anyhow::bail!("remote error: {}", message);
+        }
+        match packet.text().as_deref() {
+            Some("packfile") => {
+                demux_sideband(reader, pack, progress)?;
+                return Ok(());
+            }
+            // A section header or one of its lines; sections end with a delimiter.
+            Some(_) | None => continue,
+        }
+    }
+    anyhow::bail!("protocol error: the server's answer ended before the pack")
+}
+
+/// Reads a v0 response to a request ending in `done`: `NAK` (no common commits), then the
+/// pack, in sideband packets when side-band was negotiated, raw otherwise.
+// Used by `fetch_pack`.
+fn read_v0_fetch_response<R: std::io::Read>(reader: &mut PacketReader<R>, pack: &mut Vec<u8>, progress: &mut dyn FnMut(&[u8]), sideband: bool) -> Result<()> {
+    loop {
+        let Some(packet) = reader.read_packet()? else {
+            anyhow::bail!("protocol error: the server's answer ended before the pack");
+        };
+        if let Some(message) = packet.error_message() {
+            anyhow::bail!("remote error: {}", message);
+        }
+        match packet.text().as_deref() {
+            Some("NAK") => break,
+            Some(line) if line.starts_with("ACK ") => continue,
+            Some(line) if line.starts_with("shallow ") || line.starts_with("unshallow ") => continue,
+            _ => anyhow::bail!("protocol error: expected NAK from the server"),
+        }
+    }
+    if sideband {
+        demux_sideband(reader, pack, progress)?;
+    } else {
+        reader.read_raw_to_end(pack)?;
+    }
+    Ok(())
+}
+
+/// Shows sideband progress text as git does: each line (ended by `\n` or `\r`) prefixed
+/// with `remote: `.
+// Used by `fetch_pack`.
+fn show_remote_progress(bytes: &[u8]) {
+    use std::io::Write;
+    let text = String::from_utf8_lossy(bytes);
+    let mut stderr = std::io::stderr().lock();
+    let mut start = 0;
+    for (i, c) in text.char_indices() {
+        if c == '\n' || c == '\r' {
+            let _ = write!(stderr, "remote: {}{}", &text[start..i], c);
+            start = i + 1;
+        }
+    }
+    if start < text.len() {
+        let _ = write!(stderr, "remote: {}", &text[start..]);
+    }
+    let _ = stderr.flush();
 }
 
 #[cfg(test)]

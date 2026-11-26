@@ -259,6 +259,7 @@ pub fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> any
         tree_entries.push((name, entry_bytes));
     }
 
+    // Git sorts a folder as if its name ended in '/', so `backup.rs` comes before `backup/`.
     for subdir in subdirs {
         let sub_prefix = if prefix.is_empty() {
             subdir.clone()
@@ -273,10 +274,10 @@ pub fn write_tree_from_index_prefix(entries: &[IndexEntry], prefix: &str) -> any
         entry_bytes.extend_from_slice(subdir.as_bytes());
         entry_bytes.push(0);
         entry_bytes.extend_from_slice(&sub_tree_hash);
-        tree_entries.push((subdir, entry_bytes));
+        tree_entries.push((format!("{}/", subdir), entry_bytes));
     }
 
-    tree_entries.sort_by(|(name_a, _), (name_b, _)| name_a.cmp(name_b));
+    tree_entries.sort_by(|(key_a, _), (key_b, _)| key_a.as_bytes().cmp(key_b.as_bytes()));
 
     let mut tree_content = Vec::new();
     for (_, bytes) in tree_entries {

@@ -53,3 +53,14 @@ fn help_output() {
     r.run("help").run("help commit").run("help -a").run("--help").run("commit --help");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn tree_entries_use_git_order() {
+    // Git sorts a folder as `name/`: `a+`, `a-b`, `a.rs` come before the folder `a`, then `a0`.
+    let mut r = Repo::init();
+    for f in ["a.rs", "a/b.txt", "a-b", "a0", "a+", "src/backup.rs", "src/backup/cli.rs"] {
+        r.write(f, &format!("{}\n", f));
+    }
+    r.run("add .").run("commit -m 'file and folder with the same name'").run("ls-tree HEAD").run("ls-tree HEAD src/").run("fsck");
+    assert_snapshot!(r.finish());
+}

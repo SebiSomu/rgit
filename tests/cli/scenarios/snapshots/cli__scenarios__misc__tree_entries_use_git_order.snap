@@ -1,0 +1,74 @@
+---
+source: tests/cli/scenarios/misc.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.rs (5 bytes)
+$ write a/b.txt (8 bytes)
+$ write a-b (4 bytes)
+$ write a0 (3 bytes)
+$ write a+ (3 bytes)
+$ write src/backup.rs (14 bytes)
+$ write src/backup/cli.rs (18 bytes)
+$ rgit add .
+Staged files to index (7 new).
+$ rgit commit -m 'file and folder with the same name'
+[main (root-commit) <H1:7>] file and folder with the same name
+ Author: Test Author <author@example.com>
+ 7 files changed, 7 insertions(+)
+ create mode 100644 a+
+ create mode 100644 a-b
+ create mode 100644 a.rs
+ create mode 100644 a/b.txt
+ create mode 100644 a0
+ create mode 100644 src/backup.rs
+ create mode 100644 src/backup/cli.rs
+$ rgit ls-tree HEAD
+100644 blob <H2>	a+
+100644 blob <H3>	a-b
+100644 blob <H4>	a.rs
+040000 tree <H5>	a
+100644 blob <H6>	a0
+040000 tree <H7>	src
+$ rgit ls-tree HEAD src/
+100644 blob <H8>	src/backup.rs
+040000 tree <H9>	src/backup
+$ rgit fsck
+Checked 12 objects: 0 errors, 0 warnings, 0 dangling.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H1>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H2> 0	a+
+  100644 <H3> 0	a-b
+  100644 <H4> 0	a.rs
+  100644 <H10> 0	a/b.txt
+  100644 <H6> 0	a0
+  100644 <H8> 0	src/backup.rs
+  100644 <H11> 0	src/backup/cli.rs
+HEAD commit:
+  tree <H12>
+  author Test Author <author@example.com> 1700000120 +0000
+  committer Test Committer <committer@example.com> 1700000120 +0000
+  
+  file and folder with the same name
+worktree:
+  a+
+    | a+
+  a-b
+    | a-b
+  a.rs
+    | a.rs
+  a/b.txt
+    | a/b.txt
+  a0
+    | a0
+  src/backup.rs
+    | src/backup.rs
+  src/backup/cli.rs
+    | src/backup/cli.rs

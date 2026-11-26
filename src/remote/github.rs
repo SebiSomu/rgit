@@ -45,11 +45,60 @@ pub fn parse_commit_identity(line: &str) -> Option<CommitIdentity> {
     let email = content[open_bracket + 1..close_bracket].trim().to_string();
 
     let rest = content[close_bracket + 1..].trim();
-    let timestamp_str = rest.split_whitespace().next()?;
-    let secs: u64 = timestamp_str.parse().unwrap_or(0);
-    let date = format_unix_timestamp_iso8601(secs);
+    let mut fields = rest.split_whitespace();
+    let secs: u64 = fields.next()?.parse().unwrap_or(0);
+    let offset_minutes = fields.next().and_then(parse_tz_offset).unwrap_or(0);
+    let date = format_iso8601_with_offset(secs, offset_minutes);
 
     Some(CommitIdentity { name, email, date })
+}
+
+/// Parses a git time zone (`+0200`, `-0530`) into minutes east of UTC.
+// Used by `parse_commit_identity`.
+fn parse_tz_offset(tz: &str) -> Option<i64> {
+    let (sign, digits) = match tz.as_bytes().first()? {
+        b'+' => (1, &tz[1..]),
+        b'-' => (-1, &tz[1..]),
+        _ => return None,
+    };
+    if digits.len() != 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let hours: i64 = digits[..2].parse().ok()?;
+    let minutes: i64 = digits[2..].parse().ok()?;
+    Some(sign * (hours * 60 + minutes))
+}
+
+/// An ISO 8601 date in the commit's own time zone (`2026-11-26T12:24:00+02:00`, or `...Z` at
+/// UTC), so GitHub rebuilds the commit with the same zone and therefore the same hash.
+// Used by `parse_commit_identity`.
+pub fn format_iso8601_with_offset(secs: u64, offset_minutes: i64) -> String {
+    if offset_minutes == 0 {
+        return format_unix_timestamp_iso8601(secs);
+    }
+    let local = (secs as i64 + offset_minutes * 60).max(0) as u64;
+    let utc_text = format_unix_timestamp_iso8601(local);
+    let sign = if offset_minutes < 0 { '-' } else { '+' };
+    let abs = offset_minutes.abs();
+    format!("{}{}{:02}:{:02}", utc_text.trim_end_matches('Z'), sign, abs / 60, abs % 60)
+}
+
+/// Fails a push when GitHub stored a commit under a different hash than the local one: the
+/// API rebuilds commits from their parts, and anything it can't reproduce (a signature, an
+/// unusual header or tree) changes the hash. Run before any ref is updated.
+// Used by `push_to_github`.
+pub fn ensure_pushed_commit_matches(local: &str, remote: &str, branch: &str) -> Result<()> {
+    if local == remote {
+        return Ok(());
+    }
+    anyhow::bail!(
+        "fatal: GitHub stored commit {} as {}, which is a different commit hash.\n\
+         The GitHub API rebuilds each commit from its parts and could not reproduce this one exactly\n\
+         (for example a signature, an unusual header, or a tree written in the wrong order).\n\
+         Nothing was updated: '{}' on GitHub and its remote-tracking branch are unchanged.\n\
+         hint: `git push` sends the commit as it is.",
+        &local[..local.len().min(7)], &remote[..remote.len().min(7)], branch
+    )
 }
 
 /// Inspects a remote URL or remote spec to determine if it points to a GitHub repository,
@@ -217,6 +266,46 @@ pub fn upload_blob_to_github(client: &reqwest::blocking::Client, target: &GitHub
     let json: serde_json::Value = res.json()?;
     let sha = json["sha"].as_str().context("Missing sha in blob response")?.to_string();
     Ok(sha)
+}
+
+/// Marks every tree and blob reachable from `tree_hash` as already on GitHub (each tree maps
+/// to itself: GitHub stores it under the same hash). `read` returns an object's type and
+/// content. Submodule entries (gitlinks) are skipped: their commits live in another repository.
+// Used by `push_to_github`, seeded with the remote branch's tree.
+pub fn collect_known_tree_objects<R: Fn(&str) -> Result<(String, Vec<u8>)>>(
+    tree_hash: &str,
+    read: &R,
+    trees: &mut HashMap<String, String>,
+    blobs: &mut HashSet<String>,
+) -> Result<()> {
+    if trees.contains_key(tree_hash) {
+        return Ok(());
+    }
+    let (kind, content) = read(tree_hash)?;
+    if kind != "tree" {
+        anyhow::bail!("Expected tree object for hash {}, found {}", tree_hash, kind);
+    }
+    trees.insert(tree_hash.to_string(), tree_hash.to_string());
+    let mut pos = 0;
+    while pos < content.len() {
+        let space = content[pos..].iter().position(|&b| b == b' ').context("Missing mode separator in tree object")? + pos;
+        let nul = content[space..].iter().position(|&b| b == 0).context("Missing name terminator in tree object")? + space;
+        let end = nul + 21;
+        if end > content.len() {
+            anyhow::bail!("Corrupted tree object: incomplete entry hash");
+        }
+        let mode = &content[pos..space];
+        let hash = hex::encode(&content[nul + 1..end]);
+        match mode {
+            b"40000" | b"040000" => collect_known_tree_objects(&hash, read, trees, blobs)?,
+            b"160000" => {}
+            _ => {
+                blobs.insert(hash);
+            }
+        }
+        pos = end;
+    }
+    Ok(())
 }
 
 /// Recursively traverses and uploads a local tree object and its subtrees/blobs to GitHub.
@@ -836,6 +925,15 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
 
     let mut uploaded_blobs = HashSet::new();
     let mut uploaded_trees = HashMap::new();
+    // Everything under the remote branch's current tree is already on GitHub with the same
+    // hashes, so only files and folders that changed since then get uploaded.
+    if let Some(remote_hash) = &remote_commit_opt
+        && let Ok(remote_tree) = crate::core::object_store::tree_hash_of_commit(remote_hash)
+    {
+        let read = |hash: &str| crate::core::object_store::read_object(hash);
+        // A partial walk is still correct (it only lists objects GitHub has); it just saves less.
+        let _ = collect_known_tree_objects(&remote_tree, &read, &mut uploaded_trees, &mut uploaded_blobs);
+    }
     let mut commit_map: HashMap<String, String> = HashMap::new();
 
     let mut count = 0;
@@ -890,6 +988,7 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
             committer.as_ref(),
         )?;
 
+        ensure_pushed_commit_matches(commit_hash, &remote_commit_sha, dest_branch)?;
         commit_map.insert(commit_hash.clone(), remote_commit_sha);
         count += 1;
     }

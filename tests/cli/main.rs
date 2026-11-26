@@ -4,4 +4,5 @@
 
 mod harness;
 mod http_server;
+mod http_server_tests;
 mod scenarios;

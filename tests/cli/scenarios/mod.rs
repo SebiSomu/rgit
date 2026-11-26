@@ -11,6 +11,7 @@ mod maintenance;
 mod remotes;
 mod misc;
 mod oops;
+mod recover;
 mod open;
 mod undo;
 mod wip;

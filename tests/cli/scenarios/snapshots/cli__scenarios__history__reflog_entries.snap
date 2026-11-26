@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/history.rs
+assertion_line: 102
 expression: r.finish()
 ---
 $ rgit init
@@ -55,7 +56,7 @@ $ rgit reflog exists nothing
 $ rgit reset --hard HEAD~1
 HEAD is now at <H1:7> base
 $ rgit reflog -n 2
-<H1:7> HEAD@{0}: update
+<H1:7> HEAD@{0}: reset: moving to HEAD~1
 <H2:7> HEAD@{1}: checkout: moving from feature to main
 $ rgit rev-parse HEAD@{1}
 <H2>

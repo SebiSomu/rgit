@@ -201,6 +201,8 @@ pub enum Commands {
     Redo(crate::workspace::undo::cli::RedoArgs),
     /// "I just did something wrong": lists the most likely fixes; `rgit oops <n>` runs one.
     Oops(crate::workspace::oops::cli::OopsArgs),
+    /// Find lost work (commits left behind by a reset, amend, rebase or deleted branch, dropped stashes); `rgit recover <n>` brings one back.
+    Recover(crate::workspace::recover::cli::RecoverArgs),
     /// Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back.
     #[command(visible_alias = "save")]
     Wip(crate::workspace::wip::cli::WipArgs),
@@ -415,6 +417,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Undo(args) => crate::workspace::undo::cli::dispatch_undo(args)?,
         Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
         Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
+        Commands::Recover(args) => crate::workspace::recover::cli::dispatch_recover(args)?,
         Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
         Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
         Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,

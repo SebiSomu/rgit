@@ -1,0 +1,148 @@
+---
+source: tests/cli/scenarios/recover.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit recover
+No lost work: every commit in the repository is on a branch, a tag, the stash or HEAD.
+$ write a.txt (5 bytes)
+$ rgit commit -a -m 'fourth commit'
+[main <H4:7>] fourth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+$ write a.txt (5 bytes)
+$ rgit commit -a -m 'fifth commit'
+[main <H5:7>] fifth commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit reset --hard HEAD~2
+HEAD is now at <H3:7> third commit
+$ write b.txt (5 bytes)
+$ rgit commit -a -m 'fix tpyo'
+[main <H6:7>] fix tpyo
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit commit --amend -m 'fix typo'
+[main <H7:7>] fix typo
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:23:20 2023 +0000
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ rgit switch -c topic
+Switched to a new branch 'topic'
+$ write topic.txt (2 bytes)
+$ rgit add topic.txt
+Staged files to index (1 new).
+$ rgit commit -m 'topic work'
+[topic <H8:7>] topic work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 topic.txt
+$ rgit switch main
+Switched to branch 'main'
+$ rgit branch -D topic
+Deleted branch topic (was <H8:7>).
+$ rgit commit-tree HEAD^{tree} -m 'made by hand'
+<H9>
+$ rgit recover
+Lost work, newest first:
+  [1] <H9:7>  <NOW-DATE>  made by hand
+      1 commit, not on any branch and in no reflog
+  [2] <H8:7>  2023-11-14 22:27  topic work
+      1 commit, left behind by HEAD@{0}: checkout: moving from topic to main
+  [3] <H6:7>  2023-11-14 22:23  fix tpyo
+      1 commit, left behind by HEAD@{3}: commit (amend): fix typo
+  [4] <H5:7>  2023-11-14 22:21  fifth commit
+      2 commits, left behind by HEAD@{5}: reset: moving to HEAD~2
+`rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
+(`recovered-<commit>` by default), and a stash back on the stash list.
+$ rgit recover 2 topic
+Created branch 'topic' at <H8:7> (topic work): 1 commit back.
+`rgit switch topic` to work on it, or `rgit merge topic` / `rgit cherry-pick <H8:7>` to bring it into your branch.
+$ rgit log --oneline -1 topic
+<H8:7> topic work
+$ rgit recover 1
+Created branch 'recovered-<H9:7>' at <H9:7> (made by hand): 1 commit back.
+`rgit switch recovered-<H9:7>` to work on it, or `rgit merge recovered-<H9:7>` / `rgit cherry-pick <H9:7>` to bring it into your branch.
+$ rgit recover
+Lost work, newest first:
+  [1] <H6:7>  2023-11-14 22:23  fix tpyo
+      1 commit, left behind by HEAD@{3}: commit (amend): fix typo
+  [2] <H5:7>  2023-11-14 22:21  fifth commit
+      2 commits, left behind by HEAD@{5}: reset: moving to HEAD~2
+`rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
+(`recovered-<commit>` by default), and a stash back on the stash list.
+$ rgit recover <H6:8>
+Created branch 'recovered-<H6:7>' at <H6:7> (fix tpyo): 1 commit back.
+`rgit switch recovered-<H6:7>` to work on it, or `rgit merge recovered-<H6:7>` / `rgit cherry-pick <H6:7>` to bring it into your branch.
+$ rgit recover
+Lost work, newest first:
+  [1] <H5:7>  2023-11-14 22:21  fifth commit
+      2 commits, left behind by HEAD@{5}: reset: moving to HEAD~2
+`rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
+(`recovered-<commit>` by default), and a stash back on the stash list.
+$ rgit recover 9
+[stderr]
+Error: fatal: there is no lost work number 9 (`rgit recover` lists 1)
+[exit 1]
+$ rgit recover ffffffff
+[stderr]
+Error: fatal: 'ffffffff' is not in the list of lost work (`rgit recover` lists it by number)
+[exit 1]
+$ rgit recover 1 topic
+[stderr]
+Error: fatal: a branch named 'topic' already exists
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+  refs/heads/recovered-<H6:7> <H6>
+  refs/heads/recovered-<H9:7> <H9>
+  refs/heads/topic <H8>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H10> 0	a.txt
+  100644 <H11> 0	b.txt
+  100644 <H12> 0	src/lib.txt
+HEAD commit:
+  tree <H13>
+  parent <H3>
+  author Test Author <author@example.com> 1700000600 +0000
+  committer Test Committer <committer@example.com> 1700000660 +0000
+  
+  fix typo
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | typo
+  src/lib.txt
+    | lib v2

@@ -125,6 +125,8 @@ pub fn reset(commit: Option<String>, soft: bool, _mixed: bool, hard: bool, paths
 
     let source = commit.as_deref().unwrap_or("HEAD");
     let target_commit = resolve_commit_from_source(source)?;
+    // The reflog line git writes: `reset: moving to <what was given>`.
+    crate::core::reflog::set_reflog_action(&format!("reset: moving to {}", source));
 
     let head_state = refs::resolve_head()?;
     let old_head_commit = refs::resolve_head_commit()?;

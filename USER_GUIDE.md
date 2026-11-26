@@ -283,6 +283,7 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 | [`undo`](#rgit-undo) | Undo the last rgit operation: commit, merge, reset --hard, rebase, ... (rgit only). |
 | [`redo`](#rgit-redo) | Bring back the operation most recently undone (rgit only). |
 | [`oops`](#rgit-oops) | "I just did something wrong": the most likely fixes, ready to run (rgit only). |
+| [`recover`](#rgit-recover) | Find lost work and bring it back (rgit only). |
 | [`wip`](#rgit-wip) | Save everything uncommitted on a hidden per-branch ref and clean the tree; `--restore` brings it back (rgit only). |
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
@@ -2101,6 +2102,61 @@ $ rgit oops 2
 Fix 2: Bring back the deleted branch 'topic' (it was at 8e2f1a4 "topic work")
 $ rgit branch topic 8e2f1a4c03b7
 Done. `rgit undo` takes it back.
+```
+
+
+### `rgit recover`
+
+Find lost work and bring it back (rgit only).
+
+**Syntax:** `rgit recover [<number> | <commit>] [<branch>]`
+
+Lists every piece of lost work in the repository, newest first: commits that nothing keeps any more. Something is kept when a branch, tag, remote-tracking ref, HEAD, the index, the stash list or an operation in progress reaches it. A reflog alone doesn't count, because reflogs expire, and neither does `ORIG_HEAD`. Each piece is the newest commit of a lost line, shown once with how many commits come back with it and how it got lost:
+
+- **left behind**: a reset, an amend, a rebase or a branch switch moved away from it. The reflog line that did so is quoted (`HEAD@{5}: reset: moving to HEAD~2`).
+- **stash that was dropped or popped**: a stash or `rgit wip` save no longer on the list.
+- **not on any branch and in no reflog**: a commit nothing ever pointed at, or whose reflog is gone (a branch deleted with real git, an expired reflog, a commit made with `commit-tree`).
+
+`rgit recover <number>` (or a commit prefix from the list) brings one back. A commit gets a branch, `<branch>` or `recovered-<commit>` by default. A stash goes back on the stash list as `stash@{0}`, unless a `<branch>` is given. Nothing is overwritten, and `rgit undo` takes a recover back.
+
+`rgit oops` suggests a fix for the mistake you just made; `recover` is the full list, however long ago the work got lost (until `gc` prunes it).
+
+<details>
+<summary>Options as printed by <code>rgit recover -h</code></summary>
+
+```text
+Find lost work (commits left behind by a reset, amend, rebase or deleted branch, dropped stashes); `rgit recover <n>` brings one back
+
+Usage: rgit recover [PICK] [BRANCH]
+
+Arguments:
+  [PICK]    The number `rgit recover` listed (or the commit) to bring back
+  [BRANCH]  Name of the branch to create (default: recovered-<commit>)
+
+Options:
+  -h, --help  Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit reset --hard HEAD~2
+$ rgit recover
+Lost work, newest first:
+  [1] 7c41d09  2026-11-26 21:40  On main: parser idea
+      stash that was dropped or popped
+  [2] 3f2a1bc  2026-11-26 21:31  fifth commit
+      2 commits, left behind by HEAD@{0}: reset: moving to HEAD~2
+`rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
+(`recovered-<commit>` by default), and a stash back on the stash list.
+$ rgit recover 2
+Created branch 'recovered-3f2a1bc' at 3f2a1bc (fifth commit): 2 commits back.
+`rgit switch recovered-3f2a1bc` to work on it, or `rgit merge recovered-3f2a1bc` / `rgit cherry-pick 3f2a1bc` to bring it into your branch.
+$ rgit recover 1
+Restored stash@{0}: On main: parser idea
+`rgit stash show -p` shows it, `rgit stash pop` applies it.
 ```
 
 
@@ -5634,6 +5690,7 @@ rgit absorb                            # let rgit pick the commit for each stage
 rgit split <commit>                    # cut one commit into several, hunk by hunk
 rgit move-commit <commit> other        # committed on the wrong branch? move it (-c copies)
 rgit oops                              # after a mistake: the most likely fixes
+rgit recover                           # everything lost (reset, amend, dropped stash, ...); `recover <n>` brings one back
 ```
 
 ## Open a pull request

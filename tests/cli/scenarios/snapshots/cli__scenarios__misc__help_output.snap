@@ -1,60 +1,62 @@
 ---
 source: tests/cli/scenarios/misc.rs
+assertion_line: 54
 expression: r.finish()
 ---
 $ rgit help
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              fsck                remote
-   add                 fsck-objects        repack
-   am                  gc                  replace
-   annotate            get-tar-commit-id   replay
-   apply               grep                repo
-   archive             hash-object         request-pull
-   backup              help                rerere
-   banana-split        hook                reset
-   bingo               hotspots            restore
-   bisect              ignore              rev-list
-   blame               index-pack          rev-parse
-   branch              init                revert
-   bundle              init-db             rm
-   cat-file            interpret-trailers  save
-   changelog           last-modified       secrets
-   check-ignore        log                 shortlog
-   check-mailmap       ls-files            show
-   check-ref-format    ls-remote           show-branch
-   checkout            ls-tree             show-index
-   checkout-index      mailinfo            show-ref
-   cherry              mailsplit           sparse-checkout
-   cherry-pick         maintenance         split
-   clean               merge               stage
-   clone               merge-base          stash
-   column              merge-file          stats
-   commit              merge-tree          status
-   commit-graph        mktag               story
-   commit-tree         mktree              stripspace
-   compare             move-commit         submodule
-   config              multi-pack-index    switch
-   conflicts           mv                  symbolic-ref
-   contributors        name-rev            sync
-   count-objects       notes               tag
-   credential          oops                timeline
-   credential-store    open                tip
-   describe            pack-objects        undo
-   diff                pack-refs           unpack-file
-   diff-files          patch-id            unpack-objects
-   diff-index          pr-summary          update-index
-   diff-tree           prune               update-ref
-   doctor              prune-packed        var
-   fast-export         pull                verify-pack
-   fast-import         push                version
-   fetch               range-diff          whatchanged
-   fixup               read-tree           whereami
-   fmt-merge-msg       rebase              wip
-   for-each-ref        redo                worktree
-   for-each-repo       reflog              write-tree
-   format-patch        refs                zen
+   absorb              fsck-objects        repack
+   add                 gc                  replace
+   am                  get-tar-commit-id   replay
+   annotate            grep                repo
+   apply               hash-object         request-pull
+   archive             help                rerere
+   backup              hook                reset
+   banana-split        hotspots            restore
+   bingo               ignore              rev-list
+   bisect              index-pack          rev-parse
+   blame               init                revert
+   branch              init-db             rm
+   bundle              interpret-trailers  save
+   cat-file            last-modified       secrets
+   changelog           log                 shortlog
+   check-ignore        ls-files            show
+   check-mailmap       ls-remote           show-branch
+   check-ref-format    ls-tree             show-index
+   checkout            mailinfo            show-ref
+   checkout-index      mailsplit           sparse-checkout
+   cherry              maintenance         split
+   cherry-pick         merge               stage
+   clean               merge-base          stash
+   clone               merge-file          stats
+   column              merge-tree          status
+   commit              mktag               story
+   commit-graph        mktree              stripspace
+   commit-tree         move-commit         submodule
+   compare             multi-pack-index    switch
+   config              mv                  symbolic-ref
+   conflicts           name-rev            sync
+   contributors        notes               tag
+   count-objects       oops                timeline
+   credential          open                tip
+   credential-store    pack-objects        undo
+   describe            pack-refs           unpack-file
+   diff                patch-id            unpack-objects
+   diff-files          pr-summary          update-index
+   diff-index          prune               update-ref
+   diff-tree           prune-packed        var
+   doctor              pull                verify-pack
+   fast-export         push                version
+   fast-import         range-diff          whatchanged
+   fetch               read-tree           whereami
+   fixup               rebase              wip
+   fmt-merge-msg       recover             worktree
+   for-each-ref        redo                write-tree
+   for-each-repo       reflog              zen
+   format-patch        refs
+   fsck                remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit help commit
@@ -117,55 +119,56 @@ $ rgit help -a
 usage: rgit <command> [<args>]
 
 Available commands:
-   absorb              fsck                remote
-   add                 fsck-objects        repack
-   am                  gc                  replace
-   annotate            get-tar-commit-id   replay
-   apply               grep                repo
-   archive             hash-object         request-pull
-   backup              help                rerere
-   banana-split        hook                reset
-   bingo               hotspots            restore
-   bisect              ignore              rev-list
-   blame               index-pack          rev-parse
-   branch              init                revert
-   bundle              init-db             rm
-   cat-file            interpret-trailers  save
-   changelog           last-modified       secrets
-   check-ignore        log                 shortlog
-   check-mailmap       ls-files            show
-   check-ref-format    ls-remote           show-branch
-   checkout            ls-tree             show-index
-   checkout-index      mailinfo            show-ref
-   cherry              mailsplit           sparse-checkout
-   cherry-pick         maintenance         split
-   clean               merge               stage
-   clone               merge-base          stash
-   column              merge-file          stats
-   commit              merge-tree          status
-   commit-graph        mktag               story
-   commit-tree         mktree              stripspace
-   compare             move-commit         submodule
-   config              multi-pack-index    switch
-   conflicts           mv                  symbolic-ref
-   contributors        name-rev            sync
-   count-objects       notes               tag
-   credential          oops                timeline
-   credential-store    open                tip
-   describe            pack-objects        undo
-   diff                pack-refs           unpack-file
-   diff-files          patch-id            unpack-objects
-   diff-index          pr-summary          update-index
-   diff-tree           prune               update-ref
-   doctor              prune-packed        var
-   fast-export         pull                verify-pack
-   fast-import         push                version
-   fetch               range-diff          whatchanged
-   fixup               read-tree           whereami
-   fmt-merge-msg       rebase              wip
-   for-each-ref        redo                worktree
-   for-each-repo       reflog              write-tree
-   format-patch        refs                zen
+   absorb              fsck-objects        repack
+   add                 gc                  replace
+   am                  get-tar-commit-id   replay
+   annotate            grep                repo
+   apply               hash-object         request-pull
+   archive             help                rerere
+   backup              hook                reset
+   banana-split        hotspots            restore
+   bingo               ignore              rev-list
+   bisect              index-pack          rev-parse
+   blame               init                revert
+   branch              init-db             rm
+   bundle              interpret-trailers  save
+   cat-file            last-modified       secrets
+   changelog           log                 shortlog
+   check-ignore        ls-files            show
+   check-mailmap       ls-remote           show-branch
+   check-ref-format    ls-tree             show-index
+   checkout            mailinfo            show-ref
+   checkout-index      mailsplit           sparse-checkout
+   cherry              maintenance         split
+   cherry-pick         merge               stage
+   clean               merge-base          stash
+   clone               merge-file          stats
+   column              merge-tree          status
+   commit              mktag               story
+   commit-graph        mktree              stripspace
+   commit-tree         move-commit         submodule
+   compare             multi-pack-index    switch
+   config              mv                  symbolic-ref
+   conflicts           name-rev            sync
+   contributors        notes               tag
+   count-objects       oops                timeline
+   credential          open                tip
+   credential-store    pack-objects        undo
+   describe            pack-refs           unpack-file
+   diff                patch-id            unpack-objects
+   diff-files          pr-summary          update-index
+   diff-index          prune               update-ref
+   diff-tree           prune-packed        var
+   doctor              pull                verify-pack
+   fast-export         push                version
+   fast-import         range-diff          whatchanged
+   fetch               read-tree           whereami
+   fixup               rebase              wip
+   fmt-merge-msg       recover             worktree
+   for-each-ref        redo                write-tree
+   for-each-repo       reflog              zen
+   format-patch        refs
+   fsck                remote
 
 See 'rgit help <command>' for the options of a command.
 $ rgit --help
@@ -289,6 +292,7 @@ Commands:
   undo                Undo the last rgit operation (commit, merge, reset --hard, rebase, ...); `--list` shows the log
   redo                Bring back the operation most recently undone
   oops                "I just did something wrong": lists the most likely fixes; `rgit oops <n>` runs one
+  recover             Find lost work (commits left behind by a reset, amend, rebase or deleted branch, dropped stashes); `rgit recover <n>` brings one back
   wip                 Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back [alias: save]
   fixup               Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top
   sync                Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push)

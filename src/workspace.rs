@@ -14,6 +14,7 @@ pub mod oops;
 pub mod ls_files;
 pub mod patch;
 pub mod read_tree;
+pub mod recover;
 pub mod reset;
 pub mod restore;
 pub mod secrets;

@@ -12,7 +12,7 @@ It started as a way to learn how version control works inside, and it has grown 
 
 ## Highlights
 
-- **148 commands** (`rgit help -a`), from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
+- **149 commands** (`rgit help -a`), from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
 - **Git-compatible storage.** Zlib objects, SHA-1 ids, index v2/v3, packfiles with offset and ref deltas, `packed-refs`, reflogs, `.git` worktree files.
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
 - **Remote transports.** Local paths, bundles, and any HTTPS git server (GitHub included) over git's own smart-HTTP protocol, with logins from git's credential helpers or a GitHub token.

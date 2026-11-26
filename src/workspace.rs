@@ -19,6 +19,7 @@ pub mod reset;
 pub mod restore;
 pub mod secrets;
 pub mod sparse_checkout;
+pub mod squash;
 pub mod staging;
 pub mod stash;
 pub mod state_files;

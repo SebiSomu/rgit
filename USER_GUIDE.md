@@ -288,6 +288,7 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 | [`fixup`](#rgit-fixup) | Fold the staged changes into an earlier commit and rewrite the commits on top, in one step (rgit only). |
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
+| [`squash`](#rgit-squash) | Fold the last N commits into one, with their messages combined to edit (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
@@ -2374,6 +2375,63 @@ Split 8c41d2e into 3 commits:
   a91f4c2 mixed bag (part 2)
   0d6e8b1 mixed bag
 Rewrote the commit on top; the files are unchanged.
+```
+
+
+### `rgit squash`
+
+Fold the last N commits into one (rgit only).
+
+**Syntax:** `rgit squash <n> [-m <message> | --no-edit] [-f]`
+
+`rgit squash 3` replaces HEAD and the two commits before it with one commit, without writing an interactive rebase todo. The new commit has HEAD's files, sits where the oldest of the three was (with its parent), and keeps the oldest one's author and date.
+
+Its message:
+
+- **By default** your editor opens on git's squash template: every message, oldest first, under a `# This is the commit message #n:` header. `fixup!` messages (after the first commit) are commented out, as `rebase --autosquash` would drop them. Lines starting with `#` are removed, and an empty message cancels the squash.
+- **`-m <message>`** uses that message instead.
+- **`--no-edit`** keeps the messages as they are, joined by a blank line, without the `fixup!` ones.
+
+The staged changes and the working tree are not touched: anything staged stays staged and is not part of the squash. `squash` refuses merge commits in the range, an operation in progress, and commits that a remote-tracking branch already has (`-f` squashes them anyway; then `rgit push --force`). `rgit undo` takes a squash back.
+
+<details>
+<summary>Options as printed by <code>rgit squash -h</code></summary>
+
+```text
+Fold the last N commits into one, with their messages combined to edit
+
+Usage: rgit squash [OPTIONS] <COUNT>
+
+Arguments:
+  <COUNT>  How many commits to fold together, counting HEAD (2 or more)
+
+Options:
+  -m, --message <MESSAGE>  Use this message instead of opening the editor
+      --no-edit            Keep the commits' messages, joined, without opening the editor
+  -f, --force              Squash even if some of the commits are already pushed
+  -h, --help               Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit log --oneline -4
+6d1e2f0 Parse strings
+5c4b3a2 fixup! Add parser
+4f3e2d1 Add parser
+3a2b1c0 third commit
+$ rgit squash 3 --no-edit
+[main 7e8f9a0] Add parser
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:20:20 2023 +0000
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+ create mode 100644 parser.txt
+Squashed 3 commits (4f3e2d1..6d1e2f0) into 7e8f9a0. `rgit undo` takes it back.
+$ rgit log --oneline -2
+7e8f9a0 Add parser
+3a2b1c0 third commit
 ```
 
 
@@ -5688,6 +5746,7 @@ rgit hotspots                          # files that change most, and change toge
 rgit fixup <commit>                    # fold the staged fix into an earlier commit
 rgit absorb                            # let rgit pick the commit for each staged hunk
 rgit split <commit>                    # cut one commit into several, hunk by hunk
+rgit squash 3                          # fold the last 3 commits into one
 rgit move-commit <commit> other        # committed on the wrong branch? move it (-c copies)
 rgit oops                              # after a mistake: the most likely fixes
 rgit recover                           # everything lost (reset, amend, dropped stash, ...); `recover <n>` brings one back

@@ -203,6 +203,8 @@ pub enum Commands {
     Oops(crate::workspace::oops::cli::OopsArgs),
     /// Find lost work (commits left behind by a reset, amend, rebase or deleted branch, dropped stashes); `rgit recover <n>` brings one back.
     Recover(crate::workspace::recover::cli::RecoverArgs),
+    /// Fold the last N commits into one, with their messages combined to edit.
+    Squash(crate::workspace::squash::cli::SquashArgs),
     /// Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back.
     #[command(visible_alias = "save")]
     Wip(crate::workspace::wip::cli::WipArgs),
@@ -418,6 +420,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Redo(args) => crate::workspace::undo::cli::dispatch_redo(args)?,
         Commands::Oops(args) => crate::workspace::oops::cli::dispatch_oops(args)?,
         Commands::Recover(args) => crate::workspace::recover::cli::dispatch_recover(args)?,
+        Commands::Squash(args) => crate::workspace::squash::cli::dispatch_squash(args)?,
         Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
         Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
         Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,

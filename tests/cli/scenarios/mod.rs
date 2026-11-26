@@ -28,6 +28,7 @@ mod ignore;
 mod move_commit;
 mod secrets;
 mod split;
+mod squash;
 mod stats;
 mod story;
 mod timeline;

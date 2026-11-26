@@ -1,0 +1,91 @@
+---
+source: tests/cli/scenarios/squash.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit squash 1
+[stderr]
+fatal: squashing needs at least 2 commits (`rgit squash 2` folds HEAD into the commit before it)
+[exit 128]
+$ rgit squash 9
+[stderr]
+fatal: there are only 3 commits on this branch (`rgit squash 3` folds them all)
+[exit 128]
+$ rgit squash 2 -m ''
+[stderr]
+Aborting squash due to empty commit message; nothing changed.
+[exit 1]
+$ rgit log --oneline -1
+<H3:7> third commit
+$ rgit update-ref refs/remotes/origin/main HEAD~1
+$ rgit squash 2 --no-edit
+[stderr]
+fatal: <H2:7> "second commit" is already pushed (origin/main has it); squashing it would make the branches diverge
+hint: pass --force to squash anyway (you'll need `rgit push --force` afterwards)
+[exit 128]
+$ rgit squash 2 --no-edit --force
+[main <H4:7>] second commit
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:16:20 2023 +0000
+ 3 files changed, 3 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+Squashed 2 commits (<H2:7>..<H3:7>) into <H4:7>. `rgit undo` takes it back.
+$ rgit log --oneline
+<H4:7> second commit
+<H1:7> first commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H4>
+  refs/remotes/origin/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H1>
+  author Test Author <author@example.com> 1700000180 +0000
+  committer Test Committer <committer@example.com> 1700000720 +0000
+  
+  second commit
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

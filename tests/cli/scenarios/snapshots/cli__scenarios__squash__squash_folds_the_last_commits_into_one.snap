@@ -1,0 +1,146 @@
+---
+source: tests/cli/scenarios/squash.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ export RGIT_EDITOR=/home/claude/rgit10/target/debug/rgit ls-files
+$ write parser.txt (8 bytes)
+$ rgit add parser.txt
+Staged files to index (1 new).
+$ rgit commit -m 'Add parser' -m 'Handles numbers.'
+[main <H4:7>] Add parser
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 parser.txt
+$ write parser.txt (8 bytes)
+$ write a.txt (6 bytes)
+$ rgit commit -a -m 'fixup! Add parser'
+[main <H5:7>] fixup! Add parser
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+$ write parser.txt (16 bytes)
+$ rgit commit -a -m 'Parse strings'
+[main <H6:7>] Parse strings
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write b.txt (7 bytes)
+$ rgit add b.txt
+Staged files to index (1 modified).
+$ rgit squash 3
+[main <H7:7>] Add parser
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:20:20 2023 +0000
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+ create mode 100644 parser.txt
+Squashed 3 commits (<H4:7>..<H6:7>) into <H7:7>. `rgit undo` takes it back.
+$ rgit log --oneline
+<H7:7> Add parser
+<H3:7> third commit
+<H2:7> second commit
+<H1:7> first commit
+$ rgit log -1
+commit <H7>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:20:20 2023 +0000
+
+    Add parser
+    
+    Handles numbers.
+    
+    Parse strings
+$ rgit status --short
+M  b.txt
+$ rgit undo
+Undoing #11: rgit squash 3  (just now)
+  - branch 'main': <H7:7> -> <H6:7> "Parse strings"
+Done. `rgit redo` brings it back.
+$ rgit log --oneline -4
+<H6:7> Parse strings
+<H5:7> fixup! Add parser
+<H4:7> Add parser
+<H3:7> third commit
+$ rgit squash 2 -m 'Parse strings, after the fix'
+[main <H8:7>] Parse strings, after the fix
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:21:20 2023 +0000
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+Squashed 2 commits (<H5:7>..<H6:7>) into <H8:7>. `rgit undo` takes it back.
+$ rgit log --oneline -3
+<H8:7> Parse strings, after the fix
+<H4:7> Add parser
+<H3:7> third commit
+$ rgit squash 2 --no-edit
+[main <H9:7>] Add parser
+ Author: Test Author <author@example.com>
+ Date: Tue Nov 14 22:20:20 2023 +0000
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+ create mode 100644 parser.txt
+Squashed 2 commits (<H4:7>..<H8:7>) into <H9:7>. `rgit undo` takes it back.
+$ rgit log -1
+commit <H9>
+Author: Test Author <author@example.com>
+Date:   Tue Nov 14 22:20:20 2023 +0000
+
+    Add parser
+    
+    Handles numbers.
+    
+    Parse strings, after the fix
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H9>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H10> 0	a.txt
+  100644 <H11> 0	b.txt
+  100644 <H12> 0	parser.txt
+  100644 <H13> 0	src/lib.txt
+HEAD commit:
+  tree <H14>
+  parent <H3>
+  author Test Author <author@example.com> 1700000420 +0000
+  committer Test Committer <committer@example.com> 1700001140 +0000
+  
+  Add parser
+  
+  Handles numbers.
+  
+  Parse strings, after the fix
+worktree:
+  a.txt
+    | fixed
+  b.txt
+    | staged
+  parser.txt
+    | numbers
+    | strings
+  src/lib.txt
+    | lib v2

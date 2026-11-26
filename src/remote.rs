@@ -5,6 +5,7 @@ pub mod credential;
 pub mod fetch;
 pub mod github;
 pub mod open;
+pub mod pktline;
 pub mod pr_summary;
 pub mod pull;
 pub mod push;

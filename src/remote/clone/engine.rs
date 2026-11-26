@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use crate::workspace::checkout::{sync_working_tree, update_index_from_tree};
-use crate::remote::bundle::engine::{bundle_head_branch, is_bundle_file, read_bundle};
+use crate::remote::bundle::engine::{bundle_head_branch, read_bundle};
 use crate::remote::fetch::engine::read_remote_head;
 use crate::remote::github::{build_github_client, get_github_default_branch, parse_github_remote, resolve_github_token};
-use crate::remote::push::engine::resolve_remote_repo_path;
+use crate::remote::transport::{resolve_remote, types::Transport};
 use crate::core::commit::resolve_tree_from_source;
 use crate::remote::types::GitHubTarget;
 use crate::remote::clone::types::CloneSource;
@@ -26,11 +26,12 @@ pub fn classify_clone_source(spec: &str) -> Result<CloneSource> {
     if as_path.exists() {
         let absolute = std::path::absolute(as_path)
             .with_context(|| format!("Cannot resolve path '{}'", spec))?;
-        if is_bundle_file(&absolute) {
-            return Ok(CloneSource::Bundle { path: absolute });
-        }
-        let git_dir = resolve_remote_repo_path(&absolute.to_string_lossy())?;
-        return Ok(CloneSource::Local { path: absolute, git_dir });
+        return Ok(match resolve_remote(&absolute.to_string_lossy())?.transport {
+            Transport::Bundle { .. } => CloneSource::Bundle { path: absolute },
+            Transport::Local { git_dir } => CloneSource::Local { path: absolute, git_dir },
+            // An existing path is never classified as GitHub.
+            Transport::GitHubApi { owner, repo } => CloneSource::GitHub { owner, repo },
+        });
     }
 
     if let Some((owner, repo)) = parse_github_remote(spec) {

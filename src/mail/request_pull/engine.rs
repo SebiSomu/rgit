@@ -5,10 +5,10 @@ use crate::core::config::get_config_value;
 use crate::remote::fetch::engine::read_object_from_path;
 use crate::core::commit::{parse_commit_object, split_commit_message};
 use crate::diff::hunks::diff_tree_file;
-use crate::remote::github::{build_github_client, get_github_default_branch, list_github_refs, parse_github_remote, resolve_github_token};
+use crate::remote::github::{build_github_client, get_github_default_branch, list_github_refs, resolve_github_token};
+use crate::remote::transport::{not_a_repository, resolve_remote, types::Transport};
 use crate::mail::mailmap::map_user;
 use crate::core::object_store::{flatten_tree, read_object};
-use crate::remote::push::engine::resolve_remote_repo_path;
 use crate::core::refs::list_all_refs;
 use crate::history::rev_list::engine::run_rev_list_walk;
 use crate::core::rev_parse::resolve_rev;
@@ -88,23 +88,24 @@ pub fn remote_display_url(url: &str) -> String {
 /// with one) and GitHub, where only branches are listed.
 // Used by `request-pull`.
 pub fn list_remote_refs_for_pull(url: &str) -> anyhow::Result<Vec<(String, String)>> {
-    let configured = get_config_value(&format!("remote.{}.url", url)).ok().flatten();
-    if let Some((owner, repo)) = configured.as_deref().and_then(parse_github_remote).or_else(|| parse_github_remote(url)) {
-        let target = GitHubTarget { owner, repo, token: resolve_github_token(url)? };
-        let client = build_github_client(&target.token)?;
-        let branches = list_github_refs(&client, &target)?;
-        let mut refs = Vec::new();
-        if let Ok(default_branch) = get_github_default_branch(&client, &target) {
-            if let Some((_, hash)) = branches.iter().find(|(name, _)| *name == default_branch) {
-                refs.push((hash.clone(), "HEAD".to_string()));
+    let git_dir = match resolve_remote(url)?.transport {
+        Transport::GitHubApi { owner, repo } => {
+            let target = GitHubTarget { owner, repo, token: resolve_github_token(url)? };
+            let client = build_github_client(&target.token)?;
+            let branches = list_github_refs(&client, &target)?;
+            let mut refs = Vec::new();
+            if let Ok(default_branch) = get_github_default_branch(&client, &target) {
+                if let Some((_, hash)) = branches.iter().find(|(name, _)| *name == default_branch) {
+                    refs.push((hash.clone(), "HEAD".to_string()));
+                }
             }
+            let sorted: BTreeMap<String, String> = branches.into_iter().map(|(name, hash)| (format!("refs/heads/{}", name), hash)).collect();
+            refs.extend(sorted.into_iter().map(|(name, hash)| (hash, name)));
+            return Ok(refs);
         }
-        let sorted: BTreeMap<String, String> = branches.into_iter().map(|(name, hash)| (format!("refs/heads/{}", name), hash)).collect();
-        refs.extend(sorted.into_iter().map(|(name, hash)| (hash, name)));
-        return Ok(refs);
-    }
-
-    let git_dir = resolve_remote_repo_path(url)?;
+        Transport::Bundle { path } => return Err(not_a_repository(&path)),
+        Transport::Local { git_dir } => git_dir,
+    };
     let mut by_name: BTreeMap<String, String> = BTreeMap::new();
     let mut peeled: BTreeMap<String, String> = BTreeMap::new();
     if let Ok(packed) = fs::read_to_string(git_dir.join("packed-refs")) {

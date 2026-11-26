@@ -12,4 +12,5 @@ pub mod push;
 #[allow(clippy::module_inception)]
 pub mod remote;
 pub mod sync;
+pub mod transport;
 pub mod types;

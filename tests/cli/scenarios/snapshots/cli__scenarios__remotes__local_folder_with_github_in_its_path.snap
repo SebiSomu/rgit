@@ -1,0 +1,100 @@
+---
+source: tests/cli/scenarios/remotes.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+(..) $ rgit clone repo repo/github.com/me/lib
+Cloning into 'repo/github.com/me/lib'...
+From <REPO>
+ * [new branch]      main                 -> origin/main
+Receiving objects: 100% (13/13), done.
+$ write github.com/me/lib/new.txt (4 bytes)
+(github.com/me/lib) $ rgit add new.txt
+Staged files to index (1 new).
+(github.com/me/lib) $ rgit commit -m 'in lib'
+[main <H4:7>] in lib
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 new.txt
+$ rgit fetch github.com/me/lib
+From github.com/me/lib/.git
+ * [new branch]      main                 -> github.com/me/lib/main
+Receiving objects: 100% (3/3), done.
+$ rgit log --oneline -1 github.com/me/lib/main
+<H4:7> in lib
+$ rgit push github.com/me/lib main:from-outer
+Enumerating objects: 0, done.
+To github.com/me/lib/.git
+ * [new branch]      main -> from-outer
+(github.com/me/lib) $ rgit branch
+  from-outer
+* main
+$ rgit fetch ./no/such/place
+[stderr]
+Error: fatal: './no/such/place' does not appear to be a git repository
+fatal: Could not read from remote repository.
+[exit 1]
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+  refs/remotes/github.com/me/lib/HEAD ref: refs/remotes/github.com/me/lib/main
+  refs/remotes/github.com/me/lib/main <H4>
+git-dir entries:
+  COMMIT_EDITMSG FETCH_HEAD
+index (ls-files -s):
+  100644 <H5> 0	a.txt
+  100644 <H6> 0	b.txt
+  100644 <H7> 0	src/lib.txt
+HEAD commit:
+  tree <H8>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  github.com/me/lib/a.txt
+    | one
+    | two
+  github.com/me/lib/b.txt
+    | bee
+  github.com/me/lib/new.txt
+    | new
+  github.com/me/lib/src/lib.txt
+    | lib v2
+  src/lib.txt
+    | lib v2

@@ -3,14 +3,14 @@ pub mod engine;
 pub mod types;
 
 use anyhow::Result;
-use crate::remote::github::{parse_github_remote, push_to_github, resolve_github_token};
+use crate::remote::github::{push_to_github, resolve_github_token};
+use crate::remote::transport::{not_a_repository, resolve_remote, types::Transport};
 use crate::remote::push::engine::{
     collect_missing_objects,
     copy_object_to_remote,
     delete_remote_ref,
     delete_remote_tracking_ref,
     read_remote_ref,
-    resolve_remote_repo_path,
     set_upstream_branch,
     write_remote_ref,
     write_remote_tracking_ref,
@@ -41,79 +41,69 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
         }
     };
 
-    let configured_url = crate::core::config::get_config_value(&format!("remote.{}.url", remote_name))?;
+    let remote = resolve_remote(&remote_name)?;
+    let remote_display = remote.display();
+    let remote_git_dir = match remote.transport {
+        Transport::GitHubApi { owner, repo } => {
+            let token = resolve_github_token(&remote_name)?;
+            let target = GitHubTarget { owner, repo, token };
 
-    // Check if the target remote points to a GitHub repository
-    let github_info = configured_url
-        .as_deref()
-        .and_then(parse_github_remote)
-        .or_else(|| parse_github_remote(&remote_name));
-
-    if let Some((owner, repo)) = github_info {
-        let remote_display = configured_url.unwrap_or_else(|| format!("https://github.com/{}/{}", owner, repo));
-        let token = resolve_github_token(&remote_name)?;
-        let target = GitHubTarget { owner, repo, token };
-
-        let (src_name, dest_branch) = match refspec {
-            Some(spec) => {
-                if let Some((src, dest)) = spec.split_once(':') {
-                    (src.to_string(), dest.to_string())
-                } else {
-                    (spec.clone(), spec)
+            let (src_name, dest_branch) = match refspec {
+                Some(spec) => {
+                    if let Some((src, dest)) = spec.split_once(':') {
+                        (src.to_string(), dest.to_string())
+                    } else {
+                        (spec.clone(), spec)
+                    }
                 }
-            }
-            None => {
-                match current_branch_opt.clone() {
-                    Some(b) => (b.clone(), b),
-                    None => {
-                        anyhow::bail!(
-                            "fatal: You are not currently on a branch. To push the history leading to the current (detached HEAD) state now, use\n\n    rgit push {} HEAD:<name-of-remote-branch>",
-                            remote_name
+                None => {
+                    match current_branch_opt.clone() {
+                        Some(b) => (b.clone(), b),
+                        None => {
+                            anyhow::bail!(
+                                "fatal: You are not currently on a branch. To push the history leading to the current (detached HEAD) state now, use\n\n    rgit push {} HEAD:<name-of-remote-branch>",
+                                remote_name
+                            );
+                        }
+                    }
+                }
+            };
+
+            let local_commit_hash = if src_name.is_empty() {
+                None
+            } else if src_name == "HEAD" {
+                Some(refs::resolve_head_commit()?.ok_or_else(|| anyhow::anyhow!("error: HEAD has no commits yet"))?)
+            } else {
+                Some(resolve_commit_from_source(&src_name)
+                    .map_err(|_| anyhow::anyhow!("error: src refspec '{}' does not match any", src_name))?)
+            };
+
+            push_to_github(
+                &target,
+                &remote_name,
+                &remote_display,
+                &src_name,
+                &dest_branch,
+                local_commit_hash.as_deref(),
+                force,
+            )?;
+
+            if set_upstream {
+                if let Some(ref local_branch) = current_branch_opt {
+                    if &src_name == local_branch || src_name == "HEAD" {
+                        set_upstream_branch(local_branch, &remote_name, &dest_branch)?;
+                        println!(
+                            "branch '{}' set up to track '{}/{}'.",
+                            local_branch, remote_name, dest_branch
                         );
                     }
                 }
             }
-        };
 
-        let local_commit_hash = if src_name.is_empty() {
-            None
-        } else if src_name == "HEAD" {
-            Some(refs::resolve_head_commit()?.ok_or_else(|| anyhow::anyhow!("error: HEAD has no commits yet"))?)
-        } else {
-            Some(resolve_commit_from_source(&src_name)
-                .map_err(|_| anyhow::anyhow!("error: src refspec '{}' does not match any", src_name))?)
-        };
-
-        push_to_github(
-            &target,
-            &remote_name,
-            &remote_display,
-            &src_name,
-            &dest_branch,
-            local_commit_hash.as_deref(),
-            force,
-        )?;
-
-        if set_upstream {
-            if let Some(ref local_branch) = current_branch_opt {
-                if &src_name == local_branch || src_name == "HEAD" {
-                    set_upstream_branch(local_branch, &remote_name, &dest_branch)?;
-                    println!(
-                        "branch '{}' set up to track '{}/{}'.",
-                        local_branch, remote_name, dest_branch
-                    );
-                }
-            }
+            return Ok(());
         }
-
-        return Ok(());
-    }
-
-    let remote_git_dir = resolve_remote_repo_path(&remote_name)?;
-    let remote_display = if let Some(url) = configured_url {
-        url
-    } else {
-        remote_git_dir.display().to_string()
+        Transport::Bundle { path } => return Err(not_a_repository(&path)),
+        Transport::Local { git_dir } => git_dir,
     };
 
     let (src_name, dest_branch) = match refspec {

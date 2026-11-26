@@ -1,0 +1,43 @@
+//! Picking the transport for a remote: one place that turns a remote name, path or URL into
+//! a `Transport`, so `fetch`, `push`, `clone` and `request-pull` agree on how to reach it.
+
+pub mod types;
+
+use std::path::Path;
+use anyhow::Result;
+
+use crate::remote::bundle::engine::is_bundle_file;
+use crate::remote::github::parse_github_remote;
+use crate::remote::push::engine::resolve_remote_repo_path;
+use crate::remote::transport::types::{Remote, Transport};
+
+/// Resolves a remote given as a configured name (`origin`), a path or a URL. The URL is
+/// `remote.<spec>.url` when configured, else `spec` itself. A path that exists on disk is a
+/// bundle (by its signature) or a repository; anything else GitHub recognizes is a GitHub
+/// repository; the rest fails with the usual "does not appear to be a git repository" errors.
+// Used by `fetch`, `push`, `clone` and `request-pull`.
+pub fn resolve_remote(spec: &str) -> Result<Remote> {
+    let configured_url = crate::core::config::get_config_value(&format!("remote.{}.url", spec))?;
+    let url = configured_url.clone().unwrap_or_else(|| spec.to_string());
+    let path = Path::new(&url);
+
+    let transport = if path.exists() && is_bundle_file(path) {
+        Transport::Bundle { path: path.to_path_buf() }
+    } else if path.exists() {
+        Transport::Local { git_dir: resolve_remote_repo_path(spec)? }
+    } else if let Some((owner, repo)) = parse_github_remote(&url) {
+        Transport::GitHubApi { owner, repo }
+    } else {
+        // Not on disk and not GitHub: this reports the missing path the way it always has.
+        Transport::Local { git_dir: resolve_remote_repo_path(spec)? }
+    };
+
+    Ok(Remote { spec: spec.to_string(), configured_url, transport })
+}
+
+/// The error a command gives when it can only work with repositories and got a bundle
+/// (`push` to a bundle, `request-pull` against one): the same as for any other file.
+// Used by `push` and `request-pull`.
+pub fn not_a_repository(path: &Path) -> anyhow::Error {
+    anyhow::anyhow!("fatal: '{}' does not appear to be a git repository", path.display())
+}

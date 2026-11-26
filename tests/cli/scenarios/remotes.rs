@@ -83,3 +83,17 @@ fn credential_helpers() {
     r.run("credential").run("credential-store --bogus get");
     assert_snapshot!(r.finish());
 }
+
+#[test]
+fn local_folder_with_github_in_its_path() {
+    // `github.com/me/lib` looks like a GitHub URL, but it is a repository on disk, so fetch
+    // and push treat it as one (no GitHub token needed), as clone always did.
+    let mut r = three_commits();
+    r.run_in("..", "clone repo repo/github.com/me/lib");
+    r.write("github.com/me/lib/new.txt", "new\n").run_in("github.com/me/lib", "add new.txt").run_in("github.com/me/lib", "commit -m 'in lib'");
+    r.run("fetch github.com/me/lib").run("log --oneline -1 github.com/me/lib/main");
+    r.run("push github.com/me/lib main:from-outer").run_in("github.com/me/lib", "branch");
+    // A path that doesn't exist and isn't GitHub still fails the usual way.
+    r.run("fetch ./no/such/place");
+    assert_snapshot!(r.finish());
+}

@@ -12,9 +12,9 @@ use crate::remote::fetch::engine::{
     write_fetch_head,
     write_local_remote_tracking_ref,
 };
-use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, is_bundle_file, read_bundle, read_packfile, store_loose_objects};
-use crate::remote::github::{fetch_from_github, parse_github_remote, resolve_github_token};
-use crate::remote::push::engine::resolve_remote_repo_path;
+use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, read_bundle, read_packfile, store_loose_objects};
+use crate::remote::github::{fetch_from_github, resolve_github_token};
+use crate::remote::transport::{resolve_remote, types::Transport};
 use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
 
 pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
@@ -35,33 +35,18 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
         }
     };
 
-    let configured_url =
-        crate::core::config::get_config_value(&format!("remote.{}.url", remote_name))?;
-
-    let github_info = configured_url
-        .as_deref()
-        .and_then(parse_github_remote)
-        .or_else(|| parse_github_remote(&remote_name));
-
-    if let Some((owner, repo)) = github_info {
-        let remote_display = configured_url
-            .unwrap_or_else(|| format!("https://github.com/{}/{}", owner, repo));
-        let token = resolve_github_token(&remote_name)?;
-        let target = GitHubTarget { owner, repo, token };
-
-        fetch_from_github(&target, &remote_name, &remote_display, branch.as_deref())?;
-        return Ok(());
-    }
-
-    let bundle_path = std::path::PathBuf::from(configured_url.as_deref().unwrap_or(&remote_name));
-    if is_bundle_file(&bundle_path) {
-        let remote_display = configured_url.unwrap_or_else(|| remote_name.clone());
-        return fetch_from_bundle(&bundle_path, &remote_name, &remote_display, branch.as_deref());
-    }
-
-    let remote_git_dir = resolve_remote_repo_path(&remote_name)?;
-    let remote_display = configured_url
-        .unwrap_or_else(|| remote_git_dir.display().to_string());
+    let remote = resolve_remote(&remote_name)?;
+    let remote_display = remote.display();
+    let remote_git_dir = match remote.transport {
+        Transport::GitHubApi { owner, repo } => {
+            let token = resolve_github_token(&remote_name)?;
+            let target = GitHubTarget { owner, repo, token };
+            fetch_from_github(&target, &remote_name, &remote_display, branch.as_deref())?;
+            return Ok(());
+        }
+        Transport::Bundle { path } => return fetch_from_bundle(&path, &remote_name, &remote_display, branch.as_deref()),
+        Transport::Local { git_dir } => git_dir,
+    };
 
     let remote_refs = list_remote_refs(&remote_git_dir)?;
     let filtered_refs: Vec<_> = match &branch {

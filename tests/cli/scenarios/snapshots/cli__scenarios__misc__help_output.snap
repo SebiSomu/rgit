@@ -20,43 +20,43 @@ Available commands:
    blame               init                reword
    branch              init-db             rm
    bundle              interpret-trailers  save
-   cat-file            last-modified       secrets
-   changelog           log                 shortlog
-   check-ignore        ls-files            show
-   check-mailmap       ls-remote           show-branch
-   check-ref-format    ls-tree             show-index
-   checkout            mailinfo            show-ref
-   checkout-index      mailsplit           sparse-checkout
-   cherry              maintenance         split
-   cherry-pick         merge               squash
-   clean               merge-base          stage
-   clone               merge-file          stash
-   column              merge-tree          stats
-   commit              mktag               status
-   commit-graph        mktree              story
-   commit-tree         move-commit         stripspace
-   compare             multi-pack-index    submodule
-   config              mv                  switch
-   conflicts           name-rev            symbolic-ref
-   contributors        notes               sync
-   count-objects       oops                tag
-   credential          open                timeline
-   credential-store    pack-objects        tip
-   describe            pack-refs           undo
-   diff                patch-id            unpack-file
-   diff-files          pr-summary          unpack-objects
-   diff-index          prune               update-index
-   diff-tree           prune-packed        update-ref
-   doctor              pull                var
-   drop                push                verify-pack
-   fast-export         range-diff          version
-   fast-import         read-tree           whatchanged
-   fetch               rebase              whereami
-   fixup               recover             wip
-   fmt-merge-msg       redo                worktree
-   for-each-ref        reflog              write-tree
-   for-each-repo       refs                zen
-   format-patch        remote
+   cat-file            last-modified       scrub
+   changelog           log                 secrets
+   check-ignore        ls-files            shortlog
+   check-mailmap       ls-remote           show
+   check-ref-format    ls-tree             show-branch
+   checkout            mailinfo            show-index
+   checkout-index      mailsplit           show-ref
+   cherry              maintenance         sparse-checkout
+   cherry-pick         merge               split
+   clean               merge-base          squash
+   clone               merge-file          stage
+   column              merge-tree          stash
+   commit              mktag               stats
+   commit-graph        mktree              status
+   commit-tree         move-commit         story
+   compare             multi-pack-index    stripspace
+   config              mv                  submodule
+   conflicts           name-rev            switch
+   contributors        notes               symbolic-ref
+   count-objects       oops                sync
+   credential          open                tag
+   credential-store    pack-objects        timeline
+   describe            pack-refs           tip
+   diff                patch-id            undo
+   diff-files          pr-summary          unpack-file
+   diff-index          prune               unpack-objects
+   diff-tree           prune-packed        update-index
+   doctor              pull                update-ref
+   drop                push                var
+   fast-export         range-diff          verify-pack
+   fast-import         read-tree           version
+   fetch               rebase              whatchanged
+   fixup               recover             whereami
+   fmt-merge-msg       redo                wip
+   for-each-ref        reflog              worktree
+   for-each-repo       refs                write-tree
+   format-patch        remote              zen
    fsck                repack
 
 See 'rgit help <command>' for the options of a command.
@@ -133,43 +133,43 @@ Available commands:
    blame               init                reword
    branch              init-db             rm
    bundle              interpret-trailers  save
-   cat-file            last-modified       secrets
-   changelog           log                 shortlog
-   check-ignore        ls-files            show
-   check-mailmap       ls-remote           show-branch
-   check-ref-format    ls-tree             show-index
-   checkout            mailinfo            show-ref
-   checkout-index      mailsplit           sparse-checkout
-   cherry              maintenance         split
-   cherry-pick         merge               squash
-   clean               merge-base          stage
-   clone               merge-file          stash
-   column              merge-tree          stats
-   commit              mktag               status
-   commit-graph        mktree              story
-   commit-tree         move-commit         stripspace
-   compare             multi-pack-index    submodule
-   config              mv                  switch
-   conflicts           name-rev            symbolic-ref
-   contributors        notes               sync
-   count-objects       oops                tag
-   credential          open                timeline
-   credential-store    pack-objects        tip
-   describe            pack-refs           undo
-   diff                patch-id            unpack-file
-   diff-files          pr-summary          unpack-objects
-   diff-index          prune               update-index
-   diff-tree           prune-packed        update-ref
-   doctor              pull                var
-   drop                push                verify-pack
-   fast-export         range-diff          version
-   fast-import         read-tree           whatchanged
-   fetch               rebase              whereami
-   fixup               recover             wip
-   fmt-merge-msg       redo                worktree
-   for-each-ref        reflog              write-tree
-   for-each-repo       refs                zen
-   format-patch        remote
+   cat-file            last-modified       scrub
+   changelog           log                 secrets
+   check-ignore        ls-files            shortlog
+   check-mailmap       ls-remote           show
+   check-ref-format    ls-tree             show-branch
+   checkout            mailinfo            show-index
+   checkout-index      mailsplit           show-ref
+   cherry              maintenance         sparse-checkout
+   cherry-pick         merge               split
+   clean               merge-base          squash
+   clone               merge-file          stage
+   column              merge-tree          stash
+   commit              mktag               stats
+   commit-graph        mktree              status
+   commit-tree         move-commit         story
+   compare             multi-pack-index    stripspace
+   config              mv                  submodule
+   conflicts           name-rev            switch
+   contributors        notes               symbolic-ref
+   count-objects       oops                sync
+   credential          open                tag
+   credential-store    pack-objects        timeline
+   describe            pack-refs           tip
+   diff                patch-id            undo
+   diff-files          pr-summary          unpack-file
+   diff-index          prune               unpack-objects
+   diff-tree           prune-packed        update-index
+   doctor              pull                update-ref
+   drop                push                var
+   fast-export         range-diff          verify-pack
+   fast-import         read-tree           version
+   fetch               rebase              whatchanged
+   fixup               recover             whereami
+   fmt-merge-msg       redo                wip
+   for-each-ref        reflog              worktree
+   for-each-repo       refs                write-tree
+   format-patch        remote              zen
    fsck                repack
 
 See 'rgit help <command>' for the options of a command.
@@ -298,6 +298,7 @@ Commands:
   squash              Fold the last N commits into one, with their messages combined to edit
   reword              Change the message of HEAD or an earlier commit, without an interactive rebase
   drop                Remove one commit from the current branch and replay the commits after it
+  scrub               Remove files or folders (a leaked secret, a big binary) from all history, with a backup
   wip                 Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back [alias: save]
   fixup               Fold the staged changes into an earlier commit (picked from a list or named) and rewrite the commits on top
   sync                Fetch the branch's upstream, print the plan, then fast-forward, rebase or merge onto it (and push with --push)

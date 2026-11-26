@@ -12,7 +12,7 @@
 4. [Global options and narration](#global-options-and-narration)
 5. [Configuration, identity and environment](#configuration-identity-and-environment)
 6. [Revision syntax cheat sheet](#revision-syntax-cheat-sheet)
-7. [Remotes: local paths and GitHub](#remotes-local-paths-and-github)
+7. [Remotes: local paths and HTTPS servers](#remotes-local-paths-and-https-servers)
 8. [Command index](#command-index) and the [command reference](#command-reference)
 9. [Everyday recipes](#everyday-recipes)
 10. [Known differences and limits](#known-differences-and-limits)
@@ -318,6 +318,7 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 |---|---|
 | [`ignore`](#rgit-ignore) | Add patterns to .gitignore and stop tracking the files they now ignore (rgit only). |
 | [`secrets`](#rgit-secrets) | Look for secrets in the staged changes, all files or the history; exit 1 when found (rgit only). |
+| [`scrub`](#rgit-scrub) | Remove files or folders (a leaked secret, a big binary) from all history, with a backup (rgit only). |
 | [`doctor`](#rgit-doctor) | Check the repository for problems and how to fix them; `--fix` applies the safe fixes (rgit only). |
 | [`backup`](#rgit-backup) | Save every ref to a dated bundle, keeping the newest 10; `rgit clone <file>` restores one (rgit only). |
 | [`fsck`](#rgit-fsck) | Check the object database for corruption. |
@@ -340,9 +341,12 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 | [`fetch`](#rgit-fetch) | Download new commits from a remote. |
 | [`push`](#rgit-push) | Upload commits to a remote. |
 | [`pull`](#rgit-pull) | Fetch from a remote and merge it into the current branch. |
+| [`ls-remote`](#rgit-ls-remote) | List a remote's branches and tags without fetching anything. |
 | [`bundle`](#rgit-bundle) | Pack history into a single file for offline transfer. |
 | [`request-pull`](#rgit-request-pull) | Write a pull-request summary. |
 | [`fmt-merge-msg`](#rgit-fmt-merge-msg) | Build a merge commit message from FETCH_HEAD-style lines. |
+| [`credential`](#rgit-credential) | Fill, approve or reject a login through the credential helpers, as git does. |
+| [`credential-store`](#rgit-credential-store) | The `store` credential helper: logins in `~/.git-credentials`. |
 
 ### 11. Patches and email
 
@@ -3355,6 +3359,69 @@ False alarm? Add `rgit:allow-secret` in a comment on that line.
 ```
 
 
+### `rgit scrub`
+
+Remove files or folders from all history, with a backup (rgit only).
+
+**Syntax:** `rgit scrub <path>... [--dry-run]` · `rgit scrub --drop-backup`
+
+The friendly `filter-branch`, for a leaked secret or a big binary that should never have been committed. `rgit scrub secrets.env` removes the file, or `build/` a whole folder, from every commit your local branches and tags reach. The commits are rewritten parents first, the same way `git filter-branch --index-filter 'git rm -r --cached --ignore-unmatch <path>' --prune-empty --tag-name-filter cat -- --branches --tags` rewrites them: rgit produces the same commit and tag hashes.
+
+- A commit that only changed the scrubbed paths is left out.
+- Merges are kept.
+- Annotated tags are rewritten to point at the new commits.
+- Authors, dates, messages and other headers are kept byte for byte.
+- Commits that never contained the paths keep their hash, and their signatures stay valid. Rewritten commits lose their signature.
+- A file tracked in HEAD stays on disk, now untracked: add it to `.gitignore`.
+
+`--dry-run` shows how many commits contain the paths, how many would be rewritten or left out, and which refs would move. The old branches and tags are saved under `refs/rgit/scrub-backup/`, and `rgit undo` takes the whole scrub back. A second scrub waits until the backup is dropped.
+
+**What a scrub can't do for you.** If it was a secret, revoke or rotate it, because anyone who already cloned or fetched has it. Then publish the new history with `rgit push --force` for each branch and tag the scrub lists. To remove every copy from your own repository:
+
+```text
+rgit scrub --drop-backup                 # the backup refs and the undo history (which keeps old commits too)
+rgit reflog expire --expire=now --all
+rgit gc --prune=now                      # loose objects
+rgit repack -a -d                        # packed objects
+```
+
+<details>
+<summary>Options as printed by <code>rgit scrub -h</code></summary>
+
+```text
+Remove files or folders (a leaked secret, a big binary) from all history, with a backup
+
+Usage: rgit scrub [OPTIONS] [PATHS]...
+
+Arguments:
+  [PATHS]...  Files or folders to remove from every commit
+
+Options:
+  -n, --dry-run      Show what would change without writing anything
+      --drop-backup  Delete the backup refs a previous scrub left
+  -h, --help         Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit scrub secrets.env
+'secrets.env' is in 3 of the 6 commits on your branches and tags.
+1 commit was rewritten, and 2 commits left out (they only changed that path).
+2 refs moved: main, tag v1
+Old branches and tags are saved under refs/rgit/scrub-backup/ (`rgit undo` takes the whole scrub back).
+Files that were tracked stay on disk, now untracked: add them to .gitignore.
+
+Still to do:
+  1. If it was a secret, revoke or rotate it: anyone who already cloned or fetched has it.
+  2. Publish the new history: `rgit push --force origin main`, `rgit push --force origin v1`.
+  3. Then forget the old copies here: `rgit scrub --drop-backup` (also clears the undo history),
+     `rgit reflog expire --expire=now --all`, `rgit gc --prune=now`, `rgit repack -a -d`.
+```
+
+
 ### `rgit doctor`
 
 Check the repository for problems, each with the command that fixes it; `--fix` applies the safe fixes (rgit only).
@@ -3882,6 +3949,46 @@ rgit pull
 ```
 
 
+### `rgit ls-remote`
+
+List a remote's branches and tags without fetching anything.
+
+**Syntax:** `rgit ls-remote [--heads] [--tags] [--refs] [-q] [--exit-code] [--get-url] [--symref] [<repository> [<pattern>...]]`
+
+Prints one `<id>	<ref>` line per ref, with the same output as `git ls-remote`, including `HEAD` and peeled tags (`refs/tags/v1^{}`, the commit an annotated tag points at). `<repository>` is a remote name, a path, a bundle or a URL. Without one it is the current branch's remote, or `origin`. Over HTTPS this is one request, and on GitHub it uses git's protocol, not the API.
+
+- `--heads` (`-h` when other arguments follow) and `--tags` (`-t`) keep only branches or only tags; `--refs` leaves out `HEAD` and the peeled `^{}` lines.
+- `<pattern>`s keep the refs whose name ends with one of them, by whole path components (`main` matches `refs/heads/main`, not `refs/heads/domain`).
+- `--symref` adds `ref: refs/heads/main	HEAD` lines for symbolic refs.
+- `--exit-code` exits with 2 when no ref matched; `-q` prints nothing; `--get-url` prints the remote's URL and stops.
+
+With no `<repository>` given, a `From <url>` line on standard error says which remote was asked.
+
+<details>
+<summary>Options as printed by <code>rgit ls-remote -h</code></summary>
+
+```text
+usage: rgit ls-remote [--heads] [--tags] [--refs] [--upload-pack=<exec>]
+                      [-q | --quiet] [--exit-code] [--get-url] [--symref]
+                      [<repository> [<patterns>...]]
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit ls-remote
+From https://github.com/SebiSomu/rgit.git
+31d341b4d083efc54b0ef254361e166ade711e7a	HEAD
+31d341b4d083efc54b0ef254361e166ade711e7a	refs/heads/main
+206c59891b8ccc231edd1d0a0ed8051ab6f1de5a	refs/tags/v1
+31d341b4d083efc54b0ef254361e166ade711e7a	refs/tags/v1^{}
+$ rgit ls-remote --tags --refs origin
+206c59891b8ccc231edd1d0a0ed8051ab6f1de5a	refs/tags/v1
+```
+
+
 ### `rgit bundle`
 
 Pack history into a single file for offline transfer.
@@ -3968,6 +4075,74 @@ usage: rgit fmt-merge-msg [-m <message>] [--log[=<n>] | --no-log] [--file <file>
 
 ```bash
 printf '%s\t\tbranch '"'"'feature'"'"' of .\n' $(rgit rev-parse feature) | rgit fmt-merge-msg
+```
+
+
+### `rgit credential`
+
+Fill, approve or reject a login through the credential helpers, as git does.
+
+**Syntax:** `rgit credential (fill|approve|reject)`
+
+git's credential protocol, the machinery behind every login rgit asks for over HTTPS. It reads a credential from standard input (`protocol=`, `host=`, `path=`, `username=`, `password=` or `url=` lines, up to a blank line).
+
+- `fill` asks each helper in `credential.helper` for what is missing, then `GIT_ASKPASS` / `core.askPass` or the terminal, and prints the completed credential.
+- `approve` tells the helpers to store it, and `reject` tells them to erase it.
+
+Helpers written for git work unchanged: `store`, `cache` (as `git credential-cache`), Git Credential Manager (`manager`), `!shell commands`, absolute paths, and `git-credential-<name>` programs. Several `credential.helper` lines are tried in order, and an empty value clears the ones before it, as in git (per-URL `credential.<url>.helper` settings are not read yet). rgit's own config is in `~/.rgitconfig`, so set the helper with `rgit config --global credential.helper <name>`.
+
+With `GIT_TERMINAL_PROMPT=0` it never prompts, and fails with git's message instead. It exits 128 on errors and 129 for usage errors.
+
+<details>
+<summary>Options as printed by <code>rgit credential -h</code></summary>
+
+```text
+usage: rgit credential (fill|approve|reject)
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit config --global credential.helper store
+$ printf 'protocol=https\nhost=example.com\nusername=sebi\npassword=pw\n\n' | rgit credential approve
+$ printf 'protocol=https\nhost=example.com\n\n' | rgit credential fill
+protocol=https
+host=example.com
+username=sebi
+password=pw
+```
+
+
+### `rgit credential-store`
+
+The `store` credential helper: logins in `~/.git-credentials`.
+
+**Syntax:** `rgit credential-store [--file <path>] (get|store|erase)`
+
+The helper behind `credential.helper = store`. It keeps logins unencrypted in `~/.git-credentials`, readable by you only, one `https://user:password@host` line each, in git's own format, so git and rgit share the file. It also reads `$XDG_CONFIG_HOME/git/credentials`, and `--file` uses another file instead. `rgit credential` runs it for you; by hand, it reads a credential from standard input like `credential` does.
+
+Since the file is plain text, prefer an encrypted helper such as Git Credential Manager where you have one.
+
+<details>
+<summary>Options as printed by <code>rgit credential-store -h</code></summary>
+
+```text
+usage: rgit credential-store [<options>] <action>
+
+    --[no-]file <path>    fetch and store credentials in <path>
+```
+
+</details>
+
+**Example:**
+
+```text
+$ printf 'protocol=https\nhost=example.com\nusername=sebi\npassword=pw\n\n' | rgit credential-store store
+$ printf 'protocol=https\nhost=example.com\n\n' | rgit credential-store get
+username=sebi
+password=pw
 ```
 
 
@@ -5845,6 +6020,7 @@ rgit recover                           # everything lost (reset, amend, dropped 
 
 ```bash
 rgit secrets                           # nothing sensitive in the staged changes? (exit 1 if found)
+rgit scrub secrets.env                 # committed one anyway? remove it from all history
 rgit sync                              # fetch, rebase onto the upstream, push, with a plan first
 rgit pr-summary main                   # Markdown description: commits, files, merges cleanly?
 rgit open -p                           # print the branch's web page (without -p it opens it)

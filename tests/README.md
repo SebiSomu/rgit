@@ -7,7 +7,7 @@ cargo test                  # unit tests (in the rgit binary) + snapshot scenari
 cargo test --test cli merge # only scenarios whose name contains "merge"
 ```
 
-Today: 31 unit tests and 118 scenarios (one `.snap` file each in `tests/cli/scenarios/snapshots/`).
+Today: 95 unit tests, 136 scenarios (139 `.snap` files in `tests/cli/scenarios/snapshots/`) and 18 HTTP tests against real git.
 
 ## `tests/cli/`: end-to-end scenarios
 
@@ -27,10 +27,22 @@ Adding a scenario: write a `#[test]` in `scenarios/<name>.rs` using `Repo::init(
 
 Scenarios run on Linux and Windows. Snapshots in this repository use CRLF line endings; keep them as they are.
 
+## `tests/cli/`: HTTP tests against real git
+
+`http_server.rs` is a small HTTP/1.1 server on 127.0.0.1 that runs `git http-backend` (git's own smart-HTTP program) for every request, serving bare repositories from a temporary directory: the HTTPS transport is tested against a real git server with no network and no accounts. Options: HTTP Basic authentication, a redirect, and protocol v0 only; every request is logged (method, path, headers, status) so tests can check what rgit sent. `plain_path` gives paths Git for Windows accepts (no `\\?\` prefix).
+
+- `smart_http_fetch.rs`: clone and fetch over protocol v2 and v0, with a login, an empty repository, negotiation past many local commits, unrelated histories.
+- `smart_http_push.rs`: fast-forwards, new branches, annotated tags, deletions, rejected and forced updates, a refusing server hook, a login.
+- `smart_http_tags.rs`: tag auto-follow, `--tags`, `--no-tags`, moved tags.
+- `ls_remote_parity.rs`: `rgit ls-remote` output byte for byte against `git ls-remote`.
+- `http_server_tests.rs`: the server itself, with real git as the client.
+
+Each result is checked with `git fsck --strict` and real git's view of the refs. The tests skip themselves when `git http-backend` isn't available.
+
 ## `tests/unit/`: unit tests
 
 Parsing and formatting helpers. Each file is compiled *inside* its module through a `#[cfg(test)] #[path = "..."] mod tests;` line at the bottom of the source file, so the tests keep access to private items while `src/` holds no test code. When a module moves, fix the `#[path]` in that line.
 
 ## `clippy-baseline.txt`
 
-The number of warnings `cargo clippy --bin rgit` reports (226 at the time of writing). New work should not raise it.
+The number of warnings `cargo clippy --bin rgit` reports, in total and per lint (218 at the time of writing). New work should not raise any of them.

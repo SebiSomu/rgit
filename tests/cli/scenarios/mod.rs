@@ -28,6 +28,7 @@ mod drop;
 mod hotspots;
 mod ignore;
 mod move_commit;
+mod scrub;
 mod secrets;
 mod split;
 mod squash;

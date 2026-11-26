@@ -209,6 +209,8 @@ pub enum Commands {
     Reword(crate::workspace::reword::cli::RewordArgs),
     /// Remove one commit from the current branch and replay the commits after it.
     Drop(crate::workspace::drop::cli::DropArgs),
+    /// Remove files or folders (a leaked secret, a big binary) from all history, with a backup.
+    Scrub(crate::history::scrub::cli::ScrubArgs),
     /// Save everything uncommitted as a WIP commit on a hidden per-branch ref and clean the tree; `--restore` brings it back.
     #[command(visible_alias = "save")]
     Wip(crate::workspace::wip::cli::WipArgs),
@@ -427,6 +429,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Squash(args) => crate::workspace::squash::cli::dispatch_squash(args)?,
         Commands::Reword(args) => crate::workspace::reword::cli::dispatch_reword(args)?,
         Commands::Drop(args) => crate::workspace::drop::cli::dispatch_drop(args)?,
+        Commands::Scrub(args) => crate::history::scrub::cli::dispatch_scrub(args)?,
         Commands::Wip(args) => crate::workspace::wip::cli::dispatch_wip(args)?,
         Commands::Fixup(args) => crate::workspace::fixup::cli::dispatch_fixup(args)?,
         Commands::Sync(args) => crate::remote::sync::cli::dispatch_sync(args)?,

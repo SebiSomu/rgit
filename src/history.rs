@@ -12,6 +12,7 @@ pub mod last_modified;
 pub mod log;
 pub mod name_rev;
 pub mod range_diff;
+pub mod scrub;
 pub mod rev_list;
 pub mod shortlog;
 pub mod show_branch;

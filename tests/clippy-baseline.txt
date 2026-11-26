@@ -1,32 +1,31 @@
-# Clippy baseline before the refactor (`cargo clippy --bin rgit`, clippy 0.1.97 (2d8144b788 2026-07-07)).
-# The refactor must not raise any of these counts. Total first, then per lint.
-227
-  132 clippy::collapsible_if
+# Clippy baseline (`cargo clippy --bin rgit`, clippy 0.1.97 (2d8144b788 2026-07-07)).
+# New code must not raise any of these counts. Total first, then per lint.
+218
+  124 clippy::collapsible_if
    23 clippy::type_complexity
    20 clippy::doc_lazy_continuation
     6 clippy::manual_pattern_char_comparison
     5 clippy::needless_range_loop
     4 clippy::unnecessary_sort_by
     3 clippy::if_same_then_else
-    3 clippy::ptr_arg
     3 clippy::manual_is_multiple_of
-    2 clippy::manual_map
-    2 clippy::manual_strip
-    2 clippy::too_many_arguments
+    3 clippy::ptr_arg
     2 clippy::implicit_saturating_sub
     2 clippy::manual_checked_ops
-    2 clippy::while_let_loop
-    2 clippy::mut_range_bound
     2 clippy::manual_contains
-    1 clippy::empty_line_after_doc_comments
-    1 clippy::useless_format
-    1 clippy::cloned_ref_to_slice_refs
-    1 clippy::needless_ifs
-    1 clippy::redundant_guards
-    1 clippy::unnecessary_unwrap
+    2 clippy::manual_map
+    2 clippy::manual_strip
+    2 clippy::mut_range_bound
+    2 clippy::too_many_arguments
+    2 clippy::while_let_loop
     1 clippy::bind_instead_of_map
-    1 clippy::question_mark
+    1 clippy::cloned_ref_to_slice_refs
+    1 clippy::empty_line_after_doc_comments
+    1 clippy::manual_option_zip
     1 clippy::manual_range_contains
     1 clippy::manual_repeat_n
-    1 clippy::manual_option_zip
+    1 clippy::question_mark
+    1 clippy::redundant_guards
     1 clippy::unnecessary_get_then_check
+    1 clippy::unnecessary_unwrap
+    1 clippy::useless_format

@@ -122,6 +122,25 @@ pub fn finish_recording() {
     let _ = append_operation(OpKind::Command, &p.command, p.before.state, after.state);
 }
 
+/// Forgets every recorded operation and the private copies kept for them (saved indexes,
+/// working-tree file contents), and doesn't record the command running now. After it, `undo`
+/// has nothing to take back and `gc` no longer keeps objects for it.
+// Used by `rgit scrub --drop-backup`, which must leave no copy of the scrubbed files behind.
+pub fn forget_history() -> Result<()> {
+    if let Ok(mut pending) = PENDING.lock() {
+        *pending = None;
+    }
+    let oplog = repo::path(OPLOG_PATH);
+    if oplog.exists() {
+        fs::remove_file(&oplog).context("failed to remove the operation log")?;
+    }
+    let store = repo::path(STORE_PATH);
+    if store.exists() {
+        fs::remove_dir_all(&store).context("failed to remove the operation log's object store")?;
+    }
+    Ok(())
+}
+
 /// Whether two states are the same for undo's purposes (the index is compared by content).
 // Used by `finish_recording`.
 fn same_state(a: &RepoState, b: &RepoState) -> bool {

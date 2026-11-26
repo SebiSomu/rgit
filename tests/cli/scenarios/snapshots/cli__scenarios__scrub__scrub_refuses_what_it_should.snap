@@ -1,0 +1,79 @@
+---
+source: tests/cli/scenarios/scrub.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit scrub
+[stderr]
+error: the following required arguments were not provided:
+  <PATHS>...
+
+Usage: rgit scrub <PATHS>...
+
+For more information, try '--help'.
+[exit 2]
+$ rgit scrub nothing-here.txt
+Nothing to scrub: 'nothing-here.txt' is in none of the 3 commits on your branches and tags.
+$ rgit scrub ../outside
+[stderr]
+fatal: '../outside' is not a path inside the repository
+[exit 128]
+$ rgit scrub .git/config
+[stderr]
+fatal: '.git/config' is not a path inside the repository
+[exit 128]
+$ rgit scrub --drop-backup
+There is no scrub backup to drop.
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H3>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H4> 0	a.txt
+  100644 <H5> 0	b.txt
+  100644 <H6> 0	src/lib.txt
+HEAD commit:
+  tree <H7>
+  parent <H2>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000300 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

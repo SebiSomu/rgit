@@ -195,9 +195,11 @@ const MAX_IN_VAIN: usize = 256;
 /// servers. The pack may be thin (deltas against objects this repository has): the caller
 /// completes it while indexing. With `progress`, the server's progress text is shown as
 /// `remote: ...` lines (git shows it only when stderr is a terminal); otherwise the server is
-/// asked not to send it. Returns the raw pack bytes, still to be verified and indexed.
+/// asked not to send it. With `include_tag`, the server adds the tag objects of tags that
+/// point at objects in the pack (git's tag auto-follow). Returns the raw pack bytes, still to
+/// be verified and indexed.
 // Used by `fetch` (and so `clone` and `pull`) over HTTPS.
-pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: &[String], local_tips: &[String], progress: bool) -> Result<Vec<u8>> {
+pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: &[String], local_tips: &[String], include_tag: bool, progress: bool) -> Result<Vec<u8>> {
     let v2 = discovery.version == ProtocolVersion::V2;
     let offered = |name: &str| discovery.capabilities.iter().any(|c| c == name);
     // v0 over HTTP can only negotiate with multi_ack_detailed; without it, send no haves.
@@ -226,9 +228,9 @@ pub fn fetch_pack(client: &HttpClient, discovery: &Discovery, url: &str, wants: 
         let mut all_haves = acked.clone();
         all_haves.extend(haves);
         let body = if v2 {
-            v2_fetch_request(&discovery.capabilities, wants, &all_haves, done, progress)?
+            v2_fetch_request(&discovery.capabilities, wants, &all_haves, done, include_tag, progress)?
         } else {
-            v0_fetch_request(&discovery.capabilities, wants, &all_haves, done, progress)?
+            v0_fetch_request(&discovery.capabilities, wants, &all_haves, done, include_tag, progress)?
         };
         let response = client.post(&format!("{}/git-upload-pack", discovery.base_url), &headers, &body)?.check_status(url)?;
         let mut reader = PacketReader::new(response.into_reader());
@@ -274,10 +276,10 @@ fn commit_parents_and_date(oid: &str) -> Option<(Vec<String>, i64)> {
     crate::history::name_rev::engine::commit_parents_and_date(oid)
 }
 
-/// A v2 `fetch` request: the command, then `thin-pack` and `ofs-delta`, one `want` per
+/// A v2 `fetch` request: the command, then `thin-pack`, `ofs-delta` (and `include-tag`), one `want` per
 /// object, the `have`s, and `done` when this is the last round.
 // Used by `fetch_pack`.
-fn v2_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, progress: bool) -> Result<Vec<u8>> {
+fn v2_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, include_tag: bool, progress: bool) -> Result<Vec<u8>> {
     if !capabilities.iter().any(|c| c == "fetch" || c.starts_with("fetch=")) {
         anyhow::bail!("fatal: the server speaks protocol v2 but does not offer fetch");
     }
@@ -291,6 +293,9 @@ fn v2_fetch_request(capabilities: &[String], wants: &[String], haves: &[String],
     body.extend_from_slice(DELIM);
     body.extend(encode_text("thin-pack")?);
     body.extend(encode_text("ofs-delta")?);
+    if include_tag {
+        body.extend(encode_text("include-tag")?);
+    }
     if !progress {
         body.extend(encode_text("no-progress")?);
     }
@@ -311,7 +316,7 @@ fn v2_fetch_request(capabilities: &[String], wants: &[String], haves: &[String],
 /// offered), then the other `want`s and a flush, the `have`s, and `done` for the last round
 /// or a flush for a round that waits for acknowledgements.
 // Used by `fetch_pack`.
-fn v0_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, progress: bool) -> Result<Vec<u8>> {
+fn v0_fetch_request(capabilities: &[String], wants: &[String], haves: &[String], done: bool, include_tag: bool, progress: bool) -> Result<Vec<u8>> {
     let offered = |name: &str| capabilities.iter().any(|c| c == name);
     let mut requested: Vec<String> = Vec::new();
     if offered("multi_ack_detailed") {
@@ -327,6 +332,9 @@ fn v0_fetch_request(capabilities: &[String], wants: &[String], haves: &[String],
     }
     if offered("ofs-delta") {
         requested.push("ofs-delta".into());
+    }
+    if include_tag && offered("include-tag") {
+        requested.push("include-tag".into());
     }
     if !progress && offered("no-progress") {
         requested.push("no-progress".into());

@@ -15,9 +15,16 @@ use crate::remote::fetch::engine::{
 use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, read_bundle, read_packfile, store_loose_objects};
 use crate::remote::github::{fetch_from_github, resolve_github_token};
 use crate::remote::transport::{resolve_remote, types::Transport};
-use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
+use crate::remote::{fetch::types::{FetchRefResult, TagMode}, types::GitHubTarget};
 
 pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
+    fetch_with_tags(remote, branch, TagMode::Follow)
+}
+
+/// `fetch` with a choice of tags (`--tags`, `--no-tags`; the default follows tags, as git
+/// does). Tags are fetched only over HTTPS so far; other transports ignore the choice.
+// Used by `fetch` and `rgit fetch`.
+pub fn fetch_with_tags(remote: Option<String>, branch: Option<String>, tags: TagMode) -> Result<()> {
     let remote_name = match remote {
         Some(r) => r,
         None => {
@@ -45,7 +52,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
             return Ok(());
         }
         Transport::Bundle { path } => return fetch_from_bundle(&path, &remote_name, &remote_display, branch.as_deref()),
-        Transport::SmartHttp { url } => return fetch_from_smart_http(&url, &remote_name, &remote_display, branch.as_deref()),
+        Transport::SmartHttp { url } => return fetch_from_smart_http(&url, &remote_name, &remote_display, branch.as_deref(), tags),
         Transport::Local { git_dir } => git_dir,
     };
 
@@ -223,20 +230,26 @@ fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: 
 }
 
 /// `rgit fetch` from a remote reached over git's smart-HTTP protocol (any https host, and
-/// GitHub unless `rgit.httpTransport=api`). Lists the server's branches, negotiates with the
-/// local ref tips so the server sends only what this repository lacks, then verifies and
-/// indexes the pack (completing a thin pack with the local bases it deltas against), checks
-/// that every wanted commit arrived and that everything the new objects reference exists,
-/// and only then installs the pack and moves
+/// GitHub unless `rgit.httpTransport=api`). Lists the server's branches (and tags, unless
+/// `--no-tags`), negotiates with the local ref tips so the server sends only what this
+/// repository lacks, then verifies and indexes the pack (completing a thin pack with the
+/// local bases it deltas against), checks that every wanted object arrived and that
+/// everything the new objects reference exists, and only then installs the pack and moves
 /// `refs/remotes/<remote>/<branch>` (only `branch` when given), the remote HEAD and FETCH_HEAD.
-/// A transfer that fails at any point leaves the repository unchanged. The output matches a
-/// fetch from a local repository.
-fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, branch: Option<&str>) -> Result<()> {
-    use std::io::IsTerminal;
-    use crate::remote::smart_http::{discover_refs, fetch_pack};
+/// Tags follow as in git: by default the new tags that point at something this repository
+/// has afterwards (the server includes their tag objects in the pack), with `--tags` all new
+/// tags; an existing local tag is never changed. A transfer that fails at any point leaves
+/// the repository unchanged. The output matches a fetch from a local repository.
+fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, branch: Option<&str>, tags: TagMode) -> Result<()> {
+    use crate::remote::fetch::engine::local_has_object;
+    use crate::remote::smart_http::discover_refs;
 
     let client = crate::remote::http::HttpClient::for_remote(remote_name, url)?;
-    let discovery = discover_refs(&client, url, &["HEAD".to_string(), "refs/heads/".to_string()], false)?;
+    let mut prefixes = vec!["HEAD".to_string(), "refs/heads/".to_string()];
+    if tags != TagMode::None {
+        prefixes.push("refs/tags/".to_string());
+    }
+    let discovery = discover_refs(&client, url, &prefixes, false)?;
     let branches: Vec<(String, String)> = discovery
         .refs
         .iter()
@@ -251,29 +264,54 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
         return Ok(());
     }
 
-    let mut wants: Vec<String> = branches.iter().map(|(_, oid)| oid.clone()).filter(|oid| !crate::remote::fetch::engine::local_has_object(oid)).collect();
+    // The server's tags this repository doesn't have yet: (name, tag value, what it points at).
+    let local_refs = crate::core::refs::list_all_refs();
+    let mut clobbered: Vec<String> = Vec::new();
+    let candidate_tags: Vec<(String, String, String)> = if tags == TagMode::None {
+        Vec::new()
+    } else {
+        discovery
+            .refs
+            .iter()
+            .filter_map(|r| {
+                let name = r.name.strip_prefix("refs/tags/")?;
+                let oid = r.oid.clone()?;
+                match local_refs.get(&r.name) {
+                    Some(local) if *local == oid => return None,
+                    // An existing tag is never moved; `--tags` reports it, as git does.
+                    Some(_) => {
+                        if tags == TagMode::All {
+                            clobbered.push(name.to_string());
+                        }
+                        return None;
+                    }
+                    None => {}
+                }
+                let target = r.peeled.clone().unwrap_or_else(|| oid.clone());
+                Some((name.to_string(), oid, target))
+            })
+            .collect()
+    };
+
+    let mut wants: Vec<String> = branches.iter().map(|(_, oid)| oid.clone()).collect();
+    // `--tags` wants every new tag; following wants the tags whose target is already here.
+    for (_, oid, target) in &candidate_tags {
+        if tags == TagMode::All || local_has_object(target) {
+            wants.push(oid.clone());
+        }
+    }
+    wants.retain(|oid| !local_has_object(oid));
     wants.sort();
     wants.dedup();
-    let mut received = 0usize;
-    if !wants.is_empty() {
-        // The local ref tips, annotated tags peeled to what they name, are where the `have`s start.
-        let mut local_tips: Vec<String> = crate::core::refs::list_all_refs()
-            .into_values()
-            .filter_map(|oid| crate::history::name_rev::engine::peel_ref_tip(&oid).map(|(peeled, _, _, _)| peeled))
-            .collect();
-        local_tips.sort();
-        local_tips.dedup();
-        let pack = fetch_pack(&client, &discovery, url, &wants, &local_tips, std::io::stderr().is_terminal())?;
-        received = pack_object_count(&pack);
-        let (pack, index, objects) = crate::core::pack::index_pack_bytes(pack, true)?;
-        let arrived: std::collections::HashSet<&str> = objects.iter().map(|o| o.hash.as_str()).collect();
-        if let Some(missing) = wants.iter().find(|w| !arrived.contains(w.as_str())) {
-            anyhow::bail!("fatal: the pack from '{}' does not contain {}; nothing was updated", shown, missing);
-        }
-        if let Some((object, missing)) = crate::remote::fetch::engine::first_missing_reference(&objects, &arrived) {
-            anyhow::bail!("fatal: the pack from '{}' is incomplete: {} references {}, which is missing; nothing was updated", shown, object, missing);
-        }
-        crate::core::pack::store_pack(&crate::core::repo::path(".git/objects/pack"), "pack-", &pack, &index)?;
+    let mut received = download_pack(&client, &discovery, url, &shown, &wants, tags == TagMode::Follow)?;
+    // Without include-tag the server may have left out tag objects of fetched commits.
+    let missing_tags: Vec<String> = candidate_tags
+        .iter()
+        .filter(|(_, oid, target)| local_has_object(target) && !local_has_object(oid))
+        .map(|(_, oid, _)| oid.clone())
+        .collect();
+    if !missing_tags.is_empty() {
+        received += download_pack(&client, &discovery, url, &shown, &missing_tags, false)?;
     }
 
     let mut fetch_head_entries = Vec::new();
@@ -295,6 +333,15 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
             ),
         }
     }
+    for (name, oid, _) in &candidate_tags {
+        if local_has_object(oid) {
+            crate::core::refs::write_ref(&format!("refs/tags/{}", name), oid)?;
+            println!(" * [new tag]         {:20} -> {}", name, name);
+        }
+    }
+    for name in &clobbered {
+        println!(" ! [rejected]        {:20} -> {}  (would clobber existing tag)", name, name);
+    }
     if received > 0 {
         println!("Receiving objects: 100% ({}/{}), done.", received, received);
     }
@@ -305,7 +352,47 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
         let _ = crate::core::refs::write_remote_head(remote_name, default_branch, sha);
     }
     write_fetch_head(&fetch_head_entries)?;
+    if !clobbered.is_empty() {
+        anyhow::bail!("error: some local refs could not be updated; delete those tags first (rgit tag -d <name>) to take the remote's");
+    }
     Ok(())
+}
+
+/// Downloads, verifies and installs one pack with `wants` (nothing when empty); with
+/// `include_tag` the server adds the tag objects of tags pointing into the pack. Returns the
+/// number of objects the server sent. Nothing is stored unless the whole pack checks out.
+// Used by `fetch_from_smart_http`.
+fn download_pack(
+    client: &crate::remote::http::HttpClient,
+    discovery: &crate::remote::smart_http::types::Discovery,
+    url: &str,
+    shown: &str,
+    wants: &[String],
+    include_tag: bool,
+) -> Result<usize> {
+    use std::io::IsTerminal;
+    if wants.is_empty() {
+        return Ok(0);
+    }
+    // The local ref tips, annotated tags peeled to what they name, are where the `have`s start.
+    let mut local_tips: Vec<String> = crate::core::refs::list_all_refs()
+        .into_values()
+        .filter_map(|oid| crate::history::name_rev::engine::peel_ref_tip(&oid).map(|(peeled, _, _, _)| peeled))
+        .collect();
+    local_tips.sort();
+    local_tips.dedup();
+    let pack = crate::remote::smart_http::fetch_pack(client, discovery, url, wants, &local_tips, include_tag, std::io::stderr().is_terminal())?;
+    let received = pack_object_count(&pack);
+    let (pack, index, objects) = crate::core::pack::index_pack_bytes(pack, true)?;
+    let arrived: std::collections::HashSet<&str> = objects.iter().map(|o| o.hash.as_str()).collect();
+    if let Some(missing) = wants.iter().find(|w| !arrived.contains(w.as_str())) {
+        anyhow::bail!("fatal: the pack from '{}' does not contain {}; nothing was updated", shown, missing);
+    }
+    if let Some((object, missing)) = crate::remote::fetch::engine::first_missing_reference(&objects, &arrived) {
+        anyhow::bail!("fatal: the pack from '{}' is incomplete: {} references {}, which is missing; nothing was updated", shown, object, missing);
+    }
+    crate::core::pack::store_pack(&crate::core::repo::path(".git/objects/pack"), "pack-", &pack, &index)?;
+    Ok(received)
 }
 
 /// The number of objects a pack's header announces (what the server sent, before a thin

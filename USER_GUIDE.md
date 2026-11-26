@@ -3581,22 +3581,26 @@ rgit remote remove old
 
 Download new commits from a remote.
 
-**Syntax:** `rgit fetch [<remote>] [<branch>]`
+**Syntax:** `rgit fetch [--tags | --no-tags] [<remote>] [<branch>]`
 
 Walks remote commit graphs, downloads missing objects, updates remote-tracking refs (`refs/remotes/<remote>/<branch>`), and writes `FETCH_HEAD`.
+
+Over HTTPS, tags come along as in git: by default the new tags that point at something you have after the fetch, with `--tags` every tag, with `--no-tags` none. A tag you already have is never changed; `--tags` reports a tag that moved on the remote as `would clobber existing tag`.
 
 <details>
 <summary>Options as printed by <code>rgit fetch -h</code></summary>
 
 ```text
-Usage: rgit fetch [REMOTE] [BRANCH]
+Usage: rgit fetch [OPTIONS] [REMOTE] [BRANCH]
 
 Arguments:
   [REMOTE]  
   [BRANCH]  
 
 Options:
-  -h, --help  Print help
+  -t, --tags     Fetch all tags from the remote (over HTTPS)
+  -n, --no-tags  Do not fetch any tags
+  -h, --help     Print help
 ```
 
 </details>
@@ -3606,6 +3610,7 @@ Options:
 ```bash
 rgit fetch
 rgit fetch origin main
+rgit fetch --tags
 ```
 
 
@@ -5665,7 +5670,7 @@ rgit backup                            # every ref in a dated bundle (newest 10 
 
 rgit aims for git's behaviour and output, but some things are different or missing:
 
-- **Transports.** Local paths, bundles and HTTPS (smart HTTP). No SSH. `fetch` over HTTPS does not fetch tags yet.
+- **Transports.** Local paths, bundles and HTTPS (smart HTTP). No SSH.
 - **Tags over local transport.** `clone` and `fetch` from a local path do not copy tags (a bundle does, so `rgit clone <backup file>` restores them).
 - **`stash show`** with no flag prints the full patch; git prints only a summary there and the patch with `-p`. `-p` is accepted.
 - **`reflog <ref>`** needs the word `show` (`rgit reflog show main`); `reflog -n <count>` works on its own.

@@ -8,4 +8,5 @@ mod http_server_tests;
 mod ls_remote_parity;
 mod smart_http_fetch;
 mod smart_http_push;
+mod smart_http_tags;
 mod scenarios;

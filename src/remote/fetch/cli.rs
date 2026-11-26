@@ -9,12 +9,23 @@
 pub struct FetchArgs {
     remote: Option<String>,
     branch: Option<String>,
+    /// Fetch all tags from the remote (over HTTPS)
+    #[arg(short = 't', long, conflicts_with = "no_tags")]
+    tags: bool,
+    /// Do not fetch any tags
+    #[arg(short = 'n', long = "no-tags")]
+    no_tags: bool,
 }
 
 /// Runs `rgit fetch` with its parsed arguments (the dispatch that used to live in `cli.rs`).
 // Used by `cli::handle_commands`.
 pub fn dispatch_fetch(args: FetchArgs) -> anyhow::Result<()> {
-    let FetchArgs { remote, branch } = args;
-    crate::remote::fetch::fetch(remote, branch)?;
+    let FetchArgs { remote, branch, tags, no_tags } = args;
+    let tag_mode = match (tags, no_tags) {
+        (true, _) => crate::remote::fetch::types::TagMode::All,
+        (_, true) => crate::remote::fetch::types::TagMode::None,
+        _ => crate::remote::fetch::types::TagMode::Follow,
+    };
+    crate::remote::fetch::fetch_with_tags(remote, branch, tag_mode)?;
     Ok(())
 }

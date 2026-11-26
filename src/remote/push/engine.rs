@@ -257,7 +257,7 @@ pub fn set_upstream_branch(local_branch: &str, remote_name: &str, remote_branch:
 
 
 /// `rgit push` to a remote reached over git's smart-HTTP protocol (any https host, and
-/// GitHub with `rgit.httpTransport=smart`). Pushes `src_name` (a branch, tag, `HEAD` or
+/// GitHub unless `rgit.httpTransport=api`). Pushes `src_name` (a branch, tag, `HEAD` or
 /// revision; empty to delete) to `dest` on the server: asks `git-receive-pack` for its refs,
 /// checks the update locally as git does (fast-forward unless `force`; existing tags only
 /// with `force`), sends the ref update with a pack of the objects the server lacks, and moves
@@ -269,7 +269,7 @@ pub fn push_over_smart_http(url: &str, remote_name: &str, remote_display: &str, 
     use crate::remote::smart_http::types::RefUpdate;
     use std::io::IsTerminal;
 
-    let client = crate::remote::http::HttpClient::new()?;
+    let client = crate::remote::http::HttpClient::for_remote(remote_name, url)?;
     let discovery = discover_receive_pack(&client, url)?;
     let shown = crate::remote::http::redact_url(remote_display);
     let remote_value = |name: &str| discovery.refs.iter().find(|r| r.name == name).and_then(|r| r.oid.clone());

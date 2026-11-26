@@ -57,12 +57,12 @@ fn run(args: Vec<String>) -> Result<()> {
     let refs = match &remote.transport {
         Transport::Local { git_dir } => local_refs(git_dir)?,
         Transport::Bundle { path } => bundle_refs(path)?,
-        Transport::SmartHttp { url } => discover_refs(&HttpClient::new()?, url, &prefixes, false)?.refs,
+        Transport::SmartHttp { url } => discover_refs(&HttpClient::for_remote(&spec, url)?, url, &prefixes, false)?.refs,
         // ls-remote is read-only, so it uses git's own protocol on GitHub too: one request, and
         // exactly git's answer (peeled tags, symbolic refs).
         Transport::GitHubApi { owner, repo } => {
             let url = crate::remote::transport::github_https_url(remote.configured_url.as_deref().unwrap_or(""), owner, repo);
-            discover_refs(&HttpClient::new()?, &url, &prefixes, false)?.refs
+            discover_refs(&HttpClient::for_remote(&spec, &url)?, &url, &prefixes, false)?.refs
         }
     };
 

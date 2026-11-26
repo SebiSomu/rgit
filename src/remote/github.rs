@@ -145,30 +145,10 @@ pub fn parse_github_remote(remote_url: &str) -> Option<(String, String)> {
 /// Retrieves the GitHub personal access token: `GITHUB_TOKEN` / `RGIT_GITHUB_TOKEN`, then
 /// `remote.<name>.token` / `github.token`, then the credential helpers and a prompt (the
 /// password of the `https://github.com` login).
-// Used by `push`, `fetch`, `clone` and `request-pull`.
+// Used by `push`, `fetch`, `clone` and `request-pull` over the GitHub REST API.
 pub fn resolve_github_token(remote_name: &str) -> Result<String> {
-    if let Ok(tok) = std::env::var("GITHUB_TOKEN") {
-        if !tok.trim().is_empty() {
-            return Ok(tok.trim().to_string());
-        }
-    }
-
-    if let Ok(tok) = std::env::var("RGIT_GITHUB_TOKEN") {
-        if !tok.trim().is_empty() {
-            return Ok(tok.trim().to_string());
-        }
-    }
-
-    if let Some(tok) = crate::core::config::get_config_value(&format!("remote.{}.token", remote_name))? {
-        if !tok.trim().is_empty() {
-            return Ok(tok.trim().to_string());
-        }
-    }
-
-    if let Some(tok) = crate::core::config::get_config_value("github.token")? {
-        if !tok.trim().is_empty() {
-            return Ok(tok.trim().to_string());
-        }
+    if let Some(token) = configured_github_token(remote_name)? {
+        return Ok(token);
     }
 
     // Then the credential helpers (`credential.helper`), and a prompt when someone can answer
@@ -189,6 +169,28 @@ pub fn resolve_github_token(remote_name: &str) -> Result<String> {
          - Or configuring via: rgit config github.token <your-token>\n\
          - Or a credential helper (rgit config --global credential.helper store), then run the command in a terminal once"
     )
+}
+
+/// The GitHub token set up without a credential helper, if any: `GITHUB_TOKEN`, then
+/// `RGIT_GITHUB_TOKEN`, then `remote.<name>.token`, then `github.token` (empty values are
+/// skipped). Never prompts.
+// Used by `resolve_github_token` and `HttpClient::for_remote` (the login for github.com).
+pub fn configured_github_token(remote_name: &str) -> Result<Option<String>> {
+    for variable in ["GITHUB_TOKEN", "RGIT_GITHUB_TOKEN"] {
+        if let Ok(token) = std::env::var(variable)
+            && !token.trim().is_empty()
+        {
+            return Ok(Some(token.trim().to_string()));
+        }
+    }
+    for key in [format!("remote.{}.token", remote_name), "github.token".to_string()] {
+        if let Some(token) = crate::core::config::get_config_value(&key)?
+            && !token.trim().is_empty()
+        {
+            return Ok(Some(token.trim().to_string()));
+        }
+    }
+    Ok(None)
 }
 
 /// Constructs a preconfigured blocking HTTP client with standard GitHub API headers.

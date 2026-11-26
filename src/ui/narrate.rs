@@ -114,6 +114,22 @@ pub fn commits_between(old: Option<&str>, new: &str) -> usize {
     new_set.difference(&old_set).count()
 }
 
+/// How many commits reachable from `new` are reachable from none of `known` (the tips a
+/// remote already had): what a push to a new branch actually sent.
+// Used by the push summary.
+pub fn commits_not_in(new: &str, known: &[&str]) -> usize {
+    let mut new_set = crate::core::commit::collect_ancestors(new).unwrap_or_default();
+    for tip in known {
+        if new_set.is_empty() {
+            break;
+        }
+        for commit in crate::core::commit::collect_ancestors(tip).unwrap_or_default() {
+            new_set.remove(&commit);
+        }
+    }
+    new_set.len()
+}
+
 /// Whether `ancestor` is reachable from `descendant` (a commit counts as its own ancestor).
 // Used by the narration (fast-forward / already-up-to-date / force-push checks).
 pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {

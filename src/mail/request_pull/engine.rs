@@ -6,7 +6,7 @@ use crate::remote::fetch::engine::read_object_from_path;
 use crate::core::commit::{parse_commit_object, split_commit_message};
 use crate::diff::hunks::diff_tree_file;
 use crate::remote::github::{build_github_client, get_github_default_branch, list_github_refs, resolve_github_token};
-use crate::remote::transport::{not_a_repository, resolve_remote, smart_http_not_supported_yet, types::Transport};
+use crate::remote::transport::{not_a_repository, resolve_remote, types::Transport};
 use crate::mail::mailmap::map_user;
 use crate::core::object_store::{flatten_tree, read_object};
 use crate::core::refs::list_all_refs;
@@ -85,7 +85,8 @@ pub fn remote_display_url(url: &str) -> String {
 /// Lists a repository's refs like `git ls-remote`: `HEAD` first, then every ref in name
 /// order, an annotated tag being followed by a `<ref>^{}` entry with the commit it points
 /// at. Works for the repositories rgit can talk to: local paths (or remotes configured
-/// with one) and GitHub, where only branches are listed.
+/// with one), smart-HTTP servers (GitHub included), and GitHub's REST API, where only
+/// branches are listed.
 // Used by `request-pull`.
 pub fn list_remote_refs_for_pull(url: &str) -> anyhow::Result<Vec<(String, String)>> {
     let git_dir = match resolve_remote(url)?.transport {
@@ -104,7 +105,24 @@ pub fn list_remote_refs_for_pull(url: &str) -> anyhow::Result<Vec<(String, Strin
             return Ok(refs);
         }
         Transport::Bundle { path } => return Err(not_a_repository(&path)),
-        Transport::SmartHttp { url } => return Err(smart_http_not_supported_yet("list the refs of", &url)),
+        Transport::SmartHttp { url: http_url } => {
+            let client = crate::remote::http::HttpClient::for_remote(url, &http_url)?;
+            let discovery = crate::remote::smart_http::discover_refs(&client, &http_url, &[], false)?;
+            let mut refs = Vec::new();
+            if let Some(head) = discovery.refs.iter().find(|r| r.name == "HEAD").and_then(|r| r.oid.clone()) {
+                refs.push((head, "HEAD".to_string()));
+            }
+            let mut named: Vec<_> = discovery.refs.iter().filter(|r| r.name != "HEAD").collect();
+            named.sort_by(|a, b| a.name.cmp(&b.name));
+            for r in named {
+                let Some(oid) = r.oid.clone() else { continue };
+                refs.push((oid, r.name.clone()));
+                if let Some(peeled) = &r.peeled {
+                    refs.push((peeled.clone(), format!("{}^{{}}", r.name)));
+                }
+            }
+            return Ok(refs);
+        }
         Transport::Local { git_dir } => git_dir,
     };
     let mut by_name: BTreeMap<String, String> = BTreeMap::new();

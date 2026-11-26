@@ -15,7 +15,7 @@ It started as a way to learn how version control works inside, and it has grown 
 - **139 commands**, from everyday porcelain (`add`, `commit`, `branch`, `merge`, `rebase`, `stash`, `bisect`) to plumbing (`cat-file`, `update-index`, `pack-objects`, `commit-graph`).
 - **Git-compatible storage.** Zlib objects, SHA-1 ids, index v2/v3, packfiles with offset and ref deltas, `packed-refs`, reflogs, `.git` worktree files.
 - **Faithful algorithms.** Myers diff with git's xdiff compaction, rename and copy detection (`diffcore-rename`), three-way merge, `log --graph`, `--follow`, `range-diff`, `blame`, interactive rebase, patch mode (`add -p`).
-- **Two remote transports.** Local paths, and GitHub through its REST API with a personal access token.
+- **Remote transports.** Local paths, bundles, and any HTTPS git server (GitHub included) over git's own smart-HTTP protocol, with logins from git's credential helpers or a GitHub token.
 - **A git that explains itself.** `--explain` and `--teach` narrate what a command did and what to do next (on standard error, so scripts are unaffected), and `reset --soft` says where the changes went. `rgit conflicts` lists unresolved conflicts in plain words, `rgit whereami` shows where you stand and what to run next, and `rgit tip` teaches one git trick at a time.
 - **Safer history editing.** `rgit undo` takes back the last operation (even `reset --hard`) after showing what it will change, `rgit oops` suggests the most likely fix right after a mistake, `rgit wip` saves unfinished work per branch, and `rgit fixup`, `absorb`, `split` and `move-commit` rewrite commits with every step checked in memory before any ref moves. See [Beyond git](#beyond-git).
 - **Insight into a repository.** `story`, `hotspots`, `stats`, `timeline`, `compare` and `contributors` answer the questions people usually write scripts for; `secrets` and `doctor` check a repository before you share it.
@@ -113,10 +113,10 @@ These commands exist only in rgit. All of them are documented, with examples, in
 
 `clone`, `fetch`, `pull` and `push` work with:
 
-1. **A local path**, a folder containing a repository or a bare repository.
-2. **GitHub**, as `owner/repo` or an HTTPS URL, using a personal access token (scope `repo`). The token is read from `GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN`, `remote.<name>.token` or `github.token`.
+1. **A local path**, a folder containing a repository or a bare repository (or a bundle file, for `clone` and `fetch`).
+2. **Any HTTPS git server**, GitHub included (also as `owner/repo`), over git's smart-HTTP protocol (v2, with v0 fallback). Logins come from git's credential helpers (`credential.helper`); for GitHub, a token in `GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN`, `remote.<name>.token` or `github.token` is used first. `rgit config --global rgit.httpTransport api` switches GitHub back to the older REST API transport.
 
-SSH and the plain git smart-HTTP protocol are not supported.
+SSH is not supported.
 
 ## Project layout
 

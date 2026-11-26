@@ -60,7 +60,7 @@ pub fn remote_default_branch(source: &CloneSource, remote_name: &str) -> Result<
         CloneSource::Bundle { path } => Ok(bundle_head_branch(&read_bundle(&path.to_string_lossy())?.0)),
         // Asks for an unborn HEAD too, so an empty repository still names its default branch.
         CloneSource::SmartHttp { url } => {
-            let client = crate::remote::http::HttpClient::new()?;
+            let client = crate::remote::http::HttpClient::for_remote(remote_name, url)?;
             let discovery = crate::remote::smart_http::discover_refs(&client, url, &["HEAD".to_string()], true)?;
             Ok(discovery
                 .refs

@@ -223,7 +223,7 @@ fn fetch_from_bundle(path: &std::path::Path, remote_name: &str, remote_display: 
 }
 
 /// `rgit fetch` from a remote reached over git's smart-HTTP protocol (any https host, and
-/// GitHub with `rgit.httpTransport=smart`). Lists the server's branches, negotiates with the
+/// GitHub unless `rgit.httpTransport=api`). Lists the server's branches, negotiates with the
 /// local ref tips so the server sends only what this repository lacks, then verifies and
 /// indexes the pack (completing a thin pack with the local bases it deltas against), checks
 /// that every wanted commit arrived and that everything the new objects reference exists,
@@ -235,7 +235,7 @@ fn fetch_from_smart_http(url: &str, remote_name: &str, remote_display: &str, bra
     use std::io::IsTerminal;
     use crate::remote::smart_http::{discover_refs, fetch_pack};
 
-    let client = crate::remote::http::HttpClient::new()?;
+    let client = crate::remote::http::HttpClient::for_remote(remote_name, url)?;
     let discovery = discover_refs(&client, url, &["HEAD".to_string(), "refs/heads/".to_string()], false)?;
     let branches: Vec<(String, String)> = discovery
         .refs

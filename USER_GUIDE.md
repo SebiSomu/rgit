@@ -177,14 +177,16 @@ Anywhere a command takes a commit, you can write:
 | `A...B` | Commits in either, but not both. |
 | `^X`, `--not` | Exclude `X` and its ancestors. |
 
-## Remotes: local paths and GitHub
+## Remotes: local paths and HTTPS servers
 
 rgit has two transports for `clone`, `fetch`, `pull` and `push`:
 
 1. **A local path.** Any folder on disk containing a repository, or a bare repository: `rgit clone ../project my-copy`.
-2. **GitHub.** `owner/repo` or an HTTPS URL, through GitHub's REST API with a personal access token (scope `repo`).
+2. **HTTPS.** Any git server, GitHub included (also as `owner/repo`), over git's own smart-HTTP protocol, the same one `git` uses: fetches download only what is new, pushes send only what the server lacks.
 
-The token is looked up in this order: `GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN`, the config key `remote.<name>.token`, the config key `github.token`.
+Logins come from git's credential helpers (`credential.helper`, see `rgit credential`). For GitHub, a personal access token is used first when one is set up, looked up in this order: `GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN`, the config key `remote.<name>.token`, the config key `github.token`. If GitHub refuses it, rgit warns and asks the credential helper instead.
+
+The older transport through GitHub's REST API is still there: `rgit config --global rgit.httpTransport api` (and `--unset` to go back).
 
 ```powershell
 $env:GITHUB_TOKEN = "ghp_..."                 # PowerShell, current session
@@ -195,7 +197,7 @@ rgit clone SebiSomu/rgit
 rgit config --global github.token ghp_xxx    # stored in ~/.rgitconfig
 ```
 
-General git servers over SSH or plain HTTPS git protocol are not supported. Treat the token like a password: do not commit `.rgitconfig`.
+SSH is not supported. Treat the token like a password: do not commit `.rgitconfig`.
 
 ---
 
@@ -5663,7 +5665,7 @@ rgit backup                            # every ref in a dated bundle (newest 10 
 
 rgit aims for git's behaviour and output, but some things are different or missing:
 
-- **Transports.** Only local paths and GitHub (REST API). No SSH, no smart HTTP git protocol.
+- **Transports.** Local paths, bundles and HTTPS (smart HTTP). No SSH. `fetch` over HTTPS does not fetch tags yet.
 - **Tags over local transport.** `clone` and `fetch` from a local path do not copy tags (a bundle does, so `rgit clone <backup file>` restores them).
 - **`stash show`** with no flag prints the full patch; git prints only a summary there and the patch with `-p`. `-p` is accepted.
 - **`reflog <ref>`** needs the word `show` (`rgit reflog show main`); `reflog -n <count>` works on its own.
@@ -5695,6 +5697,7 @@ rgit aims for git's behaviour and output, but some things are different or missi
 | `error: unexpected argument '...' found` (exit 2) | A flag rgit does not have. Check `rgit <command> -h`. |
 | `GitHub token not found` | Set `GITHUB_TOKEN`, or `rgit config --global github.token <token>`. |
 | `Authentication failed for GitHub` | The token is wrong, expired or lacks the `repo` scope. |
+| `warning: github.com refused the configured GitHub token` | The token in `GITHUB_TOKEN` / `github.token` is expired or revoked: remove it (`rgit config --unset github.token`) or replace it; meanwhile the credential helper is used. |
 | An editor opens and you did not expect it | Give the message on the command line (`-m`), or set `RGIT_EDITOR` / `core.editor`. |
 | A merge stopped halfway | `rgit status`, then `rgit conflicts`; finish with `--continue` or give up with `--abort`. |
 | Lost a commit after `reset --hard` | `rgit undo`, or `rgit reflog`, then `rgit reset --hard <hash or HEAD@{n}>`. |

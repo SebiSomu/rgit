@@ -2,7 +2,7 @@
 
 use crate::ui::{
     {danger, detail, has, next, note, plural, positionals, short},
-    narrate::{commits_between, is_ancestor, take_snapshot},
+    narrate::{commits_between, commits_not_in, is_ancestor, take_snapshot},
     report::upstream_of,
     report::merge::report_merge,
     types::RepoSnapshot,
@@ -86,9 +86,19 @@ pub(super) fn report_push(args: &[String], b: &RepoSnapshot, a: &RepoSnapshot, o
                 (Some(o), Some(n)) if !is_ancestor(o, n) => {
                     danger(&format!("Force-pushed {}: {} -> {}; the remote lost {} it had.", name, short(o), short(n), plural(commits_between(Some(n), o), "commit", "commits")));
                 }
-                (_, Some(n)) => {
-                    let sent = commits_between(old.as_deref(), n);
-                    note(&format!("Sent {} to {} ({}{}).", plural(sent, "commit", "commits"), name, old.as_deref().map(|o| format!("{}..", short(o))).unwrap_or_default(), short(n)));
+                (Some(o), Some(n)) => {
+                    let sent = commits_between(Some(o), n);
+                    note(&format!("Sent {} to {} ({}..{}).", plural(sent, "commit", "commits"), name, short(o), short(n)));
+                }
+                (None, Some(n)) => {
+                    // A new branch: only what the remote's other branches didn't already have.
+                    let remote = name.split('/').next().unwrap_or_default();
+                    let prefix = format!("refs/remotes/{}/", remote);
+                    let known: Vec<&str> = b.refs.iter().filter(|(r, _)| r.starts_with(&prefix)).map(|(_, h)| h.as_str()).collect();
+                    match commits_not_in(n, &known) {
+                        0 => note(&format!("Created {} at {}; the remote already had its commits.", name, short(n))),
+                        sent => note(&format!("Sent {} to new branch {} ({}).", plural(sent, "commit", "commits"), name, short(n))),
+                    }
                 }
                 (Some(o), None) => note(&format!("Deleted {} on the remote (was {}).", name, short(o))),
                 _ => {}

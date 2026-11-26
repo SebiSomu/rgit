@@ -125,6 +125,40 @@ fn a_refused_login_is_rejected_and_the_request_fails() {
     assert!(!err.contains("wrong"), "the password never appears in messages");
 }
 
+/// The login for the test server's host, as `HttpClient::for_remote` makes from a token.
+fn preset(server: &GitHttpServer, password: &str) -> Credential {
+    let url = Url::parse(&server.url("")).unwrap();
+    Credential {
+        protocol: Some("http".into()),
+        host: Some(format!("{}:{}", url.host_str().unwrap(), url.port().unwrap())),
+        username: Some("sebi".into()),
+        password: Some(password.into()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_configured_token_is_sent_from_the_first_request_and_never_stored() {
+    let (server, _work) = or_skip!(server_with_repo(auth()));
+    let (http, calls) = client(Some(("sebi", "s3cret")));
+    http.preset_login(preset(&server, "s3cret"));
+    assert_eq!(http.get(&info_refs(&server), &[]).unwrap().status(), StatusCode::OK);
+    assert_eq!(server.requests()[0].status, 200, "no 401 round trip");
+    assert!(calls.lock().unwrap().is_empty(), "the credential helpers are not told about a configured token");
+}
+
+#[test]
+fn a_refused_token_falls_back_to_the_credential_helper() {
+    let (server, _work) = or_skip!(server_with_repo(auth()));
+    let (http, calls) = client(Some(("sebi", "s3cret")));
+    http.preset_login(preset(&server, "expired"));
+    assert_eq!(http.get(&info_refs(&server), &[]).unwrap().status(), StatusCode::OK);
+    let calls = calls.lock().unwrap();
+    assert!(calls[0].starts_with("fill "), "{:?}", calls);
+    // The helper's login is approved; the refused token is never passed to `reject`.
+    assert_eq!(calls[1..], ["approve sebi".to_string()]);
+}
+
 #[test]
 fn no_login_available_fails_like_git() {
     let (server, _work) = or_skip!(server_with_repo(auth()));

@@ -31,6 +31,10 @@ pub struct HttpClient {
     login: Mutex<Option<Credential>>,
     /// Whether that login was already approved (helpers are told once per operation).
     approved: Mutex<bool>,
+    /// Whether the login in use is a configured token (`HttpClient::for_remote`) rather than
+    /// one from the credential helpers: helpers are never told about it, and when the server
+    /// refuses it the client warns and asks the helpers instead.
+    preset: Mutex<bool>,
 }
 
 /// A response whose status was not 401: the caller checks the status (`check_status`) and
@@ -92,6 +96,29 @@ impl HttpClient {
         HttpClient::with_credentials(Box::new(HelperCredentials), allow)
     }
 
+    /// The client for remote `remote_name` at `url`: for `https://github.com`, a configured
+    /// GitHub token (`GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN`, `remote.<name>.token`,
+    /// `github.token`) is the login from the first request, so GitHub needs no credential
+    /// helper; if GitHub refuses it, the credential helpers are asked as for any host.
+    pub fn for_remote(remote_name: &str, url: &str) -> Result<HttpClient> {
+        let client = HttpClient::new()?;
+        let is_github = Url::parse(url).is_ok_and(|u| u.scheme() == "https" && u.host_str() == Some("github.com") && u.username().is_empty());
+        if is_github && let Some(token) = crate::remote::github::configured_github_token(remote_name)? {
+            client.preset_login(Credential {
+                username: Some("x-access-token".to_string()),
+                password: Some(token),
+                ..Credential::for_https_host("github.com")
+            });
+        }
+        Ok(client)
+    }
+
+    /// Starts with `login` (a configured token) instead of waiting for a 401.
+    pub fn preset_login(&self, login: Credential) {
+        *self.login.lock().unwrap() = Some(login);
+        *self.preset.lock().unwrap() = true;
+    }
+
     /// A client with its own credential source (tests use a recording fake).
     pub fn with_credentials(credentials: Box<dyn CredentialSource>, allow_insecure_auth: bool) -> Result<HttpClient> {
         let client = Client::builder()
@@ -112,7 +139,7 @@ impl HttpClient {
         #[cfg(test)]
         let client = client.no_proxy();
         let client = client.build()?;
-        Ok(HttpClient { client, credentials, allow_insecure_auth, login: Mutex::new(None), approved: Mutex::new(false) })
+        Ok(HttpClient { client, credentials, allow_insecure_auth, login: Mutex::new(None), approved: Mutex::new(false), preset: Mutex::new(false) })
     }
 
     /// `GET url` with extra headers (e.g. `Git-Protocol: version=2`).
@@ -161,9 +188,11 @@ impl HttpClient {
                 .send()
                 .map_err(|e| anyhow::anyhow!("fatal: unable to access '{}': {}", repo_display(url), describe_error(&e)))?;
 
+            let preset = *self.preset.lock().unwrap();
             if response.status() != StatusCode::UNAUTHORIZED {
                 if let Some(login) = &login
                     && response.status().is_success()
+                    && !preset
                 {
                     let mut approved = self.approved.lock().unwrap();
                     if !*approved {
@@ -174,6 +203,16 @@ impl HttpClient {
                 return Ok(HttpResponse { response });
             }
 
+            // 401 to a configured token: say so (it is likely expired) and ask the helpers.
+            if preset {
+                *self.preset.lock().unwrap() = false;
+                *self.login.lock().unwrap() = None;
+                eprintln!(
+                    "warning: {} refused the configured GitHub token (GITHUB_TOKEN, RGIT_GITHUB_TOKEN, remote.<name>.token or github.token); going on without it (the credential helper is asked if a login is needed)",
+                    target.host_str().unwrap_or("the server")
+                );
+                continue;
+            }
             // 401: a login we already sent was refused, so forget it; otherwise ask for one.
             if let Some(login) = login {
                 self.credentials.reject(&login);

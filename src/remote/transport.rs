@@ -14,7 +14,8 @@ use crate::remote::transport::types::{Remote, Transport};
 /// Resolves a remote given as a configured name (`origin`), a path or a URL. The URL is
 /// `remote.<spec>.url` when configured, else `spec` itself. A path that exists on disk is a
 /// bundle (by its signature) or a repository; anything else GitHub recognizes is a GitHub
-/// repository; any other `http(s)://` URL is smart HTTP; the rest fails with the usual
+/// repository, reached over smart HTTP unless `rgit.httpTransport=api` picks the REST API;
+/// any other `http(s)://` URL is smart HTTP; the rest fails with the usual
 /// "does not appear to be a git repository" errors.
 // Used by `fetch`, `push`, `clone` and `request-pull`.
 pub fn resolve_remote(spec: &str) -> Result<Remote> {
@@ -49,26 +50,15 @@ pub fn not_a_repository(path: &Path) -> anyhow::Error {
     anyhow::anyhow!("fatal: '{}' does not appear to be a git repository", path.display())
 }
 
-/// The error for a command that can't use git's smart-HTTP protocol yet (`fetch`, `push`,
-/// `request-pull` to a host other than GitHub), pointing at what does work.
-// Used by `fetch`, `push` and `request-pull`.
-pub fn smart_http_not_supported_yet(action: &str, url: &str) -> anyhow::Error {
-    anyhow::anyhow!(
-        "fatal: rgit can't {} '{}' yet: over HTTPS only GitHub is supported so far\nhint: `rgit ls-remote {}` already works with any host",
-        action,
-        crate::remote::http::redact_url(url),
-        crate::remote::http::redact_url(url)
-    )
-}
-
-/// Whether GitHub remotes use git's smart-HTTP protocol instead of the REST API: opt in with
-/// `rgit config --global rgit.httpTransport smart` (until smart HTTP becomes the default).
+/// Whether GitHub remotes use git's smart-HTTP protocol (the default) instead of the REST
+/// API transport: `rgit config --global rgit.httpTransport api` switches back to the API
+/// (any other value, or none, means smart HTTP).
 // Used by `resolve_remote` and `clone`.
 pub fn github_uses_smart_http() -> bool {
-    crate::core::config::get_config_value("rgit.httptransport")
+    !crate::core::config::get_config_value("rgit.httptransport")
         .ok()
         .flatten()
-        .is_some_and(|v| v.trim().eq_ignore_ascii_case("smart"))
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("api"))
 }
 
 /// The https URL of a GitHub repository: the URL itself when it already is one, else

@@ -6,6 +6,7 @@ pub mod checkout_index;
 pub mod clean;
 pub mod commit;
 pub mod commit_summary;
+pub mod drop;
 pub mod fixup;
 pub mod gitignore;
 pub mod ignore;

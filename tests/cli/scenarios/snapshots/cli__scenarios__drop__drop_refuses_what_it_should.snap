@@ -1,0 +1,97 @@
+---
+source: tests/cli/scenarios/drop.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit drop HEAD~2
+[stderr]
+fatal: <H1:7> "first commit" is the root commit; there is nothing to put the later commits on
+[exit 128]
+$ rgit drop nope
+[stderr]
+fatal: 'nope' is not a commit
+[exit 128]
+$ rgit switch -c side
+Switched to a new branch 'side'
+$ write side.txt (2 bytes)
+$ rgit add side.txt
+Staged files to index (1 new).
+$ rgit commit -m side
+[side <H4:7>] side
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 side.txt
+$ rgit switch main
+Switched to branch 'main'
+$ rgit drop side
+[stderr]
+fatal: <H4:7> is not in the current branch's first-parent history (`rgit log --first-parent` lists what can be dropped)
+[exit 128]
+$ rgit update-ref refs/remotes/origin/main HEAD~1
+$ rgit drop HEAD~1
+[stderr]
+fatal: <H2:7> "second commit" is already pushed (origin/main has it); dropping it would make the branches diverge
+hint: pass --force to drop it anyway (you'll need `rgit push --force` afterwards)
+[exit 128]
+$ rgit drop HEAD~1 --force
+Dropped <H2:7> "second commit", 1 later commit replayed; HEAD is now <H5:7>.
+`rgit undo` takes it back (`rgit recover` lists dropped commits too).
+[stderr]
+Rebasing (1/1)[KSuccessfully rebased and updated refs/heads/main.
+$ rgit log --oneline
+<H5:7> third commit
+<H1:7> first commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H5>
+  refs/heads/side <H4>
+  refs/remotes/origin/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD
+index (ls-files -s):
+  100644 <H6> 0	a.txt
+  100644 <H7> 0	b.txt
+  100644 <H8> 0	src/lib.txt
+HEAD commit:
+  tree <H9>
+  parent <H1>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000900 +0000
+  
+  third commit
+  
+  With a body paragraph.
+worktree:
+  a.txt
+    | one
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

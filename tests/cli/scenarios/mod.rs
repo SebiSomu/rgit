@@ -24,6 +24,7 @@ mod changelog;
 mod compare;
 mod contributors;
 mod doctor;
+mod drop;
 mod hotspots;
 mod ignore;
 mod move_commit;

@@ -290,6 +290,7 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
 | [`squash`](#rgit-squash) | Fold the last N commits into one, with their messages combined to edit (rgit only). |
 | [`reword`](#rgit-reword) | Change the message of HEAD or an earlier commit, without an interactive rebase (rgit only). |
+| [`drop`](#rgit-drop) | Remove one commit from the current branch and replay the commits after it (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
@@ -2475,6 +2476,49 @@ $ rgit log --oneline -3
 $ rgit reword HEAD~2 -m 'First commit'
 Reworded 3c2b1a0 -> 9f8e7d6 "First commit", 2 later commits rewritten.
 (was "frist commit"; `rgit undo` takes it back)
+```
+
+
+### `rgit drop`
+
+Remove one commit from the current branch (rgit only).
+
+**Syntax:** `rgit drop <commit> [-f]`
+
+`rgit drop HEAD~2` takes that commit out of the branch and replays the commits after it onto its parent, with the rebase engine: what `rebase -i` with a `drop` line does, without writing the todo. Dropping HEAD just moves the branch back one commit.
+
+Because the later commits lose the dropped one's changes, a replay can stop on a conflict. It stops the same way a rebase does: resolve, `rgit add`, `rgit rebase --continue` (or `--skip`), or `rgit rebase --abort` to keep the commit after all. Uncommitted changes are stashed around the replay and applied again after it, as git's `rebase --autostash` does, so staged changes come back unstaged.
+
+`drop` refuses the root commit, a merge commit (dropping one, or replaying past one), a commit that is not on the branch's first-parent history, an operation in progress, and a commit a remote-tracking branch already has (`-f` drops it anyway; then `rgit push --force`). `rgit undo` takes a drop back, and `rgit recover` lists dropped commits.
+
+<details>
+<summary>Options as printed by <code>rgit drop -h</code></summary>
+
+```text
+Remove one commit from the current branch and replay the commits after it
+
+Usage: rgit drop [OPTIONS] <COMMIT>
+
+Arguments:
+  <COMMIT>  The commit to remove from the current branch
+
+Options:
+  -f, --force  Drop it even if it is already pushed
+  -h, --help   Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit log --oneline -3
+6e5d4c3 fourth commit
+5d4c3b2 Add debug output
+4c3b2a1 third commit
+$ rgit drop HEAD~1
+Dropped 5d4c3b2 "Add debug output", 1 later commit replayed; HEAD is now 8a7b6c5.
+`rgit undo` takes it back (`rgit recover` lists dropped commits too).
 ```
 
 
@@ -5791,6 +5835,7 @@ rgit absorb                            # let rgit pick the commit for each stage
 rgit split <commit>                    # cut one commit into several, hunk by hunk
 rgit squash 3                          # fold the last 3 commits into one
 rgit reword HEAD~2                     # fix an older commit's message
+rgit drop HEAD~2                       # take one commit out of the branch
 rgit move-commit <commit> other        # committed on the wrong branch? move it (-c copies)
 rgit oops                              # after a mistake: the most likely fixes
 rgit recover                           # everything lost (reset, amend, dropped stash, ...); `recover <n>` brings one back

@@ -1,15 +1,10 @@
-use super::{diverged, three_commits};
+use super::{diverged, keep_editor_text, three_commits};
 use insta::assert_snapshot;
-
-/// An "editor" that saves the file unchanged, prints nothing and works on every platform.
-fn keep_template() -> String {
-    format!("{} ls-files", env!("CARGO_BIN_EXE_rgit"))
-}
 
 #[test]
 fn squash_folds_the_last_commits_into_one() {
     let mut r = three_commits();
-    r.set_env("RGIT_EDITOR", &keep_template());
+    keep_editor_text(&mut r);
     r.write("parser.txt", "numbers\n").run("add parser.txt").run("commit -m 'Add parser' -m 'Handles numbers.'");
     r.write("parser.txt", "numbers\n").write("a.txt", "fixed\n").run("commit -a -m 'fixup! Add parser'");
     r.write("parser.txt", "numbers\nstrings\n").run("commit -a -m 'Parse strings'");

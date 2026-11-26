@@ -28,7 +28,7 @@ $ rgit commit -m 'third commit' -m 'With a body paragraph.'
  Author: Test Author <author@example.com>
  2 files changed, 2 insertions(+), 1 deletion(-)
  create mode 100644 b.txt
-$ export RGIT_EDITOR=/home/claude/rgit10/target/debug/rgit ls-files
+$ export RGIT_EDITOR=<rgit> ls-files
 $ write parser.txt (8 bytes)
 $ rgit add parser.txt
 Staged files to index (1 new).

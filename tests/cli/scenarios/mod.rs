@@ -12,6 +12,7 @@ mod remotes;
 mod misc;
 mod oops;
 mod recover;
+mod reword;
 mod open;
 mod undo;
 mod wip;
@@ -47,6 +48,14 @@ pub fn three_commits() -> Repo {
     r.write("src/lib.txt", "lib v2\n").write("b.txt", "bee\n");
     r.run("add .").run("commit -m 'third commit' -m 'With a body paragraph.'");
     r
+}
+
+/// Sets an "editor" that saves the file unchanged, prints nothing and works on every
+/// platform (rgit itself, as `rgit ls-files <file>`), with the binary's path masked so the
+/// snapshot doesn't depend on where the project is built.
+pub fn keep_editor_text(r: &mut Repo) {
+    let rgit = env!("CARGO_BIN_EXE_rgit");
+    r.mask(rgit, "<rgit>").set_env("RGIT_EDITOR", &format!("{} ls-files", rgit));
 }
 
 /// `main` and `feature` diverged from a common base, touching different files.

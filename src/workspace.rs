@@ -17,6 +17,7 @@ pub mod read_tree;
 pub mod recover;
 pub mod reset;
 pub mod restore;
+pub mod reword;
 pub mod secrets;
 pub mod sparse_checkout;
 pub mod squash;

@@ -1,0 +1,98 @@
+---
+source: tests/cli/scenarios/reword.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write a.txt (4 bytes)
+$ write src/lib.txt (7 bytes)
+$ rgit add .
+Staged files to index (2 new).
+$ rgit commit -m 'first commit'
+[main (root-commit) <H1:7>] first commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+)
+ create mode 100644 a.txt
+ create mode 100644 src/lib.txt
+$ write a.txt (8 bytes)
+$ rgit commit -a -m 'second commit'
+[main <H2:7>] second commit
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ write src/lib.txt (7 bytes)
+$ write b.txt (4 bytes)
+$ rgit add .
+Staged files to index (1 new, 1 modified, 1 unchanged).
+$ rgit commit -m 'third commit' -m 'With a body paragraph.'
+[main <H3:7>] third commit
+ Author: Test Author <author@example.com>
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 100644 b.txt
+$ rgit reword HEAD -m ''
+[stderr]
+Aborting reword due to empty commit message; nothing changed.
+[exit 1]
+$ rgit reword nope -m x
+[stderr]
+fatal: 'nope' is not a commit
+[exit 128]
+$ rgit switch -c side
+Switched to a new branch 'side'
+$ write side.txt (2 bytes)
+$ rgit add side.txt
+Staged files to index (1 new).
+$ rgit commit -m side
+[side <H4:7>] side
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 side.txt
+$ rgit switch main
+Switched to branch 'main'
+$ rgit reword side -m 'not here'
+[stderr]
+fatal: <H4:7> is not in the current branch's first-parent history (`rgit log --first-parent` lists what can be reworded)
+[exit 128]
+$ rgit update-ref refs/remotes/origin/main HEAD~1
+$ rgit reword HEAD~1 -m 'pushed already'
+[stderr]
+fatal: <H2:7> "second commit" is already pushed (origin/main has it); rewording it would make the branches diverge
+hint: pass --force to reword it anyway (you'll need `rgit push --force` afterwards)
+[exit 128]
+$ rgit reword HEAD -m 'not pushed yet'
+Reworded <H3:7> -> <H5:7> "not pushed yet".
+(was "third commit"; `rgit undo` takes it back)
+$ rgit reword HEAD~1 -m 'pushed, but forced' --force
+Reworded <H2:7> -> <H6:7> "pushed, but forced", 1 later commit rewritten.
+(was "second commit"; `rgit undo` takes it back)
+$ rgit log --oneline
+<H7:7> not pushed yet
+<H6:7> pushed, but forced
+<H1:7> first commit
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/main <H7>
+  refs/heads/side <H4>
+  refs/remotes/origin/main <H2>
+git-dir entries:
+  COMMIT_EDITMSG
+index (ls-files -s):
+  100644 <H8> 0	a.txt
+  100644 <H9> 0	b.txt
+  100644 <H10> 0	src/lib.txt
+HEAD commit:
+  tree <H11>
+  parent <H6>
+  author Test Author <author@example.com> 1700000300 +0000
+  committer Test Committer <committer@example.com> 1700000960 +0000
+  
+  not pushed yet
+worktree:
+  a.txt
+    | one
+    | two
+  b.txt
+    | bee
+  src/lib.txt
+    | lib v2

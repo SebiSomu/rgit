@@ -289,6 +289,7 @@ SSH is not supported. Treat the token like a password: do not commit `.rgitconfi
 | [`absorb`](#rgit-absorb) | Fold each staged hunk into the commit that last changed those lines, in one rewrite (rgit only). |
 | [`split`](#rgit-split) | Split one commit into several by hunk, picking each new commit's hunks and message (rgit only). |
 | [`squash`](#rgit-squash) | Fold the last N commits into one, with their messages combined to edit (rgit only). |
+| [`reword`](#rgit-reword) | Change the message of HEAD or an earlier commit, without an interactive rebase (rgit only). |
 | [`move-commit`](#rgit-move-commit) | Move commits of the current branch to another branch without switching (rgit only). |
 | [`sync`](#rgit-sync) | Fetch, then fast-forward, rebase or merge onto the upstream (and push), with a plan printed first (rgit only). |
 | [`reset`](#rgit-reset) | Move HEAD and optionally reset the index and working tree. |
@@ -2432,6 +2433,48 @@ Squashed 3 commits (4f3e2d1..6d1e2f0) into 7e8f9a0. `rgit undo` takes it back.
 $ rgit log --oneline -2
 7e8f9a0 Add parser
 3a2b1c0 third commit
+```
+
+
+### `rgit reword`
+
+Change the message of HEAD or an earlier commit (rgit only).
+
+**Syntax:** `rgit reword [<commit>] [-m <message>]... [-f]`
+
+`rgit reword` opens your editor on HEAD's message. `rgit reword HEAD~3` does the same for an older commit on the current branch, with no interactive rebase todo to write. `-m` gives the new message directly; several `-m` make paragraphs, as in `commit`. Saving the message unchanged does nothing, and an empty message cancels.
+
+Only the message changes. The commits after the reworded one are written again with the same files, authors and messages, so a reword never stops on a conflict, and the index and working tree are left alone (staged changes stay staged, unlike `commit --amend`). A merge commit after it keeps its other parents. The commit must be on the branch's first-parent history (`rgit log --first-parent`). `reword` refuses during an operation in progress, and for a commit a remote-tracking branch already has (`-f` rewords it anyway; then `rgit push --force`). `rgit undo` takes a reword back.
+
+<details>
+<summary>Options as printed by <code>rgit reword -h</code></summary>
+
+```text
+Change the message of HEAD or an earlier commit, without an interactive rebase
+
+Usage: rgit reword [OPTIONS] [COMMIT]
+
+Arguments:
+  [COMMIT]  The commit whose message to change (default: HEAD)
+
+Options:
+  -m, --message <MESSAGE>  Use this message instead of opening the editor (several -m make paragraphs, as in commit)
+  -f, --force              Reword even if the commit is already pushed
+  -h, --help               Print help
+```
+
+</details>
+
+**Example:**
+
+```text
+$ rgit log --oneline -3
+5e4d3c2 third commit
+4d3c2b1 second commit
+3c2b1a0 frist commit
+$ rgit reword HEAD~2 -m 'First commit'
+Reworded 3c2b1a0 -> 9f8e7d6 "First commit", 2 later commits rewritten.
+(was "frist commit"; `rgit undo` takes it back)
 ```
 
 
@@ -5747,6 +5790,7 @@ rgit fixup <commit>                    # fold the staged fix into an earlier com
 rgit absorb                            # let rgit pick the commit for each staged hunk
 rgit split <commit>                    # cut one commit into several, hunk by hunk
 rgit squash 3                          # fold the last 3 commits into one
+rgit reword HEAD~2                     # fix an older commit's message
 rgit move-commit <commit> other        # committed on the wrong branch? move it (-c copies)
 rgit oops                              # after a mistake: the most likely fixes
 rgit recover                           # everything lost (reset, amend, dropped stash, ...); `recover <n>` brings one back

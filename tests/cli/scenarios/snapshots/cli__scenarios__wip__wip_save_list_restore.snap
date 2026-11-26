@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/wip.rs
+assertion_line: 17
 expression: r.finish()
 ---
 $ rgit init
@@ -53,15 +54,15 @@ $ rgit save
 Saved wip@{0} (WIP on main: <H4:7> ignore-logs)
 The working tree is clean; `rgit wip --restore` brings the changes back.
 $ rgit wip --list
-wip@{0}: WIP on main: <H4:7> ignore-logs (just now)
-wip@{1}: WIP on main: halfway through parser (just now)
+wip@{0}: WIP on main: <H4:7> ignore-logs (<AGE> ago)
+wip@{1}: WIP on main: halfway through parser (<AGE> ago)
 $ rgit wip --restore 1
 Restored wip@{1} (WIP on main: halfway through parser)
 $ rgit status --short
 MM a.txt
 ?? notes/
 $ rgit wip --list
-wip@{0}: WIP on main: <H4:7> ignore-logs (just now)
+wip@{0}: WIP on main: <H4:7> ignore-logs (<AGE> ago)
 $ rgit wip --restore
 [stderr]
 Error: error: cannot restore WIP: you have staged changes.

@@ -5,7 +5,7 @@ use insta::assert_snapshot;
 /// Commits on chosen dates (author time) by chosen authors.
 fn history() -> Repo {
     let mut r = Repo::init();
-    let mut commit = |r: &mut Repo, who: &str, date: &str, file: &str, content: &str, msg: &str| {
+    let commit = |r: &mut Repo, who: &str, date: &str, file: &str, content: &str, msg: &str| {
         r.set_env("GIT_AUTHOR_NAME", who).set_env("GIT_AUTHOR_DATE", date);
         r.write(file, content).run(&format!("add {}", file)).run(&format!("commit -m '{}'", msg));
     };

@@ -309,16 +309,8 @@ pub(crate) fn apply_stash_trees(w_hash: &str, w_tree: &BTreeMap<String, ([u8; 20
 /// index commit and, with `-u`/`-a`, the untracked-files commit; that one has none).
 // Used by `stash push -u` / `-a`.
 pub fn build_stash_commit(tree_hash: &str, parents: &[&str], message: &str) -> anyhow::Result<String> {
-    let mut content = format!("tree {}\n", tree_hash);
-    for parent in parents {
-        content.push_str(&format!("parent {}\n", parent));
-    }
-    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
-    let author = crate::core::config::author_identity()?;
-    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("\n{}\n", message));
-    crate::core::object_store::write_object("commit", content.as_bytes())
+    let parents: Vec<String> = parents.iter().map(|p| p.to_string()).collect();
+    crate::core::commit::write_commit_now(tree_hash, &parents, message)
 }
 
 /// Lists the untracked files of the working tree (`.gitignore`-aware; with `include_ignored`,

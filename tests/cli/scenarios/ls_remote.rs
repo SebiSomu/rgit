@@ -11,8 +11,9 @@ fn serve(r: &mut Repo, server: &GitHttpServer) {
     r.mask(&format!("http://{}", host), "<HTTP>").mask(&host, "<HOST>");
     r.mask(&server.root().to_string_lossy(), "<SRV>");
     server.create_bare_repo("repo.git");
-    let bare = server.root().join("repo.git");
-    r.run(&format!("push '{}' main", bare.display()));
+    // `/` on every platform, so the transcript is the same on Windows.
+    let bare = format!("{}/repo.git", server.root().to_string_lossy());
+    r.run(&format!("push '{}' main", bare));
 }
 
 #[test]

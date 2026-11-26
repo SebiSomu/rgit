@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/wip.rs
+assertion_line: 29
 expression: r.finish()
 ---
 $ rgit init
@@ -46,7 +47,7 @@ The WIP save is kept: resolve the conflicts, then `rgit wip --drop`.
 $ rgit status --short
 UU a.txt
 $ rgit wip --list
-wip@{0}: WIP on main: <H3:7> third commit (just now)
+wip@{0}: WIP on main: <H3:7> third commit (<AGE> ago)
 $ rgit reset --hard
 HEAD is now at <H4:7> moved-on
 $ rgit wip --drop
@@ -58,7 +59,7 @@ Undoing #10: rgit wip --drop  (just now)
   - refs/rgit/wip/main: recreated at <H5:7> "WIP on main: <H3:7> third commit"
 Done. `rgit redo` brings it back.
 $ rgit wip --list
-wip@{0}: WIP on main: <H3:7> third commit (just now)
+wip@{0}: WIP on main: <H3:7> third commit (<AGE> ago)
 $ rgit switch --detach HEAD
 HEAD is now at <H4:7> (detached)
 [stderr]
@@ -71,7 +72,7 @@ hint: switch to a branch first, or use `rgit stash`
 [exit 128]
 $ rgit wip --list --all
 main:
-  wip@{0}: WIP on main: <H3:7> third commit (just now)
+  wip@{0}: WIP on main: <H3:7> third commit (<AGE> ago)
 $ rgit switch main
 Switched to branch 'main'
 $ rgit wip --drop 3

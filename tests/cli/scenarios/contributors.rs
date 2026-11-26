@@ -5,7 +5,7 @@ use insta::assert_snapshot;
 #[test]
 fn contributors_mailmap_coauthors_and_sorting() {
     let mut r = Repo::init();
-    let mut commit = |r: &mut Repo, who: &str, email: &str, date: &str, file: &str, content: &str, msg: &str| {
+    let commit = |r: &mut Repo, who: &str, email: &str, date: &str, file: &str, content: &str, msg: &str| {
         r.set_env("GIT_AUTHOR_NAME", who).set_env("GIT_AUTHOR_EMAIL", email).set_env("GIT_AUTHOR_DATE", date);
         r.write(file, content).run(&format!("add {}", file)).run(&format!("commit -m \"{}\"", msg));
     };

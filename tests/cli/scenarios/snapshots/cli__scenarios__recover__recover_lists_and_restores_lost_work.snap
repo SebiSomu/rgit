@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/recover.rs
+assertion_line: 29
 expression: r.finish()
 ---
 $ rgit init
@@ -70,7 +71,7 @@ $ rgit commit-tree HEAD^{tree} -m 'made by hand'
 <H9>
 $ rgit recover
 Lost work, newest first:
-  [1] <H9:7>  <NOW-DATE>  made by hand
+  [1] <H9:7>  2023-11-14 22:30  made by hand
       1 commit, not on any branch and in no reflog
   [2] <H8:7>  2023-11-14 22:27  topic work
       1 commit, left behind by HEAD@{0}: checkout: moving from topic to main

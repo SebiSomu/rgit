@@ -18,6 +18,8 @@ pub fn list_remote_refs(remote_git_dir: &Path) -> Result<Vec<(String, String)>> 
             refs.push((branch, sha));
         }
     }
+    // By name, as git lists refs: directory order differs between file systems.
+    refs.sort();
     Ok(refs)
 }
 

@@ -19,4 +19,7 @@ fn display_without_configuration_uses_what_was_given() {
     assert_eq!(remote("../full.bundle", None, bundle).display(), "../full.bundle");
     let local = Transport::Local { git_dir: PathBuf::from("/srv/repo.git") };
     assert_eq!(remote("/srv/repo.git", None, local).display(), "/srv/repo.git");
+    // A work tree's path, not the `.git` directory inside it.
+    let worktree = Transport::Local { git_dir: PathBuf::from("github.com/me/lib").join(".git") };
+    assert_eq!(remote("github.com/me/lib", None, worktree).display(), "github.com/me/lib");
 }

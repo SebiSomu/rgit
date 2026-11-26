@@ -77,7 +77,7 @@ fn ls_remote_matches_git_on_every_transport() {
     };
     let Some(v0_server) = GitHttpServer::start_with(ServerOptions { force_v0: true, ..Default::default() }) else { return };
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let (work, home, cwd) = (base.join("work"), base.join("home"), base.join("cwd"));
     std::fs::create_dir_all(&home).unwrap();
     std::fs::create_dir_all(&cwd).unwrap();

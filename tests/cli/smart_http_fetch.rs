@@ -64,7 +64,7 @@ fn assert_good_clone(clone: &Path, source: &Path) {
 /// Clones from `server` (as `url`), checks the clone, then fetches new commits.
 fn clone_then_fetch(server: &GitHttpServer, url: &str, home: &Path, label: &str) {
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let source = base.join("source");
     source_repo(&source);
     publish(server, &source);
@@ -184,7 +184,7 @@ fn fetch_after_local_work(options: ServerOptions, label: &str) {
     let server = or_skip!(GitHttpServer::start_with(options));
     let home = tempfile::tempdir().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let source = base.join("source");
     source_repo(&source);
     publish(&server, &source);
@@ -225,7 +225,7 @@ fn fetch_into_unrelated_history(options: ServerOptions, label: &str) {
     let server = or_skip!(GitHttpServer::start_with(options));
     let home = tempfile::tempdir().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let source = base.join("source");
     source_repo(&source);
     publish(&server, &source);

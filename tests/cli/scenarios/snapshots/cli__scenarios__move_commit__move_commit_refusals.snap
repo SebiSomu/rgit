@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/move_commit.rs
+assertion_line: 42
 expression: r.finish()
 ---
 $ rgit init
@@ -84,8 +85,8 @@ $ rgit log --oneline side
 (..) $ rgit clone repo clone
 Cloning into 'clone'...
 From <REPO>
- * [new branch]      other                -> origin/other
  * [new branch]      main                 -> origin/main
+ * [new branch]      other                -> origin/other
  * [new branch]      side                 -> origin/side
 Receiving objects: 100% (19/19), done.
 (../clone) $ rgit move-commit HEAD~1.. other -c

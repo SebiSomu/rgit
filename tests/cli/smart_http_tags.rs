@@ -54,7 +54,7 @@ fn tags_follow_the_history(options: ServerOptions, label: &str) {
     };
     let home = tempfile::tempdir().unwrap();
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let source = base.join("source");
     std::fs::create_dir_all(&source).unwrap();
     git(&source, &["init", "-q", "-b", "main"]);

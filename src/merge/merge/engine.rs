@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::core::object_store::{read_object, write_object};
+use crate::core::object_store::read_object;
 use crate::core::refs;
 
 /// Finds all best common ancestors (merge bases) between two commits.
@@ -92,23 +92,11 @@ pub fn find_merge_base(commit_a: &str, commit_b: &str) -> anyhow::Result<Option<
 }
 
 /// Builds and writes a merge commit object containing two parent hashes, authored and
-/// committed by the configured identity (`user.name` / `user.email`).
+/// committed now by the configured identity, with `GIT_AUTHOR_*` / `GIT_COMMITTER_*` applying
+/// as in `commit`.
 // Used by the `merge` command when creating a 3-way merge commit, and by `commit` and `stash`.
 pub fn build_merge_commit(tree_hash: String, parent1: &str, parent2: &str, message: &str) -> anyhow::Result<String> {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let mut content = format!("tree {}\n", tree_hash);
-    content.push_str(&format!("parent {}\n", parent1));
-    content.push_str(&format!("parent {}\n", parent2));
-
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let author = crate::core::config::author_identity()?;
-
-    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("\n{}\n", message));
-
-    write_object("commit", content.as_bytes())
+    crate::core::commit::write_commit_now(&tree_hash, &[parent1.to_string(), parent2.to_string()], message)
 }
 type TreeMap = BTreeMap<String, ([u8; 20], u32)>;
 

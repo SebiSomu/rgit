@@ -37,8 +37,9 @@ impl Remote {
         }
         match &self.transport {
             Transport::GitHubApi { owner, repo } => format!("https://github.com/{}/{}", owner, repo),
-            Transport::Bundle { .. } => self.spec.clone(),
-            Transport::Local { git_dir } => git_dir.display().to_string(),
+            // A path is shown as it was given, as git does (`From ../lib`), not as the `.git`
+            // directory found inside it (which would also mix `/` and `\` on Windows).
+            Transport::Bundle { .. } | Transport::Local { .. } => self.spec.clone(),
             Transport::SmartHttp { url } => url.clone(),
         }
     }

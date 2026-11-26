@@ -5,7 +5,7 @@ use insta::assert_snapshot;
 #[test]
 fn changelog_sections_tags_and_prepend() {
     let mut r = Repo::init();
-    let mut commit = |r: &mut Repo, file: &str, who: &str, msg: &str| {
+    let commit = |r: &mut Repo, file: &str, who: &str, msg: &str| {
         r.set_env("GIT_AUTHOR_NAME", who);
         r.write(file, &format!("{}\n", msg.len())).run(&format!("add {}", file)).run(&format!("commit -m \"{}\"", msg));
     };

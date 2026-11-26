@@ -136,22 +136,23 @@ pub fn short_hash(hash: &str) -> &str {
     &hash[..hash.len().min(7)]
 }
 
-/// Constructs and writes a commit object from a tree hash, optional parent hash, and commit message.
-// Used by `commit`, `rebase`, `banana_split`, `cherry_pick`, and `revert`.
+/// Constructs and writes a commit object from a tree hash, optional parent hash, and commit
+/// message, authored and committed now by the configured identity (see `write_commit_now`).
+// Used by `commit-tree`, `revert`, `banana-split` and the index commit of `stash`.
 pub fn build_commit(tree_hash: String, parent_hash: Option<String>, message: &str) -> anyhow::Result<String> {
-    let mut content = format!("tree {}\n", tree_hash);
-    if let Some(parent) = parent_hash {
-        content.push_str(&format!("parent {}\n", parent));
-    }
+    let parents: Vec<String> = parent_hash.into_iter().collect();
+    write_commit_now(&tree_hash, &parents, message)
+}
 
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let author = author_identity()?;
-
-    content.push_str(&format!("author {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("committer {} {} +0000\n", author, timestamp));
-    content.push_str(&format!("\n{}\n", message));
-
-    write_object("commit", content.as_bytes())
+/// Writes a commit made now, the way `commit` stamps one: the author from
+/// `current_author_signature` and the committer from `current_signature`, so
+/// `GIT_AUTHOR_*` / `GIT_COMMITTER_*` (name, email, date) apply as in git. The message gets a
+/// final newline.
+// Used by `build_commit`, `build_merge_commit` and `build_stash_commit`.
+pub fn write_commit_now(tree: &str, parents: &[String], message: &str) -> anyhow::Result<String> {
+    let author = current_author_signature()?;
+    let committer = current_signature()?;
+    write_commit_object(tree, parents, &author, &committer, &format!("{}\n", message))
 }
 
 /// The committer: the configured `Name <email>` identity stamped with the current time (in

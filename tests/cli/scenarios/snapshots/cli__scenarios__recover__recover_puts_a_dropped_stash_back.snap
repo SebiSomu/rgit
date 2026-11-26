@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/recover.rs
+assertion_line: 39
 expression: r.finish()
 ---
 $ rgit init
@@ -36,7 +37,7 @@ Dropped stash@{0} (On main: parser idea)
 $ rgit stash list
 $ rgit recover
 Lost work, newest first:
-  [1] <H4:7>  <NOW-DATE>  On main: parser idea
+  [1] <H4:7>  2023-11-14 22:19  On main: parser idea
       stash that was dropped or popped
 `rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
 (`recovered-<commit>` by default), and a stash back on the stash list.
@@ -51,7 +52,7 @@ $ rgit status --short
  M src/lib.txt
 $ rgit recover
 Lost work, newest first:
-  [1] <H4:7>  <NOW-DATE>  On main: parser idea
+  [1] <H4:7>  2023-11-14 22:19  On main: parser idea
       stash that was dropped or popped
 `rgit show <commit>` to look at one; `rgit recover <n> [<branch>]` brings it back on a branch
 (`recovered-<commit>` by default), and a stash back on the stash list.

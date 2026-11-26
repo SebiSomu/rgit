@@ -55,6 +55,18 @@ pub struct GitHttpServer {
     thread: Option<JoinHandle<()>>,
 }
 
+/// `path` made absolute with links resolved, as git accepts it: `canonicalize` gives
+/// `\\?\C:\...` on Windows, which Git for Windows refuses ("cannot mkdir ... Invalid
+/// argument"), so that prefix is dropped (network `\\?\UNC\` paths are kept as they are).
+pub fn plain_path(path: &Path) -> PathBuf {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let text = canonical.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC\\") => PathBuf::from(rest),
+        _ => canonical,
+    }
+}
+
 impl GitHttpServer {
     /// Starts a server without authentication, or `None` when `git http-backend` can't run.
     pub fn start() -> Option<GitHttpServer> {
@@ -64,7 +76,7 @@ impl GitHttpServer {
     /// Starts a server with `options`, or `None` when `git http-backend` can't run.
     pub fn start_with(options: ServerOptions) -> Option<GitHttpServer> {
         let tmp = tempfile::tempdir().ok()?;
-        let root = tmp.path().canonicalize().ok()?.join("srv");
+        let root = plain_path(tmp.path()).join("srv");
         std::fs::create_dir_all(&root).ok()?;
         if !backend_available(&root) {
             return None;
@@ -73,7 +85,7 @@ impl GitHttpServer {
         let addr = listener.local_addr().ok()?;
         let stop = Arc::new(AtomicBool::new(false));
         let log = Arc::new(Mutex::new(Vec::new()));
-        let home = tmp.path().canonicalize().ok()?.join("server-home");
+        let home = plain_path(tmp.path()).join("server-home");
         std::fs::create_dir_all(&home).ok()?;
 
         let (thread_stop, thread_log, thread_root) = (stop.clone(), log.clone(), root.clone());

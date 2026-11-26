@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/branching.rs
+assertion_line: 108
 expression: r.finish()
 ---
 $ rgit init
@@ -48,8 +49,8 @@ index (ls-files -s):
 HEAD commit:
   tree <H7>
   parent <H3>
-  author rgit <rgit@example.com> <NOW> +0000
-  committer rgit <rgit@example.com> <NOW> +0000
+  author Test Author <author@example.com> 1700000360 +0000
+  committer Test Committer <committer@example.com> 1700000360 +0000
   
   Revert "third commit"
   

@@ -1,5 +1,6 @@
 ---
 source: tests/cli/scenarios/remotes.rs
+assertion_line: 98
 expression: r.finish()
 ---
 $ rgit init
@@ -42,14 +43,14 @@ Staged files to index (1 new).
  1 file changed, 1 insertion(+)
  create mode 100644 new.txt
 $ rgit fetch github.com/me/lib
-From github.com/me/lib/.git
+From github.com/me/lib
  * [new branch]      main                 -> github.com/me/lib/main
 Receiving objects: 100% (3/3), done.
 $ rgit log --oneline -1 github.com/me/lib/main
 <H4:7> in lib
 $ rgit push github.com/me/lib main:from-outer
 Enumerating objects: 0, done.
-To github.com/me/lib/.git
+To github.com/me/lib
  * [new branch]      main -> from-outer
 (github.com/me/lib) $ rgit branch
   from-outer

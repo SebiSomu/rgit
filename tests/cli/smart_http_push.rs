@@ -44,7 +44,7 @@ fn receive_pack_posts(server: &GitHttpServer) -> usize {
 fn setup(options: ServerOptions, home: &Path) -> Option<(GitHttpServer, tempfile::TempDir, PathBuf, PathBuf)> {
     let server = GitHttpServer::start_with(options)?;
     let tmp = tempfile::tempdir().unwrap();
-    let base = tmp.path().canonicalize().unwrap();
+    let base = crate::http_server::plain_path(tmp.path());
     let source = base.join("source");
     std::fs::create_dir_all(&source).unwrap();
     git(&source, &["init", "-q", "-b", "main"]);
@@ -201,7 +201,7 @@ fn push_with_a_login_from_the_credential_helper() {
     std::fs::write(home.path().join(".git-credentials"), format!("http://sebi:s3cret@{}\n", host)).unwrap();
 
     let tmp = tempfile::tempdir().unwrap();
-    let mine = tmp.path().canonicalize().unwrap().join("mine");
+    let mine = crate::http_server::plain_path(tmp.path()).join("mine");
     std::fs::create_dir_all(&mine).unwrap();
     git(&mine, &["init", "-q", "-b", "main"]);
     commit(&mine, "README.md", "hello\n", "first");

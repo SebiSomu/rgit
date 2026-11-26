@@ -41,6 +41,9 @@ pub struct ServerOptions {
     pub basic_auth: Option<(String, String)>,
     /// Answer every request with `302 Found` to this base URL plus the request's path.
     pub redirect_to: Option<String>,
+    /// Ignore the client's `Git-Protocol` header, so the server answers with protocol v0
+    /// (like servers older than git 2.18).
+    pub force_v0: bool,
 }
 
 pub struct GitHttpServer {
@@ -229,6 +232,9 @@ fn serve_connection(stream: TcpStream, root: &Path, home: &Path, options: &Serve
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     for (header, variable) in [("content-type", "CONTENT_TYPE"), ("git-protocol", "GIT_PROTOCOL"), ("content-encoding", "HTTP_CONTENT_ENCODING")] {
+        if header == "git-protocol" && options.force_v0 {
+            continue;
+        }
         if let Some(value) = headers.get(header) {
             command.env(variable, value);
         }

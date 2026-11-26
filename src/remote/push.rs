@@ -4,7 +4,7 @@ pub mod types;
 
 use anyhow::Result;
 use crate::remote::github::{push_to_github, resolve_github_token};
-use crate::remote::transport::{not_a_repository, resolve_remote, types::Transport};
+use crate::remote::transport::{not_a_repository, resolve_remote, smart_http_not_supported_yet, types::Transport};
 use crate::remote::push::engine::{
     collect_missing_objects,
     copy_object_to_remote,
@@ -103,6 +103,7 @@ pub fn push(remote: Option<String>, refspec: Option<String>, force: bool, set_up
             return Ok(());
         }
         Transport::Bundle { path } => return Err(not_a_repository(&path)),
+        Transport::SmartHttp { url } => return Err(smart_http_not_supported_yet("push to", &url)),
         Transport::Local { git_dir } => git_dir,
     };
 

@@ -118,7 +118,7 @@ fn a_refused_login_is_rejected_and_the_request_fails() {
     let (server, _work) = or_skip!(server_with_repo(auth()));
     let (http, calls) = client(Some(("sebi", "wrong")));
     let err = http.get(&info_refs(&server), &[]).err().unwrap().to_string();
-    assert_eq!(err, format!("fatal: Authentication failed for '{}'", info_refs(&server)));
+    assert_eq!(err, format!("fatal: Authentication failed for '{}/'", server.url("repo.git")));
     let calls = calls.lock().unwrap();
     assert!(calls[0].starts_with("fill "));
     assert_eq!(calls[1..], ["reject sebi".to_string()]);
@@ -149,7 +149,7 @@ fn missing_repositories_and_errors_read_like_git() {
     let (http, _) = client(None);
     let missing = server.url("nope.git");
     let response = http.get(&format!("{}/info/refs?service=git-upload-pack", missing), &[]).unwrap();
-    assert_eq!(response.check_status(&missing).err().unwrap().to_string(), format!("fatal: repository '{}' not found", missing));
+    assert_eq!(response.check_status(&missing).err().unwrap().to_string(), format!("fatal: repository '{}/' not found", missing));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn passwords_are_never_sent_over_plain_http_to_other_machines() {
     assert!(calls.lock().unwrap().is_empty());
     let (allowed, _) = (HttpClient::with_credentials(Box::new(FakeCredentials::default()), true).unwrap(), ());
     let err = allowed.get("http://sebi:s3cret@127.0.0.1:1/repo.git/info/refs", &[]).err().unwrap().to_string();
-    assert!(err.starts_with("fatal: unable to access 'http://127.0.0.1:1/repo.git/info/refs'"), "{}", err);
+    assert!(err.starts_with("fatal: unable to access 'http://127.0.0.1:1/repo.git/': "), "{}", err);
 }
 
 #[test]
@@ -176,6 +176,14 @@ fn a_login_does_not_follow_a_redirect_to_another_host() {
     assert_eq!(response.final_url().as_str(), info_refs(&target), "the new base URL is visible to callers");
     assert!(redirector.requests()[0].headers.contains_key("authorization"));
     assert!(!target.requests()[0].headers.contains_key("authorization"), "the other host never sees the login");
+}
+
+#[test]
+fn messages_name_the_repository_like_git() {
+    assert_eq!(repo_display("https://me:tok@host/o/r.git/info/refs?service=git-upload-pack"), "https://host/o/r.git/");
+    assert_eq!(repo_display("https://host/o/r.git/git-upload-pack"), "https://host/o/r.git/");
+    assert_eq!(repo_display("https://host/o/r.git/"), "https://host/o/r.git/");
+    assert_eq!(repo_display("https://host/o/r"), "https://host/o/r/");
 }
 
 #[test]

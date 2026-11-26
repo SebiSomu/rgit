@@ -244,6 +244,9 @@ pub enum Commands {
     /// The `store` credential helper: logins in ~/.git-credentials, shared with git.
     #[command(disable_help_flag = true)]
     CredentialStore(crate::remote::credential::cli::CredentialStoreArgs),
+    /// List the refs of another repository (a remote, a path, a bundle or an http(s) URL).
+    #[command(disable_help_flag = true)]
+    LsRemote(crate::remote::ls_remote::cli::LsRemoteArgs),
     /// A Markdown changelog from conventional commits: breaking changes, features, fixes... per version.
     Changelog(crate::history::changelog::cli::ChangelogArgs),
     /// Everyone who wrote the commits (with .mailmap and co-authors): commits, share, lines, first and last day.
@@ -432,6 +435,7 @@ pub fn handle_commands() -> Result<()> {
         Commands::Open(args) => crate::remote::open::cli::dispatch_open(args)?,
         Commands::Credential(args) => crate::remote::credential::cli::dispatch_credential(args)?,
         Commands::CredentialStore(args) => crate::remote::credential::cli::dispatch_credential_store(args)?,
+        Commands::LsRemote(args) => crate::remote::ls_remote::cli::dispatch_ls_remote(args)?,
         Commands::Changelog(args) => crate::history::changelog::cli::dispatch_changelog(args)?,
         Commands::Contributors(args) => crate::history::contributors::cli::dispatch_contributors(args)?,
         Commands::Tip(args) => crate::plumbing::tip::cli::dispatch_tip(args)?,

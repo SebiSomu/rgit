@@ -25,6 +25,8 @@ pub struct Repo {
     log: String,
     objects: BTreeSet<String>,
     env: BTreeMap<String, String>,
+    /// Text replaced in the transcript (`http://127.0.0.1:41234` -> `<HTTP>`), longest first.
+    masks: Vec<(String, String)>,
 }
 
 impl Repo {
@@ -36,7 +38,7 @@ impl Repo {
         let home = base.join("home");
         fs::create_dir_all(&root).unwrap();
         fs::create_dir_all(&home).unwrap();
-        Repo { _tmp: tmp, base, root, home, clock: BASE_TIME, log: String::new(), objects: BTreeSet::new(), env: BTreeMap::new() }
+        Repo { _tmp: tmp, base, root, home, clock: BASE_TIME, log: String::new(), objects: BTreeSet::new(), env: BTreeMap::new(), masks: Vec::new() }
     }
 
     /// A repository that already ran `rgit init`.
@@ -51,6 +53,14 @@ impl Repo {
     }
 
     /// Sets an extra environment variable for every following command.
+    /// Replaces `text` with `placeholder` everywhere in the transcript, for values that change
+    /// between runs (a test server's random port).
+    pub fn mask(&mut self, text: &str, placeholder: &str) -> &mut Self {
+        self.masks.push((text.to_string(), placeholder.to_string()));
+        self.masks.sort_by_key(|m| std::cmp::Reverse(m.0.len()));
+        self
+    }
+
     pub fn set_env(&mut self, key: &str, value: &str) -> &mut Self {
         self.env.insert(key.to_string(), value.to_string());
         self.log.push_str(&format!("$ export {}={}\n", key, value));
@@ -140,7 +150,12 @@ impl Repo {
             if key.starts_with("GIT_") || key.starts_with("RGIT_") || key.starts_with("RUST_") || key == "EDITOR" || key == "VISUAL" || key == "PAGER" || key == "XDG_CONFIG_HOME" {
                 cmd.env_remove(&key);
             }
+            // Test servers listen on 127.0.0.1: no proxy may catch those requests.
+            if key.to_ascii_lowercase().ends_with("_proxy") {
+                cmd.env_remove(&key);
+            }
         }
+        cmd.env("NO_PROXY", "*");
         cmd.env("HOME", &self.home)
             .env("USERPROFILE", &self.home)
             .env("TZ", "UTC")
@@ -319,6 +334,9 @@ impl Repo {
 
     fn normalize(&self, text: &str) -> String {
         let mut text = text.replace("\r\n", "\n");
+        for (value, placeholder) in &self.masks {
+            text = text.replace(value, placeholder);
+        }
         let root_variants = path_variants(&self.root);
         let home_variants = path_variants(&self.home);
         for v in root_variants {

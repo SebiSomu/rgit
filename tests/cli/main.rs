@@ -5,4 +5,5 @@
 mod harness;
 mod http_server;
 mod http_server_tests;
+mod ls_remote_parity;
 mod scenarios;

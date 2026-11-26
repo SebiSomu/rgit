@@ -3,9 +3,6 @@
 //! packets without one (`0000` flush, `0001` delimiter, `0002` response end). Also the
 //! sideband split that multiplexes pack data, progress and errors over one packet stream.
 
-// Nothing calls this yet: `ls-remote` (step 4), then fetch and push over HTTPS use it.
-#![allow(dead_code)]
-
 pub mod types;
 
 use std::io::{Read, Write};
@@ -18,6 +15,8 @@ pub const FLUSH: &[u8] = b"0000";
 /// The delimiter packet: separates the parts of a protocol v2 request or response.
 pub const DELIM: &[u8] = b"0001";
 /// The response-end packet: ends a protocol v2 response.
+// Used by fetch over HTTPS from step 5 on.
+#[allow(dead_code)]
 pub const RESPONSE_END: &[u8] = b"0002";
 
 /// The largest packet git sends or accepts, length prefix included (`LARGE_PACKET_MAX`).
@@ -99,6 +98,8 @@ impl<R: Read> PacketReader<R> {
 
     /// Reads data packets up to the next flush (or the end of the stream), failing on an
     /// `ERR` packet. Used for v0 ref advertisements and v2 `ls-refs` answers.
+    // Used by fetch over HTTPS from step 5 on.
+    #[allow(dead_code)]
     pub fn read_until_flush(&mut self) -> Result<Vec<Vec<u8>>> {
         let mut payloads = Vec::new();
         while let Some(packet) = self.read_packet()? {
@@ -128,6 +129,8 @@ pub fn decode_all(bytes: &[u8]) -> Result<Vec<Packet>> {
 
 /// Splits a sideband payload by its band byte.
 // Used by `demux_sideband`.
+// Used by fetch over HTTPS from step 5 on.
+#[allow(dead_code)]
 pub fn parse_sideband(payload: &[u8]) -> Result<Band> {
     let Some((&band, rest)) = payload.split_first() else {
         anyhow::bail!("protocol error: empty sideband packet");
@@ -144,6 +147,8 @@ pub fn parse_sideband(payload: &[u8]) -> Result<Band> {
 /// `progress`, and an error band ends it with `remote error: <message>`. Returns how many
 /// data bytes were written.
 // Used by fetch and push over HTTPS (from step 5 on).
+// Used by fetch over HTTPS from step 5 on.
+#[allow(dead_code)]
 pub fn demux_sideband<R: Read, W: Write>(reader: &mut PacketReader<R>, data: &mut W, progress: &mut dyn FnMut(&[u8])) -> Result<u64> {
     let mut written = 0u64;
     while let Some(packet) = reader.read_packet()? {

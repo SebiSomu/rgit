@@ -13,6 +13,8 @@ pub enum Transport {
     Bundle { path: PathBuf },
     /// A GitHub repository, reached through its REST API.
     GitHubApi { owner: String, repo: String },
+    /// Any other `http://` or `https://` URL: git's smart-HTTP protocol (`ls-remote` so far).
+    SmartHttp { url: String },
 }
 
 /// A remote as a command sees it: the name or URL it was given, the URL configured for that
@@ -37,6 +39,7 @@ impl Remote {
             Transport::GitHubApi { owner, repo } => format!("https://github.com/{}/{}", owner, repo),
             Transport::Bundle { .. } => self.spec.clone(),
             Transport::Local { git_dir } => git_dir.display().to_string(),
+            Transport::SmartHttp { url } => url.clone(),
         }
     }
 }

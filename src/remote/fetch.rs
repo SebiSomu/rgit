@@ -14,7 +14,7 @@ use crate::remote::fetch::engine::{
 };
 use crate::remote::bundle::engine::{bundle_branches, bundle_head_branch, check_bundle_prerequisites, read_bundle, read_packfile, store_loose_objects};
 use crate::remote::github::{fetch_from_github, resolve_github_token};
-use crate::remote::transport::{resolve_remote, types::Transport};
+use crate::remote::transport::{resolve_remote, smart_http_not_supported_yet, types::Transport};
 use crate::remote::{fetch::types::FetchRefResult, types::GitHubTarget};
 
 pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
@@ -45,6 +45,7 @@ pub fn fetch(remote: Option<String>, branch: Option<String>) -> Result<()> {
             return Ok(());
         }
         Transport::Bundle { path } => return fetch_from_bundle(&path, &remote_name, &remote_display, branch.as_deref()),
+        Transport::SmartHttp { url } => return Err(smart_http_not_supported_yet("fetch from", &url)),
         Transport::Local { git_dir } => git_dir,
     };
 

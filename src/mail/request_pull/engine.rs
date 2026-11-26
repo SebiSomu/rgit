@@ -6,7 +6,7 @@ use crate::remote::fetch::engine::read_object_from_path;
 use crate::core::commit::{parse_commit_object, split_commit_message};
 use crate::diff::hunks::diff_tree_file;
 use crate::remote::github::{build_github_client, get_github_default_branch, list_github_refs, resolve_github_token};
-use crate::remote::transport::{not_a_repository, resolve_remote, types::Transport};
+use crate::remote::transport::{not_a_repository, resolve_remote, smart_http_not_supported_yet, types::Transport};
 use crate::mail::mailmap::map_user;
 use crate::core::object_store::{flatten_tree, read_object};
 use crate::core::refs::list_all_refs;
@@ -104,6 +104,7 @@ pub fn list_remote_refs_for_pull(url: &str) -> anyhow::Result<Vec<(String, Strin
             return Ok(refs);
         }
         Transport::Bundle { path } => return Err(not_a_repository(&path)),
+        Transport::SmartHttp { url } => return Err(smart_http_not_supported_yet("list the refs of", &url)),
         Transport::Local { git_dir } => git_dir,
     };
     let mut by_name: BTreeMap<String, String> = BTreeMap::new();

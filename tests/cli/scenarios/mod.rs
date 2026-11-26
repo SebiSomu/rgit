@@ -2,6 +2,7 @@
 mod basics;
 mod branching;
 mod history;
+mod ls_remote;
 mod plumbing;
 mod narration;
 mod errors;

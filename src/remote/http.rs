@@ -3,9 +3,6 @@
 //! logins (never over plain HTTP to another machine, never to a redirect's new host, never in
 //! messages). `ls-remote`, fetch and push over HTTPS are built on it.
 
-// Nothing calls this yet: `ls-remote` (step 4) is the first user.
-#![allow(dead_code)]
-
 pub mod types;
 
 use std::sync::Mutex;
@@ -68,7 +65,7 @@ impl HttpResponse {
         if status.is_success() {
             return Ok(self);
         }
-        let shown = redact_url(repo_url);
+        let shown = repo_display(repo_url);
         if status == StatusCode::NOT_FOUND {
             anyhow::bail!("fatal: repository '{}' not found", shown);
         }
@@ -81,6 +78,8 @@ impl HttpResponse {
     }
 
     /// The body as a stream (pack data).
+    // Used by fetch over HTTPS from step 5 on.
+    #[allow(dead_code)]
     pub fn into_reader(self) -> impl std::io::Read {
         self.response
     }
@@ -162,7 +161,7 @@ impl HttpClient {
             }
             let response = request
                 .send()
-                .map_err(|e| anyhow::anyhow!("fatal: unable to access '{}': {}", redact_url(url), describe_error(&e)))?;
+                .map_err(|e| anyhow::anyhow!("fatal: unable to access '{}': {}", repo_display(url), describe_error(&e)))?;
 
             if response.status() != StatusCode::UNAUTHORIZED {
                 if let Some(login) = &login
@@ -181,10 +180,10 @@ impl HttpClient {
             if let Some(login) = login {
                 self.credentials.reject(&login);
                 *self.login.lock().unwrap() = None;
-                anyhow::bail!("fatal: Authentication failed for '{}'", redact_url(url));
+                anyhow::bail!("fatal: Authentication failed for '{}'", repo_display(url));
             }
             if filled_here {
-                anyhow::bail!("fatal: Authentication failed for '{}'", redact_url(url));
+                anyhow::bail!("fatal: Authentication failed for '{}'", repo_display(url));
             }
             let mut wanted = credential_for(&target);
             if let Some(partial) = self.login.lock().unwrap().as_ref() {
@@ -192,7 +191,7 @@ impl HttpClient {
             }
             self.credentials.fill(&mut wanted).map_err(|message| anyhow::anyhow!("fatal: {}", message))?;
             if !wanted.is_complete() {
-                anyhow::bail!("fatal: Authentication failed for '{}'", redact_url(url));
+                anyhow::bail!("fatal: Authentication failed for '{}'", repo_display(url));
             }
             *self.login.lock().unwrap() = Some(wanted);
             filled_here = true;
@@ -229,6 +228,23 @@ fn is_loopback(url: &Url) -> bool {
     let Some(host) = url.host_str() else { return false };
     let host = host.trim_start_matches('[').trim_end_matches(']');
     host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
+/// The repository a request URL belongs to, as git names it in messages: no login, no query,
+/// no protocol endpoint (`/info/refs`, `/git-upload-pack`, `/git-receive-pack`), and a
+/// trailing slash (`https://host/owner/repo.git/`).
+// Used by `HttpClient` and `HttpResponse::check_status`.
+pub fn repo_display(url: &str) -> String {
+    let shown = redact_url(url);
+    let shown = shown.split_once('?').map(|(path, _)| path.to_string()).unwrap_or(shown);
+    let mut shown = shown.trim_end_matches('/').to_string();
+    for endpoint in ["/info/refs", "/git-upload-pack", "/git-receive-pack"] {
+        if let Some(base) = shown.strip_suffix(endpoint) {
+            shown = base.to_string();
+            break;
+        }
+    }
+    format!("{}/", shown)
 }
 
 /// `url` without any user or password in it, for messages.

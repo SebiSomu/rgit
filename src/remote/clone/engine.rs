@@ -31,6 +31,7 @@ pub fn classify_clone_source(spec: &str) -> Result<CloneSource> {
             Transport::Local { git_dir } => CloneSource::Local { path: absolute, git_dir },
             // An existing path is never classified as GitHub.
             Transport::GitHubApi { owner, repo } => CloneSource::GitHub { owner, repo },
+            Transport::SmartHttp { url } => return Err(crate::remote::transport::smart_http_not_supported_yet("clone", &url)),
         });
     }
 

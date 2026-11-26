@@ -20,6 +20,8 @@ pub enum Severity {
 pub enum AutoFix {
     RemoveLock(PathBuf),
     PruneWorktrees,
+    // Only `check_hooks` on Unix creates it; `apply` still handles it everywhere.
+    #[cfg_attr(not(unix), allow(dead_code))]
     MakeExecutable(PathBuf),
 }
 

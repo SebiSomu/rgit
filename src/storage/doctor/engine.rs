@@ -184,9 +184,19 @@ pub fn check_config() -> Result<Vec<Finding>> {
     Ok(out)
 }
 
+/// Hooks that never run because they are not executable. Windows has no executable bit,
+/// so there is nothing to check there.
+// Used by the `doctor` command.
+#[cfg(not(unix))]
+pub fn check_hooks() -> Vec<Finding> {
+    Vec::new()
+}
+
 /// Hooks that never run because they are not executable (Unix only: Windows has no such bit).
 // Used by the `doctor` command.
+#[cfg(unix)]
 pub fn check_hooks() -> Vec<Finding> {
+    use std::os::unix::fs::PermissionsExt;
     let dir = match get_config_value("core.hookspath").ok().flatten().filter(|v| !v.is_empty()) {
         Some(dir) => PathBuf::from(dir),
         None => crate::core::repo::path(".git/hooks"),
@@ -196,21 +206,15 @@ pub fn check_hooks() -> Vec<Finding> {
     let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_file() && p.extension().is_none_or(|x| x != "sample")).collect();
     paths.sort();
     for path in paths {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if fs::metadata(&path).map(|m| m.permissions().mode() & 0o111 == 0).unwrap_or(false) {
-                let shown = path.to_string_lossy().replace('\\', "/");
-                out.push(Finding {
-                    severity: Severity::Warning,
-                    message: format!("hook {} is not executable, so it never runs", shown),
-                    fix: Some(format!("chmod +x {} (or `rgit doctor --fix`)", shown)),
-                    auto: Some(AutoFix::MakeExecutable(path.clone())),
-                });
-            }
+        if fs::metadata(&path).map(|m| m.permissions().mode() & 0o111 == 0).unwrap_or(false) {
+            let shown = path.to_string_lossy().replace('\\', "/");
+            out.push(Finding {
+                severity: Severity::Warning,
+                message: format!("hook {} is not executable, so it never runs", shown),
+                fix: Some(format!("chmod +x {} (or `rgit doctor --fix`)", shown)),
+                auto: Some(AutoFix::MakeExecutable(path.clone())),
+            });
         }
-        #[cfg(not(unix))]
-        let _ = path;
     }
     out
 }

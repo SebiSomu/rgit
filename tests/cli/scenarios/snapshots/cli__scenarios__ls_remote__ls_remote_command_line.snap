@@ -75,10 +75,7 @@ $ rgit fetch origin
 From <HTTP>/repo.git
  * [new branch]      main                 -> origin/main
 $ rgit push origin main
-[stderr]
-Error: fatal: rgit can't push to '<HTTP>/repo.git' yet: over HTTPS only GitHub is supported so far
-hint: `rgit ls-remote <HTTP>/repo.git` already works with any host
-[exit 1]
+Everything up-to-date
 
 ==== final state ====
 HEAD: ref: refs/heads/main

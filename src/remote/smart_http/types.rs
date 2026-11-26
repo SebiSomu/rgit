@@ -77,3 +77,24 @@ pub struct RemoteProgress {
     /// The start of a line whose end (`\n` or `\r`) has not arrived yet.
     pub(crate) pending: Vec<u8>,
 }
+
+/// One ref a push asks the server to change: from `old` to `new` (40 zeros for a ref that
+/// doesn't exist yet, or for a deletion).
+// Used by: src/remote/smart_http/receive_pack.rs, src/remote/push/engine.rs
+// Used by command/helper: `send_pack` and `push` over HTTPS
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefUpdate {
+    pub name: String,
+    pub old: String,
+    pub new: String,
+}
+
+/// The server's `report-status` after a push: whether it could unpack the pack (`None`) or
+/// why not, and per ref whether it was updated (`None`) or why it was refused.
+// Used by: src/remote/smart_http/receive_pack.rs, src/remote/push/engine.rs
+// Used by command/helper: `send_pack`, `parse_report_status` and `push` over HTTPS
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PushReport {
+    pub unpack_error: Option<String>,
+    pub refs: Vec<(String, Option<String>)>,
+}

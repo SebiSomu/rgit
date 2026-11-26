@@ -1,9 +1,10 @@
 //! git's smart-HTTP protocol (gitprotocol-http, gitprotocol-v2) on top of `HttpClient` and
 //! pkt-line: ref discovery through `info/refs`, then protocol v2 `ls-refs` when the server
 //! speaks v2, or the v0 ref advertisement when it doesn't; then fetch with have/ACK
-//! negotiation (`fetch_pack`). Push builds on this.
+//! negotiation (`fetch_pack`). Push is in `receive_pack`.
 
 pub mod negotiation;
+pub mod receive_pack;
 pub mod types;
 
 use anyhow::Result;

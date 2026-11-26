@@ -15,7 +15,7 @@ pub const FLUSH: &[u8] = b"0000";
 /// The delimiter packet: separates the parts of a protocol v2 request or response.
 pub const DELIM: &[u8] = b"0001";
 /// The response-end packet: ends a protocol v2 response.
-// Used by push over HTTPS from step 6 on.
+// Not used by a command yet: rgit reads v2 responses to their end; kept for a streaming v2 reader.
 #[allow(dead_code)]
 pub const RESPONSE_END: &[u8] = b"0002";
 
@@ -104,7 +104,7 @@ impl<R: Read> PacketReader<R> {
 
     /// Reads data packets up to the next flush (or the end of the stream), failing on an
     /// `ERR` packet. Used for v0 ref advertisements and v2 `ls-refs` answers.
-    // Used by push over HTTPS from step 6 on (the per-ref report).
+    // Not used by a command yet (push decodes its buffered report with `decode_all`); unit-tested.
     #[allow(dead_code)]
     pub fn read_until_flush(&mut self) -> Result<Vec<Vec<u8>>> {
         let mut payloads = Vec::new();

@@ -255,3 +255,237 @@ pub fn set_upstream_branch(local_branch: &str, remote_name: &str, remote_branch:
     Ok(())
 }
 
+
+/// `rgit push` to a remote reached over git's smart-HTTP protocol (any https host, and
+/// GitHub with `rgit.httpTransport=smart`). Pushes `src_name` (a branch, tag, `HEAD` or
+/// revision; empty to delete) to `dest` on the server: asks `git-receive-pack` for its refs,
+/// checks the update locally as git does (fast-forward unless `force`; existing tags only
+/// with `force`), sends the ref update with a pack of the objects the server lacks, and moves
+/// `refs/remotes/<remote>/<branch>` only once the server reports the ref updated. A refused
+/// update leaves the local repository unchanged.
+// Used by `push`.
+pub fn push_over_smart_http(url: &str, remote_name: &str, remote_display: &str, src_name: &str, dest: &str, force: bool) -> Result<()> {
+    use crate::remote::smart_http::receive_pack::{discover_receive_pack, send_pack, ZERO_OID};
+    use crate::remote::smart_http::types::RefUpdate;
+    use std::io::IsTerminal;
+
+    let client = crate::remote::http::HttpClient::new()?;
+    let discovery = discover_receive_pack(&client, url)?;
+    let shown = crate::remote::http::redact_url(remote_display);
+    let remote_value = |name: &str| discovery.refs.iter().find(|r| r.name == name).and_then(|r| r.oid.clone());
+    let offered = |name: &str| discovery.capabilities.iter().any(|c| c == name);
+
+    let (new, src_is_tag) = if src_name.is_empty() {
+        (None, false)
+    } else {
+        let (value, is_tag) = local_push_source(src_name)?;
+        (Some(value), is_tag)
+    };
+    let dest_ref = full_destination_ref(dest, src_is_tag, |name| remote_value(name).is_some());
+    let old = remote_value(&dest_ref);
+    let failed = format!("error: failed to push some refs to '{}'", shown);
+    let label = if src_name.is_empty() { dest.to_string() } else { format!("{} -> {}", src_name, dest) };
+
+    let summary = match (&old, &new) {
+        (None, None) => anyhow::bail!("error: unable to delete '{}': remote ref does not exist\n{}", dest, failed),
+        (Some(old), Some(new)) if old == new => {
+            println!("Everything up-to-date");
+            return Ok(());
+        }
+        (Some(_), None) => {
+            if !offered("delete-refs") {
+                anyhow::bail!("error: the server at '{}' does not allow deleting refs\n{}", shown, failed);
+            }
+            format!(" - [deleted]         {}", dest)
+        }
+        (None, Some(_)) if dest_ref.starts_with("refs/tags/") => format!(" * [new tag]         {}", label),
+        (None, Some(_)) if dest_ref.starts_with("refs/heads/") => format!(" * [new branch]      {}", label),
+        (None, Some(_)) => format!(" * [new reference]   {}", label),
+        (Some(old), Some(new)) => {
+            let rejection = if dest_ref.starts_with("refs/tags/") {
+                Some(("already exists", "hint: Updates were rejected because the tag already exists in the remote."))
+            } else if !crate::remote::fetch::engine::local_has_object(old) {
+                Some((
+                    "fetch first",
+                    "hint: Updates were rejected because the remote contains work that you do not\n\
+                     hint: have locally. Integrate the remote changes (e.g. 'rgit pull')\n\
+                     hint: before pushing again.",
+                ))
+            } else if !crate::core::commit::is_reachable(new, old)? {
+                Some((
+                    "non-fast-forward",
+                    "hint: Updates were rejected because the tip of your current branch is behind\n\
+                     hint: its remote counterpart. Integrate the remote changes (e.g.\n\
+                     hint: 'rgit merge') before pushing again.",
+                ))
+            } else {
+                None
+            };
+            match rejection {
+                None => format!("   {}..{}  {}", crate::core::commit::short_hash(old), crate::core::commit::short_hash(new), label),
+                Some(_) if force => format!(
+                    " + {}...{} {} (forced update)",
+                    crate::core::commit::short_hash(old),
+                    crate::core::commit::short_hash(new),
+                    label
+                ),
+                Some((reason, hint)) => {
+                    eprintln!("To {}", shown);
+                    eprintln!(" ! [rejected]        {} ({})", label, reason);
+                    anyhow::bail!("{}\n{}", failed, hint);
+                }
+            }
+        }
+    };
+
+    // The objects to send: what `new` reaches minus what the server's refs already reach.
+    let pack = match &new {
+        Some(new) => {
+            let server_tips: Vec<String> = discovery
+                .refs
+                .iter()
+                .flat_map(|r| [r.oid.clone(), r.peeled.clone()])
+                .flatten()
+                .filter(|oid| crate::remote::fetch::engine::local_has_object(oid))
+                .collect();
+            let objects = objects_to_push(new, &server_tips);
+            let window = if offered("ofs-delta") { 10 } else { 0 };
+            let built = crate::core::pack::build_pack(&objects, &crate::core::types::PackBuildOptions { window, depth: 50 })?;
+            println!("Enumerating objects: {}, done.", objects.len());
+            if !objects.is_empty() {
+                println!("Writing objects: 100% ({}/{}), done.", objects.len(), objects.len());
+            }
+            println!("Total {} (delta {}), reused 0 (delta 0)", objects.len(), built.deltas);
+            built.bytes
+        }
+        None => Vec::new(),
+    };
+
+    let update = RefUpdate {
+        name: dest_ref.clone(),
+        old: old.clone().unwrap_or_else(|| ZERO_OID.to_string()),
+        new: new.clone().unwrap_or_else(|| ZERO_OID.to_string()),
+    };
+    let report = send_pack(&client, &discovery, url, std::slice::from_ref(&update), &pack, std::io::stderr().is_terminal())?;
+    let refused = match (&report.unpack_error, report.refs.iter().find(|(name, _)| name == &dest_ref)) {
+        (Some(reason), _) => {
+            eprintln!("error: remote unpack failed: {}", reason);
+            Some("unpacker error".to_string())
+        }
+        (None, Some((_, Some(reason)))) => Some(reason.clone()),
+        (None, Some((_, None))) => None,
+        (None, None) => Some("the server did not report on this ref".to_string()),
+    };
+    if let Some(reason) = refused {
+        eprintln!("To {}", shown);
+        eprintln!(" ! [remote rejected] {} ({})", label, reason);
+        anyhow::bail!("{}", failed);
+    }
+
+    if let Some(branch) = dest_ref.strip_prefix("refs/heads/")
+        && !remote_name.contains('/')
+        && !remote_name.contains('\\')
+    {
+        let _ = match &new {
+            Some(new) => write_remote_tracking_ref(remote_name, branch, new),
+            None => delete_remote_tracking_ref(remote_name, branch),
+        };
+    }
+    println!("To {}", shown);
+    println!("{}", summary);
+    Ok(())
+}
+
+/// What a push of `src` sends and whether it is a tag: the value of the ref it names (an
+/// annotated tag stays the tag object, as git pushes it), tried as git does: a full
+/// `refs/...` name, then `refs/<src>`, `refs/tags/<src>`, `refs/heads/<src>`,
+/// `refs/remotes/<src>`; otherwise `HEAD` or any revision, resolved to its commit.
+// Used by `push_over_smart_http`.
+pub fn local_push_source(src: &str) -> Result<(String, bool)> {
+    if src == "HEAD" {
+        let head = crate::core::refs::resolve_head_commit()?.ok_or_else(|| anyhow::anyhow!("error: HEAD has no commits yet"))?;
+        return Ok((head, false));
+    }
+    let refs = crate::core::refs::list_all_refs();
+    let candidates = [
+        src.to_string(),
+        format!("refs/{}", src),
+        format!("refs/tags/{}", src),
+        format!("refs/heads/{}", src),
+        format!("refs/remotes/{}", src),
+    ];
+    for candidate in candidates.iter().filter(|c| c.starts_with("refs/")) {
+        if let Some(value) = refs.get(candidate) {
+            return Ok((value.clone(), candidate.starts_with("refs/tags/")));
+        }
+    }
+    let commit = crate::core::commit::resolve_commit_from_source(src).map_err(|_| anyhow::anyhow!("error: src refspec '{}' does not match any", src))?;
+    Ok((commit, false))
+}
+
+/// The ref a push updates on the server for the destination `dest`: a full `refs/...` name as
+/// is; otherwise the branch or tag of that name the server already has (`remote_has`), or a
+/// new tag when pushing a tag, else a new branch.
+// Used by `push_over_smart_http`.
+pub fn full_destination_ref(dest: &str, src_is_tag: bool, remote_has: impl Fn(&str) -> bool) -> String {
+    if dest.starts_with("refs/") {
+        return dest.to_string();
+    }
+    let branch = format!("refs/heads/{}", dest);
+    let tag = format!("refs/tags/{}", dest);
+    if remote_has(&branch) {
+        branch
+    } else if remote_has(&tag) || src_is_tag {
+        tag
+    } else {
+        branch
+    }
+}
+
+/// The objects to send so the server has everything `tip` reaches, given the tips it
+/// already has (`server_tips`, all present locally): commits and tags the server lacks and
+/// the trees and blobs they reach, minus everything in the trees of the commits where the
+/// new history meets the server's (git's "edge" objects), which the server has.
+// Used by `push_over_smart_http`.
+pub fn objects_to_push(tip: &str, server_tips: &[String]) -> Vec<String> {
+    use crate::core::object_store::read_object;
+    let links = |hash: &str| -> Vec<String> {
+        let Ok((kind, content)) = read_object(hash) else { return Vec::new() };
+        if kind != "commit" && kind != "tag" {
+            return Vec::new();
+        }
+        let text = String::from_utf8_lossy(&content);
+        text.lines()
+            .take_while(|l| !l.is_empty())
+            .filter_map(|l| l.strip_prefix("parent ").or_else(|| l.strip_prefix("object ")))
+            .map(|s| s.trim().to_string())
+            .collect()
+    };
+
+    let mut on_server: HashSet<String> = HashSet::new();
+    let mut stack: Vec<String> = server_tips.to_vec();
+    while let Some(hash) = stack.pop() {
+        if on_server.insert(hash.clone()) {
+            stack.extend(links(&hash));
+        }
+    }
+
+    let mut edges: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut stack = vec![tip.to_string()];
+    while let Some(hash) = stack.pop() {
+        if on_server.contains(&hash) {
+            edges.push(hash);
+        } else if seen.insert(hash.clone()) {
+            stack.extend(links(&hash));
+        }
+    }
+
+    let mut excluded = on_server;
+    for edge in edges {
+        if let Ok(tree) = crate::core::object_store::tree_hash_of_commit(&edge) {
+            excluded.extend(crate::core::pack::reachable_objects(&[tree], &HashSet::new()));
+        }
+    }
+    crate::core::pack::reachable_objects(&[tip.to_string()], &excluded)
+}

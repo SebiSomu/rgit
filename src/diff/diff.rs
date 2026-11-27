@@ -36,6 +36,19 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
         eprint!("{}", message);
         crate::ui::exit(code);
     };
+    // `--color[=<when>]` / `--no-color` decide over `color.diff` / `color.ui`.
+    let args: Vec<String> = args
+        .into_iter()
+        .filter(|arg| match crate::core::color::parse_color_flag(arg) {
+            Some(forced) => {
+                crate::core::color::set_override(forced);
+                false
+            }
+            None => true,
+        })
+        .collect();
+    let color = crate::core::color::enabled("diff");
+    let paint = |text: String| if color { crate::core::color::colorize_diff(&text) } else { text };
     let mut opts = match parse_diff_plumbing_args(&args, "diff", &usage) {
         Ok(opts) => opts,
         Err((message, code)) => die(&message, code),
@@ -145,9 +158,9 @@ pub fn diff(args: Vec<String>) -> anyhow::Result<()> {
         changes = detect_renames(changes, &opts.renames, &unmodified);
     }
     if !(opts.quiet || opts.no_output) {
-        std::io::stdout().lock().write_all(combined_text.as_bytes())?;
+        std::io::stdout().lock().write_all(paint(combined_text.clone()).as_bytes())?;
     }
-    std::io::stdout().lock().write_all(render_diff_changes(&changes, &opts)?.as_bytes())?;
+    std::io::stdout().lock().write_all(paint(render_diff_changes(&changes, &opts)?).as_bytes())?;
     warn_rename_limit("diff.renameLimit");
     if (opts.exit_code || opts.quiet) && (!changes.is_empty() || !combined_text.is_empty()) {
         crate::ui::exit(1);

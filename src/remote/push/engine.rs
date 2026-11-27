@@ -331,7 +331,12 @@ pub fn push_over_smart_http(url: &str, remote_name: &str, remote_display: &str, 
                 ),
                 Some((reason, hint)) => {
                     eprintln!("To {}", shown);
-                    eprintln!(" ! [rejected]        {} ({})", label, reason);
+                    if crate::core::color::stderr_enabled("push") {
+                        let red = crate::core::color::slot("push", "error", crate::core::color::RED);
+                        eprintln!(" {}! [rejected]       {} {} ({})", red, crate::core::color::RESET, label, reason);
+                    } else {
+                        eprintln!(" ! [rejected]        {} ({})", label, reason);
+                    }
                     anyhow::bail!("{}\n{}", failed, hint);
                 }
             }

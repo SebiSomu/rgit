@@ -1,4 +1,5 @@
 pub mod check_ref_format;
+pub mod color;
 pub mod commit;
 pub mod config;
 pub mod date;

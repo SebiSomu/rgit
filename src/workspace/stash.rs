@@ -275,7 +275,11 @@ pub fn stash_show(stash_ref: Option<String>) -> anyhow::Result<()> {
         let old_label = format!("a/{}", path);
         let new_label = format!("b/{}", path);
         let formatted = format_diff_output(&path, &old_lines, &new_lines, &old_label, &new_label);
-        print!("{}", formatted);
+        if crate::core::color::enabled("diff") {
+            print!("{}", crate::core::color::colorize_diff(&formatted));
+        } else {
+            print!("{}", formatted);
+        }
     }
 
     Ok(())

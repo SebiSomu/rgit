@@ -714,8 +714,17 @@ pub fn abbreviate_hash(hash: &str) -> String {
 /// `%x<hex>`; unknown placeholders are printed as is, like git.
 // Used by `rev-list --format`.
 pub fn expand_rev_list_format(template: &str, commit: &ParsedCommit, parents: &[String]) -> String {
+    expand_rev_list_format_color(template, commit, parents, false)
+}
+
+/// `expand_rev_list_format` with colors: `%Cred`, `%Cgreen`, `%Cblue`, `%Creset` and
+/// `%C(<color>)` paint when `color` is on (`%C(always,<color>)` even when it is off), and after
+/// `%C(auto)` the hashes are painted as git paints them.
+// Used by `log`/`show` templates.
+pub fn expand_rev_list_format_color(template: &str, commit: &ParsedCommit, parents: &[String], color: bool) -> String {
     let (subject, body) = split_commit_message(&commit.message);
     let mut out = String::new();
+    let mut auto = false;
     let chars: Vec<char> = template.chars().collect();
     let mut i = 0;
     while i < chars.len() {
@@ -725,9 +734,38 @@ pub fn expand_rev_list_format(template: &str, commit: &ParsedCommit, parents: &[
             continue;
         }
         let two: String = chars[i + 1..(i + 3).min(chars.len())].iter().collect();
+        let hash_color = |text: String| if auto { format!("{}{}{}", crate::core::color::slot("diff", "commit", crate::core::color::YELLOW), text, crate::core::color::RESET) } else { text };
         let (text, used) = match chars[i + 1] {
-            'H' => (commit.hash.clone(), 1),
-            'h' => (abbreviate_hash(&commit.hash), 1),
+            'C' => {
+                let rest: String = chars[i + 2..].iter().collect();
+                let named = [("red", crate::core::color::RED), ("green", crate::core::color::GREEN), ("blue", crate::core::color::BLUE), ("reset", crate::core::color::RESET)];
+                if let Some((name, escape)) = named.iter().find(|(name, _)| rest.starts_with(name)) {
+                    auto = false;
+                    (if color { escape.to_string() } else { String::new() }, 1 + name.len())
+                } else if let Some(end) = rest.starts_with('(').then(|| rest.find(')')).flatten() {
+                    let spec = &rest[1..end];
+                    let consumed = 1 + end + 1;
+                    if spec == "auto" {
+                        auto = color;
+                        (if auto && !out.is_empty() { crate::core::color::RESET.to_string() } else { String::new() }, consumed)
+                    } else {
+                        auto = false;
+                        let (wanted, spec) = match spec.split_once(',') {
+                            Some(("always", spec)) => (true, spec),
+                            Some(("auto", spec)) => (color, spec),
+                            _ => (color, spec),
+                        };
+                        match crate::core::color::parse_color(spec) {
+                            Ok(escape) => (if wanted { escape } else { String::new() }, consumed),
+                            Err(_) => (format!("%C{}", &rest[..=end]), consumed),
+                        }
+                    }
+                } else {
+                    ("%C".to_string(), 1)
+                }
+            }
+            'H' => (hash_color(commit.hash.clone()), 1),
+            'h' => (hash_color(abbreviate_hash(&commit.hash)), 1),
             'T' => (commit.tree.clone(), 1),
             't' => (abbreviate_hash(&commit.tree), 1),
             'P' => (parents.join(" "), 1),

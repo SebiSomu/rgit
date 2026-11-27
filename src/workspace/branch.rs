@@ -78,7 +78,7 @@ pub fn branch(args: Vec<String>) -> anyhow::Result<()> {
         }
         let Some((remote, merge, display)) = upstream_for(upstream) else {
             eprintln!("fatal: the requested upstream branch '{}' does not exist", upstream);
-            eprintln!("hint: \nhint: If you are planning on basing your work on an upstream\nhint: branch that already exists at the remote, you may need to\nhint: run \"rgit fetch\" to retrieve it.\nhint: \nhint: If you are planning to push out a new local branch that\nhint: will track its remote counterpart, you may want to use\nhint: \"rgit push -u\" to set the upstream config as you push.");
+            crate::ui::eprintln_hints("hint: \nhint: If you are planning on basing your work on an upstream\nhint: branch that already exists at the remote, you may need to\nhint: run \"rgit fetch\" to retrieve it.\nhint: \nhint: If you are planning to push out a new local branch that\nhint: will track its remote counterpart, you may want to use\nhint: \"rgit push -u\" to set the upstream config as you push.");
             crate::ui::exit(128);
         };
         if remote == "." && merge == format!("refs/heads/{}", branch_name) {
@@ -414,7 +414,7 @@ pub fn switch(branch: String, create: bool, detach: bool, force: bool, start_poi
             None => {
                 if resolve_target_commit(&branch).is_ok() {
                     eprintln!("fatal: a branch is expected, got commit '{}'", branch);
-                    eprintln!("hint: If you want to detach HEAD at the commit, try again with the --detach option.");
+                    crate::ui::eprintln_hints("hint: If you want to detach HEAD at the commit, try again with the --detach option.");
                     crate::ui::exit(128);
                 }
                 anyhow::bail!("fatal: invalid reference: {}", branch)

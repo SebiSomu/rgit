@@ -32,7 +32,7 @@ pub fn reflog(action: Option<ReflogAction>) -> Result<()> {
             if entries.is_empty() {
                 anyhow::bail!("fatal: no reflog for '{}'", name);
             }
-            print!("{}", format_reflog_output(&name, &entries, max_count));
+            print!("{}", format_reflog_output(&name, &entries, max_count, crate::core::color::enabled("diff")));
         }
 
         ReflogAction::Exists { reference } => {

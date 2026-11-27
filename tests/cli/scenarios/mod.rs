@@ -1,5 +1,6 @@
 //! Scenario groups. Each test drives rgit through a small story and snapshots the transcript.
 mod basics;
+mod colors;
 mod branching;
 mod history;
 mod ls_remote;

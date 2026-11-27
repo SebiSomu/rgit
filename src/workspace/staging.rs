@@ -165,7 +165,8 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
             }
         }
         refs::HeadState::Detached(hash) => {
-            say!("HEAD detached at {}", &hash[..7]);
+            let shown = if opts.color { crate::core::color::paint(&hash[..7], &crate::core::color::slot("status", "nobranch", crate::core::color::RED)) } else { hash[..7].to_string() };
+            say!("HEAD detached at {}", shown);
             let tree_hash = tree_hash_of_commit(hash)?;
             flatten_tree(&tree_hash, "", &mut head_tree)?;
         }
@@ -319,6 +320,15 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
     }
 
     let has_staged = !staged_new.is_empty() || !staged_modified.is_empty() || !staged_deleted.is_empty() || !staged_renamed.is_empty();
+    // git's `color.status.*` colors: staged green, everything else red.
+    let status_color = |name: &str, default: &'static str| if opts.color { crate::core::color::slot("status", name, default) } else { String::new() };
+    let (added_color, changed_color, untracked_color, unmerged_color) = (
+        status_color("added", crate::core::color::GREEN),
+        status_color("changed", crate::core::color::RED),
+        status_color("untracked", crate::core::color::RED),
+        status_color("unmerged", crate::core::color::RED),
+    );
+    let paint = crate::core::color::paint;
     let has_unstaged = !unstaged_modified.is_empty() || !unstaged_deleted.is_empty();
     let has_untracked = !untracked.is_empty();
     let mut need_leading_blank = no_commits_yet;
@@ -336,7 +346,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
             lines.push((to.clone(), format!("{}{} -> {}", if *status == 'R' { "renamed:    " } else { "copied:     " }, from, to)));
         }
         lines.sort();
-        for (_, line) in &lines { println!("\t{}", line); }
+        for (_, line) in &lines { println!("\t{}", paint(line, &added_color)); }
         println!();
         need_leading_blank = false;
     }
@@ -355,7 +365,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
                 _ => "both modified:",
             };
             // Labels are padded to the longest one ("deleted by them:") plus a space.
-            println!("\t{:<17}{}", how, path);
+            println!("\t{}", paint(&format!("{:<17}{}", how, path), &unmerged_color));
         }
         println!();
         need_leading_blank = false;
@@ -368,7 +378,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
         lines.extend(unstaged_modified.iter().map(|p| (p.clone(), format!("modified:   {}", p))));
         lines.extend(unstaged_deleted.iter().map(|p| (p.clone(), format!("deleted:    {}", p))));
         lines.sort();
-        for (_, line) in &lines { println!("\t{}", line); }
+        for (_, line) in &lines { println!("\t{}", paint(line, &changed_color)); }
         println!();
         need_leading_blank = false;
     }
@@ -376,7 +386,7 @@ pub fn status(opts: crate::workspace::status::types::StatusOptions) -> anyhow::R
     if has_untracked {
         if need_leading_blank { println!(); }
         println!("Untracked files:");
-        for p in &untracked { println!("\t{}", p); }
+        for p in &untracked { println!("\t{}", paint(p, &untracked_color)); }
         println!();
         need_leading_blank = false;
     }
@@ -627,4 +637,4 @@ pub fn mv(source: PathBuf, destination: PathBuf, force: bool) -> anyhow::Result<
     println!("renamed '{}' -> '{}'", src_rel, dest_rel);
 
     Ok(())
-}
+}

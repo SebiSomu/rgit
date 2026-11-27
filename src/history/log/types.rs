@@ -75,6 +75,8 @@ pub struct LogOptions {
     pub objects: Vec<String>,
     /// `--graph`: draw the commit graph to the left of the output (implies `--topo-order`).
     pub graph: bool,
+    /// Whether the output is colored (`--color`, `color.diff`, `color.ui`).
+    pub color: bool,
     /// `--follow`: follow one file's history across renames and copies.
     pub follow: bool,
 }

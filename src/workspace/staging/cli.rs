@@ -59,7 +59,13 @@ pub fn dispatch_status(args: StatusArgs) -> anyhow::Result<()> {
         anyhow::bail!("fatal: Invalid untracked files mode '{}'", untracked);
     }
     // `-z` implies the porcelain format, like git.
-    crate::workspace::staging::status(crate::workspace::status::types::StatusOptions { short: short || porcelain.is_some() || nul, branch, nul, untracked })?;
+    crate::workspace::staging::status(crate::workspace::status::types::StatusOptions {
+        short: short || porcelain.is_some() || nul,
+        branch,
+        nul,
+        untracked,
+        color: porcelain.is_none() && !nul && crate::core::color::enabled("status"),
+    })?;
     Ok(())
 }
 

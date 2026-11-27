@@ -11,6 +11,8 @@ pub struct GrepOptions {
     pub files_without_match: bool,
     pub fixed_strings: bool,
     pub cached: bool,
+    /// Color file names, separators, line numbers and matches as git does.
+    pub color: bool,
 }
 
 /// The result of searching a single file or blob in `grep`.

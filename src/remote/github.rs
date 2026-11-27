@@ -868,7 +868,12 @@ pub fn push_to_github(target: &GitHubTarget, remote_name: &str, remote_display: 
             let is_ff = crate::core::commit::is_reachable(local_hash, remote_hash).unwrap_or(false);
             if !is_ff && !force {
                 eprintln!("To {}", remote_display);
-                eprintln!(" ! [rejected]        {} -> {} (non-fast-forward)", src_name, dest_branch);
+                if crate::core::color::stderr_enabled("push") {
+                    let red = crate::core::color::slot("push", "error", crate::core::color::RED);
+                    eprintln!(" {}! [rejected]       {} {} -> {} (non-fast-forward)", red, crate::core::color::RESET, src_name, dest_branch);
+                } else {
+                    eprintln!(" ! [rejected]        {} -> {} (non-fast-forward)", src_name, dest_branch);
+                }
                 anyhow::bail!(
                     "error: failed to push some refs to '{}'\n\
                      hint: Updates were rejected because the tip of your current branch is behind\n\

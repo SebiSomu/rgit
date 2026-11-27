@@ -9,4 +9,6 @@ pub struct StatusOptions {
     pub branch: bool,
     pub nul: bool,
     pub untracked: String,
+    /// Color the output (`color.status`; never for `--porcelain` or `-z`).
+    pub color: bool,
 }

@@ -23,6 +23,11 @@ pub struct GrepArgs {
     fixed_strings: bool,
     #[arg(long = "cached")]
     cached: bool,
+    /// `--color[=<when>]`: color the output (`always`, `never`, `auto`).
+    #[arg(long = "color", num_args = 0..=1, require_equals = true, default_missing_value = "always")]
+    color: Option<String>,
+    #[arg(long = "no-color")]
+    no_color: bool,
     #[arg(short = 'e')]
     pattern_flag: Option<String>,
     args: Vec<String>,
@@ -42,6 +47,8 @@ pub fn dispatch_grep(args: GrepArgs) -> anyhow::Result<()> {
         files_without_match,
         fixed_strings,
         cached,
+        color,
+        no_color,
         pattern_flag,
         args,
         path_specs,
@@ -79,6 +86,14 @@ pub fn dispatch_grep(args: GrepArgs) -> anyhow::Result<()> {
         files_without_match,
         fixed_strings,
         cached,
+        color: {
+            if no_color {
+                crate::core::color::set_override(Some(false));
+            } else if let Some(when) = color {
+                crate::core::color::set_override(crate::core::color::parse_color_flag(&format!("--color={}", when)).flatten());
+            }
+            crate::core::color::enabled("grep")
+        },
     };
 
     crate::history::grep::grep(pattern, revisions, final_path_specs, options)?;

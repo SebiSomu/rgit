@@ -559,9 +559,12 @@ fn patch_update_file(
         return Ok(false);
     }
     let mut quit = false;
-    for line in &file.header {
-        let _ = out.write_all(line);
-    }
+    let diff_color = crate::core::color::enabled("diff");
+    let paint_diff = |bytes: &[u8]| -> Vec<u8> {
+        if diff_color { crate::core::color::colorize_diff(&String::from_utf8_lossy(bytes)).into_bytes() } else { bytes.to_vec() }
+    };
+    let header: Vec<u8> = file.header.concat();
+    let _ = out.write_all(&paint_diff(&header));
     let mut hunk_index = 0usize;
     // As in git 2.43, a command once allowed for this file stays allowed (the flags only grow).
     let (mut allow_prev, mut allow_prev_undecided, mut allow_next, mut allow_next_undecided) = (false, false, false, false);
@@ -580,7 +583,7 @@ fn patch_update_file(
 
         let mut options = String::new();
         if hunk_nr > 0 {
-            let _ = out.write_all(&render_hunk(&file.hunks[hunk_index]));
+            let _ = out.write_all(&paint_diff(&render_hunk(&file.hunks[hunk_index])));
             if undecided_previous.is_some() {
                 allow_prev_undecided = true;
                 options.push_str(",k");
@@ -619,7 +622,12 @@ fn patch_update_file(
         } else {
             mode.prompts[3]
         };
-        let _ = write!(out, "({}/{}) {}", hunk_index + 1, hunk_nr.max(1), prompt.replace("%s", &options));
+        let question = format!("({}/{}) {}", hunk_index + 1, hunk_nr.max(1), prompt.replace("%s", &options));
+        if crate::core::color::enabled("interactive") {
+            let _ = write!(out, "{}{}{}", crate::core::color::slot("interactive", "prompt", crate::core::color::BOLD_BLUE), question, crate::core::color::RESET);
+        } else {
+            let _ = write!(out, "{}", question);
+        }
         let Some(answer) = read_answer(out, input) else { break };
         let Some(first) = answer.chars().next() else { continue };
         let ch = first.to_ascii_lowercase();

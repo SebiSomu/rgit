@@ -241,14 +241,21 @@ pub fn note_on_failure(note: Option<String>) {
 /// to stop with git's exact error text (which usually starts with `fatal:` or `error:` itself).
 // Used by `merge`, `rebase`, `commit`, `tag`, `log`, `show-branch`, `update-index`, `interpret-trailers` and `fmt-merge-msg`.
 pub fn die(code: i32, message: &str) -> ! {
-    eprintln!("{}", message);
+    eprintln!("{}", crate::core::color::paint_hints(message));
     exit(code)
+}
+
+/// Prints `text` and a newline to stderr, its `hint:` lines in yellow on a terminal as git
+/// prints advice.
+// Used wherever rgit prints git's `hint:` lines.
+pub fn eprintln_hints(text: &str) {
+    eprintln!("{}", crate::core::color::paint_hints(text));
 }
 
 /// Prints `fatal: <message>` to stderr and ends the process with status 128, like git's `die()`.
 // Used by `update-ref` and `branch`.
 pub fn die_fatal(message: impl AsRef<str>) -> ! {
-    eprintln!("fatal: {}", message.as_ref());
+    eprintln!("fatal: {}", crate::core::color::paint_hints(message.as_ref()));
     exit(128)
 }
 
@@ -256,7 +263,7 @@ pub fn die_fatal(message: impl AsRef<str>) -> ! {
 /// `code`; for messages that already carry their own line breaks, such as usage texts.
 // Used by `submodule`, `symbolic-ref` and `update-ref`.
 pub fn die_raw(code: i32, message: &str) -> ! {
-    eprint!("{}", message);
+    eprint!("{}", crate::core::color::paint_hints(message));
     exit(code)
 }
 

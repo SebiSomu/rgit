@@ -126,8 +126,8 @@ pub fn rebase(opts: RebaseOptions) -> anyhow::Result<()> {
         for commit in &skipped {
             eprintln!("warning: skipped previously applied commit {}", crate::history::rev_list::engine::abbreviate_hash(commit));
         }
-        eprintln!("hint: use --reapply-cherry-picks to include skipped commits");
-        eprintln!("hint: Disable this message with \"rgit config advice.skippedCherryPicks false\"");
+        crate::ui::eprintln_hints("hint: use --reapply-cherry-picks to include skipped commits");
+        crate::ui::eprintln_hints("hint: Disable this message with \"rgit config advice.skippedCherryPicks false\"");
     }
     let mut items: Vec<TodoItem> = Vec::new();
     for hash in commits {

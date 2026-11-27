@@ -156,8 +156,8 @@ fn resolve_conflict_or_die(verb: &str, fatal: &str, list_paths: bool) -> anyhow:
         return Ok(());
     }
     eprintln!("error: {} is not possible because you have unmerged files.", verb);
-    eprintln!("hint: Fix them up in the work tree, and then use 'rgit add/rm <file>'");
-    eprintln!("hint: as appropriate to mark resolution and make a commit.");
+    crate::ui::eprintln_hints("hint: Fix them up in the work tree, and then use 'rgit add/rm <file>'");
+    crate::ui::eprintln_hints("hint: as appropriate to mark resolution and make a commit.");
     eprintln!("fatal: {}", fatal);
     if list_paths {
         for path in &paths {

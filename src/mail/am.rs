@@ -153,7 +153,7 @@ fn run_session(opts: &AmOptions) -> Result<bool> {
         }
         if !applies {
             println!("Patch failed at {:04} {}", next, mail.subject);
-            eprintln!("hint: Use 'rgit am --show-current-patch=diff' to see the failed patch");
+            crate::ui::eprintln_hints("hint: Use 'rgit am --show-current-patch=diff' to see the failed patch");
             print_resolve_advice();
             return Ok(false);
         }

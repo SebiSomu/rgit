@@ -1,0 +1,146 @@
+---
+source: tests/cli/scenarios/colors.rs
+expression: r.finish()
+---
+$ rgit init
+Initialized empty git repository in .git/
+$ write base.txt (5 bytes)
+$ rgit add base.txt
+Staged files to index (1 new).
+$ rgit commit -m base
+[main (root-commit) <H1:7>] base
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 base.txt
+$ rgit branch feature
+$ write main.txt (8 bytes)
+$ rgit add main.txt
+Staged files to index (1 new).
+$ rgit commit -m 'main work'
+[main <H2:7>] main work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main.txt
+$ rgit switch feature
+Switched to branch 'feature'
+$ write feature.txt (11 bytes)
+$ rgit add feature.txt
+Staged files to index (1 new).
+$ rgit commit -m 'feature work'
+[feature <H3:7>] feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
+$ write feature.txt (16 bytes)
+$ rgit commit -a -m 'more feature work'
+[feature <H4:7>] more feature work
+ Author: Test Author <author@example.com>
+ 1 file changed, 1 insertion(+)
+$ rgit switch main
+Switched to branch 'main'
+$ rgit merge feature -m merged
+Merge made by the 'ort' strategy.
+ feature.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 feature.txt
+$ rgit tag v1
+$ rgit config color.ui always
+$ write main.txt (18 bytes)
+$ write new.txt (4 bytes)
+$ rgit add new.txt
+Staged files to index (1 new).
+$ rgit status
+On branch main
+Changes to be committed:
+	<green>new file:   new.txt<reset>
+
+Changes not staged for commit:
+	<red>modified:   main.txt<reset>
+
+$ rgit status -s -b
+## <green>main<reset>
+ <red>M<reset> main.txt
+<green>A<reset>  new.txt
+$ rgit branch -v
+  feature<reset> <H4:7> more feature work
+* <green>main   <reset> <H5:7> merged
+$ rgit log --graph --oneline --decorate --all
+*   <yellow><H5:7><reset><yellow> (<reset><bold-cyan>HEAD<reset><yellow> -> <reset><bold-green>main<reset><yellow>, <reset><bold-yellow>tag: <reset><bold-yellow>v1<reset><yellow>)<reset> merged
+<red>|<reset><green>\<reset>  
+<red>|<reset> * <yellow><H4:7><reset><yellow> (<reset><bold-green>feature<reset><yellow>)<reset> more feature work
+<red>|<reset> * <yellow><H3:7><reset> feature work
+* <green>|<reset> <yellow><H2:7><reset> main work
+<green>|<reset><green>/<reset>  
+* <yellow><H1:7><reset> base
+$ rgit log --format='%C(auto)%h%d %Cgreen%s%Creset' -2
+<yellow><H5:7><reset><yellow> (<reset><bold-cyan>HEAD<reset><yellow> -> <reset><bold-green>main<reset><yellow>, <reset><bold-yellow>tag: <reset><bold-yellow>v1<reset><yellow>)<reset> <green>merged<reset>
+<yellow><H4:7><reset><yellow> (<reset><bold-green>feature<reset><yellow>)<reset> <green>more feature work<reset>
+$ rgit diff
+<bold>diff --git a/main.txt b/main.txt<reset>
+<bold>index <H6:7>..c39fdc1 100644<reset>
+<bold>--- a/main.txt<reset>
+<bold>+++ b/main.txt<reset>
+<cyan>@@ -1 +1,2 @@<reset>
+ on main<reset>
+<green>+<reset><green>changed<reset><redbg>  <reset>
+$ rgit diff --cached --stat
+ new.txt | 1 <green>+<reset>
+ 1 file changed, 1 insertion(+)
+$ rgit grep -n on
+<magenta>feature.txt<reset><cyan>:<reset><green>1<reset><cyan>:<reset><bold-red>on<reset> feature
+<magenta>main.txt<reset><cyan>:<reset><green>1<reset><cyan>:<reset><bold-red>on<reset> main
+$ rgit show-branch main feature
+<red>*<reset> [main] merged
+ <green>!<reset> [feature] more feature work
+--
+<red>-<reset>  [main] merged
+<red>*<reset><green>+<reset> [feature] more feature work
+$ rgit log --oneline --no-color -1
+<H5:7> merged
+$ rgit diff --color=never
+diff --git a/main.txt b/main.txt
+index <H6:7>..c39fdc1 100644
+--- a/main.txt
++++ b/main.txt
+@@ -1 +1,2 @@
+ on main
++changed  
+$ rgit config color.ui never
+$ rgit status -s
+ M main.txt
+A  new.txt
+$ rgit log --oneline --color=always -1
+<yellow><H5:7><reset> merged
+
+==== final state ====
+HEAD: ref: refs/heads/main
+refs:
+  refs/heads/feature <H4>
+  refs/heads/main <H5>
+  refs/tags/v1 <H5>
+git-dir entries:
+  COMMIT_EDITMSG ORIG_HEAD config
+index (ls-files -s):
+  100644 <H7> 0	base.txt
+  100644 <H8> 0	feature.txt
+  100644 <H6> 0	main.txt
+  100644 <H9> 0	new.txt
+HEAD commit:
+  tree <H10>
+  parent <H2>
+  parent <H4>
+  author Test Author <author@example.com> 1700000660 +0000
+  committer Test Committer <committer@example.com> 1700000660 +0000
+  
+  merged
+worktree:
+  base.txt
+    | base
+  feature.txt
+    | on feature
+    | more
+  main.txt
+    | on main
+    | changed  
+  new.txt
+    | new

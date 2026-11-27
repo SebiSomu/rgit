@@ -6,10 +6,48 @@ pub mod types;
 
 use crate::history::graph::types::{GitGraph, GraphState};
 
-/// Creates an empty graph drawing, ready for its first `graph_update`.
+/// git's column colors, in the order branch lines get them (`column_colors_ansi`).
+pub const COLUMN_COLORS: [&str; 12] = [
+    crate::core::color::RED,
+    crate::core::color::GREEN,
+    crate::core::color::YELLOW,
+    crate::core::color::BLUE,
+    crate::core::color::MAGENTA,
+    crate::core::color::CYAN,
+    crate::core::color::BOLD_RED,
+    crate::core::color::BOLD_GREEN,
+    crate::core::color::BOLD_YELLOW,
+    crate::core::color::BOLD_BLUE,
+    crate::core::color::BOLD_MAGENTA,
+    crate::core::color::BOLD_CYAN,
+];
+
+/// Creates an empty graph drawing, ready for its first `graph_update`; with `color`, each
+/// branch line is drawn in its own color, as git does.
 // Used by `log --graph`.
-pub fn graph_new() -> GitGraph {
-    GitGraph { merge_layout: -1, ..Default::default() }
+pub fn graph_new(color: bool) -> GitGraph {
+    GitGraph { merge_layout: -1, default_color: COLUMN_COLORS.len() - 1, color, ..Default::default() }
+}
+
+/// Writes `ch` for a branch line of color `color` (git's `graph_line_write_column`).
+// Used by every graph row writer.
+fn write_column(g: &GitGraph, line: &mut String, color: usize, ch: char) {
+    if g.color {
+        line.push_str(COLUMN_COLORS[color % COLUMN_COLORS.len()]);
+        line.push(ch);
+        line.push_str(crate::core::color::RESET);
+    } else {
+        line.push(ch);
+    }
+}
+
+/// Color of the branch line `i` before this commit, and of `i` after it.
+// Used by the graph row writers.
+fn old_color(g: &GitGraph, i: usize) -> usize {
+    g.column_colors.get(i).copied().unwrap_or(0)
+}
+fn new_color(g: &GitGraph, i: usize) -> usize {
+    g.new_column_colors.get(i).copied().unwrap_or(0)
 }
 
 /// Moves the drawing on to the next commit (git's `graph_update`): records its interesting
@@ -84,7 +122,9 @@ fn is_current(g: &GitGraph, commit: &str) -> bool {
 // Used by `graph_update`.
 fn graph_update_columns(g: &mut GitGraph) {
     std::mem::swap(&mut g.columns, &mut g.new_columns);
+    std::mem::swap(&mut g.column_colors, &mut g.new_column_colors);
     g.new_columns.clear();
+    g.new_column_colors.clear();
 
     let max_new_columns = g.columns.len() + g.parents.len();
     g.mapping_size = 2 * max_new_columns;
@@ -118,7 +158,12 @@ fn graph_update_columns(g: &mut GitGraph) {
             seen_this = true;
             g.commit_index = i as i32;
             g.merge_layout = -1;
+            // A merge, or the start of a new childless line, moves on to the next color.
+            let in_columns = i < num_columns;
             for parent in g.parents.clone() {
+                if num_parents(g) > 1 || !in_columns {
+                    g.default_color = (g.default_color + 1) % COLUMN_COLORS.len();
+                }
                 insert_into_new_columns(g, &parent, i as i32);
             }
             // The commit itself always takes up at least two screen columns.
@@ -142,7 +187,13 @@ fn insert_into_new_columns(g: &mut GitGraph, commit: &str, idx: i32) {
     let i = match g.new_columns.iter().position(|c| c == commit) {
         Some(i) => i as i32,
         None => {
+            // A line keeps its color; a new one gets the current color.
+            let color = match g.columns.iter().position(|c| c == commit) {
+                Some(old) => old_color(g, old),
+                None => g.default_color,
+            };
             g.new_columns.push(commit.to_string());
+            g.new_column_colors.push(color);
             g.new_columns.len() as i32 - 1
         }
     };
@@ -208,17 +259,37 @@ pub fn graph_next_line(g: &mut GitGraph) -> (String, bool) {
 /// Pads a row with spaces to the width of the current commit, so text to its right lines up.
 // Used by `graph_next_line` and `graph_padding_line`.
 fn pad_horizontally(g: &GitGraph, line: &mut String) {
-    let width = line.chars().count() as i32;
+    let width = visible_width(line) as i32;
     if width < g.width {
         line.push_str(&" ".repeat((g.width - width) as usize));
     }
 }
 
+/// The width of a row on screen (color escapes take none).
+// Used by `pad_horizontally`.
+fn visible_width(line: &str) -> usize {
+    let mut width = 0;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            for c in chars.by_ref() {
+                if c == 'm' {
+                    break;
+                }
+            }
+        } else {
+            width += 1;
+        }
+    }
+    width
+}
+
 /// Writes a row that keeps every branch line as it is.
 // Used by `graph_next_line`.
 fn output_padding_line(g: &GitGraph, line: &mut String) {
-    for _ in &g.new_columns {
-        line.push_str("| ");
+    for i in 0..g.new_columns.len() {
+        write_column(g, line, new_color(g, i), '|');
+        line.push(' ');
     }
 }
 
@@ -235,21 +306,22 @@ fn output_skip_line(g: &mut GitGraph, line: &mut String) {
 fn output_pre_commit_line(g: &mut GitGraph, line: &mut String) {
     let mut seen_this = false;
     for i in 0..g.columns.len() {
+        let color = old_color(g, i);
         if is_current(g, &g.columns[i]) {
             seen_this = true;
-            line.push('|');
+            write_column(g, line, color, '|');
             line.push_str(&" ".repeat(g.expansion_row.max(0) as usize));
         } else if seen_this && g.expansion_row == 0 {
             // Lines right of a merge printed as `\` on the row before stay `\` here.
             if g.prev_state == GraphState::PostMerge && g.prev_commit_index < i as i32 {
-                line.push('\\');
+                write_column(g, line, color, '\\');
             } else {
-                line.push('|');
+                write_column(g, line, color, '|');
             }
         } else if seen_this && g.expansion_row > 0 {
-            line.push('\\');
+            write_column(g, line, color, '\\');
         } else {
-            line.push('|');
+            write_column(g, line, color, '|');
         }
         line.push(' ');
     }
@@ -264,8 +336,11 @@ fn output_pre_commit_line(g: &mut GitGraph, line: &mut String) {
 fn draw_octopus_merge(g: &GitGraph, line: &mut String) {
     let dashed = num_dashed_parents(g);
     for i in 0..dashed {
-        line.push('-');
-        line.push(if i == dashed - 1 { '.' } else { '-' });
+        // The dashes lead to the parent lines, in their colors.
+        let target = g.mapping.get(((g.commit_index + i + 2) * 2) as usize).copied().unwrap_or(-1);
+        let color = if target >= 0 { new_color(g, target as usize) } else { 0 };
+        write_column(g, line, color, '-');
+        write_column(g, line, color, if i == dashed - 1 { '.' } else { '-' });
     }
 }
 
@@ -290,22 +365,22 @@ fn output_commit_line(g: &mut GitGraph, line: &mut String) {
                 draw_octopus_merge(g, line);
             }
         } else if seen_this && g.edges_added > 1 {
-            line.push('\\');
+            write_column(g, line, old_color(g, i), '\\');
         } else if seen_this && g.edges_added == 1 {
             // A right-skewed two-way merge (or left-skewed three-way): a line that was `\` on
             // the post-merge row of the previous commit stays `\`.
             if g.prev_state == GraphState::PostMerge && g.prev_edges_added > 0 && g.prev_commit_index < i as i32 {
-                line.push('\\');
+                write_column(g, line, old_color(g, i), '\\');
             } else {
-                line.push('|');
+                write_column(g, line, old_color(g, i), '|');
             }
         } else if g.prev_state == GraphState::Collapsing
             && g.old_mapping.get(2 * i + 1).copied() == Some(i as i32)
             && g.mapping.get(2 * i).copied().unwrap_or(-1) < i as i32
         {
-            line.push('/');
+            write_column(g, line, old_color(g, i), '/');
         } else {
-            line.push('|');
+            write_column(g, line, old_color(g, i), '|');
         }
         line.push(' ');
     }
@@ -340,7 +415,8 @@ fn output_post_merge_line(g: &mut GitGraph, line: &mut String) {
             let mut idx = g.merge_layout.max(0) as usize;
             let n = g.parents.len();
             for j in 0..n {
-                line.push(MERGE_CHARS[idx.min(2)]);
+                let parent_color = g.new_columns.iter().position(|c| *c == g.parents[j]).map(|p| new_color(g, p)).unwrap_or(0);
+                write_column(g, line, parent_color, MERGE_CHARS[idx.min(2)]);
                 if idx == 2 {
                     if g.edges_added > 0 || j < n - 1 {
                         line.push(' ');
@@ -353,10 +429,10 @@ fn output_post_merge_line(g: &mut GitGraph, line: &mut String) {
                 line.push(' ');
             }
         } else if seen_this {
-            line.push(if g.edges_added > 0 { '\\' } else { '|' });
+            write_column(g, line, old_color(g, i), if g.edges_added > 0 { '\\' } else { '|' });
             line.push(' ');
         } else {
-            line.push('|');
+            write_column(g, line, old_color(g, i), '|');
             if g.merge_layout != 0 || i as i32 != g.commit_index - 1 {
                 line.push(' ');
             }
@@ -434,20 +510,23 @@ fn output_collapsing_line(g: &mut GitGraph, line: &mut String) {
         let target = g.mapping[i];
         if target < 0 {
             line.push(' ');
-        } else if (target * 2) as usize == i {
-            line.push('|');
+            continue;
+        }
+        let color = new_color(g, target as usize);
+        if (target * 2) as usize == i {
+            write_column(g, line, color, '|');
         } else if target == horizontal_edge_target && i as i32 != horizontal_edge - 1 {
             // Only the first segment of a horizontal edge carries on to the next row.
             if i != (target * 2) as usize + 3 {
                 g.mapping[i] = -1;
             }
             used_horizontal = true;
-            line.push('_');
+            write_column(g, line, color, '_');
         } else {
             if used_horizontal && (i as i32) < horizontal_edge {
                 g.mapping[i] = -1;
             }
-            line.push('/');
+            write_column(g, line, color, '/');
         }
     }
 
@@ -465,7 +544,7 @@ pub fn graph_padding_line(g: &mut GitGraph) -> String {
     }
     let mut line = String::new();
     for i in 0..g.columns.len() {
-        line.push('|');
+        write_column(g, &mut line, old_color(g, i), '|');
         if is_current(g, &g.columns[i]) && g.parents.len() > 2 {
             line.push_str(&" ".repeat((g.parents.len() - 2) * 2));
         } else {

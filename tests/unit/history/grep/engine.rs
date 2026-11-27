@@ -42,6 +42,7 @@ fn test_search_content() {
         files_without_match: false,
         fixed_strings: false,
         cached: false,
+        color: false,
     };
     let matcher = build_grep_matcher("apple", false, false).unwrap();
     let content = b"one apple\ntwo bananas\nthree apples\n";

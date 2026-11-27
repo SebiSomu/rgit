@@ -146,6 +146,8 @@ pub fn diff_tree(args: Vec<String>) -> Result<()> {
                     // diff-tree never abbreviates commit ids, and the diff flags decide how
                     // the header and the diff are joined.
                     log_opts.revs.abbrev_commit = false;
+                    // Plumbing: never colored.
+                    log_opts.color = false;
                     log_opts.show_notes = false;
                     log_opts.patch = opts.patch;
                     log_opts.stat = opts.stat;

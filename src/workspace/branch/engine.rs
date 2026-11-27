@@ -88,6 +88,10 @@ pub fn parse_branch_args(args: &[String]) -> BranchOptions {
             only_args = true;
             continue;
         }
+        if let Some(when) = crate::core::color::parse_color_flag(arg) {
+            crate::core::color::set_override(when);
+            continue;
+        }
         if let Some(long) = arg.strip_prefix("--") {
             let (name, inline) = match long.split_once('=') {
                 Some((n, v)) => (n, Some(v.to_string())),
@@ -426,20 +430,45 @@ pub fn format_branch_list(opts: &BranchOptions) -> Result<String> {
     entries.sort_by(|a, b| (a.kind.min(1), &a.kind, &a.short).cmp(&(b.kind.min(1), &b.kind, &b.short)));
 
     let width = entries.iter().map(|e| e.name.chars().count()).max().unwrap_or(0);
+    // git's `color.branch.*`: the current branch green, remote-tracking ones red, those
+    // checked out in another worktree cyan, upstreams (with -vv) blue.
+    let on = crate::core::color::enabled("branch");
+    let color = |name: &str, default: &'static str| if on { crate::core::color::slot("branch", name, default) } else { String::new() };
+    let (current_color, local_color, remote_color, worktree_color, upstream_color) = (
+        color("current", crate::core::color::GREEN),
+        color("local", ""),
+        color("remote", crate::core::color::RED),
+        color("worktree", crate::core::color::CYAN),
+        color("upstream", crate::core::color::BLUE),
+    );
+    let paint = crate::core::color::paint;
     let mut out = String::new();
     for e in &entries {
         let marker = if e.current { "* " } else if e.other_worktree.is_some() { "+ " } else { "  " };
+        let name_color = if e.current {
+            &current_color
+        } else if e.kind == 2 {
+            &remote_color
+        } else if e.other_worktree.is_some() {
+            &worktree_color
+        } else {
+            &local_color
+        };
         out.push_str(marker);
+        // As git prints it: the name (padded with -v) between its color and a reset, the reset
+        // even for an uncolored local branch.
+        let colored = |text: &str| if on { format!("{}{}{}", name_color, text, crate::core::color::RESET) } else { text.to_string() };
         let target_short = e.symref.as_deref().map(|t| t.strip_prefix("refs/remotes/").unwrap_or(t).to_string());
         if opts.verbose == 0 {
-            out.push_str(&e.name);
+            out.push_str(&colored(&e.name));
             if let Some(t) = &target_short {
                 out.push_str(&format!(" -> {}", t));
             }
             out.push('\n');
             continue;
         }
-        out.push_str(&format!("{:<w$}", e.name, w = width));
+        let padding = " ".repeat(width.saturating_sub(e.name.chars().count()));
+        out.push_str(&colored(&format!("{}{}", e.name, padding)));
         if let Some(t) = &target_short {
             out.push_str(&format!(" -> {}\n", t));
             continue;
@@ -449,13 +478,13 @@ pub fn format_branch_list(opts: &BranchOptions) -> Result<String> {
             let tracking = upstream_track(&e.short);
             if opts.verbose > 1 {
                 if let Some(path) = &e.other_worktree {
-                    out.push_str(&format!("({}) ", path));
+                    out.push_str(&format!("({}) ", paint(path, &worktree_color)));
                 }
                 if let Some((up, track)) = &tracking {
                     if track.is_empty() {
-                        out.push_str(&format!("[{}] ", up));
+                        out.push_str(&format!("[{}] ", paint(up, &upstream_color)));
                     } else {
-                        out.push_str(&format!("[{}: {}] ", up, track));
+                        out.push_str(&format!("[{}: {}] ", paint(up, &upstream_color), track));
                     }
                 }
             } else if let Some((_, track)) = &tracking {

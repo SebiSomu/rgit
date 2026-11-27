@@ -46,4 +46,11 @@ pub struct GitGraph {
     pub mapping: Vec<i32>,
     pub old_mapping: Vec<i32>,
     pub mapping_size: usize,
+    /// Color index (into git's 12 column colors) of each branch line in `columns` and
+    /// `new_columns`, and the one the next new line gets (git's `default_column_color`).
+    pub column_colors: Vec<usize>,
+    pub new_column_colors: Vec<usize>,
+    pub default_color: usize,
+    /// Whether the lines are drawn in color.
+    pub color: bool,
 }

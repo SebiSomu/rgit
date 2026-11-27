@@ -353,8 +353,8 @@ pub fn approve_pending() {
     let Some((credential, typed)) = PENDING.lock().ok().and_then(|mut p| p.take()) else { return };
     let _ = approve(&credential);
     if typed && configured_helpers().is_empty() && crate::ui::level() >= crate::ui::types::Verbosity::Normal {
-        eprintln!("hint: no credential helper is set, so rgit will ask again next time");
-        eprintln!("hint: `rgit config --global credential.helper store` remembers it in ~/.git-credentials");
+        crate::ui::eprintln_hints("hint: no credential helper is set, so rgit will ask again next time");
+        crate::ui::eprintln_hints("hint: `rgit config --global credential.helper store` remembers it in ~/.git-credentials");
     }
 }
 

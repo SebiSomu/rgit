@@ -82,7 +82,7 @@ fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
     // path is still followed newest first, so the names line up.
     let mut follow_path = opts.revs.paths.first().cloned().filter(|_| opts.follow);
     let mut chosen: Vec<(WalkedCommit, String)> = Vec::new();
-    let mut graph = opts.graph.then(graph_new);
+    let mut graph = opts.graph.then(|| graph_new(opts.color));
     let mut out = BufWriter::new(io::stdout().lock());
     let mut shown = 0;
     let mut prev_missing_newline = false;
@@ -120,7 +120,10 @@ fn log_graph_or_follow(opts: &LogOptions) -> Result<()> {
                 if let Some(old) = renamed_from {
                     *path = old;
                 }
-                render_follow_diff(&pairs, opts, stat_width)?
+                {
+                    let text = render_follow_diff(&pairs, opts, stat_width)?;
+                    if opts.color { crate::core::color::colorize_diff(&text) } else { text }
+                }
             }
             None => commit_diff_output_width(commit, opts, stat_width)?,
         };
@@ -253,7 +256,9 @@ fn show_object(hash: &str, name: &str, opts: &LogOptions, decorations: &std::col
             // git varies the tag header with the format: no tagger for one-line output, no date
             // for templates and short/full, and a blank line before the target only for
             // multi-line formats.
-            let mut text = format!("{}tag {}\n", separator, field("tag "));
+            let tag_line = format!("tag {}", field("tag "));
+            let tag_line = if opts.color { format!("{}{}{}", crate::core::color::slot("diff", "commit", crate::core::color::YELLOW), tag_line, crate::core::color::RESET) } else { tag_line };
+            let mut text = format!("{}{}\n", separator, tag_line);
             let tagger = field("tagger ");
             if let Some((who, when)) = tagger.rsplit_once("> ") {
                 let mut parts = when.split_whitespace();

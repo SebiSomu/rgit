@@ -37,7 +37,6 @@ a.txt:one
 $ rgit grep -c e
 a.txt:1
 b.txt:1
-src/lib.txt:0
 $ rgit grep -l v
 src/lib.txt
 $ rgit grep --cached bee

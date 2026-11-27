@@ -7,7 +7,7 @@ cargo test                  # unit tests (in the rgit binary) + snapshot scenari
 cargo test --test cli merge # only scenarios whose name contains "merge"
 ```
 
-Today: 95 unit tests, 136 scenarios (139 `.snap` files in `tests/cli/scenarios/snapshots/`) and 18 HTTP tests against real git.
+Today: 95 unit tests, 137 scenarios (140 `.snap` files in `tests/cli/scenarios/snapshots/`) and 18 HTTP tests against real git.
 
 ## `tests/cli/`: end-to-end scenarios
 

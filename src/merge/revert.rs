@@ -89,11 +89,11 @@ pub fn revert(commit: Option<String>, no_commit: bool, cont: bool, abort: bool) 
         eprintln!("error: could not revert {}... {}", &revert_commit[..7], original_subject);
         // The narration's conflict report replaces these on a terminal.
         if !crate::ui::narration_replaces_hints() {
-            eprintln!("hint: After resolving the conflicts, mark them with");
-            eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
-            eprintln!("hint: \"rgit revert --continue\".");
-            eprintln!("hint: To abort and get back to the state before \"rgit revert\",");
-            eprintln!("hint: run \"rgit revert --abort\".");
+            crate::ui::eprintln_hints("hint: After resolving the conflicts, mark them with");
+            crate::ui::eprintln_hints("hint: \"rgit add/rm <pathspec>\", then run");
+            crate::ui::eprintln_hints("hint: \"rgit revert --continue\".");
+            crate::ui::eprintln_hints("hint: To abort and get back to the state before \"rgit revert\",");
+            crate::ui::eprintln_hints("hint: run \"rgit revert --abort\".");
         }
         crate::ui::exit(1);
     }
@@ -208,4 +208,4 @@ fn revert_abort() -> anyhow::Result<()> {
     println!("Revert of {} aborted; HEAD left unchanged.", &revert_commit[..7]);
 
     Ok(())
-}
+}

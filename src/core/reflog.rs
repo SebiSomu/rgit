@@ -335,16 +335,20 @@ pub fn expire_reflog(ref_name: &str, cutoff: Option<u64>) -> Result<usize> {
 /// Renders a reflog the way `reflog show` prints it, one line per entry:
 /// `<short hash> <name>@{<n>}: <message>`, newest first, at most `limit` entries.
 // Used by the `reflog` command (`show`).
-pub fn format_reflog_output(display_name: &str, entries: &[ReflogEntry], limit: Option<usize>) -> String {
+pub fn format_reflog_output(display_name: &str, entries: &[ReflogEntry], limit: Option<usize>, color: bool) -> String {
     let mut out = String::new();
+    // With colors, the hash is yellow, as in git's `log -g --oneline`.
+    let (start, end) = if color { (crate::core::color::slot("diff", "commit", crate::core::color::YELLOW), crate::core::color::RESET) } else { (String::new(), "") };
     for (n, entry) in entries.iter().enumerate().take(limit.unwrap_or(usize::MAX)) {
         out.push_str(&format!(
-            "{} {}@{{{}}}: {}\n",
+            "{}{}{} {}@{{{}}}: {}\n",
+            start,
             entry.new_hash.chars().take(7).collect::<String>(),
+            end,
             display_name,
             n,
             entry.message
         ));
     }
     out
-}
+}

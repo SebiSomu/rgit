@@ -597,10 +597,10 @@ pub fn process_rebase_todo() -> anyhow::Result<()> {
             eprintln!("error: could not apply {}... {}", short_hash(&item.hash), item.subject);
             // The narration's conflict report replaces these on a terminal.
             if !crate::ui::narration_replaces_hints() {
-                eprintln!("hint: Resolve all conflicts manually, mark them as resolved with");
-                eprintln!("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
-                eprintln!("hint: You can instead skip this commit: run \"rgit rebase --skip\".");
-                eprintln!("hint: To abort and get back to the state before \"rgit rebase\", run \"rgit rebase --abort\".");
+                crate::ui::eprintln_hints("hint: Resolve all conflicts manually, mark them as resolved with");
+                crate::ui::eprintln_hints("hint: \"rgit add/rm <conflicted_files>\", then run \"rgit rebase --continue\".");
+                crate::ui::eprintln_hints("hint: You can instead skip this commit: run \"rgit rebase --skip\".");
+                crate::ui::eprintln_hints("hint: To abort and get back to the state before \"rgit rebase\", run \"rgit rebase --abort\".");
             }
             eprintln!("Could not apply {}... {}", short_hash(&item.hash), item.subject);
             crate::ui::exit(1);

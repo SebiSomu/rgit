@@ -141,12 +141,19 @@ rgit config --list
 
 **Editor.** When a command needs a message and none was given, rgit opens an editor chosen from, in order: `RGIT_EDITOR`, the `core.editor` setting, `VISUAL`, `EDITOR`. Interactive rebase uses `RGIT_SEQUENCE_EDITOR` first. Lines starting with `#` are stripped from the message.
 
+**Colors.** Output is colored the way git colors it: `status` (staged green, unstaged and untracked red), `branch` (current branch green, remote-tracking red), `log`/`show`/`reflog` (commit hashes yellow, ref names in their decoration colors, a color per `--graph` line, `%C(...)` in formats), `diff` and every patch or stat output (`log -p`, `show`, `stash show`, `add -p`, the merge summary), `grep`, `show-branch`, `range-diff`, and `hint:` lines. By default colors are on only when the output is a terminal (`auto`). `color.ui` sets this for every command (`auto`, `always`, `never`), `color.<command>` for one (`color.status`, `color.branch`, `color.diff` for log/show/diff, `color.grep`, `color.showBranch`, `color.interactive`, `color.advice`, `color.push`), and `--color[=<when>]` / `--no-color` decide for a single run of `log`, `show`, `diff`, `branch`, `grep`, `show-branch` and `range-diff`. Single colors follow git's slot names and syntax, for example `rgit config color.diff.new "bold green"` or `rgit config color.branch.current yellow`. On Windows, colors need Windows 10 or later (rgit turns on the console's ANSI support).
+
+```bash
+rgit config --global color.ui auto       # the default: colors on a terminal only
+rgit log --oneline --graph --color=always | less -R
+```
+
 **Environment variables rgit reads**
 
 | Variable | Effect |
 |---|---|
 | `RGIT_VERBOSITY` | Narration level (see above). |
-| `NO_COLOR` | Disable colored narration. |
+| `NO_COLOR` | Disable colored narration, and git-style colors unless a setting or flag says `always`. |
 | `RGIT_EDITOR`, `RGIT_SEQUENCE_EDITOR` | Editor for messages / for the rebase todo list. |
 | `RGIT_PAGER` | Pager command. |
 | `GITHUB_TOKEN`, `RGIT_GITHUB_TOKEN` | GitHub access token for push, fetch and clone. |

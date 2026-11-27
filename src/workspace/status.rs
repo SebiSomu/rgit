@@ -121,21 +121,108 @@ pub fn format_short_status(
         };
         rows.insert(path.clone(), (x, y, None));
     }
+    let colors = ShortColors::new(opts.color);
     let mut out = String::new();
     if let Some(h) = header {
-        out.push_str(&h);
+        out.push_str(&colors.header(&h));
         out.push_str(end);
     }
     for (path, (x, y, from)) in &rows {
+        let unmerged_row = unmerged.contains_key(path);
+        let xy = colors.columns(*x, *y, unmerged_row);
         match from {
             Some(from) if opts.nul => out.push_str(&format!("{}{} {}\0{}\0", x, y, path, from)),
-            Some(from) => out.push_str(&format!("{}{} {} -> {}\n", x, y, show(from), show(path))),
-            None => out.push_str(&format!("{}{} {}{}", x, y, show(path), end)),
+            Some(from) => out.push_str(&format!("{} {} -> {}\n", xy, show(from), show(path))),
+            None => out.push_str(&format!("{} {}{}", xy, show(path), end)),
         }
     }
     for path in untracked {
-        out.push_str(&format!("?? {}{}", show(path), end));
+        out.push_str(&format!("{} {}{}", colors.paint("??", &colors.untracked), show(path), end));
     }
+    out
+}
+
+/// git's `color.status.*` colors for the short format (all empty when not coloring).
+// Used by `format_short_status`.
+struct ShortColors {
+    on: bool,
+    updated: String,
+    changed: String,
+    untracked: String,
+    unmerged: String,
+    local: String,
+    remote: String,
+}
+
+impl ShortColors {
+    fn new(on: bool) -> ShortColors {
+        let get = |name: &str, default: &'static str| if on { crate::core::color::slot("status", name, default) } else { String::new() };
+        ShortColors {
+            on,
+            updated: get("added", crate::core::color::GREEN),
+            changed: get("changed", crate::core::color::RED),
+            untracked: get("untracked", crate::core::color::RED),
+            unmerged: get("unmerged", crate::core::color::RED),
+            local: get("localbranch", crate::core::color::GREEN),
+            remote: get("remotebranch", crate::core::color::RED),
+        }
+    }
+
+    fn paint(&self, text: &str, color: &str) -> String {
+        crate::core::color::paint(text, color)
+    }
+
+    /// `XY`: the index column in the updated color, the work-tree column in the changed
+    /// color, both in the unmerged color for a conflict (spaces stay uncolored).
+    fn columns(&self, x: char, y: char, unmerged: bool) -> String {
+        let one = |c: char, color: &str| if c == ' ' { " ".to_string() } else { self.paint(&c.to_string(), color) };
+        if unmerged {
+            return format!("{}{}", one(x, &self.unmerged), one(y, &self.unmerged));
+        }
+        format!("{}{}", one(x, &self.updated), one(y, &self.changed))
+    }
+
+    /// `## main...origin/main [ahead 1, behind 2]`: the branch green, the upstream red, the
+    /// ahead count green and the behind count red, as git colors it.
+    fn header(&self, header: &str) -> String {
+        if !self.on {
+            return header.to_string();
+        }
+        let Some(rest) = header.strip_prefix("## ") else { return header.to_string() };
+        if rest.starts_with("HEAD (no branch)") || rest.starts_with("No commits yet on ") {
+            let (label, branch) = match rest.strip_prefix("No commits yet on ") {
+                Some(branch) => ("No commits yet on ", branch),
+                None => ("", rest),
+            };
+            let color = if label.is_empty() { crate::core::color::slot("status", "nobranch", crate::core::color::RED) } else { self.local.clone() };
+            return format!("## {}{}", label, self.paint(branch, &color));
+        }
+        let (names, track) = match rest.find(" [") {
+            Some(i) => (&rest[..i], &rest[i..]),
+            None => (rest, ""),
+        };
+        let names = match names.split_once("...") {
+            Some((local, upstream)) => format!("{}...{}", self.paint(local, &self.local), self.paint(upstream, &self.remote)),
+            None => self.paint(names, &self.local),
+        };
+        let track = color_counts(track, &self.local, &self.remote);
+        format!("## {}{}", names, track)
+    }
+}
+
+/// ` [ahead 3, behind 2]` with the ahead count in `ahead` and the behind count in `behind`.
+// Used by `ShortColors::header`.
+fn color_counts(track: &str, ahead: &str, behind: &str) -> String {
+    let mut out = String::new();
+    let mut rest = track;
+    while let Some(i) = rest.find(|c: char| c.is_ascii_digit()) {
+        let end = rest[i..].find(|c: char| !c.is_ascii_digit()).map(|e| i + e).unwrap_or(rest.len());
+        let color = if rest[..i].ends_with("behind ") { behind } else { ahead };
+        out.push_str(&rest[..i]);
+        out.push_str(&crate::core::color::paint(&rest[i..end], color));
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
     out
 }
 

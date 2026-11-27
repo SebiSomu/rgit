@@ -73,25 +73,26 @@ pub fn grep(pattern: String, revisions: Vec<String>, path_specs: Vec<String>, op
     }
 
     let mut total_matches = 0;
+    let paint = GrepColors::new(options.color);
 
     for res in results {
         let count = res.matches.len();
         if options.files_with_matches {
             if count > 0 {
-                println!("{}", res.display_path);
+                println!("{}", paint.file(&res.display_path));
                 total_matches += 1;
             }
         } else if options.files_without_match {
             if count == 0 {
-                println!("{}", res.display_path);
+                println!("{}", paint.file(&res.display_path));
                 total_matches += 1;
             }
         } else if options.count {
-            if count > 0 || !options.invert_match {
+            if count > 0 {
                 if res.is_binary && count > 0 {
                     println!("Binary file {} matches", res.display_path);
                 } else {
-                    println!("{}:{}", res.display_path, count);
+                    println!("{}{}{}", paint.file(&res.display_path), paint.sep(), count);
                 }
                 if count > 0 {
                     total_matches += count;
@@ -103,10 +104,11 @@ pub fn grep(pattern: String, revisions: Vec<String>, path_specs: Vec<String>, op
                 total_matches += 1;
             } else {
                 for (line_num, line) in res.matches {
+                    let text = if options.invert_match { line.clone() } else { paint.matches(&line, &matcher) };
                     if options.line_number {
-                        println!("{}:{}:{}", res.display_path, line_num, line);
+                        println!("{}{}{}{}{}", paint.file(&res.display_path), paint.sep(), paint.line_number(line_num), paint.sep(), text);
                     } else {
-                        println!("{}:{}", res.display_path, line);
+                        println!("{}{}{}", paint.file(&res.display_path), paint.sep(), text);
                     }
                     total_matches += 1;
                 }
@@ -119,4 +121,63 @@ pub fn grep(pattern: String, revisions: Vec<String>, path_specs: Vec<String>, op
     }
 
     Ok(())
+}
+
+/// git's grep colors (`color.grep.<slot>`): file names magenta, `:` cyan, line numbers green,
+/// matches bold red; nothing when colors are off.
+// Used by `grep`.
+struct GrepColors {
+    on: bool,
+    filename: String,
+    separator: String,
+    line_number: String,
+    matched: String,
+}
+
+impl GrepColors {
+    fn new(on: bool) -> GrepColors {
+        use crate::core::color::{slot, BOLD_RED, CYAN, GREEN, MAGENTA};
+        GrepColors {
+            on,
+            filename: slot("grep", "filename", MAGENTA),
+            separator: slot("grep", "separator", CYAN),
+            line_number: slot("grep", "lineNumber", GREEN),
+            matched: match slot("grep", "matchSelected", "") {
+                selected if selected.is_empty() => slot("grep", "match", BOLD_RED),
+                selected => selected,
+            },
+        }
+    }
+
+    fn wrap(&self, text: &str, color: &str) -> String {
+        if self.on && !color.is_empty() { format!("{}{}{}", color, text, crate::core::color::RESET) } else { text.to_string() }
+    }
+
+    fn file(&self, path: &str) -> String {
+        self.wrap(path, &self.filename)
+    }
+
+    fn sep(&self) -> String {
+        self.wrap(":", &self.separator)
+    }
+
+    fn line_number(&self, n: usize) -> String {
+        self.wrap(&n.to_string(), &self.line_number)
+    }
+
+    /// `line` with every match painted.
+    fn matches(&self, line: &str, matcher: &regex::Regex) -> String {
+        if !self.on {
+            return line.to_string();
+        }
+        let mut out = String::new();
+        let mut last = 0;
+        for m in matcher.find_iter(line).filter(|m| !m.as_str().is_empty()) {
+            out.push_str(&line[last..m.start()]);
+            out.push_str(&self.wrap(m.as_str(), &self.matched));
+            last = m.end();
+        }
+        out.push_str(&line[last..]);
+        out
+    }
 }

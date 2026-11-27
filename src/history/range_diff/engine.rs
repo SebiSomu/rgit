@@ -43,7 +43,8 @@ pub fn parse_range_diff_args(args: &[String]) -> anyhow::Result<RangeDiffOptions
                 opts.creation_factor = number(args.get(i).map(String::as_str).ok_or_else(|| anyhow::anyhow!("error: option `creation-factor' requires a value\n"))?)?;
                 i += 1;
             }
-            "--no-dual-color" | "--dual-color" | "--no-color" | "--color" | "--no-notes" => {}
+            "--no-dual-color" | "--dual-color" | "--no-notes" => {}
+            _ if let Some(forced) = crate::core::color::parse_color_flag(arg) => crate::core::color::set_override(forced),
             "--left-only" => opts.left_only = true,
             "--right-only" => opts.right_only = true,
             "-s" | "--no-patch" => opts.patch = false,
@@ -569,3 +570,73 @@ pub fn format_range_diff(a: &mut [RangePatch], b: &[RangePatch], opts: &RangeDif
     out
 }
 
+
+/// Paints `range-diff` output as git does with colors on: pair lines in the commit color
+/// (`=`), red (`<`), green (`>`), or split old red / new green around a yellow `!`; and the
+/// patch comparison in git's dual colors: the outer `-`/`+` column reversed, with the inner
+/// patch line dimmed under a `-` and bold under a `+`, plain changes in red/green.
+// Used by `range-diff`.
+pub fn color_range_diff(text: &str) -> String {
+    use crate::core::color::{slot, CYAN, GREEN, RED, RESET, YELLOW};
+    let old = slot("diff", "old", RED);
+    let new = slot("diff", "new", GREEN);
+    let commit = slot("diff", "commit", YELLOW);
+    let frag = slot("diff", "frag", CYAN);
+    let context = slot("diff", "context", "");
+    let func = slot("diff", "func", "");
+    let mut out = String::with_capacity(text.len() * 2);
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("    ") {
+            let mut chars = rest.chars();
+            let outer = chars.next().unwrap_or(' ');
+            let inner = chars.as_str();
+            if let Some(section) = rest.strip_prefix("@@") {
+                out.push_str(&format!("    \x1b[7m{}@@{}", frag, RESET));
+                if let Some(name) = section.strip_prefix(' ') {
+                    out.push_str(&format!("{} {}{}{}{}", context, RESET, func, name, RESET));
+                }
+            } else {
+                let sign = inner.chars().next().unwrap_or(' ');
+                match outer {
+                    '-' | '+' => {
+                        let (mark, attr) = if outer == '-' { (&old, "2") } else { (&new, "1") };
+                        let inner_color = match sign {
+                            '-' => format!("\x1b[{};31m", attr),
+                            '+' => format!("\x1b[{};32m", attr),
+                            _ => format!("\x1b[{}m", attr),
+                        };
+                        out.push_str(&format!("    \x1b[7m{}{}{}{}{}{}", mark, outer, RESET, inner_color, inner, RESET));
+                    }
+                    _ => {
+                        let color = match sign {
+                            '-' => &old,
+                            '+' => &new,
+                            _ => &context,
+                        };
+                        out.push_str(&format!("    {}{}{}", color, rest, RESET));
+                    }
+                }
+            }
+        } else {
+            // `<n>:  <hash> <status> <m>:  <hash> <subject>`: the status follows the first hash.
+            let status_at = line.find(":  ").map(|p| p + 3 + 7 + 1).filter(|&p| line.is_char_boundary(p) && p < line.len());
+            let status = status_at.and_then(|p| line[p..].chars().next()).unwrap_or('=');
+            if let (Some(pos), '!') = (status_at, status) {
+                let left = &line[..pos - 1];
+                let after = &line[pos + 1..];
+                let hash_end = after.find(":  ").map(|p| p + 3 + 7).unwrap_or(after.len()).min(after.len());
+                out.push_str(&format!("{}{} {}{}!{}{}{}{}{}{}{}", old, left, RESET, commit, RESET, new, &after[..hash_end], RESET, commit, &after[hash_end..], RESET));
+                out.push('\n');
+                continue;
+            }
+            let color = match status {
+                '<' => &old,
+                '>' => &new,
+                _ => &commit,
+            };
+            out.push_str(&format!("{}{}{}", color, line, RESET));
+        }
+        out.push('\n');
+    }
+    out
+}

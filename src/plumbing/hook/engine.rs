@@ -25,8 +25,8 @@ pub fn find_hook(name: &str) -> Option<PathBuf> {
     {
         use std::os::unix::fs::PermissionsExt;
         if meta.permissions().mode() & 0o111 == 0 {
-            eprintln!("hint: The '{}' hook was ignored because it's not set as executable.", path.display());
-            eprintln!("hint: You can disable this warning with `rgit config advice.ignoredHook false`.");
+            crate::ui::eprintln_hints(&format!("hint: The '{}' hook was ignored because it's not set as executable.", path.display()));
+            crate::ui::eprintln_hints("hint: You can disable this warning with `rgit config advice.ignoredHook false`.");
             return None;
         }
     }

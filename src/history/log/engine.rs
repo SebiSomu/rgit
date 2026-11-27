@@ -11,7 +11,7 @@ use crate::core::{
 use crate::core::date::format_rfc2822_date;
 use crate::workspace::ls_files::engine::{matches_ls_files_pathspec, normalize_pathspecs};
 use crate::core::refs::list_all_refs;
-use crate::history::rev_list::engine::{abbreviate_hash, expand_rev_list_format, parse_revision_args};
+use crate::history::rev_list::engine::{abbreviate_hash, expand_rev_list_format_color, parse_revision_args};
 use crate::core::rev_parse::peel_to_type;
 use crate::core::types::{CommitSignature, ParsedCommit};
 use crate::diff::{plumbing::types::DiffPlumbingOptions, types::{DiffChange, DiffSide}};
@@ -79,14 +79,13 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
             "--no-abbrev-commit" => abbrev_commit = false,
             "--decorate" => decorate = Some(LogDecorate::Short),
             "--no-decorate" => decorate = Some(LogDecorate::No),
-            "--color" | "--no-color" => {}
+            _ if let Some(forced) = crate::core::color::parse_color_flag(arg) => crate::core::color::set_override(forced),
             "--graph" => opts.graph = true,
             "--follow" => opts.follow = true,
             _ if crate::diff::rename::parse_rename_option(arg, &mut opts.renames) => {}
             _ if arg.starts_with("--decorate=") => {
                 decorate = Some(parse_decorate(&arg["--decorate=".len()..])?);
             }
-            _ if arg.starts_with("--color=") => {}
             _ if arg == "--date" || arg.starts_with("--date=") => {
                 opts.date = parse_date_mode(&value(arg, args, &mut i, "--date")?)?;
             }
@@ -107,6 +106,7 @@ pub fn parse_log_args(args: &[String], show_mode: bool) -> anyhow::Result<LogOpt
     }
 
     opts.show_notes = notes.unwrap_or(!pretty_given);
+    opts.color = crate::core::color::enabled("diff");
     opts.revs = parse_revision_args(&rev_args)?;
     if opts.graph {
         if opts.revs.reverse {
@@ -334,8 +334,10 @@ fn message_block(message: &str) -> String {
 
 /// Expands `%d` (` (refs)`) and `%D` (`refs`) in a template, leaving `%%` and every other
 /// placeholder for `expand_rev_list_format`.
-fn substitute_decorations(template: &str, labels: &[String]) -> String {
+fn substitute_decorations(template: &str, labels: &[String], color: bool) -> String {
     let mut out = String::new();
+    // After `%C(auto)` the decorations are colored (when colors are on), until another `%C`.
+    let mut auto = false;
     let mut chars = template.chars().peekable();
     while let Some(c) = chars.next() {
         if c != '%' {
@@ -345,13 +347,18 @@ fn substitute_decorations(template: &str, labels: &[String]) -> String {
         match chars.peek() {
             Some('d') => {
                 chars.next();
-                if !labels.is_empty() {
-                    out.push_str(&format!(" ({})", labels.join(", ")));
-                }
+                out.push_str(&paint_decorations(labels, " (", ")", auto).replace('%', "%%"));
             }
             Some('D') => {
                 chars.next();
-                out.push_str(&labels.join(", "));
+                if !labels.is_empty() {
+                    out.push_str(&paint_decorations(labels, "", "", auto).replace('%', "%%"));
+                }
+            }
+            Some('C') => {
+                let rest: String = chars.clone().collect();
+                auto = rest.starts_with("C(auto)") && color;
+                out.push('%');
             }
             Some('%') => {
                 chars.next();
@@ -363,13 +370,75 @@ fn substitute_decorations(template: &str, labels: &[String]) -> String {
     out
 }
 
+/// `text` wrapped in `color` and a reset, as git writes every colored piece (even an empty
+/// color gets the reset); just `text` when `color` is empty because colors are off.
+// Used by `format_log_entry` and `paint_decorations`.
+fn paint_raw(text: &str, color: &str) -> String {
+    if color.is_empty() { text.to_string() } else { format!("{}{}{}", color, text, crate::core::color::RESET) }
+}
+
+/// The ref names next to a commit, between `prefix` and `suffix` and separated by `, `; with
+/// `color`, laid out exactly as git's `format_decorations` does: punctuation in the commit
+/// color, HEAD bold cyan, local branches bold green, remote-tracking branches bold red, tags
+/// bold yellow (`tag: ` painted on its own), the stash bold magenta, other refs plain.
+// Used by `format_log_entry` and `substitute_decorations`.
+pub fn paint_decorations(labels: &[String], prefix: &str, suffix: &str, color: bool) -> String {
+    use crate::core::color::{slot, BOLD_CYAN, BOLD_GREEN, BOLD_MAGENTA, BOLD_RED, BOLD_YELLOW, RESET, YELLOW};
+    if labels.is_empty() {
+        return String::new();
+    }
+    if !color {
+        return format!("{}{}{}", prefix, labels.join(", "), suffix);
+    }
+    let refs = list_all_refs();
+    let punct = slot("diff", "commit", YELLOW);
+    let kind = |name: &str| -> String {
+        if name == "HEAD" {
+            slot("decorate", "HEAD", BOLD_CYAN)
+        } else if name == "refs/stash" {
+            slot("decorate", "stash", BOLD_MAGENTA)
+        } else if name.starts_with("refs/heads/") || refs.contains_key(&format!("refs/heads/{}", name)) {
+            slot("decorate", "branch", BOLD_GREEN)
+        } else if name.starts_with("refs/remotes/") || refs.contains_key(&format!("refs/remotes/{}", name)) {
+            slot("decorate", "remoteBranch", BOLD_RED)
+        } else {
+            RESET.to_string()
+        }
+    };
+    let mut out = String::new();
+    for (i, label) in labels.iter().enumerate() {
+        let separator = if i == 0 { prefix } else { ", " };
+        if !separator.is_empty() {
+            out.push_str(&paint_raw(separator, &punct));
+        }
+        if let Some(tag) = label.strip_prefix("tag: ") {
+            let tag_color = slot("decorate", "tag", BOLD_YELLOW);
+            out.push_str(&paint_raw("tag: ", &tag_color));
+            out.push_str(&paint_raw(tag, &tag_color));
+        } else if let Some(branch) = label.strip_prefix("HEAD -> ") {
+            out.push_str(&paint_raw("HEAD", &kind("HEAD")));
+            out.push_str(&paint_raw(" -> ", &punct));
+            out.push_str(&paint_raw(branch, &kind(branch)));
+        } else {
+            out.push_str(&paint_raw(label, &kind(label)));
+        }
+    }
+    if !suffix.is_empty() {
+        out.push_str(&paint_raw(suffix, &punct));
+    }
+    out
+}
+
 /// Renders one commit's header and message in the chosen layout (without any diff output and
 /// without the blank line git puts between entries).
 // Used by `log` and `show`.
 pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &HashMap<String, Vec<String>>) -> String {
     let labels = decorations.get(&commit.hash).cloned().unwrap_or_default();
-    let decor = if labels.is_empty() { String::new() } else { format!(" ({})", labels.join(", ")) };
-    let hash = if opts.revs.abbrev_commit { abbreviate_hash(&commit.hash) } else { commit.hash.clone() };
+    let decor = paint_decorations(&labels, " (", ")", opts.color);
+    let short = if opts.revs.abbrev_commit { abbreviate_hash(&commit.hash) } else { commit.hash.clone() };
+    // git prints the `commit <hash>` line (the hash alone for --oneline) in yellow.
+    let commit_color = if opts.color { crate::core::color::slot("diff", "commit", crate::core::color::YELLOW) } else { String::new() };
+    let hash = paint_raw(&short, &commit_color);
     let date = |sig: &CommitSignature| format_log_date(sig.timestamp, &sig.tz, opts.date);
     let merge_line = if commit.parents.len() > 1 {
         let short: Vec<String> = commit.parents.iter().map(|p| abbreviate_hash(p)).collect();
@@ -380,10 +449,10 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
 
     let entry = match &opts.format {
         LogFormat::Oneline => format!("{}{} {}\n", hash, decor, split_commit_message(&commit.message).0),
-        LogFormat::Short => format!("commit {}{}\n{}Author: {}\n{}", hash, decor, merge_line, signature_line(&commit.author), message_block(&split_commit_message(&commit.message).0)),
+        LogFormat::Short => format!("{}{}\n{}Author: {}\n{}", paint_raw(&format!("commit {}", short), &commit_color), decor, merge_line, signature_line(&commit.author), message_block(&split_commit_message(&commit.message).0)),
         LogFormat::Medium => format!(
-            "commit {}{}\n{}Author: {}\nDate:   {}\n{}",
-            hash,
+            "{}{}\n{}Author: {}\nDate:   {}\n{}",
+            paint_raw(&format!("commit {}", short), &commit_color),
             decor,
             merge_line,
             signature_line(&commit.author),
@@ -391,8 +460,8 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             message_block(&commit.message)
         ),
         LogFormat::Full => format!(
-            "commit {}{}\n{}Author: {}\nCommit: {}\n{}",
-            hash,
+            "{}{}\n{}Author: {}\nCommit: {}\n{}",
+            paint_raw(&format!("commit {}", short), &commit_color),
             decor,
             merge_line,
             signature_line(&commit.author),
@@ -400,8 +469,8 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             message_block(&commit.message)
         ),
         LogFormat::Fuller => format!(
-            "commit {}{}\n{}Author:     {}\nAuthorDate: {}\nCommit:     {}\nCommitDate: {}\n{}",
-            hash,
+            "{}{}\n{}Author:     {}\nAuthorDate: {}\nCommit:     {}\nCommitDate: {}\n{}",
+            paint_raw(&format!("commit {}", short), &commit_color),
             decor,
             merge_line,
             signature_line(&commit.author),
@@ -411,7 +480,7 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             message_block(&commit.message)
         ),
         LogFormat::Raw => {
-            let mut out = format!("commit {}{}\ntree {}\n", commit.hash, decor, commit.tree);
+            let mut out = format!("{}{}\ntree {}\n", paint_raw(&format!("commit {}", commit.hash), &commit_color), decor, commit.tree);
             for parent in &commit.parents {
                 out.push_str(&format!("parent {}\n", parent));
             }
@@ -420,7 +489,7 @@ pub fn format_log_entry(commit: &ParsedCommit, opts: &LogOptions, decorations: &
             out
         }
         LogFormat::Template { template, terminator } => {
-            let text = expand_rev_list_format(&substitute_decorations(template, &labels), commit, &commit.parents);
+            let text = expand_rev_list_format_color(&substitute_decorations(template, &labels, opts.color), commit, &commit.parents, opts.color);
             if *terminator { format!("{}\n", text) } else { text }
         }
     };
@@ -450,6 +519,11 @@ pub fn commit_diff_output(commit: &ParsedCommit, opts: &LogOptions) -> anyhow::R
 /// than 80 when `--graph` takes up the left of each line, as in git).
 // Used by `log --graph` and `commit_diff_output`.
 pub fn commit_diff_output_width(commit: &ParsedCommit, opts: &LogOptions, stat_width: usize) -> anyhow::Result<String> {
+    let text = plain_commit_diff_output(commit, opts, stat_width)?;
+    Ok(if opts.color { crate::core::color::colorize_diff(&text) } else { text })
+}
+
+fn plain_commit_diff_output(commit: &ParsedCommit, opts: &LogOptions, stat_width: usize) -> anyhow::Result<String> {
     let wants_diff = opts.patch || opts.stat || opts.shortstat || opts.summary || opts.name_only || opts.name_status || opts.raw;
     if !wants_diff || commit.parents.len() > 1 {
         return Ok(String::new());

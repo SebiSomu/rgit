@@ -54,6 +54,11 @@ pub fn range_diff(args: Vec<String>) -> Result<()> {
     let mut a = load(&opts.range1);
     let mut b = load(&opts.range2);
     match_range_patches(&mut a, &mut b, opts.creation_factor);
-    print!("{}", format_range_diff(&mut a, &b, &opts));
+    let text = format_range_diff(&mut a, &b, &opts);
+    if crate::core::color::enabled("diff") {
+        print!("{}", crate::history::range_diff::engine::color_range_diff(&text));
+    } else {
+        print!("{}", text);
+    }
     Ok(())
 }

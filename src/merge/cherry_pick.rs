@@ -123,7 +123,7 @@ fn start(opts: &CherryPickOptions) -> anyhow::Result<Pick> {
     if sequencer_active() {
         eprintln!("error: cherry-pick is already in progress");
         let skip = if crate::core::repo::path(".git/CHERRY_PICK_HEAD").exists() { "--skip | " } else { "" };
-        eprintln!("hint: try \"rgit cherry-pick (--continue | {}--abort | --quit)\"", skip);
+        crate::ui::eprintln_hints(&format!("hint: try \"rgit cherry-pick (--continue | {}--abort | --quit)\"", skip));
         eprintln!("fatal: cherry-pick failed");
         return Ok(Pick::Stop(128));
     }
@@ -169,7 +169,7 @@ fn index_tree() -> Option<TreeMap> {
 fn dirty_index_error() -> anyhow::Result<Pick> {
     die_if_unmerged("Cherry-picking", "cherry-pick failed")?;
     eprintln!("error: your local changes would be overwritten by cherry-pick.");
-    eprintln!("hint: commit your changes or stash them to proceed.");
+    crate::ui::eprintln_hints("hint: commit your changes or stash them to proceed.");
     eprintln!("fatal: cherry-pick failed");
     Ok(Pick::Stop(128))
 }
@@ -259,19 +259,19 @@ fn pick_one(commit: &str, opts: &CherryPickOptions) -> anyhow::Result<Pick> {
         if opts.no_commit {
             // The narration's conflict report replaces these on a terminal.
             if !crate::ui::narration_replaces_hints() {
-                eprintln!("hint: after resolving the conflicts, mark the corrected paths");
-                eprintln!("hint: with 'rgit add <paths>' or 'rgit rm <paths>'");
+                crate::ui::eprintln_hints("hint: after resolving the conflicts, mark the corrected paths");
+                crate::ui::eprintln_hints("hint: with 'rgit add <paths>' or 'rgit rm <paths>'");
             }
         } else {
             fs::write(&pick_head, format!("{}\n", commit))?;
             // The narration's conflict report replaces these on a terminal.
             if !crate::ui::narration_replaces_hints() {
-                eprintln!("hint: After resolving the conflicts, mark them with");
-                eprintln!("hint: \"rgit add/rm <pathspec>\", then run");
-                eprintln!("hint: \"rgit cherry-pick --continue\".");
-                eprintln!("hint: You can instead skip this commit with \"rgit cherry-pick --skip\".");
-                eprintln!("hint: To abort and get back to the state before \"rgit cherry-pick\",");
-                eprintln!("hint: run \"rgit cherry-pick --abort\".");
+                crate::ui::eprintln_hints("hint: After resolving the conflicts, mark them with");
+                crate::ui::eprintln_hints("hint: \"rgit add/rm <pathspec>\", then run");
+                crate::ui::eprintln_hints("hint: \"rgit cherry-pick --continue\".");
+                crate::ui::eprintln_hints("hint: You can instead skip this commit with \"rgit cherry-pick --skip\".");
+                crate::ui::eprintln_hints("hint: To abort and get back to the state before \"rgit cherry-pick\",");
+                crate::ui::eprintln_hints("hint: run \"rgit cherry-pick --abort\".");
             }
         }
         return Ok(Pick::Stop(1));
@@ -389,8 +389,8 @@ fn skip() -> anyhow::Result<Pick> {
         }
         if !rollback_is_safe(&head) {
             eprintln!("error: there is nothing to skip");
-            eprintln!("hint: have you committed already?");
-            eprintln!("hint: try \"rgit cherry-pick --continue\"");
+            crate::ui::eprintln_hints("hint: have you committed already?");
+            crate::ui::eprintln_hints("hint: try \"rgit cherry-pick --continue\"");
             eprintln!("fatal: cherry-pick failed");
             return Ok(Pick::Stop(128));
         }

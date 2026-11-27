@@ -127,7 +127,7 @@ pub fn merge(opts: MergeOptions) -> anyhow::Result<()> {
         return Ok(());
     }
     if opts.ff == FastForwardMode::Only {
-        eprintln!("hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \trgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \trgit rebase\nhint: \nhint: Disable this message with \"rgit config advice.diverging false\"");
+        crate::ui::eprintln_hints("hint: Diverging branches can't be fast-forwarded, you need to either:\nhint: \nhint: \trgit merge --no-ff\nhint: \nhint: or:\nhint: \nhint: \trgit rebase\nhint: \nhint: Disable this message with \"rgit config advice.diverging false\"");
         crate::ui::die(128, "fatal: Not possible to fast-forward, aborting.");
     }
 
@@ -273,7 +273,8 @@ fn print_diffstat(old: &TreeMap, new: &TreeMap) -> anyhow::Result<()> {
     let mut changes = Vec::new();
     diff_trees(Some(&old_tree), Some(&new_tree), "", &opts, &[], &mut changes)?;
     let changes = crate::diff::rename::detect_renames(changes, &opts.renames, &[]);
-    print!("{}", render_diff_changes(&changes, &opts)?);
+    let text = render_diff_changes(&changes, &opts)?;
+    print!("{}", if crate::core::color::enabled("diff") { crate::core::color::colorize_diff(&text) } else { text });
     Ok(())
 }
 

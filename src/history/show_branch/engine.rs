@@ -58,7 +58,7 @@ pub fn parse_show_branch_args(args: &[String]) -> anyhow::Result<ShowBranchOptio
             "--date-order" => opts.date_order = true,
             "--topics" => opts.topics = true,
             "--sparse" => opts.sparse = true,
-            "--color" | "--no-color" => {}
+            _ if let Some(forced) = crate::core::color::parse_color_flag(arg) => crate::core::color::set_override(forced),
             "-g" | "--reflog" => anyhow::bail!("fatal: --reflog is not supported by rgit\n"),
             _ => match arg.strip_prefix("--more=").map(|n| n.parse::<i64>()) {
                 Some(Ok(n)) => opts.extra = n,
@@ -484,13 +484,22 @@ pub fn show_branch_output(opts: &ShowBranchOptions, names: &[String], head: Opti
 
     let no_names = HashMap::new();
     let mut head_at: Option<usize> = None;
+    // Each tip's column marks are painted in its own color, as git does.
+    let color = crate::core::color::enabled("showBranch");
+    let mark = |i: usize, c: char| -> String {
+        if color && c != ' ' {
+            format!("{}{}{}", crate::history::graph::COLUMN_COLORS[i % crate::history::graph::COLUMN_COLORS.len()], c, crate::core::color::RESET)
+        } else {
+            c.to_string()
+        }
+    };
     if num_rev > 1 || opts.extra < 0 {
         for (i, name) in names.iter().enumerate() {
             let is_head = rev_is_head(head, name) && head_hash.as_deref() == Some(tips[i].as_str());
             if opts.extra < 0 {
                 out.push_str(&format!("{} [{}] ", if is_head { '*' } else { ' ' }, name));
             } else {
-                out.push_str(&format!("{}{} [{}] ", " ".repeat(i), if is_head { '*' } else { '!' }, name));
+                out.push_str(&format!("{}{} [{}] ", " ".repeat(i), mark(i, if is_head { '*' } else { '!' }), name));
             }
             out.push_str(&one_commit_line(&graph, &tips[i], &no_names, true));
             if is_head {
@@ -527,7 +536,7 @@ pub fn show_branch_output(opts: &ShowBranchOptions, names: &[String], head: Opti
                 continue;
             }
             for i in 0..num_rev {
-                out.push(if this_flag & (1u32 << (i as u32 + REV_SHIFT)) == 0 {
+                out.push_str(&mark(i, if this_flag & (1u32 << (i as u32 + REV_SHIFT)) == 0 {
                     ' '
                 } else if is_merge {
                     '-'
@@ -535,7 +544,7 @@ pub fn show_branch_output(opts: &ShowBranchOptions, names: &[String], head: Opti
                     '*'
                 } else {
                     '+'
-                });
+                }));
             }
             out.push(' ');
         }

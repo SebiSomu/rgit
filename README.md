@@ -172,7 +172,7 @@ src/merge/
 └── types.rs              types shared by several merge commands
 ```
 
-To add a command: write its logic in the command module, its `Args` struct and `dispatch_<command>` function in `<command>/cli.rs`, then add one variant to the `Commands` enum and one dispatch line in `src/cli.rs`.
+To add a command: write its logic in the command module, its `Args` struct and `dispatch_<command>` function in `<command>/cli.rs`, then add one variant to the `Commands` enum and one dispatch line in `src/cli.rs`, and a line with a one-line description in `src/plumbing/help/catalog.rs` (what `rgit help -a` lists; a unit test fails when a command is missing there).
 
 More detail about conventions (imports, file size, comments, narration) is in `.agents/skills/rgit_agentic_guidelines/SKILL.md`.
 

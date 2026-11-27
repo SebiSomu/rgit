@@ -1,3 +1,4 @@
+pub mod catalog;
 pub mod cli;
 pub mod engine;
 pub mod types;
@@ -6,13 +7,14 @@ use std::io::Write;
 use std::process::Command;
 use anyhow::Result;
 
-use crate::plumbing::column::engine::{default_column_options, render_columns};
-use crate::plumbing::help::engine::{all_command_names, command_help, similar_commands};
-use crate::plumbing::{column::types::ColumnEnable, help::types::CommandHelp};
+use crate::plumbing::help::catalog::{description_of, COMMAND_GROUPS, COMMON_GROUPS};
+use crate::plumbing::help::engine::{command_help, similar_commands, synonyms};
+use crate::plumbing::help::types::CommandHelp;
 
 /// `rgit help [-a | --all] [<command>]`
 ///
-/// Without a command (or with `-a`), lists every rgit command in columns. With a command
+/// Without a command, the commands most work starts with, grouped as in git; with `-a`, every
+/// command, grouped as in the user guide, each with a one-line description. With a command
 /// name or synonym, prints that command's usage and options: for commands that parse their
 /// own arguments this is exactly what `rgit <command> -h` prints, for the others the help
 /// clap generates. Works outside a repository. Exit status: 0, 1 for an unknown command,
@@ -37,15 +39,8 @@ pub fn help(args: Vec<String>) -> Result<()> {
     }
 
     let Some(topic) = topic else {
-        let mut opts = default_column_options();
-        opts.enable = ColumnEnable::Always;
-        opts.indent = "   ".to_string();
-        opts.padding = 2;
-        let text = format!(
-            "usage: rgit <command> [<args>]\n\nAvailable commands:\n{}\nSee 'rgit help <command>' for the options of a command.\n",
-            render_columns(&all_command_names(), &opts)
-        );
-        show(&text);
+        let all = args.iter().any(|a| a == "-a" || a == "--all");
+        show(&if all { all_commands_text() } else { common_commands_text() });
         return Ok(());
     };
 
@@ -83,4 +78,42 @@ pub fn unknown_command(name: &str) -> ! {
 /// Writes help text to standard output; a closed pipe (`rgit help | head`) is not an error.
 fn show(text: &str) {
     let _ = std::io::stdout().lock().write_all(text.as_bytes());
+}
+
+/// Column where descriptions start in the command lists (as in git's).
+const NAME_WIDTH: usize = 24;
+
+/// `rgit help -a`: every command by group, with its description, then the synonyms.
+// Used by `help -a`.
+pub fn all_commands_text() -> String {
+    let mut text = String::from("See 'rgit help <command>' to read about a specific command\n");
+    for (group, commands) in COMMAND_GROUPS {
+        text.push_str(&format!("\n{}\n", group));
+        for (name, description) in commands.iter() {
+            text.push_str(&format!("   {:<width$}{}\n", name, description, width = NAME_WIDTH));
+        }
+    }
+    let synonyms = synonyms();
+    if !synonyms.is_empty() {
+        let shown: Vec<String> = synonyms.iter().map(|(alias, command)| format!("{} = {}", alias, command)).collect();
+        text.push_str(&format!("\nSynonyms: {}\n", shown.join(", ")));
+    }
+    text.push_str("\nCommands marked (rgit) exist only in rgit.\n");
+    text
+}
+
+/// `rgit help`: the usage line and the common commands by what they're for, as git prints them.
+// Used by `help` without arguments.
+pub fn common_commands_text() -> String {
+    let mut text = String::from("usage: rgit [--explain | --teach | --plain] <command> [<args>]\n\nThese are common rgit commands used in various situations:\n");
+    let width = COMMON_GROUPS.iter().flat_map(|(_, c)| c.iter()).map(|c| c.len()).max().unwrap_or(0) + 3;
+    for (group, commands) in COMMON_GROUPS {
+        text.push_str(&format!("\n{}\n", group));
+        for name in commands.iter() {
+            let description = description_of(name).unwrap_or_default().trim_end_matches(" (rgit)");
+            text.push_str(&format!("   {:<width$}{}\n", name, description, width = width));
+        }
+    }
+    text.push_str("\n'rgit help -a' lists every command, 'rgit help <command>' shows the options of one.\n");
+    text
 }

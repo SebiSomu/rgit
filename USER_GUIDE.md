@@ -584,11 +584,29 @@ rgit version --build-options
 
 ### `rgit help`
 
-List all commands, or show one command's usage.
+List the commands, every command by group, or one command's usage.
 
 **Arguments and flags:** `-a|--all`, `<command>`
 
-Lists every command in columns, or shows one command's usage and options (the command's own `-h` text where it has one, clap's help otherwise).
+Like git's:
+
+- **`rgit help`** lists the commands most work starts with, grouped by what they're for.
+- **`rgit help -a`** lists every command in the groups of this guide, each with a one-line description; commands that exist only in rgit are marked `(rgit)`, and the synonyms come last.
+- **`rgit help <command>`** shows one command's usage and options: the command's own `-h` text where it has one, clap's help otherwise.
+
+```text
+$ rgit help -a
+See 'rgit help <command>' to read about a specific command
+
+Getting started and configuration
+   init                    Create an empty repository or reinitialize an existing one
+   clone                   Copy a repository into a new directory
+   ...
+
+Undo and recovery
+   undo                    Take back the last operation, even reset --hard (rgit)
+   ...
+```
 
 <details>
 <summary>Options as printed by <code>rgit help -h</code></summary>

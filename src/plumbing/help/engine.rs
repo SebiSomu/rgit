@@ -17,6 +17,18 @@ pub fn all_command_names() -> Vec<String> {
     names
 }
 
+/// The synonyms clap knows, as `(synonym, command)`, sorted by synonym.
+// Used by `help -a`.
+pub fn synonyms() -> Vec<(String, String)> {
+    let root = Cli::command();
+    let mut out: Vec<(String, String)> = root
+        .get_subcommands()
+        .flat_map(|sub| sub.get_visible_aliases().map(move |alias| (alias.to_string(), sub.get_name().to_string())))
+        .collect();
+    out.sort();
+    out
+}
+
 /// Looks a command up by name or synonym and says how its help is produced; `None` when rgit
 /// has no such command.
 // Used by `help <command>`.
